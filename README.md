@@ -19,24 +19,22 @@ If you need help setting up a custom integration, you can create an [issue](http
 # Existing Integrations 
 
 ## Import to runZero 
-- [Automox](./automox/)
-- [Carbon Black](./carbon-black/)
-- [Digital Ocean](./digital-ocean/)
-- [Drata](./drata/)
-- [JAMF](./jamf/)
-- [Lima Charlie](./lima-charlie/)
-- [Palo Alto Cortex XDR](./cortex-xdr/)
-- [Tanium](./tanium/)
-
+- [Automox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/)
+- [Carbon Black](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/carbon-black/)
+- [Cortex XDR](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/)
+- [Digital Ocean](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/)
+- [Drata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/)
+- [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
+- [Kandji](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/)
+- [Lima Charlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)
+- [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 ## Export from runZero 
-- [Sumo Logic](./sumo-logic/)
-
-# Building Integrations and Contributing
-
+- [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)
 ## The boilerplate folder has examples to follow
 
 1. Sample [README.md](./boilerplate/README.md) for contributing
 2. Sample [script](./boilerplate/custom-integration-boilerplate.star) that shows how to use all of the supported libraries
+3. Sample [config.json](./boilerplate/config.json) that gives context on the integration for automations to reference
 
 ## Contributing
 

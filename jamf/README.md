@@ -23,6 +23,7 @@
 
 1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
     - Modify API calls as needed to filter inventory data.
+      - NOTE: `START_DATE` will limit the data fetch to assets seen since the date you input.
     - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
