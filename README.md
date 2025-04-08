@@ -26,6 +26,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Drata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/)
 - [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
 - [Kandji](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/)
+- [Kubernetes](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kubernetes/)
 - [Lima Charlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 ## Export from runZero 
