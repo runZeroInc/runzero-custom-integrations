@@ -70,10 +70,10 @@ def get_jamf_inventory(token, request_count, client_id, client_secret):
     page_size = 100
     endpoints = []
     # hardcoded filter for the time being until we support datetime
-    url = JAMF_URL + '/api/v1/computers-inventory?filter=general.lastContactTime%3Dge%3D%22{}%22'.format(START_DATE)
+    url = JAMF_URL + '/api/v1/computers-inventory'
 
     while hasNextPage:
-        params = {"page": page, "page-size": page_size}
+        params = {"page": page, "page-size": page_size, "filter": 'general.lastContactTime=ge="{}T00:00:00Z"'.format(START_DATE)}
         resp, token, request_count = http_request("GET", url, params=params, token=token, request_count=request_count, client_id=client_id, client_secret=client_secret)
         if not resp or resp.status_code != 200:
             print("Failed to retrieve inventory. Status code:", getattr(resp, 'status_code', 'None'))
@@ -85,12 +85,14 @@ def get_jamf_inventory(token, request_count, client_id, client_secret):
             return endpoints, token, request_count
 
         results = inventory.get('results', [])
+
         if not results:
             hasNextPage = False
             continue
 
         endpoints.extend(results)
         page += 1
+        print(len(endpoints))
 
     return endpoints, token, request_count
 
@@ -124,10 +126,10 @@ def get_mobile_device_inventory(token, request_count, client_id, client_secret):
     page_size = 100
     mobile_devices = []
     # hardcoded filter for the time being until we support datetime
-    url = JAMF_URL + "/api/v2/mobile-devices/detail?filter=general.lastInventoryUpdateDate%3Dge%3D%2220{}%22".format(START_DATE)
+    url = JAMF_URL + "/api/v2/mobile-devices/detail"
 
     while hasNextPage:
-        params = {"page": page, "page-size": page_size, "section": "GENERAL"}
+        params = {"page": page, "page-size": page_size, "section": "GENERAL", "filter": 'lastInventoryUpdateDate=ge="{}T00:00:00Z"'.format(START_DATE)}
         resp, token, request_count = http_request("GET", url, params=params, token=token, request_count=request_count, client_id=client_id, client_secret=client_secret)
         if not resp or resp.status_code != 200:
             print("Failed to retrieve mobile device inventory. Status code:", getattr(resp, 'status_code', 'None'))
@@ -139,6 +141,7 @@ def get_mobile_device_inventory(token, request_count, client_id, client_secret):
             return mobile_devices, token, request_count
 
         results = inventory.get('results', [])
+
         if not results:
             hasNextPage = False
             continue
@@ -380,17 +383,19 @@ def main(*args, **kwargs):
 
     # Fetch and process computer inventory
     inventory, token, request_count = get_jamf_inventory(token, request_count, client_id, client_secret)
+    print(len(inventory))
     if not inventory:
         print("No inventory data found for computers")
+
+    # Fetch and process mobile device inventory
+    mobile_inventory, token, request_count = get_mobile_device_inventory(token, request_count, client_id, client_secret)
+    print(len(mobile_inventory))
+    if not mobile_inventory:
+        print("No inventory data found for mobile devices")
 
     details, token, request_count = get_jamf_details(token, request_count, client_id, client_secret, inventory)
     if not details:
         print("No details retrieved for computers")
-
-    # Fetch and process mobile device inventory
-    mobile_inventory, token, request_count = get_mobile_device_inventory(token, request_count, client_id, client_secret)
-    if not mobile_inventory:
-        print("No inventory data found for mobile devices")
 
     mobile_details, token, request_count = get_mobile_device_details(token, request_count, client_id, client_secret, mobile_inventory)
     if not mobile_details:
