@@ -4,7 +4,7 @@ load('net', 'ip_address')
 load('http', http_post='post', http_get='get', 'url_encode')
 load('uuid', 'new_uuid')
 
-NETSKOPE_API_URL = 'https://<your-netskope-account>.goskope.com/api'
+NETSKOPE_API_URL = 'https://<your_netskope_account>.goskope.com/api'
 
 def get_assets(token):
     hasNextPage = True
@@ -43,6 +43,23 @@ def build_assets(assets_json):
     imported_assets = []
     for item in assets_json:
 
+        # parse operating system
+        os_name = item.get('host_info', {}).get('os', '')
+        os_version = item.get('host_info', {}).get('os_version', '')
+
+        # clean up operating system name
+        os_name_map = {
+            'Windows': 'Microsoft Windows',
+            'Windows Server': 'Microsoft Windows Server',
+            'Mac': 'Apple macOS',
+            'Android': 'Google Android'
+        }
+
+        if os_name in os_name_map:
+            os = os_name_map[os_name]
+        else:
+            os = os_name
+
         # parse network interfaces
         ips = []
         macs = []
@@ -58,28 +75,29 @@ def build_assets(assets_json):
         else:
             network = build_network_interface(ips=ips, mac=None)
             networks.append(network)
-                
+
         imported_assets.append(
             ImportAsset(
                 id=item.get('_id', new_uuid),
                 hostnames=[
                     item.get('host_info', {}).get('hostname', ''), 
                 ],
-                networkInterfaces=[networks],
-                os=item.get('host_info', {}).get('os', ''),
-                osVersion=item.get('host_info', {}).get('os_version', ''),
+                networkInterfaces=networks,
+                os=os,
+                osVersion=os_version,
                 manufacturer=item.get('host_info', {}).get('device_make', ''),
                 model=item.get('host_info', {}).get('device_model', ''),
-                #last_seen_ts=item.get('host_info, {}').get('last_update_timestamp', 0),
                 customAttributes={
                     'clientInstallTime':item.get('client_install_time', 0),
                     'clientVersion':item.get('client_version', ''),
                     'deviceHash':item.get('device_hash', ''),
                     'deviceId':item.get('device_id', ''),
                     'guid':item.get('guid', ''),
+                    'lastConnectedFromPrivateIP':item.get('last_connected_from_private_ip', ''),
+                    'lastUpdateTimestamp':item.get('last_update_timestamp', ''),
                     'serialNumber':item.get('host_info', {}).get('serial_number', ''),
                     'serviceIdentifier':item.get('_service_identifier', ''),
-                    'steeringConfig':item.get('host_info', {}).get(''),
+                    'steeringConfig':item.get('host_info', {}).get('steering_config', ''),
                     'userInfoDeviceClassificationStatus':item.get('user_info', {}).get('device_classification_status', ''),
                     'userInfoOrgKey':item.get('user_info', {}).get('orgkey', ''),
                     'userInfoUserKey':item.get('user_info', {}).get('userkey', ''),
@@ -95,7 +113,6 @@ def build_network_interface(ips, mac):
     ip4s = []
     ip6s = []
     for ip in ips[:99]:
-        print(ip)
         ip_addr = ip_address(ip)
         if ip_addr.version == 4:
             ip4s.append(ip_addr)
