@@ -4,7 +4,7 @@ load('net', 'ip_address')
 load('http', http_post='post', http_get='get', 'url_encode')
 load('uuid', 'new_uuid')
 
-NETSKOPE_API_URL = 'https://<your_netskope_account>.goskope.com/api'
+NETSKOPE_API_URL = 'https://<your-netskope-account>.goskope.com/api'
 
 def get_assets(token):
     hasNextPage = True
@@ -16,7 +16,7 @@ def get_assets(token):
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
 
     while hasNextPage:
-        query = '?offset={}&limit={}'.format(page_offset, page_limit)
+        query = '?groupbys=hostname&fields=host_info&offset={}&limit={}'.format(page_offset, page_limit)
         url = NETSKOPE_API_URL + '/v2/events/datasearch/clientstatus' + query
 
         response = http_get(url, headers=headers)
@@ -26,6 +26,7 @@ def get_assets(token):
             return None
 
         assets = json_decode(response.body)['result']
+        print(assets)
 
         if len(assets) == page_limit:
             assets_all.extend(assets)
@@ -66,8 +67,8 @@ def build_assets(assets_json):
         networks = []
                
         ips.append(item.get('last_connected_from_private_ip', '127.0.0.1'))
-
         macs = item.get('host_info', {}).get('mac_addresses', [])    
+        
         if macs:
             for m in macs:
                 network = build_network_interface(ips=ips, mac=m)
