@@ -97,7 +97,7 @@ def build_assets(assets_json):
         else:
             network = build_network_interface(ips=ips, mac=None)
             networks.append(network)
-                
+
         imported_assets.append(
             ImportAsset(
                 id=str(id),
@@ -107,9 +107,8 @@ def build_assets(assets_json):
                     item.get('dnsName', ''),
                     item.get('netbiosName', '')
                 ],
-                networkInterfaces=[networks],
+                networkInterfaces=networks,
                 os=item.get('os', {}).get('name', ''),
-                osVersion=item.get('os', {}).get('buildNumber', ''),
                 manufacturer=item.get('system', {}).get('manufacturer', ''),
                 customAttributes={
                     'id':id,
@@ -135,7 +134,6 @@ def build_assets(assets_json):
                     'osServicePackMinorVersion':item.get('os', {}).get('servicePackMinorVersion', ''),
                     'osLanguage':item.get('os', {}).get('language', ''),
                     'osNeedsReboot':item.get('os', {}).get('needsReboot', ''),
-                    #'systemName':item.get('system', {}).get('name', ''),
                     'systemManufacturer':item.get('system', {}).get('manufacturer', ''),
                     'systemModel':item.get('system', {}).get('model', ''),
                     'systemBiosSerialNumber':item.get('system', {}).get('biosSerialNumber', ''),
