@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-04-17T10:26:35.663903Z",
-  "totalIntegrations": 11,
+  "lastUpdated": "2025-04-17T17:20:37.983979Z",
+  "totalIntegrations": 12,
   "integrationDetails": [
     {
       "name": "Automox",
@@ -43,6 +43,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/custom-integration-digital-ocean.star"
+    },
+    {
+      "name": "Kubernetes",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kubernetes/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kubernetes/custom-integration-kubernetes.star"
     },
     {
       "name": "Kandji",
