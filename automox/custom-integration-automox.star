@@ -8,13 +8,15 @@ load('uuid', 'new_uuid')
 
 AUTOMOX_API_URL = "https://console.automox.com/api/servers"
 
-def get_automox_devices(headers):
+def get_automox_devices(headers, org_id=None):
     """Retrieve all devices from Automox using pagination"""
-
     query = {
         "limit": "500",
         "page": "0"
     }
+
+    if org_id:
+        query["o"] = org_id
 
     devices = []
 
@@ -36,16 +38,18 @@ def get_automox_devices(headers):
     print("Loaded", len(devices), "devices")
     return devices
 
+
 def build_assets(api_token, org_id=None):
     """Convert Automox device data into runZero asset format"""
     headers = {
         "Authorization": "Bearer " + api_token,
         "Content-Type": "application/json"
     }
-    all_devices = get_automox_devices(headers)
+    all_devices = get_automox_devices(headers, org_id)
     assets = []
 
     for device in all_devices:
+        print(device.get("organization_id", None))
         device_id = device.get("id", new_uuid())
         custom_attrs = {
             "os_version": device.get("os_version", ""),
