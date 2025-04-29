@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-04-29T20:10:59.586200Z",
+  "lastUpdated": "2025-04-29T20:13:45.381962Z",
   "totalIntegrations": 12,
   "integrationDetails": [
     {
@@ -9,8 +9,8 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/custom-integration-drata.star"
     },
     {
-      "name": "vulnerability-workflow",
-      "type": "inbound",
+      "name": "runZero Vunerability Workflow",
+      "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/custom-integration-vulnerability-workflow.star"
     },
