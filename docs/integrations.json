@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-04-30T16:32:23.576639Z",
-  "totalIntegrations": 12,
+  "lastUpdated": "2025-04-30T16:43:52.862560Z",
+  "totalIntegrations": 13,
   "integrationDetails": [
     {
       "name": "Drata",
@@ -67,6 +67,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/custom-integration-jamf.star"
+    },
+    {
+      "name": "Device42",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/custom-integration-device42.star"
     },
     {
       "name": "Tanium",
