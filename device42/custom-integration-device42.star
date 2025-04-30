@@ -44,24 +44,54 @@ def build_network_interfaces(mac_entries, ip_entries):
 def build_assets(devices):
     assets = []
     for d in devices:
-        asset_id = str(d.get('id', new_uuid()))
-        hostname = d.get('name', '')
+        asset_id = str(d.get('id') or d.get('uuid') or new_uuid())
+
+        hostnames = []
+        for key in ('name', 'preferred_alias', 'virtual_host_name'):
+            val = d.get(key)
+            if val and val not in hostnames:
+                hostnames.append(val)
 
         mac_entries = d.get('macAddresses', []) + d.get('mac_addresses', [])
         ip_entries  = d.get('ipAddresses', [])  + d.get('ip_addresses', [])
-
         network_ifaces = build_network_interfaces(mac_entries, ip_entries)
+
+        asset_os = d.get('os')
+        asset_os_version = d.get('osver') or d.get('osverno')
+        asset_model = d.get('hw_model')
+        asset_manufacturer = d.get('manufacturer')
+        asset_device_type = d.get('type') or d.get('device_sub_type') or d.get('virtual_subtype')
+
+        asset_tags = []
+        raw_tags = d.get('tags') or []
+        if type(raw_tags) == list:
+            for t in raw_tags:
+                asset_tags.append(str(t))
+
+        exclude_keys = [
+            'id', 'uuid', 'device_id', 'macAddresses', 'mac_addresses',
+            'ipAddresses', 'ip_addresses', 'name', 'preferred_alias',
+            'virtual_host_name', 'os', 'osver', 'osverno', 'hw_model',
+            'manufacturer', 'type', 'device_sub_type', 'virtual_subtype',
+            'tags',
+        ]
 
         custom = {}
         for k, v in d.items():
-            if k in ('id','name','macAddresses','mac_addresses','ipAddresses','ip_addresses'):
+            if k in exclude_keys:
                 continue
             custom[k] = str(v)[:1023]
 
         assets.append(
             ImportAsset(
                 id=asset_id,
-                hostnames=[hostname] if hostname else [],
+                hostnames=hostnames,
+                os=asset_os,
+                osVersion=asset_os_version,
+                model=asset_model,
+                manufacturer=asset_manufacturer,
+                deviceType=asset_device_type,
+                tags=asset_tags,
                 networkInterfaces=network_ifaces,
                 customAttributes=custom,
             )
@@ -104,5 +134,5 @@ def main(**kwargs):
     if not all_devices:
         print('No devices returned')
         return None
-
+    
     return build_assets(all_devices)
