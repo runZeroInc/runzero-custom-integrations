@@ -99,11 +99,22 @@ def build_assets(devices):
     return assets
 
 def main(**kwargs):
-    pwd  = kwargs['access_secret']
-    headers = {
-        'Authorization': 'Basic ' + pwd,
-        'Accept': 'application/json',
-    }
+    auth_type = kwargs['access_key'].lower()
+    secret = kwargs['access_secret']
+    
+    if auth_type == 'basic':
+        headers = {
+            'Authorization': 'Basic ' + secret,
+            'Accept': 'application/json',
+        }
+    elif auth_type == 'bearer':
+        headers = {
+            'Authorization': 'Bearer ' + secret,
+            'Accept': 'application/json',
+        }
+    else:
+        print('Unsupported access_key (must be "basic" or "bearer")')
+        return None
 
     offset = 0
     all_devices = []
@@ -134,5 +145,6 @@ def main(**kwargs):
     if not all_devices:
         print('No devices returned')
         return None
-    
+
     return build_assets(all_devices)
+
