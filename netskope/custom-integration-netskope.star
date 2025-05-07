@@ -45,7 +45,7 @@ def get_assets(token):
         query = '?groupbys={}&fields={}&offset={}&limit={}'.format(NETSKOPE_API_GROUPBYS, fields, page_offset, page_limit)
         url = NETSKOPE_API_URL + '/v2/events/datasearch/clientstatus' + query
 
-        response = http_get(url, headers=headers)
+        response = http_get(url, headers=headers, timeout=300)
 
         if response.status_code != 200:
             print('failed to retrieve assets', response.status_code)
