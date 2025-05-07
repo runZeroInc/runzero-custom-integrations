@@ -5,18 +5,44 @@ load('http', http_post='post', http_get='get', 'url_encode')
 load('uuid', 'new_uuid')
 
 NETSKOPE_API_URL = 'https://<your-netskope-account>.goskope.com/api'
+NETSKOPE_API_GROUPBYS = 'nsdeviceuid'
+NETSKOPE_API_ATTRIBUTES = [
+    'deleted',
+    'device_classification_status',
+    'device_id',
+    'device_make',
+    'device_model',
+    'groups',
+    'hostname',
+    'mac_addresses',
+    'nsdeviceuid',
+    'ns_tenant_id',
+    'organization_unit',
+    'os',
+    'os_version',
+    'serial_number',
+    'steering_config',
+    'timestamp',
+    'ur_normalized',
+    'user',
+    'userkey',
+    'usergroup',
+    'user_added_time',
+    'user_status'
+]
 
 def get_assets(token):
     hasNextPage = True
     page_offset = 0
-    page_limit = 500
+    page_limit = 20000
     assets = []
     assets_all = []
 
+    fields = ','.join(NETSKOPE_API_ATTRIBUTES)
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
 
     while hasNextPage:
-        query = '?groupbys=hostname&fields=host_info&offset={}&limit={}'.format(page_offset, page_limit)
+        query = '?groupbys={}&fields={}&offset={}&limit={}'.format(NETSKOPE_API_GROUPBYS, fields, page_offset, page_limit)
         url = NETSKOPE_API_URL + '/v2/events/datasearch/clientstatus' + query
 
         response = http_get(url, headers=headers)
@@ -45,30 +71,20 @@ def build_assets(assets_json):
     for item in assets_json:
 
         # parse operating system
-        os_name = item.get('host_info', {}).get('os', '')
-        os_version = item.get('host_info', {}).get('os_version', '')
+        os_name = item.get('os', '')
+        os_version = item.get('os_version', '')
 
-        # clean up operating system name
-        os_name_map = {
-            'Windows': 'Microsoft Windows',
-            'Windows Server': 'Microsoft Windows Server',
-            'Mac': 'Apple macOS',
-            'Android': 'Google Android'
-        }
-
-        if os_name in os_name_map:
-            os = os_name_map[os_name]
+        if 'Mac' in os_name:
+            os = 'macOS'
         else:
             os = os_name
 
         # parse network interfaces
-        ips = []
+        ips = ["127.0.0.1"]
         macs = []
         networks = []
                
-        ips.append(item.get('last_connected_from_private_ip', '127.0.0.1'))
-        macs = item.get('host_info', {}).get('mac_addresses', [])    
-        
+        macs = item.get('mac_addresses', [])       
         if macs:
             for m in macs:
                 network = build_network_interface(ips=ips, mac=m)
@@ -79,30 +95,31 @@ def build_assets(assets_json):
 
         imported_assets.append(
             ImportAsset(
-                id=item.get('_id', new_uuid),
-                hostnames=[
-                    item.get('host_info', {}).get('hostname', ''), 
-                ],
+                id=item.get('_id', {}).get('nsdeviceuid', new_uuid),
+                hostnames=[item.get('hostname', '')],
                 networkInterfaces=networks,
                 os=os,
-                osVersion=os_version,
-                manufacturer=item.get('host_info', {}).get('device_make', ''),
-                model=item.get('host_info', {}).get('device_model', ''),
+                #os_version=os_version,
+                manufacturer=item.get('device_make', ''),
+                model=item.get('device_model', ''),
                 customAttributes={
-                    'clientInstallTime':item.get('client_install_time', 0),
                     'clientVersion':item.get('client_version', ''),
-                    'deviceHash':item.get('device_hash', ''),
                     'deviceId':item.get('device_id', ''),
-                    'guid':item.get('guid', ''),
-                    'lastConnectedFromPrivateIP':item.get('last_connected_from_private_ip', ''),
-                    'lastUpdateTimestamp':item.get('last_update_timestamp', ''),
-                    'serialNumber':item.get('host_info', {}).get('serial_number', ''),
-                    'serviceIdentifier':item.get('_service_identifier', ''),
-                    'steeringConfig':item.get('host_info', {}).get('steering_config', ''),
-                    'userInfoDeviceClassificationStatus':item.get('user_info', {}).get('device_classification_status', ''),
-                    'userInfoOrgKey':item.get('user_info', {}).get('orgkey', ''),
-                    'userInfoUserKey':item.get('user_info', {}).get('userkey', ''),
+                    'deleted':item.get('deleted', ''),
+                    'groups':item.get('groups', []),
+                    'nsdeviceuid':item.get('_id', {}).get('nsdeviceuid', ''),
+                    'ns_tenant_id':item.get('ns_tenant_id', ''),
+                    'osName':item.get('os', ''),
+                    'osVersion':item.get('os_version', ''),
+                    'serialNumber':item.get('serial_number', ''),
+                    'steeringConfig':item.get('steering_config', ''),
+                    'netskopeTS':item.get('timestamp', ''),
+                    'userInfoDeviceClassificationStatus':item.get('device_classification_status', ''),
+                    'userInfoUserKey':item.get('userkey', ''),
                     'userName':item.get('username', ''),
+                    'userNormalized':item.get('ur_normalized', ''),
+                    'userSource':item.get('user_source', ''),
+                    'userStatus':item.get('user_status', ''),
                     'userGroup':item.get('usergroup', [])
                 }
             )

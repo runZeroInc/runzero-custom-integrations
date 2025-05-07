@@ -6,7 +6,7 @@
 
 ## Netskope requirements
 
-- REST API token with appropriate permissions.
+- REST API token with appropriate permissions. This script calls the `/v2/events/datasearch/clientstatus` API endpoint.
 - Netskope API URL: `https://<your-netskope-account>.goskope.com/`.
 
 ## Steps
@@ -20,8 +20,10 @@
 ### runZero configuration
 
 1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
-    - Modify API calls as needed to filter inventory data.
-    - Modify datapoints uploaded to runZero as needed.
+    - Modify the NETSKOPE_API variable to reflect your environment.
+    - Modify the NETSKOPE_API_GROUPBYS attribute, if appropriate. By default this script groups by nsdeviceuid to avoid duplicate records. Modifying this variable could alter what attributes are available.
+    - Modify the NETSKOPE_API_ATTRIBUTES array. These are the attributes that runZero will ingest. It is passed to Netskope as part of the API call.
+    - Modify datapoints uploaded to runZero as needed. If you modify the NETSKOPE_API_ATTRIBUTES, you will also need to update `ImportAssets` so that the asset is included in the import. 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
     - Leave the `access_client` blank.
