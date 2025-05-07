@@ -28,6 +28,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
 - [Kandji](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/)
 - [Lima Charlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)
+- [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 ## Export from runZero 
