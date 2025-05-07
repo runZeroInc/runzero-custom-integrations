@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-05-07T16:53:33.876583Z",
-  "totalIntegrations": 14,
+  "lastUpdated": "2025-05-07T18:12:34.304084Z",
+  "totalIntegrations": 15,
   "integrationDetails": [
     {
       "name": "Device42",
@@ -37,6 +37,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/custom-integration-ninjaone.star"
+    },
+    {
+      "name": "Manage Engine Endpoint Central",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/custom-integration-endpoint-central.star"
     },
     {
       "name": "Tanium",
