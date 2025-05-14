@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-05-14T15:58:34.643623Z",
-  "totalIntegrations": 16,
+  "lastUpdated": "2025-05-14T15:24:01.616939Z",
+  "totalIntegrations": 15,
   "integrationDetails": [
     {
       "name": "Drata",
@@ -67,12 +67,6 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
-    },
-    {
-      "name": "Cisco-ISE",
-      "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/custom_integration_cisco-ise.star"
     },
     {
       "name": "Kandji",
