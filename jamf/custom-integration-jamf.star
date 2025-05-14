@@ -163,7 +163,7 @@ def get_mobile_device_details(token, request_count, client_id, client_secret, in
             print("ID not found in mobile device item:", item)
             continue
 
-        url = "{}/api/v2/mobile-devices/{}".format(JAMF_URL, uid)
+        url = "{}/api/v2/mobile-devices/{}/detail".format(JAMF_URL, uid)
         resp, token, request_count = http_request("GET", url, token=token, request_count=request_count, client_id=client_id, client_secret=client_secret)
         if not resp or resp.status_code != 200:
             print("Failed to retrieve details for mobile device ID:", uid, "Status code:", getattr(resp, 'status_code', 'None'))
@@ -212,25 +212,6 @@ def asset_ips(item):
             ips.append(ip)
     return ips
 
-def asset_os_hardware(item):
-    operating_system = item.get("operatingSystem") or {}
-    hardware = item.get("hardware") or {}
-    general = item.get("general") or {}
-
-    os_name = operating_system.get("name", "") if operating_system else "iOS"
-    os_version = operating_system.get("version", "") or general.get("osVersion", "")
-    model = hardware.get("model", "") or item.get("model", "")
-    manufacturer = hardware.get("make", "") or "Apple"
-    macs = [mac for mac in [hardware.get("macAddress", ""), hardware.get("altMacAddress", ""), item.get("wifiMacAddress", "")] if mac]
-
-    return {
-        'os_name': os_name,
-        'os_version': os_version,
-        'model': model,
-        'manufacturer': manufacturer,
-        'macs': macs
-    }
-
 def asset_networks(ips, mac):
     ip4s = []
     ip6s = []
@@ -246,69 +227,129 @@ def asset_networks(ips, mac):
 
 def build_asset(item):
     if not item:
-        return
-
-    asset_id = item.get("udid") or item.get("mobileDeviceId")
+        return None
+    
+    # Extract the main asset ID (UDID or Mobile Device ID)
+    asset_id = item.get("udid") or item.get("id")
     if not asset_id:
-        print("Asset ID not found:", item)
-        return
+        print("Asset ID not found: {}".format(item))
+        return None
 
-    general = item.get("general") or {}
+    # Extract basic info
+    general = item.get("general", {})
     name = general.get("name", "")
+    site = general.get("site", {})
+    site_name = site.get("name", "")
+    site_id = site.get("id", "")
 
-    os_hardware = asset_os_hardware(item) or {}
-    ips = asset_ips(item)
-    networks = [asset_networks(ips, mac) for mac in os_hardware.get("macs", []) if mac]
+    # Extract hardware details
+    hardware = item.get("hardware", {})
+    serial_number = hardware.get("serialNumber", "")
+    manufacturer = hardware.get("make", "")
+    model = hardware.get("model", "")
+    model_identifier = hardware.get("modelIdentifier", "")
+    macs = [hardware.get("macAddress", ""), hardware.get("altMacAddress", "")]
+    ips = [general.get("lastIpAddress", ""), general.get("lastReportedIp", "")]
+    networks = [asset_networks(ips, mac) for mac in macs if mac]
 
-    security = item.get("security") or {}
-    disk = item.get("diskEncryption") or {}
-    boot = disk.get("bootPartitionEncryptionDetails") or {}
-    user = item.get("userAndLocation") or {}
+    # Collect all attributes
+    custom_attributes = {
+        "name": name,
+        "serial_number": serial_number,
+        "site_name": site_name,
+        "site_id": site_id,
+        "platform": general.get("platform", ""),
+        "barcode1": general.get("barcode1", ""),
+        "barcode2": general.get("barcode2", ""),
+        "asset_tag": general.get("assetTag", ""),
+        "last_contact_time": general.get("lastContactTime", ""),
+        "last_reported_ip": general.get("lastReportedIp", ""),
+        "report_date": general.get("reportDate", ""),
+        "last_cloud_backup_date": general.get("lastCloudBackupDate", ""),
+        "last_enrolled_date": general.get("lastEnrolledDate", ""),
+        "mdm_profile_expiration": general.get("mdmProfileExpiration", ""),
+        "initial_entry_date": general.get("initialEntryDate", ""),
+        "distribution_point": general.get("distributionPoint", ""),
+        "enrolled_via_automated_device_enrollment": str(general.get("enrolledViaAutomatedDeviceEnrollment", False)),
+        "user_approved_mdm": str(general.get("userApprovedMdm", False)),
+        "declarative_device_mgmt_enabled": str(general.get("declarativeDeviceManagementEnabled", False)),
+        "itunes_store_account_active": str(general.get("itunesStoreAccountActive", False)),
+        "management_id": general.get("managementId", ""),
+    }
 
+    # Handle nested structures like MDM, enrollment methods, and remote management
+    enrollment_method = general.get("enrollmentMethod", {})
+    custom_attributes.update({
+        "enrollment_method_id": enrollment_method.get("id", ""),
+        "enrollment_method_object_name": enrollment_method.get("objectName", ""),
+        "enrollment_method_object_type": enrollment_method.get("objectType", ""),
+    })
+
+    remote_management = general.get("remoteManagement", {})
+    custom_attributes.update({
+        "remote_management_managed": str(remote_management.get("managed", False))
+    })
+
+    mdm_capable = general.get("mdmCapable", {})
+    custom_attributes.update({
+        "mdm_capable": str(mdm_capable.get("capable", False)),
+        "mdm_capable_users": ",".join(mdm_capable.get("capableUsers", []))
+    })
+
+    # Handle extension attributes
+    extension_attributes = item.get("extensionAttributes", [])
+    for ea in extension_attributes:
+        ea_name = ea.get("name", "").replace(" ", "_").lower()
+        ea_values = ea.get("values", [])
+        custom_attributes["extension_attr_{}".format(ea_name)] = ",".join([str(v) for v in ea_values])
+
+    # Handle user and location
+    user_location = item.get("userAndLocation", {})
+    custom_attributes.update({
+        "user_username": user_location.get("username", ""),
+        "user_realname": user_location.get("realname", ""),
+        "user_email": user_location.get("email", ""),
+        "user_position": user_location.get("position", ""),
+        "user_phone": user_location.get("phone", ""),
+        "user_department_id": user_location.get("departmentId", ""),
+        "user_building_id": user_location.get("buildingId", ""),
+        "user_room": user_location.get("room", "")
+    })
+
+    # Handle security settings
+    security = item.get("security", {})
+    for key, value in security.items():
+        custom_attributes["security_{}".format(key)] = str(value)
+
+    # Handle disk encryption
+    disk_encryption = item.get("diskEncryption", {})
+    for key, value in disk_encryption.items():
+        if type(value) == "dict":
+            for sub_key, sub_value in value.items():
+                custom_attributes["diskEncryption_{}_{}".format(key, sub_key)] = str(sub_value)
+        elif type(value) == "list":
+            custom_attributes["diskEncryption_{}".format(key)] = ",".join([str(v) for v in value])
+        else:
+            custom_attributes["diskEncryption_{}".format(key)] = str(value)
+
+    # Handle applications
+    applications = item.get("applications", [])
+    custom_attributes["installed_applications"] = ",".join(
+        ["{} (v{})".format(app.get("name", ""), app.get("version", "")) for app in applications]
+    )
+
+    # Build the asset
     return ImportAsset(
         id=asset_id,
         networkInterfaces=networks,
-        os=os_hardware.get('os_name', ''),
-        osVersion=os_hardware.get('os_version', ''),
-        manufacturer=os_hardware.get('manufacturer', ''),
-        model=os_hardware.get('model', ''),
-        hostnames=[name],
-        customAttributes={
-            "last_seen_TS": general.get("lastContactTime", ""),
-            "security_sipStatus": security.get("sipStatus", ""),
-            "security_gatekeeperStatus": security.get("gatekeeperStatus", ""),
-            "security_xprotectVersion": security.get("xprotectVersion", ""),
-            "security_autoLoginDisabled": security.get("autoLoginDisabled", ""),
-            "security_remoteDesktopEnabled": security.get("remoteDesktopEnabled", ""),
-            "security_activationLockEnabled": security.get("activationLockEnabled", ""),
-            "security_secureBootLevel": security.get("secureBootLevel", ""),
-            "security_externalBootLevel": security.get("externalBootLevel", ""),
-            "security_bootstrapTokenAllowed": security.get("bootstrapTokenAllowed", ""),
-            "security_bootstrapTokenEscrowedStatus": security.get("bootstrapTokenEscrowedStatus", ""),
-            "security_recoveryLockEnabled": security.get("recoveryLockEnabled", ""),
-            "security_firewallEnabled": security.get("firewallEnabled", ""),
-            "security_lastAttestationAttempt": security.get("lastAttestationAttempt", ""),
-            "security_lastSuccessfulAttestation": security.get("lastSuccessfulAttestation", ""),
-            "security_attestationStatus": security.get("attestationStatus", ""),
-            "diskEncryption_individualRecoveryKeyValidityStatus": disk.get("individualRecoveryKeyValidityStatus", ""),
-            "diskEncryption_institutionalRecoveryKeyPresent": disk.get("institutionalRecoveryKeyPresent", ""),
-            "diskEncryption_diskEncryptionConfigurationName": disk.get("diskEncryptionConfigurationName", ""),
-            "diskEncryption_fileVault2Enabled": disk.get("fileVault2Enabled", ""),
-            "diskEncryption_fileVault2EligibilityMessage": disk.get("fileVault2EligibilityMessage", ""),
-            "diskEncryption_fileVault2EnabledUserNames": disk.get("fileVault2EnabledUserNames", ""),
-            "diskEncryption_bootPartitionEncryptionDetails_partitionName": boot.get("partitionName", ""),
-            "diskEncryption_bootPartitionEncryptionDetails_partitionFileVault2State": boot.get("partitionFileVault2State", ""),
-            "diskEncryption_bootPartitionEncryptionDetails_partitionFileVault2Percent": boot.get("partitionFileVault2Percent", ""),
-            "userAndLocation_username": user.get("username", ""),
-            "userAndLocation_realname": user.get("realname", ""),
-            "userAndLocation_email": user.get("email", ""),
-            "userAndLocation_position": user.get("position", ""),
-            "userAndLocation_phone": user.get("phone", ""),
-            "userAndLocation_departmentId": user.get("departmentId", ""),
-            "userAndLocation_buildingId": user.get("buildingId", ""),
-            "userAndLocation_room": user.get("room", "")
-        }
+        hostnames=[name.replace(" ", "-")],
+        os=hardware.get("model", ""),
+        osVersion=hardware.get("modelIdentifier", ""),
+        manufacturer=manufacturer,
+        model=model,
+        customAttributes=custom_attributes
     )
+
 
 def build_assets(inventory):
     assets = []
@@ -322,49 +363,108 @@ def build_assets(inventory):
 def build_mobile_asset(item):
     if not item:
         return None
+    
+    # Extract the main asset ID (UDID or Mobile Device ID)
     mobile_asset_id = item.get("udid") or item.get("mobileDeviceId")
     if not mobile_asset_id:
-        print("Mobile asset ID not found:", item)
+        print("Mobile asset ID not found: {}".format(item))
         return None
 
-    general = item.get("general") or {}
+    # Extract basic device info
     name = item.get("name", "")
-    os_hardware = asset_os_hardware(item)
-    ips = asset_ips(item)
-    networks = [asset_networks(ips, mac) for mac in os_hardware.get("macs", []) if mac]
+    serial_number = item.get("serialNumber", "")
+    os_version = item.get("osVersion", "")
+    os_build = item.get("osBuild", "")
+    manufacturer = "Apple"
+    model = item.get("modelIdentifier", "")
+    ip_address = item.get("ipAddress", "")
+    wifi_mac = item.get("wifiMacAddress", "")
+    bluetooth_mac = item.get("bluetoothMacAddress", "")
 
+    # Network interfaces
+    ips = [ip_address] if ip_address else []
+    macs = [wifi_mac, bluetooth_mac]
+    networks = [asset_networks(ips, mac) for mac in macs if mac]
+
+    # Collect all attributes
+    custom_attributes = {
+        "name": name,
+        "serial_number": serial_number,
+        "asset_tag": item.get("assetTag", ""),
+        "os_version": os_version,
+        "os_build": os_build,
+        "enforce_name": str(item.get("enforceName", False)),
+        "last_inventory_update": item.get("lastInventoryUpdateTimestamp", ""),
+        "os_supplemental_build": item.get("osSupplementalBuildVersion", ""),
+        "os_rapid_security_response": item.get("osRapidSecurityResponse", ""),
+        "software_update_device_id": item.get("softwareUpdateDeviceId", ""),
+        "managed": str(item.get("managed", False)),
+        "time_zone": item.get("timeZone", ""),
+        "initial_entry_ts": item.get("initialEntryTimestamp", ""),
+        "last_enrollment_ts": item.get("lastEnrollmentTimestamp", ""),
+        "mdm_profile_expiration": item.get("mdmProfileExpirationTimestamp", ""),
+        "device_ownership_level": item.get("deviceOwnershipLevel", ""),
+        "enrollment_method": item.get("enrollmentMethod", ""),
+        "enrollment_session_token_valid": str(item.get("enrollmentSessionTokenValid", False)),
+        "declarative_mgmt_enabled": str(item.get("declarativeDeviceManagementEnabled", False)),
+        "management_id": item.get("managementId", ""),
+    }
+
+    # Site information
+    site = item.get("site", {})
+    if site:
+        custom_attributes.update({
+            "site_id": site.get("id", ""),
+            "site_name": site.get("name", ""),
+        })
+
+    # Location information
+    location = item.get("location", {})
+    if location:
+        custom_attributes.update({
+            "username": location.get("username", ""),
+            "real_name": location.get("realName", ""),
+            "email_address": location.get("emailAddress", ""),
+            "position": location.get("position", ""),
+            "phone_number": location.get("phoneNumber", ""),
+            "department_id": location.get("departmentId", ""),
+            "building_id": location.get("buildingId", ""),
+            "room": location.get("room", ""),
+        })
+
+    # Extension attributes
+    extension_attributes = item.get("extensionAttributes", [])
+    for ea in extension_attributes:
+        ea_name = ea.get("name", "").replace(" ", "_").lower()
+        ea_value = ea.get("value", [])
+        custom_attributes["extension_attr_{}".format(ea_name)] = ",".join([str(v) for v in ea_value])
+
+    # OS-specific attributes
+    for os_type in ["ios", "tvos", "watchos", "visionos"]:
+        os_data = item.get(os_type, {})
+        if os_data:
+            for key, value in os_data.items():
+                # Handle nested dictionaries (like purchasing, security, etc.)
+                if type(value) == "dict":
+                    for sub_key, sub_value in value.items():
+                        custom_attributes["{}_{}_{}".format(os_type, key, sub_key)] = str(sub_value)
+                # Handle lists (like applications, certificates, etc.)
+                elif type(value) == "list":
+                    custom_attributes["{}_{}".format(os_type, key)] = ",".join([str(v) for v in value])
+                # Handle simple key-value pairs
+                else:
+                    custom_attributes["{}_{}".format(os_type, key)] = str(value)
+
+    # Build the asset
     return ImportAsset(
         id=mobile_asset_id,
         networkInterfaces=networks,
         hostnames=[name.replace(" ", "-")],
-        os=os_hardware.get('os_name', ''),
-        osVersion=os_hardware.get('os_version', ''),
-        manufacturer=os_hardware.get('manufacturer', ''),
-        model=os_hardware.get('model', ''),
-        customAttributes={
-            "last_seen_TS": general.get("lastInventoryUpdateDate", ""),
-            "device_name": name,
-            "serial_number": item.get("serialNumber", ""),
-            "model_identifier": item.get("modelIdentifier", ""),
-            "device_type": item.get("deviceType", ""),
-            "os_build": general.get("osBuild", ""),
-            "last_inventory_update": general.get("lastInventoryUpdateDate", ""),
-            "last_enrolled_date": general.get("lastEnrolledDate", ""),
-            "mdm_profile_expiration": general.get("mdmProfileExpirationDate", ""),
-            "time_zone": general.get("timeZone", ""),
-            "management_id": item.get("managementId", ""),
-            "itunes_store_account_active": general.get("itunesStoreAccountActive", ""),
-            "exchange_device_id": general.get("exchangeDeviceId", ""),
-            "tethered": general.get("tethered", ""),
-            "supervised": general.get("supervised", ""),
-            "device_ownership_type": general.get("deviceOwnershipType", ""),
-            "declarative_mgmt_enabled": general.get("declarativeDeviceManagementEnabled", ""),
-            "cloud_backup_enabled": general.get("cloudBackupEnabled", ""),
-            "last_cloud_backup_date": general.get("lastCloudBackupDate", ""),
-            "device_locator_service": general.get("deviceLocatorServiceEnabled", ""),
-            "diagnostic_reporting_enabled": general.get("diagnosticAndUsageReportingEnabled", ""),
-            "app_analytics_enabled": general.get("appAnalyticsEnabled", "")
-        }
+        os="iOS",
+        osVersion=os_version,
+        manufacturer=manufacturer,
+        model=model,
+        customAttributes=custom_attributes
     )
 
 def build_mobile_assets(inventory):
