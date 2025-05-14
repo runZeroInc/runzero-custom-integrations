@@ -4,7 +4,7 @@ load('net', 'ip_address')
 load('http', http_post='post', http_get='get', 'url_encode')
 load('time', 'now', 'parse_duration')
 
-JAMF_URL = 'https://<UPDATE_ME>.jamfcloud.com'
+JAMF_URL = 'https://a16z.jamfcloud.com'
 DAYS_AGO = 60  # Adjust as needed
 duration_str = "-{}h".format(DAYS_AGO * 24)  # Go duration format, e.g. "-720h" for 30 days
 ago_duration = parse_duration(duration_str)
@@ -72,7 +72,7 @@ def http_request(method, url, headers=None, params=None, body=None, token=None, 
 def get_jamf_inventory(token, request_count, client_id, client_secret):
     hasNextPage = True
     page = 0
-    page_size = 100
+    page_size = 10
     endpoints = []
     # hardcoded filter for the time being until we support datetime
     url = JAMF_URL + '/api/v1/computers-inventory'
@@ -97,6 +97,7 @@ def get_jamf_inventory(token, request_count, client_id, client_secret):
 
         endpoints.extend(results)
         page += 1
+        hasNextPage = False
 
     return endpoints, token, request_count
 
@@ -127,7 +128,7 @@ def get_jamf_details(token, request_count, client_id, client_secret, inventory):
 def get_mobile_device_inventory(token, request_count, client_id, client_secret):
     hasNextPage = True
     page = 0
-    page_size = 100
+    page_size = 10
     mobile_devices = []
     # hardcoded filter for the time being until we support datetime
     url = JAMF_URL + "/api/v2/mobile-devices/detail"
@@ -152,6 +153,7 @@ def get_mobile_device_inventory(token, request_count, client_id, client_secret):
 
         mobile_devices.extend(results)
         page += 1
+        hasNextPage = False
 
     return mobile_devices, token, request_count
 
@@ -249,7 +251,7 @@ def build_asset(item):
     model = hardware.get("model", "")
     model_identifier = hardware.get("modelIdentifier", "")
     macs = [hardware.get("macAddress", ""), hardware.get("altMacAddress", "")]
-    ips = [general.get("lastIpAddress", ""), general.get("lastReportedIp", "")]
+    ips = asset_ips(item)
     networks = [asset_networks(ips, mac) for mac in macs if mac]
 
     # Collect all attributes
@@ -371,6 +373,7 @@ def build_mobile_asset(item):
         return None
 
     # Extract basic device info
+    print(item.keys())
     name = item.get("name", "")
     serial_number = item.get("serialNumber", "")
     os_version = item.get("osVersion", "")
@@ -382,7 +385,7 @@ def build_mobile_asset(item):
     bluetooth_mac = item.get("bluetoothMacAddress", "")
 
     # Network interfaces
-    ips = [ip_address] if ip_address else []
+    ips = asset_ips(item)
     macs = [wifi_mac, bluetooth_mac]
     networks = [asset_networks(ips, mac) for mac in macs if mac]
 
@@ -440,6 +443,8 @@ def build_mobile_asset(item):
         custom_attributes["extension_attr_{}".format(ea_name)] = ",".join([str(v) for v in ea_value])
 
     # OS-specific attributes
+    os_type = item.get("type", "")
+    print(os_type)
     for os_type in ["ios", "tvos", "watchos", "visionos"]:
         os_data = item.get(os_type, {})
         if os_data:
@@ -460,7 +465,7 @@ def build_mobile_asset(item):
         id=mobile_asset_id,
         networkInterfaces=networks,
         hostnames=[name.replace(" ", "-")],
-        os="iOS",
+        os=os_type,
         osVersion=os_version,
         manufacturer=manufacturer,
         model=model,
