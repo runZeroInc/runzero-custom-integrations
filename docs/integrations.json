@@ -74,6 +74,23 @@
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/custom_integration_cisco-ise.star"
     },
+      "name": "Automox",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/custom-integration-automox.star"
+    },
+    {
+      "name": "Sumo Logic",
+      "type": "outbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
+    },
+    {
+      "name": "Cortex XDR",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
+    },
     {
       "name": "Kandji",
       "type": "inbound",

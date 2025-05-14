@@ -4,7 +4,7 @@ load('net', 'ip_address')
 load('http', http_get='get')
 load('uuid', 'new_uuid')
 
-EC_HOST         = 'yourEndpointCentralURL'
+EC_HOST         = '<UPDATE_ME>'
 API_VERSION     = '1.4'
 SCAN_ENDPOINT   = '/api/' + API_VERSION + '/inventory/scancomputers'
 PAGE_LIMIT      = 1000
@@ -18,10 +18,11 @@ def build_network_interfaces(device):
     ipv6s = []
     for ip in ips:
         addr = ip_address(ip)
-        if addr.version == 4:
-            ipv4s.append(addr)
-        else:
-            ipv6s.append(addr)
+        if addr:
+            if addr.version == 4:
+                ipv4s.append(addr)
+            else:
+                ipv6s.append(addr)
     return [ NetworkInterface(macAddress=mac,
                               ipv4Addresses=ipv4s,
                               ipv6Addresses=ipv6s) ]
@@ -62,14 +63,9 @@ def main(**kwargs):
     page        = 1
     all_devices = []
     while True:
-        url = (
-            'https://' + EC_HOST
-            + SCAN_ENDPOINT
-            + '?format=json'
-            + '&pagelimit=' + str(PAGE_LIMIT)
-            + '&page='      + str(page)
-        )
-        resp = http_get(url, headers=headers)
+        url = 'https://' + EC_HOST + SCAN_ENDPOINT
+        params = {"pagelimit": PAGE_LIMIT, "page": page}
+        resp = http_get(url, headers=headers, params=params, timeout=3600)
         if resp.status_code != 200:
             print('Scan API error:', resp.status_code, resp.body)
             return None
