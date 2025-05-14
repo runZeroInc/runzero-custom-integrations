@@ -63,7 +63,7 @@ def http_request(method, url, headers=None, params=None, body=None, token=None, 
             return None, token, request_count
         headers["Authorization"] = "Bearer {}".format(token)
         if method == "GET":
-            response = http_get(url=url, headers=headers, params=params)
+            response = http_get(url=url, headers=headers, params=params, timeout=300)
         elif method == "POST":
             response = http_post(url=url, headers=headers, body=body)
 
