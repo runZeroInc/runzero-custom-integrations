@@ -21,6 +21,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 ## Import to runZero 
 - [Automox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/)
 - [Carbon Black](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/carbon-black/)
+- [Cisco-ISE](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/)
 - [Cortex XDR](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/)
 - [Device42](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/)
 - [Digital Ocean](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/)
