@@ -32,6 +32,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Manage Engine Endpoint Central](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/)
 - [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
+- [runZero Task Sync](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 ## Export from runZero 
 - [runZero Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)

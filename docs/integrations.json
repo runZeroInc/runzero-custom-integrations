@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-05-14T20:39:42.109566Z",
-  "totalIntegrations": 16,
+  "lastUpdated": "2025-05-14T18:05:08.106092Z",
+  "totalIntegrations": 17,
   "integrationDetails": [
     {
       "name": "Drata",
@@ -85,6 +85,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/custom-integration-jamf.star"
+    },
+    {
+      "name": "runZero Task Sync",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/custom-integration-task-sync.star"
     },
     {
       "name": "Device42",
