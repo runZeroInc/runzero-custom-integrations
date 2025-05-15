@@ -3,6 +3,7 @@ load('json', json_encode='encode', json_decode='decode')
 load('net', 'ip_address')
 load('http', http_post='post', http_get='get', 'url_encode')
 load('time', 'now', 'parse_duration')
+load('flatten_json', 'flatten')
 
 JAMF_URL = 'https://<UPDATE_ME>.jamfcloud.com'
 DAYS_AGO = 60  # Adjust as needed
@@ -63,7 +64,7 @@ def http_request(method, url, headers=None, params=None, body=None, token=None, 
             return None, token, request_count
         headers["Authorization"] = "Bearer {}".format(token)
         if method == "GET":
-            response = http_get(url=url, headers=headers, params=params)
+            response = http_get(url=url, headers=headers, params=params, timeout=300)
         elif method == "POST":
             response = http_post(url=url, headers=headers, body=body)
 
@@ -163,7 +164,7 @@ def get_mobile_device_details(token, request_count, client_id, client_secret, in
             print("ID not found in mobile device item:", item)
             continue
 
-        url = "{}/api/v2/mobile-devices/{}".format(JAMF_URL, uid)
+        url = "{}/api/v2/mobile-devices/{}/detail".format(JAMF_URL, uid)
         resp, token, request_count = http_request("GET", url, token=token, request_count=request_count, client_id=client_id, client_secret=client_secret)
         if not resp or resp.status_code != 200:
             print("Failed to retrieve details for mobile device ID:", uid, "Status code:", getattr(resp, 'status_code', 'None'))
@@ -212,25 +213,6 @@ def asset_ips(item):
             ips.append(ip)
     return ips
 
-def asset_os_hardware(item):
-    operating_system = item.get("operatingSystem") or {}
-    hardware = item.get("hardware") or {}
-    general = item.get("general") or {}
-
-    os_name = operating_system.get("name", "") if operating_system else "iOS"
-    os_version = operating_system.get("version", "") or general.get("osVersion", "")
-    model = hardware.get("model", "") or item.get("model", "")
-    manufacturer = hardware.get("make", "") or "Apple"
-    macs = [mac for mac in [hardware.get("macAddress", ""), hardware.get("altMacAddress", ""), item.get("wifiMacAddress", "")] if mac]
-
-    return {
-        'os_name': os_name,
-        'os_version': os_version,
-        'model': model,
-        'manufacturer': manufacturer,
-        'macs': macs
-    }
-
 def asset_networks(ips, mac):
     ip4s = []
     ip6s = []
@@ -243,6 +225,27 @@ def asset_networks(ips, mac):
     if not mac:
         return NetworkInterface(ipv4Addresses=ip4s, ipv6Addresses=ip6s)
     return NetworkInterface(macAddress=mac, ipv4Addresses=ip4s, ipv6Addresses=ip6s)
+
+def asset_os_hardware(item):
+    operating_system = item.get("operatingSystem") or {}
+    hardware = item.get("hardware") or {}
+    general = item.get("general") or {}
+
+    os_name = operating_system.get("name", "") if operating_system else "iOS"
+    os_version = operating_system.get("version", "") or general.get("osVersion", "")
+    model = hardware.get("model", "") or item.get("model", "")
+    manufacturer = hardware.get("make", "") or "Apple"
+    macs = [mac for mac in [hardware.get("macAddress", ""), hardware.get("altMacAddress", ""), item.get("wifiMacAddress", "")] if mac]
+    serial_number = hardware.get("serialNumber", "")
+
+    return {
+        'os_name': os_name,
+        'os_version': os_version,
+        'model': model,
+        'manufacturer': manufacturer,
+        'macs': macs,
+        'serial_number': serial_number
+    }
 
 def build_asset(item):
     if not item:
@@ -264,6 +267,23 @@ def build_asset(item):
     disk = item.get("diskEncryption") or {}
     boot = disk.get("bootPartitionEncryptionDetails") or {}
     user = item.get("userAndLocation") or {}
+    
+
+    # add flattened version of certain attributes
+    custom_attributes = {}
+    for key in item.keys():
+        if key == "extensionAttributes":
+            for ext in item["extensionAttributes"]:
+                name = ext.get("name", None).replace(" ", "_").lower()
+                values = ext.get("values", None) or ext.get("value", None)
+                if name and values:
+                    key_name = "ext_attr_" + name
+                    custom_attributes[key_name] = ",".join(values)
+        elif key not in ["purchasing", "storage", "packageReceipts", "contentCaching"]:
+            if type(item[key]) == "dict":
+                custom_attributes.update(flatten(item[key]))
+            elif type(item[key]) == "string":
+                custom_attributes[key] = item[key]
 
     return ImportAsset(
         id=asset_id,
@@ -273,41 +293,7 @@ def build_asset(item):
         manufacturer=os_hardware.get('manufacturer', ''),
         model=os_hardware.get('model', ''),
         hostnames=[name],
-        customAttributes={
-            "last_seen_TS": general.get("lastContactTime", ""),
-            "security_sipStatus": security.get("sipStatus", ""),
-            "security_gatekeeperStatus": security.get("gatekeeperStatus", ""),
-            "security_xprotectVersion": security.get("xprotectVersion", ""),
-            "security_autoLoginDisabled": security.get("autoLoginDisabled", ""),
-            "security_remoteDesktopEnabled": security.get("remoteDesktopEnabled", ""),
-            "security_activationLockEnabled": security.get("activationLockEnabled", ""),
-            "security_secureBootLevel": security.get("secureBootLevel", ""),
-            "security_externalBootLevel": security.get("externalBootLevel", ""),
-            "security_bootstrapTokenAllowed": security.get("bootstrapTokenAllowed", ""),
-            "security_bootstrapTokenEscrowedStatus": security.get("bootstrapTokenEscrowedStatus", ""),
-            "security_recoveryLockEnabled": security.get("recoveryLockEnabled", ""),
-            "security_firewallEnabled": security.get("firewallEnabled", ""),
-            "security_lastAttestationAttempt": security.get("lastAttestationAttempt", ""),
-            "security_lastSuccessfulAttestation": security.get("lastSuccessfulAttestation", ""),
-            "security_attestationStatus": security.get("attestationStatus", ""),
-            "diskEncryption_individualRecoveryKeyValidityStatus": disk.get("individualRecoveryKeyValidityStatus", ""),
-            "diskEncryption_institutionalRecoveryKeyPresent": disk.get("institutionalRecoveryKeyPresent", ""),
-            "diskEncryption_diskEncryptionConfigurationName": disk.get("diskEncryptionConfigurationName", ""),
-            "diskEncryption_fileVault2Enabled": disk.get("fileVault2Enabled", ""),
-            "diskEncryption_fileVault2EligibilityMessage": disk.get("fileVault2EligibilityMessage", ""),
-            "diskEncryption_fileVault2EnabledUserNames": disk.get("fileVault2EnabledUserNames", ""),
-            "diskEncryption_bootPartitionEncryptionDetails_partitionName": boot.get("partitionName", ""),
-            "diskEncryption_bootPartitionEncryptionDetails_partitionFileVault2State": boot.get("partitionFileVault2State", ""),
-            "diskEncryption_bootPartitionEncryptionDetails_partitionFileVault2Percent": boot.get("partitionFileVault2Percent", ""),
-            "userAndLocation_username": user.get("username", ""),
-            "userAndLocation_realname": user.get("realname", ""),
-            "userAndLocation_email": user.get("email", ""),
-            "userAndLocation_position": user.get("position", ""),
-            "userAndLocation_phone": user.get("phone", ""),
-            "userAndLocation_departmentId": user.get("departmentId", ""),
-            "userAndLocation_buildingId": user.get("buildingId", ""),
-            "userAndLocation_room": user.get("room", "")
-        }
+        customAttributes=custom_attributes,
     )
 
 def build_assets(inventory):
@@ -333,6 +319,22 @@ def build_mobile_asset(item):
     ips = asset_ips(item)
     networks = [asset_networks(ips, mac) for mac in os_hardware.get("macs", []) if mac]
 
+    # add flattened version of certain attributes
+    custom_attributes = {}
+    for key in item.keys():
+        if key == "extensionAttributes":
+            for ext in item["extensionAttributes"]:
+                name = ext.get("name", None).replace(" ", "_").lower()
+                values = ext.get("values", None) or ext.get("value", None)
+                if name and values:
+                    key_name = "ext_attr_" + name
+                    custom_attributes[key_name] = ",".join(values)
+        elif key not in ["applications", "certificates", "purchasing", "serviceSubscription", "ebooks", "fonts", ]:
+            if type(item[key]) == "dict":
+                custom_attributes.update(flatten(item[key]))
+            elif type(item[key]) == "string" or type(item[key]) == "bool":
+                custom_attributes[key] = str(item[key])
+
     return ImportAsset(
         id=mobile_asset_id,
         networkInterfaces=networks,
@@ -341,30 +343,7 @@ def build_mobile_asset(item):
         osVersion=os_hardware.get('os_version', ''),
         manufacturer=os_hardware.get('manufacturer', ''),
         model=os_hardware.get('model', ''),
-        customAttributes={
-            "last_seen_TS": general.get("lastInventoryUpdateDate", ""),
-            "device_name": name,
-            "serial_number": item.get("serialNumber", ""),
-            "model_identifier": item.get("modelIdentifier", ""),
-            "device_type": item.get("deviceType", ""),
-            "os_build": general.get("osBuild", ""),
-            "last_inventory_update": general.get("lastInventoryUpdateDate", ""),
-            "last_enrolled_date": general.get("lastEnrolledDate", ""),
-            "mdm_profile_expiration": general.get("mdmProfileExpirationDate", ""),
-            "time_zone": general.get("timeZone", ""),
-            "management_id": item.get("managementId", ""),
-            "itunes_store_account_active": general.get("itunesStoreAccountActive", ""),
-            "exchange_device_id": general.get("exchangeDeviceId", ""),
-            "tethered": general.get("tethered", ""),
-            "supervised": general.get("supervised", ""),
-            "device_ownership_type": general.get("deviceOwnershipType", ""),
-            "declarative_mgmt_enabled": general.get("declarativeDeviceManagementEnabled", ""),
-            "cloud_backup_enabled": general.get("cloudBackupEnabled", ""),
-            "last_cloud_backup_date": general.get("lastCloudBackupDate", ""),
-            "device_locator_service": general.get("deviceLocatorServiceEnabled", ""),
-            "diagnostic_reporting_enabled": general.get("diagnosticAndUsageReportingEnabled", ""),
-            "app_analytics_enabled": general.get("appAnalyticsEnabled", "")
-        }
+        customAttributes=custom_attributes
     )
 
 def build_mobile_assets(inventory):
