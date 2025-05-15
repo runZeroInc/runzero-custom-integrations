@@ -5,7 +5,7 @@ load('http', http_post='post', http_get='get', 'url_encode')
 load('time', 'now', 'parse_duration')
 load('flatten_json', 'flatten')
 
-JAMF_URL = 'https://<UPDATE_ME>.jamfcloud.com'
+JAMF_URL = 'https://a16z.jamfcloud.com'
 DAYS_AGO = 60  # Adjust as needed
 duration_str = "-{}h".format(DAYS_AGO * 24)  # Go duration format, e.g. "-720h" for 30 days
 ago_duration = parse_duration(duration_str)
@@ -272,7 +272,13 @@ def build_asset(item):
     # add flattened version of certain attributes
     custom_attributes = {}
     for key in item.keys():
-        if key not in ["purchasing", "storage", "packageReceipts", "contentCaching"]:
+        if key == "extensionAttributes":
+            for ext in item["extensionAttributes"]:
+                name = ext.get("name", None).replace(" ", "_").lower()
+                values = ext.get("values", None) or ext.get("value", None)
+                if name and values:
+                    custom_attributes[name] = ",".join(values)
+        elif key not in ["purchasing", "storage", "packageReceipts", "contentCaching"]:
             if type(item[key]) == "dict":
                 custom_attributes.update(flatten(item[key]))
             elif type(item[key]) == "string":
@@ -315,11 +321,17 @@ def build_mobile_asset(item):
     # add flattened version of certain attributes
     custom_attributes = {}
     for key in item.keys():
-        if key not in ["purchasing", "storage", "packageReceipts", "contentCaching"]:
+        if key == "extensionAttributes":
+            for ext in item["extensionAttributes"]:
+                name = ext.get("name", None).replace(" ", "_").lower()
+                values = ext.get("values", None) or ext.get("value", None)
+                if name and values:
+                    custom_attributes[name] = ",".join(values)
+        elif key not in ["applications", "certificates", "purchasing", "serviceSubscription", "ebooks", "fonts", ]:
             if type(item[key]) == "dict":
                 custom_attributes.update(flatten(item[key]))
-            elif type(item[key]) == "string":
-                custom_attributes[key] = item[key]
+            elif type(item[key]) == "string" or type(item[key]) == "bool":
+                custom_attributes[key] = str(item[key])
 
     return ImportAsset(
         id=mobile_asset_id,
