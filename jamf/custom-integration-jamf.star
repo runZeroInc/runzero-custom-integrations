@@ -277,7 +277,8 @@ def build_asset(item):
                 name = ext.get("name", None).replace(" ", "_").lower()
                 values = ext.get("values", None) or ext.get("value", None)
                 if name and values:
-                    custom_attributes[name] = ",".join(values)
+                    key_name = "ext_attr_" + name
+                    custom_attributes[key_name] = ",".join(values)
         elif key not in ["purchasing", "storage", "packageReceipts", "contentCaching"]:
             if type(item[key]) == "dict":
                 custom_attributes.update(flatten(item[key]))
@@ -326,7 +327,8 @@ def build_mobile_asset(item):
                 name = ext.get("name", None).replace(" ", "_").lower()
                 values = ext.get("values", None) or ext.get("value", None)
                 if name and values:
-                    custom_attributes[name] = ",".join(values)
+                    key_name = "ext_attr_" + name
+                    custom_attributes[key_name] = ",".join(values)
         elif key not in ["applications", "certificates", "purchasing", "serviceSubscription", "ebooks", "fonts", ]:
             if type(item[key]) == "dict":
                 custom_attributes.update(flatten(item[key]))
