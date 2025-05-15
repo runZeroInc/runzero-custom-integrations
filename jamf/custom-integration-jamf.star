@@ -5,7 +5,7 @@ load('http', http_post='post', http_get='get', 'url_encode')
 load('time', 'now', 'parse_duration')
 load('flatten_json', 'flatten')
 
-JAMF_URL = 'https://a16z.jamfcloud.com'
+JAMF_URL = 'https://<UPDATE_ME>.jamfcloud.com'
 DAYS_AGO = 60  # Adjust as needed
 duration_str = "-{}h".format(DAYS_AGO * 24)  # Go duration format, e.g. "-720h" for 30 days
 ago_duration = parse_duration(duration_str)
