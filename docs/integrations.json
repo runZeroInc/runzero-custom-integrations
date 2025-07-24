@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD
-  "lastUpdated": "2025-06-02T10:51:31.122357Z",
-  "totalIntegrations": 16,
-=======
-  "lastUpdated": "2025-05-23T20:31:27.935744Z",
-  "totalIntegrations": 18,
->>>>>>> 385028e53cf2dd8fb86aa9ae54dd43d9a519cb3e
+  "lastUpdated": "2025-06-02T21:09:20.457960Z",
+  "totalIntegrations": 20,
   "integrationDetails": [
     {
       "name": "Carbon Black",
@@ -38,7 +33,6 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/custom-integration-lima-charlie.star"
     },
     {
-<<<<<<< HEAD
       "name": "Stairwell",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/README.md",
@@ -49,18 +43,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/custom-integration-digital-ocean.star"
-=======
-      "name": "Digital Ocean",
-      "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/custom-integration-digital-ocean.star"
     },
     {
       "name": "Snipe-IT",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/snipeit.star"
->>>>>>> 385028e53cf2dd8fb86aa9ae54dd43d9a519cb3e
     },
     {
       "name": "Cortex XDR",
@@ -69,10 +57,6 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
     },
     {
-<<<<<<< HEAD
-      "name": "NinjaOne",
-      "type": "inbound",
-=======
       "name": "runZero Task Sync",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/README.md",
@@ -81,12 +65,11 @@
     {
       "name": "NinjaOne",
       "type": "inbound",
->>>>>>> 385028e53cf2dd8fb86aa9ae54dd43d9a519cb3e
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/custom-integration-ninjaone.star"
     },
     {
-      "name": "runZero Vunerability Workflow",
+      "name": "runZero Vulnerability Workflow",
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/custom-integration-vulnerability-workflow.star"
@@ -110,19 +93,22 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/custom-integration-endpoint-central.star"
     },
     {
-<<<<<<< HEAD
-=======
       "name": "Cisco-ISE",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/custom_integration_cisco-ise.star"
     },
     {
->>>>>>> 385028e53cf2dd8fb86aa9ae54dd43d9a519cb3e
       "name": "Automox",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/custom-integration-automox.star"
+    },
+    {
+      "name": "Extreme Networks CloudIQ",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/custom-integrations-extreme-cloud-iq.star"
     },
     {
       "name": "Tanium",

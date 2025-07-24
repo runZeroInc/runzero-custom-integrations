@@ -16,6 +16,12 @@ COMPUTER_ASSETS = True
 MOBILE_ASSETS = True
 DEV_MODE = False
 
+def sanitize_string(s):
+    if s:
+        return s.replace(" ", "_").replace(".", "").replace("+", "").replace("(", "").replace(")", "").lower()
+    else:
+        return None
+
 def get_bearer_token(client_id, client_secret):
     headers = {'Content-Type': 'application/x-www-form-urlencoded', 'accept': 'application/json'}
     params = {'client_id': client_id, 'client_secret': client_secret, 'grant_type': 'client_credentials'}
@@ -278,15 +284,27 @@ def build_asset(item):
 
     # add flattened version of certain attributes
     custom_attributes = {}
+    # add extension attributes
+    main_ext_attrs = item.get("extensionAttributes", [])
+    if len(main_ext_attrs) > 0:
+        for ext in main_ext_attrs:
+            ext_name = sanitize_string(ext.get("name", None))
+            ext_values = ext.get("values", None) or ext.get("value", None)
+            if ext_name and ext_values:
+                key_name = "ext_attr_" + ext_name
+                custom_attributes[key_name] = ",".join(ext_values)
+    # add user extension attributes
+    user_ext_attrs = item.get("userAndLocation", {}).get("extensionAttributes", [])
+    if len(user_ext_attrs) > 0:
+        for ext in user_ext_attrs:
+            user_ext_name = sanitize_string(ext.get("name", None))
+            user_ext_values = ext.get("values", None) or ext.get("value", None)
+            if user_ext_name and user_ext_values:
+                key_name = "ext_attr_" + user_ext_name
+                custom_attributes[key_name] = ",".join(user_ext_values)
+
     for key in item.keys():
-        if key == "extensionAttributes":
-            for ext in item["extensionAttributes"]:
-                ext_name = ext.get("name", None).replace(" ", "_").lower()
-                ext_values = ext.get("values", None) or ext.get("value", None)
-                if ext_name and ext_values:
-                    key_name = "ext_attr_" + ext_name
-                    custom_attributes[key_name] = ",".join(ext_values)
-        elif key not in ["purchasing", "storage", "packageReceipts", "contentCaching"]:
+        if key not in ["purchasing", "storage", "packageReceipts", "contentCaching", "extensionAttributes", "userAndLocation"]:
             if type(item[key]) == "dict":
                 custom_attributes.update(flatten(item[key]))
             elif type(item[key]) == "string":
@@ -294,8 +312,6 @@ def build_asset(item):
             elif type(item[key]) == "list":
                 # skip lists unless we have more context on them like extensionAttributes
                 continue
-        else:
-            continue
 
     return ImportAsset(
         id=asset_id,

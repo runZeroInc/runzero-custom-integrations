@@ -26,18 +26,16 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Device42](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/)
 - [Digital Ocean](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/)
 - [Drata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/)
+- [Extreme Networks CloudIQ](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/)
 - [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
 - [Kandji](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/)
 - [Lima Charlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)
 - [Manage Engine Endpoint Central](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/)
 - [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
-<<<<<<< HEAD
-- [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
-=======
 - [runZero Task Sync](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/)
 - [Snipe-IT](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/)
->>>>>>> 385028e53cf2dd8fb86aa9ae54dd43d9a519cb3e
+- [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 ## Export from runZero 
 - [runZero Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
