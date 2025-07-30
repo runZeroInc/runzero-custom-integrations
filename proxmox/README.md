@@ -1,95 +1,125 @@
 ## Proxmox VE Custom Integration for runZero
 
-This custom integration discovers Proxmox VE cluster nodes and imports them into runZero as assets, complete with hostnames, management IPs, device metadata, and custom attributes.
+This custom integration discovers Proxmox VE cluster nodes, QEMU VMs and LXC containers, and imports them into runZero as assets—complete with hostnames, management IPs, in-guest IPs, MAC addresses, device metadata, and custom attributes. A global `DEBUG` flag controls verbose logging.
 
 ---
 
 ## Features
 
-* **Automatic Discovery**: Enumerates all Proxmox VE cluster nodes via the REST API.
-* **Rich Metadata**: Captures OS version, hostnames, management IPs, CPU/memory/disk stats, uptime, and more.
-* **Flexible Configuration**: Pass a single JSON blob containing your Proxmox URL and API token parameters.
+* **Cluster Nodes**
+
+  * Discovers all nodes via `/nodes`
+  * Captures management IP, CPU/memory/disk stats, uptime, status
+
+* **QEMU VM Discovery**
+
+  * Enumerates VMs via `/nodes/{node}/qemu`
+  * Fetches live in-guest interfaces (MAC + IP) via the QEMU Guest Agent
+  * Falls back to parsing VM config for MACs and to `/status/current` for IPs
+
+* **LXC Container Discovery**
+
+  * Enumerates containers via `/nodes/{node}/lxc`
+  * Parses container config for MACs and `/status/current` for IPs
+
+* **Insecure TLS**
+
+  * Global `INSECURE_ALLOWED = True|False` allows connections to endpoints without valid TLS certificates
+
+* **Debug Logging**
+
+  * Global `DEBUG = True|False` toggles all `print("DEBUG: …")` statements
 
 ---
 
 ## Prerequisites
 
-1. **Proxmox VE API Token**
+### 1. Proxmox VE API Token
 
-   * Create an API token in the Proxmox UI (e.g. `root@pam!monitoring`).
-   * Copy the token’s UUID secret.
+Create a token in **Datacenter → Permissions → API Tokens** (e.g. `root@pam!monitoring`) and note its UUID secret.
 
-2. **runZero Console**
+#### Required Privileges
 
-   * Go to **Credentials** → **Add Credential** → **Custom Script Secret**.
-   * **Access Key**: can be any placeholder (e.g. `foo`).
-   * **Access Secret**: paste your JSON configuration (see below).
+To ensure the script can read node, VM, container, storage, and other resource details, grant **Audit/Monitor** privileges at the root (`/`) path (with “Propagate” checked) or individually:
 
-3. **Script Upload**
+| Resource                                   | ACL Path    | Minimum Privilege |
+| ------------------------------------------ | ----------- | ----------------- |
+| Cluster nodes                              | `/nodes`    | `Sys.Audit`       |
+| QEMU VMs                                   | `/vms`      | `VM.Audit`        |
+| Guest-Agent commands                       | `/vms/VMID` | `VM.Monitor`      |
+| LXC containers                             | `/lxc`      | `PVEVM.Audit`     |
+| Storage                                    | `/storage`  | `Datastore.Audit` |
+| Pools                                      | `/pool`     | `Pool.Audit`      |
+| SDN                                        | `/sdn`      | `SDN.Audit`       |
+| (Or use built-in “PVEAuditor” role at `/`) |             |                   |
 
-   * In **Integrations** → **Custom Integrations**, create a new script.
-   * Copy the provided Starlark script into the editor.
-   * Save and assign to your discovery task.
+### 2. runZero Console
+
+1. **Credentials** → **Add Credential** → **Custom Script Secret**
+
+   * **Access Key**: any placeholder (e.g. `foo`)
+   * **Access Secret**: your JSON config (see below)
+
+2. **Integrations** → **Custom Integrations** → **Add Script**
+
+   * Paste the Starlark code (with the `DEBUG` global at top)
+   * Save and attach to a discovery job
 
 ---
 
 ## Configuration
 
-When you create or edit your credential in runZero:
+**Access Secret** (paste as a single-line JSON string):
 
-* **Access Key**:
+```json
+{"base_url":"https://your.proxmox.server:8006","access_key":"root@pam!monitoring","access_secret":"123e4567-e89b-12d3-a456-426614174000"}
+```
 
-  ```text
-  foo
-  ```
-* **Access Secret**: a single-line JSON string (no spaces), for example:
-
-  ```json
-  {"base_url":"https://your.proxmox0-console.com","access_key":"root@pam!monitoring","access_secret":"123e4567-e89b-12d3-a456-426614174000"}
-  ```
-
-| JSON Field      | Description                                                             |
-| --------------- | ----------------------------------------------------------------------- |
-| `base_url`      | Proxmox UI URL (including port), e.g. `https://lab-vm.runzero.com:8006` |
-| `access_key`    | Your Proxmox API token ID, e.g. `root@pam!monitoring`                   |
-| `access_secret` | The UUID secret of your API token                                       |
+| Field           | Description                                                     |
+| --------------- | --------------------------------------------------------------- |
+| `base_url`      | Proxmox API URL (including port), e.g. `https://pve.local:8006` |
+| `access_key`    | Your API token ID, e.g. `root@pam!monitoring`                   |
+| `access_secret` | UUID secret of your API token                                   |
 
 ---
 
 ## Script Entry Point
 
 ```python
+# Toggle debug prints on or off
+DEBUG = True
+
 def main(*args, **kwargs):
     """
     Entrypoint for Proxmox VE integration.
     Expects kwargs['access_secret'] to be a JSON string containing:
-      - base_url:       Proxmox URL
-      - access_key:     API token ID
-      - access_secret:  API token secret (UUID)
-    Returns: list of ImportAsset objects for each cluster node.
+      - base_url:      Proxmox URL
+      - access_key:    API token ID
+      - access_secret: API token secret (UUID)
+    Returns: list of ImportAsset objects for nodes, VMs, containers.
     """
-    # (Script code as provided...)
+    # (…script code with DEBUG guards…)
 ```
 
 ---
 
 ## Running the Integration
 
-1. **Associate** the custom integration with a discovery job in runZero.
-2. **Select** the credential you created (with Access Key=`foo` and your JSON `access_secret`).
-3. **Launch** the scan.
-4. **Review** discovered Proxmox nodes in the Assets view.
+1. **Associate** the custom script with a discovery job.
+2. **Select** the credential (Access Key=`foo`, your JSON `access_secret`).
+3. **Run** the scan.
+4. **Review** discovered assets—nodes, VMs, and containers with IPs and MACs—in runZero.
 
 ---
 
 ## Extending the Integration
 
-* **Network Details**: Query `/nodes/{node}/status/network` for full NIC enumeration.
-* **Guest Workloads**: Import VMs via `/nodes/{node}/qemu` and containers via `/nodes/{node}/lxc`.
-* **Additional Metadata**: Add fields such as storage usage, firewall settings, or custom tags.
+* **Additional Resources**: Call `/cluster/resources` to pull storage, pools, SDN, OpenVZ, etc., as generic assets.
+* **Network Topology**: Query `/nodes/{node}/status/network` for full NIC details on cluster nodes.
+* **Custom Tags**: Map Proxmox tags or pool names into runZero asset tags.
 
 ---
 
 ## Support
 
-For questions or assistance, please reach out to your runZero administrator or consult the [runZero documentation](https://docs.runzero.com).
+For help, contact your runZero administrator or see the [runZero docs](https://docs.runzero.com).

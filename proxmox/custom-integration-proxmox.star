@@ -1,62 +1,73 @@
-# Proxmox VE Custom Integration for runZero (with VM & Container discovery)
-
 load('requests', 'Session')
 load('json', json_decode='decode')
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
 load('net', 'ip_address')
 
+# Toggle debug prints on or off
+DEBUG = False
+INSECURE_ALLOWED = True
+
 def main(*args, **kwargs):
     """
-    Entrypoint for Proxmox VE integration.
-    Expects kwargs['access_secret'] to be a JSON string containing:
-      - base_url:      Proxmox URL, e.g. "https://lab-vm.runzero.com:8006"
-      - access_key:    API token ID,   e.g. "root@pam!monitoring"
-      - access_secret: API token secret (UUID)
-    Returns a list of ImportAsset objects for each cluster node, VM, and LXC container.
+    Entrypoint for Proxmox VE integration, with debug prints
+    controlled by the DEBUG global, and robust handling when
+    the Guest Agent returns an error object instead of a list.
     """
-    # --- 1) Parse JSON config & auth setup ---
+    # --- 1) Parse config & auth ---
     secret       = json_decode(kwargs.get('access_secret', '{}'))
+    if DEBUG:
+        print("DEBUG: Parsed secret: {}".format(secret))
     base_url     = secret.get('base_url', '').rstrip('/')
     token_id     = secret.get('access_key')
     token_secret = secret.get('access_secret')
+    if DEBUG:
+        print("DEBUG: base_url='{}', token_id='{}'".format(base_url, token_id))
     if not (base_url and token_id and token_secret):
+        print("ERROR: Missing base_url or credentials")
         return []
 
-    # Build the PVEAPIToken header
+    # --- 2) Setup session & fetch version ---
     token_header = "PVEAPIToken={}={}".format(token_id, token_secret)
-    session      = Session()
+    session      = Session(insecure_skip_verify=INSECURE_ALLOWED)
     session.headers.set('Accept', 'application/json')
     session.headers.set('Authorization', token_header)
+    api_url      = base_url + "/api2/json"
+    if DEBUG:
+        print("DEBUG: API URL: {}".format(api_url))
 
-    api_url = "{}{}".format(base_url, "/api2/json")  # Base API URL :contentReference[oaicite:0]{index=0}
-
-    # --- 2) Fetch Proxmox VE version ---
     ver_resp = session.get(api_url + "/version")
-    version  = json_decode(ver_resp.body).get('data', {}).get('release', '')
+    if DEBUG:
+        print("DEBUG: /version status code: {}".format(ver_resp.status_code))
+    version = json_decode(ver_resp.body).get('data', {}).get('release', '')
+    if DEBUG:
+        print("DEBUG: Proxmox version: {}".format(version))
 
     assets = []
-    idx    = 1
 
     # --- 3) Discover cluster nodes ---
-    nodes_resp = session.get(api_url + "/nodes")
-    nodes      = json_decode(nodes_resp.body).get('data', [])  # GET /nodes :contentReference[oaicite:1]{index=1}
+    nodes = json_decode(session.get(api_url + "/nodes").body).get('data', [])
+    if DEBUG:
+        print("DEBUG: Found {} nodes".format(len(nodes)))
     for node in nodes:
+        if DEBUG:
+            print("DEBUG: Node entry: {}".format(node))
         node_name = node.get('node')
+        asset_id  = node_name
+        mgmt_ip   = node.get('ip')
+        if DEBUG:
+            print("DEBUG: Node {} mgmt_ip: {}".format(node_name, mgmt_ip))
 
-        # Build NetworkInterface list from management IP
         network_ifaces = []
-        mgmt_ip = node.get('ip')
         if mgmt_ip:
-            ip_addr = ip_address(mgmt_ip)
-            network_ifaces.append(
-                NetworkInterface(
-                    macAddress=None,
-                    ipv4Addresses=[ip_addr] if ip_addr.version == 4 else [],
-                    ipv6Addresses=[ip_addr] if ip_addr.version == 6 else []
-                )
-            )
+            ip_clean = mgmt_ip.split('/', 1)[0]
+            ip_obj   = ip_address(ip_clean)
+            if ip_obj:
+                network_ifaces.append(NetworkInterface(
+                    macAddress    = None,
+                    ipv4Addresses = [ip_obj] if ip_obj.version == 4 else [],
+                    ipv6Addresses = [ip_obj] if ip_obj.version == 6 else []
+                ))
 
-        # Flatten key stats into customAttributes
         node_attrs = {
             'status':       node.get('status'),
             'cpu_usage':    node.get('cpu'),
@@ -67,90 +78,159 @@ def main(*args, **kwargs):
             'disk_total':   node.get('maxdisk'),
             'uptime':       node.get('uptime'),
         }
+        assets.append(ImportAsset(
+            id                = asset_id,
+            hostnames         = [node_name],
+            networkInterfaces = network_ifaces,
+            os                = "Proxmox VE",
+            osVersion         = version,
+            manufacturer      = "Proxmox",
+            model             = node_name,
+            deviceType        = "Proxmox Cluster Node",
+            tags              = ["proxmox", "cluster", "node"],
+            customAttributes  = node_attrs,
+        ))
 
-        assets.append(
-            ImportAsset(
-                id                = idx,
-                hostnames         = [node_name],
-                networkInterfaces = network_ifaces,
-                os                = "Proxmox VE",
-                osVersion         = version,
-                manufacturer      = "Proxmox",
-                model             = node_name,
-                deviceType        = "Proxmox Cluster Node",
-                tags              = ["proxmox", "cluster", node.get('type', 'node')],
-                customAttributes  = node_attrs,
-            )
-        )
-        idx += 1
-
-        # --- 4) Discover QEMU VMs on this node ---
-        vms_resp = session.get(api_url + "/nodes/{}/qemu".format(node_name))
-        vms      = json_decode(vms_resp.body).get('data', [])
+        # --- 4) QEMU VMs on this node ---
+        vms = json_decode(session.get(api_url + "/nodes/{}/qemu".format(node_name)).body).get('data', [])
+        if DEBUG:
+            print("DEBUG: Node {} has {} VMs".format(node_name, len(vms)))
         for vm in vms:
-            vmid = vm.get('vmid')
-            # Fetch current VM status/details
-            detail = json_decode(
-                session.get(api_url + "/nodes/{}/qemu/{}/status/current".format(node_name, vmid)).body
-            ).get('data', {})
+            vmid     = vm.get('vmid')
+            asset_id = str(vmid)
+            if DEBUG:
+                print("DEBUG: Processing VMID: {}".format(vmid))
 
-            # Build VM network interfaces (if any IPs reported)
+            # 4.1) status/current
+            detail = json_decode(session.get(
+                api_url + "/nodes/{}/qemu/{}/status/current".format(node_name, vmid)
+            ).body).get('data', {})
+
+            # 4.2) Guest Agent
+            ga_json = json_decode(session.get(
+                api_url + "/nodes/{}/qemu/{}/agent/network-get-interfaces".format(node_name, vmid)
+            ).body) or {}
+            if DEBUG:
+                print("DEBUG: GA JSON for VM {}: {}".format(vmid, ga_json))
+
+            data_val = ga_json.get('data') or {}
+            raw_ifaces = data_val.get('result') or []
+            # Guard: ensure raw_ifaces is actually a list
+            if type(raw_ifaces) != type([]):
+                if DEBUG:
+                    print("DEBUG: GA result not a list for VM {}, clearing".format(vmid))
+                raw_ifaces = []
+            if DEBUG:
+                print("DEBUG: GA ifaces list for VM {}: {}".format(vmid, raw_ifaces))
+
             vm_ifaces = []
-            for ip in detail.get('ip', []):
-                ip_addr = ip_address(ip)
-                vm_ifaces.append(
-                    NetworkInterface(
-                        macAddress=None,
-                        ipv4Addresses=[ip_addr] if ip_addr.version == 4 else [],
-                        ipv6Addresses=[ip_addr] if ip_addr.version == 6 else []
-                    )
-                )
+            if raw_ifaces:
+                for nic in raw_ifaces:
+                    if DEBUG:
+                        print("DEBUG: GA NIC entry for VM {}: {}".format(vmid, nic))
+                    mac = nic.get('hardware-address')
+                    for ipinfo in nic.get('ip-addresses', []):
+                        ip_str = ipinfo.get('ip-address')
+                        if ip_str:
+                            ip_clean = ip_str.split('/', 1)[0]
+                            ip_obj   = ip_address(ip_clean)
+                            if ip_obj:
+                                vm_ifaces.append(NetworkInterface(
+                                    macAddress    = mac,
+                                    ipv4Addresses = [ip_obj] if ip_obj.version == 4 else [],
+                                    ipv6Addresses = [ip_obj] if ip_obj.version == 6 else []
+                                ))
+
+            # 4.3) Fallback to config & status/current IPs
+            if not vm_ifaces:
+                cfg_data = (json_decode(session.get(
+                    api_url + "/nodes/{}/qemu/{}/config".format(node_name, vmid)
+                ).body) or {}).get('data', {}) or {}
+                for key, val in cfg_data.items():
+                    if key.startswith('net'):
+                        parts = val.split(',')
+                        mac = None
+                        for p in parts:
+                            if p.startswith('mac='):
+                                mac = p.split('=',1)[1]
+                                break
+                        if DEBUG:
+                            print("DEBUG: Fallback MAC from {} for VM {}: {}".format(key, vmid, mac))
+                        vm_ifaces.append(NetworkInterface(
+                            macAddress    = mac,
+                            ipv4Addresses = [],
+                            ipv6Addresses = []
+                        ))
+                for ip in detail.get('ip', []):
+                    if ip:
+                        ip_clean = ip.split('/',1)[0]
+                        ip_obj   = ip_address(ip_clean)
+                        if ip_obj:
+                            vm_ifaces.append(NetworkInterface(
+                                macAddress    = None,
+                                ipv4Addresses = [ip_obj] if ip_obj.version == 4 else [],
+                                ipv6Addresses = [ip_obj] if ip_obj.version == 6 else []
+                            ))
+
+            if DEBUG:
+                print("DEBUG: Total interfaces for VM {}: {}".format(vmid, len(vm_ifaces)))
 
             vm_attrs = {
-                'vmid':  vmid,
-                'node':  node_name,
-                'status':detail.get('status'),
+                'vmid':   vmid,
+                'node':   node_name,
+                'status': detail.get('status'),
                 'memory': detail.get('maxmem'),
                 'cpu':    detail.get('maxcpu'),
                 'uptime': detail.get('uptime'),
             }
+            assets.append(ImportAsset(
+                id                = asset_id,
+                hostnames         = [detail.get('name')] if detail.get('name') else [],
+                networkInterfaces = vm_ifaces,
+                os                = detail.get('template', 'QEMU VM'),
+                osVersion         = version,
+                manufacturer      = "Proxmox",
+                model             = "VM",
+                deviceType        = "Proxmox VM",
+                tags              = ["proxmox", "qemu", "vm"],
+                customAttributes  = vm_attrs,
+            ))
 
-            assets.append(
-                ImportAsset(
-                    id                = idx,
-                    hostnames         = [ detail.get('name') ] if detail.get('name') else [],
-                    networkInterfaces = vm_ifaces,
-                    os                = detail.get('template', 'QEMU VM'),
-                    osVersion         = version,
-                    manufacturer      = "Proxmox",
-                    model             = "VM {}".format(vmid),
-                    deviceType        = "Proxmox VM",
-                    tags              = ["proxmox", "qemu", "vm"],
-                    customAttributes  = vm_attrs,
-                )
-            )
-            idx += 1
-
-        # --- 5) Discover LXC containers on this node ---
-        ct_resp = session.get(api_url + "/nodes/{}/lxc".format(node_name))
-        cts     = json_decode(ct_resp.body).get('data', [])
+        # --- 5) LXC containers on this node ---
+        cts = json_decode(session.get(api_url + "/nodes/{}/lxc".format(node_name)).body).get('data', [])
         for ct in cts:
-            ct_id = ct.get('vmid')
-            detail = json_decode(
-                session.get(api_url + "/nodes/{}/lxc/{}/status/current".format(node_name, ct_id)).body
-            ).get('data', {})
+            ct_id   = ct.get('vmid')
+            asset_id= str(ct_id)
+            detail  = json_decode(session.get(
+                api_url + "/nodes/{}/lxc/{}/status/current".format(node_name, ct_id)
+            ).body).get('data', {}) or {}
 
-            # Build container interfaces
             ct_ifaces = []
+            lxc_cfg_data = (json_decode(session.get(
+                api_url + "/nodes/{}/lxc/{}/config".format(node_name, ct_id)
+            ).body) or {}).get('data', {}) or {}
+            for key, val in lxc_cfg_data.items():
+                if key.startswith('net'):
+                    parts = val.split(',')
+                    mac = None
+                    for p in parts:
+                        if p.startswith('hwaddr=') or p.startswith('mac='):
+                            mac = p.split('=',1)[1]
+                            break
+                    ct_ifaces.append(NetworkInterface(
+                        macAddress    = mac,
+                        ipv4Addresses = [],
+                        ipv6Addresses = []
+                    ))
             for ip in detail.get('ip', []):
-                ip_addr = ip_address(ip)
-                ct_ifaces.append(
-                    NetworkInterface(
-                        macAddress=None,
-                        ipv4Addresses=[ip_addr] if ip_addr.version == 4 else [],
-                        ipv6Addresses=[ip_addr] if ip_addr.version == 6 else []
-                    )
-                )
+                if ip:
+                    ip_obj = ip_address(ip)
+                    if ip_obj:
+                        ct_ifaces.append(NetworkInterface(
+                            macAddress    = None,
+                            ipv4Addresses = [ip_obj] if ip_obj.version == 4 else [],
+                            ipv6Addresses = [ip_obj] if ip_obj.version == 6 else []
+                        ))
 
             ct_attrs = {
                 'vmid':   ct_id,
@@ -160,21 +240,19 @@ def main(*args, **kwargs):
                 'cpu':    detail.get('maxcpu'),
                 'uptime': detail.get('uptime'),
             }
+            assets.append(ImportAsset(
+                id                = asset_id,
+                hostnames         = [detail.get('name')] if detail.get('name') else [],
+                networkInterfaces = ct_ifaces,
+                os                = detail.get('template', 'LXC Container'),
+                osVersion         = version,
+                manufacturer      = "Proxmox",
+                model             = "CT",
+                deviceType        = "Proxmox LXC Container",
+                tags              = ["proxmox", "lxc", "container"],
+                customAttributes  = ct_attrs,
+            ))
 
-            assets.append(
-                ImportAsset(
-                    id                = idx,
-                    hostnames         = [ detail.get('name') ] if detail.get('name') else [],
-                    networkInterfaces = ct_ifaces,
-                    os                = detail.get('template', 'LXC Container'),
-                    osVersion         = version,
-                    manufacturer      = "Proxmox",
-                    model             = "CT {}".format(ct_id),
-                    deviceType        = "Proxmox LXC Container",
-                    tags              = ["proxmox", "lxc", "container"],
-                    customAttributes  = ct_attrs,
-                )
-            )
-            idx += 1
-
+    if DEBUG:
+        print("DEBUG: Total assets collected: {}".format(len(assets)))
     return assets
