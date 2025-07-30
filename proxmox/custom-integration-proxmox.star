@@ -1,4 +1,5 @@
 load('requests', 'Session')
+
 load('json', json_decode='decode')
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
 load('net', 'ip_address')
@@ -10,8 +11,8 @@ INSECURE_ALLOWED = True
 def main(*args, **kwargs):
     """
     Entrypoint for Proxmox VE integration, with debug prints
-    controlled by the DEBUG global, and robust handling when
-    the Guest Agent returns an error object instead of a list.
+    controlled by the DEBUG global, robust GA-interface handling,
+    and optional guest‐agent OS detection.
     """
     # --- 1) Parse config & auth ---
     secret       = json_decode(kwargs.get('access_secret', '{}'))
@@ -26,7 +27,7 @@ def main(*args, **kwargs):
         print("ERROR: Missing base_url or credentials")
         return []
 
-    # --- 2) Setup session & fetch version ---
+    # --- 2) Setup session & fetch Proxmox version ---
     token_header = "PVEAPIToken={}={}".format(token_id, token_secret)
     session      = Session(insecure_skip_verify=INSECURE_ALLOWED)
     session.headers.set('Accept', 'application/json')
@@ -49,14 +50,13 @@ def main(*args, **kwargs):
     if DEBUG:
         print("DEBUG: Found {} nodes".format(len(nodes)))
     for node in nodes:
-        if DEBUG:
-            print("DEBUG: Node entry: {}".format(node))
         node_name = node.get('node')
         asset_id  = node_name
         mgmt_ip   = node.get('ip')
         if DEBUG:
-            print("DEBUG: Node {} mgmt_ip: {}".format(node_name, mgmt_ip))
+            print("DEBUG: Node {} entry: {}".format(node_name, node))
 
+        # Management IP interface
         network_ifaces = []
         if mgmt_ip:
             ip_clean = mgmt_ip.split('/', 1)[0]
@@ -87,7 +87,7 @@ def main(*args, **kwargs):
             manufacturer      = "Proxmox",
             model             = node_name,
             deviceType        = "Proxmox Cluster Node",
-            tags              = ["proxmox", "cluster", "node"],
+            tags              = ["proxmox","cluster","node"],
             customAttributes  = node_attrs,
         ))
 
@@ -101,36 +101,35 @@ def main(*args, **kwargs):
             if DEBUG:
                 print("DEBUG: Processing VMID: {}".format(vmid))
 
-            # 4.1) status/current
+            # 4.1) Fetch VM status/current
             detail = json_decode(session.get(
                 api_url + "/nodes/{}/qemu/{}/status/current".format(node_name, vmid)
             ).body).get('data', {})
 
-            # 4.2) Guest Agent
-            ga_json = json_decode(session.get(
+            # 4.2) Build network interfaces via guest agent
+            ga_json    = json_decode(session.get(
                 api_url + "/nodes/{}/qemu/{}/agent/network-get-interfaces".format(node_name, vmid)
             ).body) or {}
             if DEBUG:
                 print("DEBUG: GA JSON for VM {}: {}".format(vmid, ga_json))
 
-            data_val = ga_json.get('data') or {}
-            raw_ifaces = data_val.get('result') or []
-            # Guard: ensure raw_ifaces is actually a list
-            if type(raw_ifaces) != type([]):
+            data_val   = ga_json.get('data') or {}
+            iface_res  = data_val.get('result') or []
+            # If Proxmox returned an error object (dict with "error"), skip GA interfaces
+            if iface_res and ("error" in iface_res):
                 if DEBUG:
-                    print("DEBUG: GA result not a list for VM {}, clearing".format(vmid))
+                    print("DEBUG: GA error for VM {}, skipping GA interfaces".format(vmid))
                 raw_ifaces = []
-            if DEBUG:
-                print("DEBUG: GA ifaces list for VM {}: {}".format(vmid, raw_ifaces))
+            else:
+                raw_ifaces = iface_res
 
             vm_ifaces = []
-            if raw_ifaces:
-                for nic in raw_ifaces:
-                    if DEBUG:
-                        print("DEBUG: GA NIC entry for VM {}: {}".format(vmid, nic))
-                    mac = nic.get('hardware-address')
-                    for ipinfo in nic.get('ip-addresses', []):
-                        ip_str = ipinfo.get('ip-address')
+            for nic in raw_ifaces:
+                # only process if this nic dict has a hardware-address field
+                if "hardware-address" in nic:
+                    mac = nic.get("hardware-address")
+                    for ipinfo in nic.get("ip-addresses", []):
+                        ip_str = ipinfo.get("ip-address")
                         if ip_str:
                             ip_clean = ip_str.split('/', 1)[0]
                             ip_obj   = ip_address(ip_clean)
@@ -141,29 +140,27 @@ def main(*args, **kwargs):
                                     ipv6Addresses = [ip_obj] if ip_obj.version == 6 else []
                                 ))
 
-            # 4.3) Fallback to config & status/current IPs
+            # 4.3) Fallback: parse VM config for MACs and status/current for IPs
             if not vm_ifaces:
                 cfg_data = (json_decode(session.get(
                     api_url + "/nodes/{}/qemu/{}/config".format(node_name, vmid)
                 ).body) or {}).get('data', {}) or {}
                 for key, val in cfg_data.items():
-                    if key.startswith('net'):
+                    if key.startswith("net"):
                         parts = val.split(',')
                         mac = None
                         for p in parts:
-                            if p.startswith('mac='):
-                                mac = p.split('=',1)[1]
+                            if p.startswith("mac="):
+                                mac = p.split("=",1)[1]
                                 break
-                        if DEBUG:
-                            print("DEBUG: Fallback MAC from {} for VM {}: {}".format(key, vmid, mac))
                         vm_ifaces.append(NetworkInterface(
                             macAddress    = mac,
                             ipv4Addresses = [],
                             ipv6Addresses = []
                         ))
-                for ip in detail.get('ip', []):
+                for ip in detail.get("ip", []):
                     if ip:
-                        ip_clean = ip.split('/',1)[0]
+                        ip_clean = ip.split("/",1)[0]
                         ip_obj   = ip_address(ip_clean)
                         if ip_obj:
                             vm_ifaces.append(NetworkInterface(
@@ -175,6 +172,33 @@ def main(*args, **kwargs):
             if DEBUG:
                 print("DEBUG: Total interfaces for VM {}: {}".format(vmid, len(vm_ifaces)))
 
+            # --- 4.4) Attempt guest-agent OS info ---
+            os_field         = detail.get("template", "QEMU VM")
+            os_version_field = version
+
+            os_json = json_decode(session.get(
+                api_url + "/nodes/{}/qemu/{}/agent/get-osinfo".format(node_name, vmid)
+            ).body) or {}
+            if DEBUG:
+                print("DEBUG: OS-Info JSON for VM {}: {}".format(vmid, os_json))
+
+            os_data = os_json.get("data") or {}
+            os_info = os_data.get("result") or os_data
+
+            # only if no error key present and pretty-name is provided
+            if os_info and ("error" not in os_info) and ("pretty-name" in os_info):
+                pretty = os_info.get("pretty-name") or os_info.get("name")
+                major  = os_info.get("major")
+                minor  = os_info.get("minor")
+                if pretty:
+                    os_field = pretty
+                if major != None and minor != None:
+                    os_version_field = "{}.{}".format(major, minor)
+                if DEBUG:
+                    print("DEBUG: Resolved OS for VM {}: {} {}".format(
+                        vmid, os_field, os_version_field
+                    ))
+
             vm_attrs = {
                 'vmid':   vmid,
                 'node':   node_name,
@@ -185,44 +209,44 @@ def main(*args, **kwargs):
             }
             assets.append(ImportAsset(
                 id                = asset_id,
-                hostnames         = [detail.get('name')] if detail.get('name') else [],
+                hostnames         = [detail.get("name")] if detail.get("name") else [],
                 networkInterfaces = vm_ifaces,
-                os                = detail.get('template', 'QEMU VM'),
-                osVersion         = version,
+                os                = os_field,
+                osVersion         = os_version_field,
                 manufacturer      = "Proxmox",
                 model             = "VM",
                 deviceType        = "Proxmox VM",
-                tags              = ["proxmox", "qemu", "vm"],
+                tags              = ["proxmox","qemu","vm"],
                 customAttributes  = vm_attrs,
             ))
 
         # --- 5) LXC containers on this node ---
         cts = json_decode(session.get(api_url + "/nodes/{}/lxc".format(node_name)).body).get('data', [])
         for ct in cts:
-            ct_id   = ct.get('vmid')
-            asset_id= str(ct_id)
-            detail  = json_decode(session.get(
+            ct_id    = ct.get("vmid")
+            asset_id = str(ct_id)
+            detail   = json_decode(session.get(
                 api_url + "/nodes/{}/lxc/{}/status/current".format(node_name, ct_id)
-            ).body).get('data', {}) or {}
+            ).body).get("data", {}) or {}
 
             ct_ifaces = []
-            lxc_cfg_data = (json_decode(session.get(
+            lxc_cfg   = (json_decode(session.get(
                 api_url + "/nodes/{}/lxc/{}/config".format(node_name, ct_id)
-            ).body) or {}).get('data', {}) or {}
-            for key, val in lxc_cfg_data.items():
-                if key.startswith('net'):
-                    parts = val.split(',')
+            ).body) or {}).get("data", {}) or {}
+            for key, val in lxc_cfg.items():
+                if key.startswith("net"):
+                    parts = val.split(",")
                     mac = None
                     for p in parts:
-                        if p.startswith('hwaddr=') or p.startswith('mac='):
-                            mac = p.split('=',1)[1]
+                        if p.startswith("hwaddr=") or p.startswith("mac="):
+                            mac = p.split("=",1)[1]
                             break
                     ct_ifaces.append(NetworkInterface(
                         macAddress    = mac,
                         ipv4Addresses = [],
                         ipv6Addresses = []
                     ))
-            for ip in detail.get('ip', []):
+            for ip in detail.get("ip", []):
                 if ip:
                     ip_obj = ip_address(ip)
                     if ip_obj:
@@ -242,14 +266,14 @@ def main(*args, **kwargs):
             }
             assets.append(ImportAsset(
                 id                = asset_id,
-                hostnames         = [detail.get('name')] if detail.get('name') else [],
+                hostnames         = [detail.get("name")] if detail.get("name") else [],
                 networkInterfaces = ct_ifaces,
-                os                = detail.get('template', 'LXC Container'),
+                os                = detail.get("template","LXC Container"),
                 osVersion         = version,
                 manufacturer      = "Proxmox",
                 model             = "CT",
                 deviceType        = "Proxmox LXC Container",
-                tags              = ["proxmox", "lxc", "container"],
+                tags              = ["proxmox","lxc","container"],
                 customAttributes  = ct_attrs,
             ))
 
