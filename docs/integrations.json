@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-07-23T17:23:21.960178Z",
-  "totalIntegrations": 21,
+  "lastUpdated": "2025-08-01T14:13:13.006642Z",
+  "totalIntegrations": 22,
   "integrationDetails": [
     {
       "name": "NinjaOne",
@@ -97,6 +97,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/custom-integration-netskope.star"
+    },
+    {
+      "name": "Proxmox",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
     },
     {
       "name": "Cortex XDR",
