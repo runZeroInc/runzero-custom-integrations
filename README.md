@@ -35,6 +35,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
 - [Proxmox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/)
 - [runZero Task Sync](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/)
+- [Scale Computing](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scale-computing/)
 - [Snipe-IT](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/)
 - [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
