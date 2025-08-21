@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-08-18T16:20:40.842751Z",
-  "totalIntegrations": 22,
+  "lastUpdated": "2025-08-21T19:43:46.074394Z",
+  "totalIntegrations": 23,
   "integrationDetails": [
     {
       "name": "Digital Ocean",
@@ -55,6 +55,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/custom-integration-stairwell.star"
+    },
+    {
+      "name": "Kubernetes",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kubernetes/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kubernetes/custom-integration-kubernetes.star"
     },
     {
       "name": "runZero Task Sync",
