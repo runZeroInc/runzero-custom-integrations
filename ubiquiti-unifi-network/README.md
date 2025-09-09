@@ -1,5 +1,5 @@
 # Custom Integration: Ubiquiti Unifi Network
-Custom Integration for retrieving clients from the Unifi Network API
+Custom Integration for retrieving clients and Unifi devices from the Unifi Network API
 ## runZero requirements
 
 - Superuser access to the [Custom Integrations configuration](https://console.runzero.com/custom-integrations) in runZero.
@@ -22,13 +22,15 @@ Custom Integration for retrieving clients from the Unifi Network API
 1. Make any necessary changes to the script to align with your environment.
     - Set `UNIFI_CONTROLLER_URL`
     - Set `UNIFI_SITE_NAME`
-    - (OPTIONAL) Modify Search Filter 
+    - (OPTIONAL) Disable client extract with `EXTRACT_CLIENTS = False`
+    - (OPTIONAL) Disable device extract with `EXTRACT_DEVICES = False`
+    - (OPTIONAL) Modify `UNIFI_CLIENT_API_FILTER`
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
     - Use the `access_secret` field for your Unifi API token.
     - For `access_key`, input a placeholder value like `foo` (unused in this integration).
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
-    - Add a Name and Icon for the integration (e.g., "unifi-clients").
+    - Add a Name and Icon for the integration (e.g., "unifi").
     - Toggle `Enable custom integration script` to input the finalized script.
     - Click `Validate` to ensure it has valid syntax.
     - Click `Save` to create the Custom Integration.
@@ -43,4 +45,4 @@ Custom Integration for retrieving clients from the Unifi Network API
 - You will see the task kick off on the [tasks](https://console.runzero.com/tasks) page like any other integration.
 - The task will update the existing assets with the data pulled from the Custom Integration source.
 - The task will create new assets for when there are no existing assets that meet merge criteria (hostname, MAC, etc).
-- You can search for assets enriched by this custom integration with the runZero search `custom_integration:unifi-clients`.
+- You can search for assets enriched by this custom integration with the runZero search `custom_integration:unifi`.
