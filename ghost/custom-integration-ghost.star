@@ -142,6 +142,7 @@ def main(*args, **kwargs):
             description=f.get("description", "No description available"),
             solution=f.get("remediation"),
             severityRank=severity_map.get(f.get("severity", "medium"), 2),
+            riskRank=severity_map.get(f.get("severity", "medium"), 2),
             custom_attributes={
                 "severity": f.get("severity", "medium"),
                 "confidence": f.get("confidence", "medium"),
