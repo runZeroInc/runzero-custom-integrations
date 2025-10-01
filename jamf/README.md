@@ -16,6 +16,7 @@
 1. Generate an API Client ID and API Client Secret in your JAMF instance.
    - Refer to the [JAMF API Documentation](https://developer.jamf.com/) for guidance.
    - Ensure the credentials have permissions to access the `computers-inventory` and `computers-inventory-detail` endpoints.
+   - Read Computer Inventory Collection, Read Computer Security, Read Computers, Read Computer Extension Attributes
 2. Note down your JAMF API URL (e.g., `https://<your-jamf-instance>.jamfcloud.com`).
 3. Test your API credentials by retrieving a bearer token using the `oauth/token` endpoint.
 
