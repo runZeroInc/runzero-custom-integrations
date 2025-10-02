@@ -1,0 +1,16 @@
+{
+  "title": "Cyberint",
+  "description": "Cyberint Argos Threat Intelligence",
+  "name": "cyberint",
+  "version": "1.0",
+  "logo": "cyberint.png",
+  "fields": [
+    {
+      "name": "cyberint_api_key",
+      "type": "password",
+      "label": "Cyberint API Key",
+      "required": true,
+      "description": "Your Cyberint API key"
+    }
+  ]
+}
