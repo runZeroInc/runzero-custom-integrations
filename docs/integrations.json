@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-10-02T21:07:47.068354Z",
+  "lastUpdated": "2025-10-02T21:08:30.500200Z",
   "totalIntegrations": 23,
   "integrationDetails": [
     {
@@ -15,7 +15,7 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
     },
     {
-      "name": "cyberint",
+      "name": "Cyberint",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberint/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberint/custom-integration-cyberint.star"
