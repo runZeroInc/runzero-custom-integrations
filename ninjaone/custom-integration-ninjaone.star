@@ -6,6 +6,8 @@ load('uuid', 'new_uuid')
 
 NINJAONE_API_URL = 'https://us2.ninjarmm.com'
 
+IMPORT_SOFTWARE = True
+
 def get_token(client_id, client_secret):
     url = NINJAONE_API_URL + '/ws/oauth/token'
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
@@ -58,7 +60,7 @@ def get_assets(token):
 
     return assets_all
 
-def build_assets(assets_json):
+def build_assets(token, assets_json):
     imported_assets = []
     for item in assets_json:
         id = item.get('id', new_uuid)
@@ -98,6 +100,11 @@ def build_assets(assets_json):
             network = build_network_interface(ips=ips, mac=None)
             networks.append(network)
 
+        # build software inventory for asset (optional)
+        software = []
+        if IMPORT_SOFTWARE == True:
+            software = build_software(token, id)
+
         imported_assets.append(
             ImportAsset(
                 id=str(id),
@@ -110,6 +117,7 @@ def build_assets(assets_json):
                 networkInterfaces=networks,
                 os=item.get('os', {}).get('name', ''),
                 manufacturer=item.get('system', {}).get('manufacturer', ''),
+                software=software,
                 customAttributes={
                     'id':id,
                     'displayName':item.get('displayName', ''), 
@@ -151,6 +159,46 @@ def build_assets(assets_json):
         )
     return imported_assets
 
+# build software inventory
+def build_software(token, id):
+    software = []
+    url = NINJAONE_API_URL + "/v2/device/{id}/software"
+    headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
+
+    response = http_get(url, headers=headers)
+
+    if response.status_code != 200:
+        print('failed to retrieve software', response)
+        return None
+
+    software_inventory = json_decode(response.body)
+
+    if software:
+        for s in software_inventory:
+            name = s.get('name', '')
+            publisher = s.get('publisher', '')
+            version = s.get('version', '')
+            location = s.get('location', '')
+            size = s.get('size', '')
+            install_date = s.get('installDate', '')
+            product_code = s.get('productCode', '') 
+            software.append(
+                Software(
+                    vendor=publisher,
+                    product=name,
+                    version=version,
+                    installed_at=location,
+                    installed_size=size,
+                    customAttributes={
+                        'installDate':install_date,
+                        'productCode':product_code
+                    }
+                    
+                )
+            )
+
+    return software
+
 # build runZero network interfaces; shouldn't need to touch this
 def build_network_interface(ips, mac):
     ip4s = []
@@ -186,6 +234,6 @@ def main(**kwargs):
         return None
     
     # build asset import
-    imported_assets = build_assets(assets)
+    imported_assets = build_assets(token, assets)
     
     return imported_assets
