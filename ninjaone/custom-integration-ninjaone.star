@@ -1,4 +1,4 @@
-load('runzero.types', 'ImportAsset', 'NetworkInterface')
+load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software', 'Vulnerability')
 load('json', json_encode='encode', json_decode='decode')
 load('net', 'ip_address')
 load('http', http_post='post', http_get='get', 'url_encode')
@@ -64,7 +64,6 @@ def build_assets(token, assets_json):
     imported_assets = []
     for item in assets_json:
         id = item.get('id', new_uuid)
-
         display_name = item.get('displayName', '')
         system_name = item.get('systemName', '')
         dns_name = item.get('')
@@ -162,18 +161,18 @@ def build_assets(token, assets_json):
 # build software inventory
 def build_software(token, id):
     software = []
-    url = NINJAONE_API_URL + "/v2/device/{id}/software"
+    url = '{}/v2/device/{}/software'.format(NINJAONE_API_URL, id)
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
 
     response = http_get(url, headers=headers)
 
     if response.status_code != 200:
-        print('failed to retrieve software', response)
+        print('failed to retrieve software for asset ', id, 'msg: ', response)
         return None
 
     software_inventory = json_decode(response.body)
 
-    if software:
+    if software_inventory:
         for s in software_inventory:
             name = s.get('name', '')
             publisher = s.get('publisher', '')
@@ -184,14 +183,15 @@ def build_software(token, id):
             product_code = s.get('productCode', '') 
             software.append(
                 Software(
+                    id=str(new_uuid),
                     vendor=publisher,
                     product=name,
                     version=version,
-                    installed_at=location,
-                    installed_size=size,
                     customAttributes={
                         'installDate':install_date,
-                        'productCode':product_code
+                        'installLocation':location,
+                        'productCode':product_code,
+                        'size':size
                     }
                     
                 )
