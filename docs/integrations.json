@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-02T21:08:30.500200Z",
-  "totalIntegrations": 23,
+  "lastUpdated": "2025-10-22T14:48:41.526510Z",
+  "totalIntegrations": 24,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -139,6 +139,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
+    },
+    {
+      "name": "Snow License Manager",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/snow.star"
     }
   ]
 }
