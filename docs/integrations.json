@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-10-01T19:59:14.765321Z",
+  "lastUpdated": "2025-10-02T21:08:30.500200Z",
   "totalIntegrations": 23,
   "integrationDetails": [
     {
@@ -13,6 +13,12 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
+    },
+    {
+      "name": "Cyberint",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberint/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberint/custom-integration-cyberint.star"
     },
     {
       "name": "Manage Engine Endpoint Central",
@@ -31,12 +37,6 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/custom-integration-vulnerability-workflow.star"
-    },
-    {
-      "name": "Ghost Security",
-      "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/custom-integration-ghost.star"
     },
     {
       "name": "Carbon Black",
