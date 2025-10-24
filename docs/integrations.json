@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-02T21:08:30.500200Z",
-  "totalIntegrations": 23,
+  "lastUpdated": "2025-10-24T15:50:17.555571Z",
+  "totalIntegrations": 24,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -37,6 +37,12 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/custom-integration-vulnerability-workflow.star"
+    },
+    {
+      "name": "Ghost Security",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/custom-integration-ghost.star"
     },
     {
       "name": "Carbon Black",
