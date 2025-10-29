@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-24T15:50:17.555571Z",
-  "totalIntegrations": 24,
+  "lastUpdated": "2025-10-29T13:28:53.818462Z",
+  "totalIntegrations": 25,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -79,6 +79,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/custom-integration-device42.star"
+    },
+    {
+      "name": "Audit Log to Webhook",
+      "type": "outbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/custom-integration-audit-events.star"
     },
     {
       "name": "NinjaOne",
