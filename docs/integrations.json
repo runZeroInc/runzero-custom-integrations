@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-10-29T13:28:23.435777Z",
+  "lastUpdated": "2025-10-29T13:28:53.818462Z",
   "totalIntegrations": 25,
   "integrationDetails": [
     {
@@ -81,7 +81,7 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/custom-integration-device42.star"
     },
     {
-      "name": "Audit Log Webhook",
+      "name": "Audit Log to Webhook",
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/custom-integration-audit-events.star"
