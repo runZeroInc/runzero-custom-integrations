@@ -28,6 +28,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Digital Ocean](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/)
 - [Drata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/)
 - [Extreme Networks CloudIQ](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/)
+- [Guardicore Centra](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai_guardicore_centra/)
 - [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
 - [Kandji](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/)
 - [Lima Charlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)

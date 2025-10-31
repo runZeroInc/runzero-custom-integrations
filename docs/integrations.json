@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-02T21:08:30.500200Z",
-  "totalIntegrations": 23,
+  "lastUpdated": "2025-10-31T18:19:15.255137Z",
+  "totalIntegrations": 24,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -13,6 +13,12 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
+    },
+    {
+      "name": "Guardicore Centra",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai_guardicore_centra/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai_guardicore_centra/centrav3.star"
     },
     {
       "name": "Cyberint",
