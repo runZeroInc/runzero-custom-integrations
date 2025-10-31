@@ -5,7 +5,7 @@
 - Clone this repository
 
 ```
-git clone https://github.com/TechnoSavage/runZero.git
+git clone https://github.com/runZeroInc/runzero-custom-integrations.git
 ``` 
 
 ## runZero requirements
@@ -28,9 +28,13 @@ git clone https://github.com/TechnoSavage/runZero.git
 
 ### Guardicore Centra configuration
 
-1. Determine the proper Guardicore Centra URL:
+1. Select appropriate script to use.
+    - Guardicore Centra concurrently supports two different API versions: the v3 API and the v4 API. Thus there is a script named centrav3.star and centrav4.star accordingly.
+    - A large portion of the data provided by each API overlaps but there are differences between the two.
+    - Review the script for each API to see if one better suits your use case than the other. Unless there is a specific need to use the centrav3.star script (v3 API) then it is recommended to use the centrav4.star script (v4 API).
+2. Determine the proper Guardicore Centra URL:
     - Assign the URL to `CENTRA_BASE_URL` within the starlark script 
-2. Create login credentials with necessary, read-only access to retrieve JWT token for API access: 
+3. Create login credentials with necessary, read-only access to retrieve JWT token for API access: 
     - Copy the username to the value for `access_key` when creating the Custom Integration credentials in the runZero console (see below)
     - Copy the password to the the value for `access_secret` when creating the Custom Integration credentials in the runZero console (see below)
 
