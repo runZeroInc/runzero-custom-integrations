@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-29T19:27:39.971854Z",
-  "totalIntegrations": 25,
+  "lastUpdated": "2025-11-03T16:33:29.642322Z",
+  "totalIntegrations": 27,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -55,6 +55,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
+    },
+    {
+      "name": "Ubiquiti Unifi Network",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/custom-integration-ubiquiti-unifi-network.star"
     },
     {
       "name": "Automox",
@@ -151,6 +157,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
+    },
+    {
+      "name": "Snow License Manager",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/snow.star"
     }
   ]
 }
