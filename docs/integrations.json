@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-31T18:19:15.255137Z",
-  "totalIntegrations": 24,
+  "lastUpdated": "2025-11-03T16:33:29.642322Z",
+  "totalIntegrations": 27,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -45,6 +45,12 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/custom-integration-vulnerability-workflow.star"
     },
     {
+      "name": "Ghost Security",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/custom-integration-ghost.star"
+    },
+    {
       "name": "Carbon Black",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/carbon-black/README.md",
@@ -55,6 +61,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
+    },
+    {
+      "name": "Ubiquiti Unifi Network",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/custom-integration-ubiquiti-unifi-network.star"
     },
     {
       "name": "Automox",
@@ -79,6 +91,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/custom-integration-device42.star"
+    },
+    {
+      "name": "Audit Log to Webhook",
+      "type": "outbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/custom-integration-audit-events.star"
     },
     {
       "name": "NinjaOne",
@@ -145,6 +163,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
+    },
+    {
+      "name": "Snow License Manager",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/snow.star"
     }
   ]
 }
