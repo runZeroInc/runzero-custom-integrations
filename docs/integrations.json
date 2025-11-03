@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-31T18:05:56.263755Z",
-  "totalIntegrations": 26,
+  "lastUpdated": "2025-11-03T16:33:29.642322Z",
+  "totalIntegrations": 27,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -55,6 +55,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
+    },
+    {
+      "name": "Ubiquiti Unifi Network",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/custom-integration-ubiquiti-unifi-network.star"
     },
     {
       "name": "Automox",

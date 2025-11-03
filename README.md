@@ -42,6 +42,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Snow License Manager](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/)
 - [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
+- [Ubiquiti Unifi Network](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/)
 ## Export from runZero 
 - [Audit Log to Webhook](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/)
 - [runZero Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
