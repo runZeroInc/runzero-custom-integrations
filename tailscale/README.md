@@ -1,146 +1,73 @@
-# 🧩 Tailscale API → runZero Integration
+# Custom Integration: Tailscale API
 
-A custom [runZero](https://www.runzero.com/) Starlark integration that imports assets directly from the [Tailscale API](https://tailscale.com/api).  
-This version uses a single API token or client secret — **no OAuth2 handshake required**.
+## runZero requirements
 
----
+- Superuser access to the [Custom Integrations configuration](https://console.runzero.com/custom-integrations) in runZero.
+- A [Custom Integration Script Secret](https://console.runzero.com/credentials) credential configured with:
+  - `access_key`: your **Tailscale OAuth Client ID** (leave blank if using a standard API key)
+  - `access_secret`: your **Tailscale API key** or **OAuth Client Secret**
 
-## 🚀 Overview
+## Tailscale requirements
 
-This integration connects to the Tailscale REST API using your **API token** (or **client secret**) and retrieves all devices in a tailnet.  
-Each Tailscale device is converted into a `runZero ImportAsset` with metadata, IP addresses, and custom attributes.
+- Either:
+  - A **User API Key** (`tskey-api-xxxxx`) created under **Settings → Keys** in the [Tailscale Admin Console](https://login.tailscale.com/admin/settings),  
+    **or**
+  - An **OAuth Client ID / Secret** pair created under **Settings → OAuth Clients** with the following scopes:
+    ```
+    devices:core:read
+    devices:routes:read
+    devices:posture_attributes:read
+    ```
 
----
-
-## 🔑 Requirements
-
-You’ll need:
-
-| Requirement | Description |
-|--------------|-------------|
-| **Tailscale API Key or Client Secret** | A `tskey-api-xxxxx` or `tskey-client-xxxxx` token from the [Tailscale admin console → Keys page](https://login.tailscale.com/admin/settings/keys). |
-| **Tailnet ID** | Usually found on the General Settings page of your Tailscale admin console (e.g., `T1234CNTRL`). You may also use `-` to reference the default tailnet. |
-| **runZero Organization Role** | You must have permission to upload or manage integrations. |
-
----
-
-
-## 🔒 API Key Permissions
-
-Tailscale has **two different API credential types**, and they have different permission behaviors.
-
-### 🔹 **User API Keys** (`tskey-api-...`)
-- Created under **Settings → Keys → Create API key**
-- Have the **same permissions as the user who created them**
-- Work automatically with this integration if:
-  - The user has **admin or owner** access to the tailnet
-  - The user can view devices in the Tailscale admin console
-
-✅ **Recommended for most users** — easiest to use and requires no special scopes.
-
-
-### 🔹 **OAuth Client Secrets** (`tskey-client-...`)
-- Created under **Settings → OAuth Clients**
-- Require explicit permission scopes to be set
-- To fetch devices successfully, your OAuth client must include:
-
-```text
-devices:core:read
-devices:routes:read
-devices:posture_attributes:read
-```
-
-## ⚙️ Configuration
-
-When adding this integration in **runZero → Integrations → Custom Integration**, configure the following fields:
-
-| Parameter | Key | Required | Example | Description |
-|------------|-----|-----------|----------|--------------|
-| **Access Secret** | `access_secret` | ✅ | `tskey-api-abc123def456` | The API key or client secret used for authentication. |
-| **Tailnet** | `tailnet` | ✅ | `T1234CNTRL` or `-` | The Tailnet ID or `-` for the default tailnet. |
-| **Insecure Skip Verify** | `insecure_skip_verify` | ❌ | `false` | Set to `true` to disable SSL verification (not recommended). |
-
----
-
-## 🔍 Data Collected
-
-Each Tailscale device is imported as a `runZero ImportAsset` with these details:
-
-| Field | Source | Example |
-|--------|---------|---------|
-| `hostnames` | `device.hostname` | `laptop01` |
-| `networkInterfaces` | `device.addresses` | IPv4 and IPv6 addresses |
-| `os` | `device.os` | `linux` |
-| `customAttributes.tailscale_user` | `device.user` | `amelie@example.com` |
-| `customAttributes.tailscale_client_version` | `device.clientVersion` | `v1.36.0` |
-| `customAttributes.tailscale_authorized` | `device.authorized` | `true` |
-| `customAttributes.tailscale_advertised_routes` | `device.advertisedRoutes` | `10.0.0.0/16` |
-| `customAttributes.tailscale_enabled_routes` | `device.enabledRoutes` | `192.168.1.0/24` |
-| `customAttributes.tailscale_tags` | `device.tags` | `tag:prod, tag:subnetrouter` |
-
----
-
-## 🧠 How It Works
-
-1. **Authenticate** – The integration reads your `access_secret` and sets it as a `Bearer` token:
-```
-
-Authorization: Bearer tskey-api-xxxxx
-
-```
-2. **Fetch Devices** – Calls:
-```
-
-GET [https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices](https://api.tailscale.com/api/v2/tailnet/{tailnet}/devices)
-
-````
-3. **Transform** – Each device is normalized into a `runZero ImportAsset`.
-4. **Import** – Assets are returned to runZero for inventory enrichment.
-
----
-
-## 🧪 Testing
-
-You can test the script using the **Custom Integrations** feature in the runZero console or by using the local `runzero script` tool.
-
-Example test run:
-
-```bash
-runzero script run tailscale_integration.star \
---access_secret tskey-api-abc123def456 \
---tailnet T1234CNTRL
+- The integration script defines your tailnet globally:
+  ```python
+  TAILNET_DEFAULT = "-"
 ````
 
----
+Update this value inside the script if your environment uses a specific tailnet ID (e.g., `"T1234CNTRL"`).
 
-## ⚠️ Troubleshooting
+## Steps
 
-| Symptom              | Cause                                        | Fix                                                                |
-| -------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| `401 Unauthorized`   | Invalid or expired API token                 | Regenerate token in the Tailscale admin console.                   |
-| `404 Not Found`      | Tailnet name is incorrect                    | Use the Tailnet ID (e.g., `T1234CNTRL`) or `-` for default.        |
-| `0 devices returned` | Tailnet has no active devices or wrong scope | Ensure devices exist and token has `devices:core:read` permission. |
-| `SSL Error`          | Certificate issue                            | Use `insecure_skip_verify=true` (only for diagnostics).            |
+### Tailscale configuration
 
----
+1. Log into the [Tailscale Admin Console](https://login.tailscale.com/admin/settings).
+2. Choose one of the following:
 
-## 🧰 Example Output
+   * **Option 1 – API Key:**
+     Create a new API key under **Settings → Keys → Create API key**.
+     Ensure the user has admin access to the tailnet.
+   * **Option 2 – OAuth Client:**
+     Create a new OAuth client under **Settings → OAuth Clients**.
+     Add the required scopes listed above and record the client ID and secret.
 
-```
-[TAILSCALE] SUCCESS: Retrieved 6 devices.
-[TAILSCALE] SUCCESS: Prepared 6 ImportAsset objects.
-[TAILSCALE] === INTEGRATION COMPLETE ===
-```
+### runZero configuration
 
----
+1. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
 
-## 🪪 Licensing
+   * Select **Custom Integration Script Secrets**.
+   * For `access_secret`, enter your **API key** or **OAuth client secret**.
+   * For `access_key`, enter your **OAuth client ID**, or a placeholder value (e.g., `foo`) if using an API key.
+2. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
 
-This integration is provided under the BSD 3-Clause license terms of the Tailscale API and runZero’s integration platform.
+   * Add a descriptive name (e.g., `tailscale-sync`).
+   * Toggle **Enable custom integration script** and paste the finalized script.
+   * Click **Validate** to confirm syntax, then **Save**.
+3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
 
----
+   * Select the Credential and Custom Integration created above.
+   * Adjust the task schedule to your preferred frequency.
+   * Select an Explorer to execute the task.
+   * Click **Save** to start the integration.
 
-## 📚 References
+### What's next?
 
-* [Tailscale API Documentation](https://tailscale.com/api)
-* [runZero Custom Integrations Guide](https://www.runzero.com/docs/integrations/custom/)
+* The task will execute and retrieve device data from the Tailscale API.
+* Each Tailscale device will be imported as a `runZero ImportAsset`.
+* You can view the integration run under [Tasks](https://console.runzero.com/tasks) in the runZero console.
+
+### Notes
+
+* The integration automatically detects whether you’re using an **API key** or **OAuth client credentials**.
+* If you encounter a `403` error, verify your API key or OAuth client has the `devices:core:read` permission.
+* The `TAILNET_DEFAULT` variable can be modified in the script if your organization uses multiple tailnets.
+* Device metadata, tags, and IP addresses from Tailscale are mapped to `runZero` custom attributes and interfaces.
