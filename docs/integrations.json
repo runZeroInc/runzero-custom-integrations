@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-10-29T13:28:53.818462Z",
-  "totalIntegrations": 25,
+  "lastUpdated": "2025-11-10T17:01:32.826754Z",
+  "totalIntegrations": 26,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -55,6 +55,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/custom-integration-cortex-xdr.star"
+    },
+    {
+      "name": "Tailscale",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/custom-integration-tailscale.star"
     },
     {
       "name": "Automox",

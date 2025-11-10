@@ -40,6 +40,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Scale Computing](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scale-computing/)
 - [Snipe-IT](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/)
 - [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
+- [Tailscale](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 ## Export from runZero 
 - [Audit Log to Webhook](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/)
