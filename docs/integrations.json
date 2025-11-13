@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-10T18:36:52.667035Z",
-  "totalIntegrations": 28,
+  "lastUpdated": "2025-11-13T17:39:24.733491Z",
+  "totalIntegrations": 29,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -13,12 +13,6 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
-    },
-    {
-      "name": "Guardicore Centra",
-      "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai_guardicore_centra/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai_guardicore_centra/centrav3.star"
     },
     {
       "name": "Cyberint",
@@ -69,6 +63,12 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/custom-integration-ubiquiti-unifi-network.star"
     },
     {
+      "name": "Tailscale",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/custom-integration-tailscale.star"
+    },
+    {
       "name": "Automox",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/README.md",
@@ -85,6 +85,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/custom-integration-digital-ocean.star"
+    },
+    {
+      "name": "Akamai Guardicore Centra",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/custom-integration-centra-v3-api.star"
     },
     {
       "name": "Device42",
