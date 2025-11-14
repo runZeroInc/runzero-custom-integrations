@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2025-11-13T18:20:42.065154Z",
-  "totalIntegrations": 28,
+  "lastUpdated": "2025-11-13T17:39:24.733491Z",
+  "totalIntegrations": 29,
   "integrationDetails": [
     {
       "name": "Lima Charlie",
@@ -61,6 +61,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/custom-integration-ubiquiti-unifi-network.star"
+    },
+    {
+      "name": "Tailscale",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/custom-integration-tailscale.star"
     },
     {
       "name": "Automox",
