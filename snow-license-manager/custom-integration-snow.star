@@ -1,9 +1,9 @@
 load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software')
 load('base64', base64_encode='encode', base64_decode='decode')
-load('flatten_json', 'flatten')
 load('http', http_get='get', http_post='post', 'url_encode')
 load('json', json_encode='encode', json_decode='decode')
 load('net', 'ip_address')
+load('time', 'parse_time')
 load('uuid', 'new_uuid')
 
 #Change the URL to match your Snow Software License Manager server
@@ -33,84 +33,117 @@ def build_assets(assets, creds):
             interfaces.append(interface)
 
         # Retrieve and map custom attributes
-        organization = item.get('Organization', '')
-        org_checksum = item.get('OrgChecksum', '')
-        is_virtual = item.get('IsVirtual', '')
-        status = item.get('Status', '')
-        last_scan_date = item.get('LastScanDate', '')
-        updated_by = item.get('UpdatedBy', '')
-        updated_date = item.get('UpdatedData', '')
-        domain = item.get('Domain', '')
-        total_disk_space = item.get('TotalDiskSpace', '')
-        physical_memory = item.get('PhyscialMemory', '')
-        processor_type = item.get('ProcessorType', '')
-        processor_count = item.get('ProcessorCount', '')
-        core_count = item.get('CoreCount', '')
+        hw = item.get('Hardware', {})
+        bios_date = hw.get('BiosDate', '')
+        #Reformat bios_date timestamp for runZero parsing
+        if bios_date and bios_date != '':
+            bios_date = parse_time(bios_date + 'Z').unix
         bios_sn = item.get('BiosSerialNumber', '')
+        bios_version = hw.get('BiosVersion', '')
+        core_count = item.get('CoreCount', '')
+        cores_per_proc = hw.get('CoresPerProcessor', '')
+        domain = item.get('Domain', '')
         hyperv_name = item.get('HypervisorName', '')
         is_portable = item.get('IsPortable', '')
         is_server = item.get('IsServer', '')
+        is_virtual = item.get('IsVirtual', '')
+        last_scan_date = item.get('LastScanDate', '')
+        # Reformat last_scan_date timestamp for runZero parsing
+        if last_scan_date and last_scan_date != '':
+            last_scan_date = parse_time(last_scan_date + 'Z').unix
+        memory_slots = hw.get('MemorySlots', '')
+        memory_slots_avail = hw.get('MemorySlotsAvailable', '')
         most_freq_user = item.get('MostFrequentUserId', '')
         most_recent_user = item.get('MostRecentUserId', '')
-        logical_disk = hw.get('LogicalDisks', {}).get('LogicalDisk', {})
-        disk_name = logical_disk.get('Name', '')
-        disk_size = logical_disk.get('SizeMb', '')
-        disk_vol = logical_disk.get('VolumeName', '')
-        optical_drives = hw.get('OpticalDrives', {}).get('OpticalDrive', {})
-        drive_name = optical_drives.get('Name', '')
-        drive_type = optical_drives.get('Type', '')
+        number_of_procs = hw.get('NumberOfProcessors', '')
+        organization = item.get('Organization', '')
+        org_checksum = item.get('OrgChecksum', '')
+        processor_count = item.get('ProcessorCount', '')
+        physical_memory = item.get('PhysicalMemory', '')
+        physical_memory_mb = hw.get('PhysicalMemoryMb', '')
+        processor_type = item.get('ProcessorType', '')
+        status = item.get('Status', '')
+        system_disk_space_mb = hw.get('SystemDiskSpaceMb', '')
+        system_disk_space_avail_mb = hw.get('SystemDiskSpaceAvailableMb', '')
+        total_disk_space = item.get('TotalDiskSpace', '')
+        total_disk_space_mb = hw.get('TotalDiskSpaceMb', '')
+        total_disk_space_avail_mb = hw.get('TotalDiskSpaceAvailableMb', '')
+        updated_by = item.get('UpdatedBy', '')
+        updated_date = item.get('UpdatedData', '')
 
         custom_attributes = {
-            'organization': organization,
-            'orgChecksum': org_checksum,
-            'isVirtual': is_virtual,
-            'status': status,
-            'lastScanDate': last_scan_date,
-            'updatedBy': updated_by,
-            'updatedDate': updated_date,
-            'domain': domain,
-            'totalDiskSpace': total_disk_space,
-            'physicalMemory': physical_memory,
-            'processorType': processor_type,
-            'processorCount': processor_count,
-            'coreCount': core_count,
+            'biosDate': bios_date,
             'biosSerialNumber': bios_sn,
+            'biosVersion': bios_version,
+            'coreCount': core_count,
+            'coresPerProcessor': cores_per_proc,
+            'domain': domain,
             'hypervisorName': hyperv_name,
             'isPortable': is_portable,
             'isServer': is_server,
+            'isVirtual': is_virtual,
+            'lastScanDate': last_scan_date,
+            'memorySlots': memory_slots,
+            'memorySlotsAvailable': memory_slots_avail,
             'mostFrequentUserId': most_freq_user,
             'mostRecentUserId': most_recent_user,
-            'logicalDisk.name': disk_name,
-            'logicalDisk.sizeMb': disk_size,
-            'logicalDisk.volumeName': disk_vol,
-            'opticalDrive.name': drive_name,
-            'opticalDrive.type': drive_type
+            'numberOfProcessors': number_of_procs,
+            'organization': organization,
+            'orgChecksum': org_checksum,
+            'processorCount': processor_count,
+            'physicalMemory': physical_memory,
+            'physicalMemoryMb': physical_memory_mb,
+            'processorType': processor_type,
+            'status': status,
+            'systemDiskSpaceMb': system_disk_space_mb,
+            'systemDiskSpaceAvailableMb': system_disk_space_avail_mb,
+            'totalDiskSpace': total_disk_space,
+            'totalDiskSpaceMb': total_disk_space_mb,
+            'totalDiskSpaceAvailableMb': total_disk_space_avail_mb,
+            'updatedBy': updated_by,
+            'updatedDate': updated_date
         }
+        
+        logical_disks = hw.get('LogicalDisks', None)
+        if logical_disks and type(logical_disks) == 'list':
+            for disk in logical_disks:
+                if disk:
+                    for k, v in disk.items():
+                        custom_attributes['logicalDisks.' + str(logical_disks.index(disk)) + '.' + k] = v
+        if logical_disks and type(logical_disks) == 'dict':
+            for k, v in logical_disks.items():
+                custom_attributes['logicalDisks.0.' + k] = v
 
-        hw = item.get('Hardware', {})
-        custom_attributes['hardware.biosSerialNumber'] = hw.get('BiosSerialNumber', '')
-        custom_attributes['hardware.biosVersion'] = hw.get('BiosVersion', '')
-        custom_attributes['hardware.biosDate'] = hw.get('BiosDate', '')
-        custom_attributes['hardware.processorType'] = hw.get('ProcessorType', '')
-        custom_attributes['hardware.numberOfProcessors'] = hw.get('NumberOfProcessors', '')
-        custom_attributes['hardware.coresPerProcessor.'] = hw.get('CoresPerProcessor', '')
-        custom_attributes['hardware.physicalMemoryMb'] = hw.get('PhysicalMemoryMb', '')
-        custom_attributes['hardware.memorySlots'] = hw.get('MemorySlots', '')
-        custom_attributes['hardware.memorySlotsAvailable'] = hw.get('MemorySlotsAvailable', '')
-        custom_attributes['hardware.systemDiskSpaceMb'] = hw.get('SystemDiskSpaceMb', '')
-        custom_attributes['hardware.systemDiskSpaceAvailableMb'] = hw.get('SystemDiskSpaceAvailableMb', '')
-        custom_attributes['hardware.totalDiskSpaceMb'] = hw.get('TotalDiskSpaceMb', '')
-        custom_attributes['hardware.totalDiskSpaceAvailableMb'] = hw.get('TotalDiskSpaceAvailableMb', '')
 
-        display_adapters = hw.get('DisplayAdapters', {}).get('DisplayAdapter', [])
-        for adapter in display_adapters:
-            for k, v in adapter:
-                custom_attributes['displayAdapter.' + str(display_adapters.index[adapter]) + '.' + k] = v
-        monitors = hw.get('Monitors', {}).get('Monitor', [])
-        for monitor in monitors:
-            for k, v in monitor:
-                custom_attributes['monitor.' + str(monitors.index[monitor]) + '.' + k] = v
+        optical_drives = hw.get('OpticalDrives', None)
+        if optical_drives and type(optical_drives) == 'list':
+            for drive in optical_drives:
+                if drive:
+                    for k, v in drive.items():
+                        custom_attributes['opticalDrives.' + str(optical_drives.index(drive)) + '.' + k] = v
+        if optical_drives and type(optical_drives) == 'dict':
+            for k, v in optical_drives.items():
+                    custom_attributes['opticalDrives.0.' + k] = v
 
+        display_adapters = hw.get('DisplayAdapters', None)
+        if display_adapters and type(display_adapters) == 'list':
+            for adapter in display_adapters:
+                if adapter:
+                    for k, v in adapter.items():
+                        custom_attributes['displayAdapter.' + str(display_adapters.index(adapter)) + '.' + k] = v
+        if display_adapters and type(display_adapters) == 'dict':
+            for k, v in display_adapters.items():
+                    custom_attributes['displayAdapter.0.' + k] = v
+
+        monitors = hw.get('Monitors', None)
+        if monitors and type(monitors) == 'list':
+            for monitor in monitors:
+                if monitor:
+                    for k, v in monitor.items():
+                        custom_attributes['monitor.' + str(monitors.index(monitor)) + '.' + k] = v
+        if monitors and type(monitors) == 'dict':
+            for k, v in monitors.items():
+                    custom_attributes['monitor.0.' + k] = v
 
         # Retrieve software information for asset
         # create software entries
@@ -170,9 +203,29 @@ def build_app(software_entry):
     bundled_app_id = app.get('BundleApplicationId', '')
     bundled_app_name = app.get('BundleApplicationName', '')
     last_used = app.get('LastUsed', '')
+    # Reformat last_used timestamp for runZero parsing
+    if last_used and last_used != '':
+        last_used = parse_time(last_used + 'Z').unix
+    else:
+        last_used = 'n/a'
     first_used = app.get('FirstUsed', '')
+    # Reformat first_used timestamp for runZero parsing
+    if first_used and first_used != '':
+        first_used = parse_time(first_used + 'Z').unix
+    else:
+        first_used = 'n/a'
     install_date = app.get('InstallDate', '')
-    discvovered_date = app.get('DiscoveredDate', '')
+    # Reformat install_date timestamp for runZero parsing
+    if install_date and install_date != '':
+        install_date = parse_time(install_date + 'Z').unix
+    else:
+        install_date = 'n/a'
+    discovered_date = app.get('DiscoveredDate', '')
+    # Reformat discovered_date timestamp for runZero parsing
+    if discovered_date and discovered_date != '':
+        discovered_date = parse_time(discovered_date + 'Z').unix
+    else:
+        discovered_date = 'n/a'
     run = app.get('Run', '')
     avg_usage_time = app.get('AvgUsageTime', '')
     users = app.get('Users', '')
@@ -196,7 +249,7 @@ def build_app(software_entry):
         'last.used': last_used,
         'first.used': first_used,
         'install.date': install_date,
-        'discovered.date': discvovered_date,
+        'discovered.date': discovered_date,
         'run': run,
         'average.usage.time': avg_usage_time,
         'users': users,

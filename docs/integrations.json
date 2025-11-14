@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2025-11-13T17:39:24.733491Z",
+  "lastUpdated": "2025-11-14T19:10:56.291488Z",
   "totalIntegrations": 29,
   "integrationDetails": [
     {
@@ -67,6 +67,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/custom-integration-tailscale.star"
+    },
+    {
+      "name": "Snow License Manager",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow-license-manager/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow-license-manager/custom-integration-snow.star"
     },
     {
       "name": "Automox",
@@ -169,12 +175,6 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
-    },
-    {
-      "name": "Snow License Manager",
-      "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow_license_manager/snow.star"
     }
   ]
 }
