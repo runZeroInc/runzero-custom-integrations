@@ -75,6 +75,12 @@ We welcome contributions to this repository! Whether you're fixing a bug, adding
 
 7. **Merge**: Once approved, your PR will be merged by a maintainer.
 
+## Agents 
+
+Using agents like Gemini CLI, OpenAI Codex, and Claude Code is encouraged! Most of these integraions follow the same structure with the only differences being in the data fetch processes. 
+
+There is an [AGENTS.md](./AGENTS.md) file to give your LLM of choice best practices and guidance will building the integrations. 
+
 ---
 
 ## License
