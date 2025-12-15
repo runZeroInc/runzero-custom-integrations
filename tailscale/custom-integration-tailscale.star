@@ -19,7 +19,7 @@ load("time", "parse_time")
 # --- Configuration ---
 TAILSCALE_API_BASE = "https://api.tailscale.com/api/v2"
 TAILSCALE_TOKEN_URL = "https://api.tailscale.com/api/v2/oauth/token"
-TAILNET_DEFAULT = "-"  # change to your tailnet ID if needed, e.g. "T1234CNTRL"
+TAILNET_DEFAULT = "YOUR_TAILNET_ID"  # change to your tailnet ID, e.g. "T1234CNTRL"
 DEFAULT_SCOPE = "devices:core:read"
 INSECURE_SKIP_VERIFY_DEFAULT = False
 
@@ -76,8 +76,9 @@ def obtain_oauth_token(client_id, client_secret, scope, insecure_skip_verify):
 def tailscale_get_devices(access_token, tailnet, insecure_skip_verify):
     """
     Fetch device inventory for a tailnet using an access token or API key.
+    Uses fields=all to get complete device information including clientConnectivity.
     """
-    url = TAILSCALE_API_BASE + "/tailnet/" + tailnet + "/devices"
+    url = TAILSCALE_API_BASE + "/tailnet/" + tailnet + "/devices?fields=all"
     headers = {"Authorization": "Bearer " + access_token, "Accept": "application/json"}
     _log("DEBUG: Fetching devices from " + url)
 
@@ -112,13 +113,43 @@ def tailscale_get_devices(access_token, tailnet, insecure_skip_verify):
 
 
 def _clean_address(addr):
+    """
+    Remove CIDR notation from addresses (e.g., 10.0.0.1/32 -> 10.0.0.1)
+    """
     if addr == None:
         return None
     parts = addr.split("/")
     return parts[0]
 
 
+def _extract_ip_from_endpoint(endpoint):
+    """
+    Extract IP address from endpoint string (e.g., "129.222.196.154:63425" -> "129.222.196.154")
+    Handles both IPv4 and IPv6 formats:
+    - IPv4: 129.222.196.154:63425
+    - IPv6: [2605:59c0:2959:8910:d1aa:3b0:5142:f680]:41641
+    """
+    if endpoint == None or endpoint == "":
+        return None
+    
+    # IPv6 format: [address]:port
+    if endpoint.startswith("["):
+        end_bracket = endpoint.find("]")
+        if end_bracket > 0:
+            return endpoint[1:end_bracket]
+    
+    # IPv4 format: address:port
+    colon_pos = endpoint.rfind(":")
+    if colon_pos > 0:
+        return endpoint[:colon_pos]
+    
+    return endpoint
+
+
 def build_network_interface_from_addresses(addresses, mac):
+    """
+    Build NetworkInterface from Tailscale addresses (Tailscale IPs)
+    """
     if addresses == None:
         return None
     ipv4s = []
@@ -141,18 +172,51 @@ def build_network_interface_from_addresses(addresses, mac):
     return NetworkInterface(macAddress=mac, ipv4Addresses=ipv4s, ipv6Addresses=ipv6s)
 
 
+def build_network_interfaces_from_endpoints(endpoints):
+    """
+    Build additional NetworkInterfaces from clientConnectivity endpoints.
+    These are the actual physical IPs (public and private) that runZero can correlate with.
+    """
+    if endpoints == None or len(endpoints) == 0:
+        return []
+    
+    ipv4s = []
+    ipv6s = []
+    
+    for endpoint in endpoints:
+        ipstr = _extract_ip_from_endpoint(endpoint)
+        if ipstr == None:
+            continue
+        ipobj = ip_address(ipstr)
+        if ipobj == None:
+            continue
+        if ipobj.version == 4:
+            ipv4s.append(ipobj)
+        else:
+            ipv6s.append(ipobj)
+        if len(ipv4s) + len(ipv6s) >= 99:
+            break
+    
+    if len(ipv4s) == 0 and len(ipv6s) == 0:
+        return []
+    
+    return [NetworkInterface(ipv4Addresses=ipv4s, ipv6Addresses=ipv6s)]
+
+
 def transform_device_to_importasset(device, tailnet):
     device_id = device.get("id", "")
     hostname = device.get("hostname", device.get("name", ""))
     addresses = device.get("addresses", [])
     os_name = device.get("os", "Unknown")
 
-    if device_id == "" or len(addresses) == 0:
+    if device_id == "":
         return None
 
-    netif = build_network_interface_from_addresses(addresses, None)
-    if netif == None:
-        return None
+    # Build primary interface from Tailscale VPN addresses
+    network_interfaces = []
+    tailscale_netif = build_network_interface_from_addresses(addresses, None)
+    if tailscale_netif != None:
+        network_interfaces.append(tailscale_netif)
 
     attrs = {
         "source": "Tailscale Integration",
@@ -168,6 +232,37 @@ def transform_device_to_importasset(device, tailnet):
         "tailscale_blocks_incoming_connections": str(device.get("blocksIncomingConnections", False)),
         "tailscale_created": device.get("created", ""),
     }
+
+    # Extract clientConnectivity information (available with fields=all)
+    client_conn = device.get("clientConnectivity")
+    if client_conn != None:
+        endpoints = client_conn.get("endpoints", [])
+        if endpoints != None and len(endpoints) > 0:
+            # Store raw endpoints for reference
+            attrs["tailscale_client_endpoints"] = ", ".join(endpoints)
+            
+            # Build additional network interfaces from physical IPs for runZero correlation
+            endpoint_interfaces = build_network_interfaces_from_endpoints(endpoints)
+            network_interfaces.extend(endpoint_interfaces)
+            _log("DEBUG: Added " + str(len(endpoint_interfaces)) + " endpoint interfaces for device " + device_id)
+        
+        derp = client_conn.get("derp", "")
+        if derp != None and derp != "":
+            attrs["tailscale_client_derp"] = derp
+        
+        mapping_varies = client_conn.get("mappingVariesByDestIP")
+        if mapping_varies != None:
+            attrs["tailscale_mapping_varies_by_dest_ip"] = str(mapping_varies)
+        
+        latency = client_conn.get("latency")
+        if latency != None:
+            for region, ms in latency.items():
+                attrs["tailscale_latency_" + region] = str(ms)
+
+    # Require at least one network interface for correlation
+    if len(network_interfaces) == 0:
+        _log("WARN: Skipping device " + device_id + " - no network interfaces available")
+        return None
 
     parsed_time = device.get("created")
     if parsed_time != None and parsed_time != "":
@@ -194,7 +289,7 @@ def transform_device_to_importasset(device, tailnet):
     return ImportAsset(
         id=asset_id,
         hostnames=hostnames,
-        networkInterfaces=[netif],
+        networkInterfaces=network_interfaces,
         os=os_name,
         tags=asset_tags,
         customAttributes=attrs,
