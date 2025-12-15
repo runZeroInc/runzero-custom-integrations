@@ -1,7 +1,13 @@
 {
-  "lastUpdated": "2025-12-11T19:44:50.765475Z",
-  "totalIntegrations": 29,
+  "lastUpdated": "2025-12-15T22:05:57.981839Z",
+  "totalIntegrations": 30,
   "integrationDetails": [
+    {
+      "name": "Moysle",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/moysle/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/moysle/custom-integration-moysle.star"
+    },
     {
       "name": "Lima Charlie",
       "type": "inbound",
