@@ -2,6 +2,7 @@ load('requests', 'Session')
 load('json', json_encode='encode', json_decode='decode')
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
 load('net', 'ip_address')
+load('flatten_json', 'flatten')
 
 BASE_URL = "https://managerapi.mosyle.com/v2"
 
@@ -15,14 +16,10 @@ def parse_credentials(secret):
 
     creds = secret
     if type(secret) == "string":
-        print(creds)
         if secret.find("{") != -1:
             creds = json_decode(secret)
-        elif secret.find(":") != -1:
-            # Backward-compat for email:password format.
-            email, password = secret.split(":", 1)
-            if email and password:
-                return email, password
+        else:
+            print("access_secret must be a JSON string with email/password")
             return None, None
 
     if type(creds) == "dict":
@@ -30,6 +27,9 @@ def parse_credentials(secret):
         password = creds.get("password")
         if email and password:
             return email, password
+        else:
+            print("Missing email or password in access_secret")
+            return None, None
 
     return None, None
 
@@ -48,19 +48,19 @@ def get_bearer_token(session, access_token, email, password):
     if not resp or resp.status_code != 200:
         print("Login failed: {}".format(resp.status_code if resp else "no response"))
         return None
-    print("response: ", resp)
     auth_header = None
     if resp.headers:
         if "Authorization" in resp.headers:
-            auth_header = resp.headers["Authorization"]
+            auth_header = resp.headers.get("Authorization", None)
         elif "authorization" in resp.headers:
-            auth_header = resp.headers["authorization"]
+            auth_header = resp.headers.get("authorization", None)
 
-    if auth_header and auth_header.startswith("Bearer "):
-        return auth_header.split(" ", 1)[1]
-
-    print("Login succeeded but bearer token missing from headers")
-    return None
+    if auth_header:
+        print("Login succeeded with bearer token")
+        return auth_header[0].split(" ")[1]
+    else:
+        print("Login succeeded but bearer token missing from headers")
+        return None
 
 
 def build_network_interface(mac, ips):
@@ -72,6 +72,8 @@ def build_network_interface(mac, ips):
     for ip in ips:
         if not ip:
             continue
+        # IPv6 has a %interface appended
+        ip = ip.split("%")[0]
         addr = ip_address(ip)
         if addr.version == 4:
             ip4s.append(addr)
@@ -89,24 +91,35 @@ def collect_hostnames(device):
     for key in ["device_name", "devicename", "HostName", "LocalHostName", "hostname"]:
         name = device.get(key, "")
         if name and name not in names:
-            names.append(name)
+            safe_name = name.replace(" ", "-")
+            names.append(safe_name)
     return names
 
 
+def parse_tags(raw_tags, asset_tag):
+    tags = []
+    if raw_tags and type(raw_tags) == "string":
+        for chunk in raw_tags.split(","):
+            for part in chunk.split():
+                part = part.strip()
+                if part and part not in tags:
+                    tags.append(part)
+    if asset_tag and asset_tag not in tags:
+        tags.append(asset_tag)
+    return tags if tags else None
+
+
 def build_custom_attributes(device, used_keys):
+    flat = flatten(device)
     attrs = {}
-    for key in device:
+    for key in flat:
         if key in used_keys:
             continue
-        value = device.get(key)
+        value = flat.get(key)
         if value == None:
             continue
-        # Normalize lists and dicts to JSON strings; primitives to strings.
-        if type(value) == "dict" or type(value) == "list":
-            attrs[key] = json_encode(value)
-        else:
-            attrs[key] = "{}".format(value)
-    return attrs
+        attrs[key] = "{}".format(value)
+    return attrs if attrs else None
 
 
 def main(*args, **kwargs):
@@ -132,89 +145,98 @@ def main(*args, **kwargs):
     session.headers.set("Authorization", "Bearer {}".format(bearer))
 
     assets = []
-    page = 0
 
-    while True:
-        list_url = "{}/listdevices".format(BASE_URL)
-        list_payload = {
-            "accessToken": api_token,
-            "options": {
-                "os": "all",
-                "page": page,
-            },
-        }
+    for os_type in ["ios", "mac", "tvos", "visionos"]:
+        print("Fetching {} devices".format(os_type))
+        page = 0
 
-        device_resp = session.post(list_url, body=bytes(json_encode(list_payload)))
-        if not device_resp or device_resp.status_code != 200:
-            print("Device list request failed on page {}: {}".format(page, device_resp.status_code if device_resp else "no response"))
-            break
+        while True:
+            list_url = "{}/listdevices".format(BASE_URL)
+            list_payload = {
+                "accessToken": api_token,
+                "options": {
+                    "os": os_type,
+                    "page": page,
+                },
+            }
 
-        data = json_decode(device_resp.body)
-        response = data.get("response", {})
-        devices = response.get("devices", [])
-        if not devices:
-            break
+            device_resp = session.post(list_url, body=bytes(json_encode(list_payload)))
+            if not device_resp or device_resp.status_code != 200:
+                print("Device list request failed on page {}: {}".format(page, device_resp.status_code if device_resp else "no response"))
+                break
 
-        for d in devices:
-            device_id = d.get("deviceudid") or d.get("serial_number") or ""
-            if not device_id:
-                continue
+            data = json_decode(device_resp.body)
+            response = data.get("response", {})
+            devices = response.get("devices", [])
+            if not devices:
+                break
 
-            hostnames = collect_hostnames(d)
+            for d in devices:
+                device_id = d.get("deviceudid") or d.get("serial_number") or ""
+                if not device_id:
+                    continue
 
-            wifi_mac = d.get("wifi_mac_address")
-            eth_mac = d.get("ethernet_mac_address")
-            wifi_ips = []
-            if d.get("last_ip_beat"):
-                wifi_ips.append(d.get("last_ip_beat"))
-            eth_ips = []
-            if d.get("last_lan_ip"):
-                eth_ips.append(d.get("last_lan_ip"))
+                hostnames = collect_hostnames(d)
 
-            network_interfaces = []
-            wifi_iface = build_network_interface(wifi_mac, wifi_ips)
-            if wifi_iface:
-                network_interfaces.append(wifi_iface)
-            eth_iface = build_network_interface(eth_mac, eth_ips)
-            if eth_iface:
-                network_interfaces.append(eth_iface)
+                wifi_mac = d.get("wifi_mac_address")
+                eth_mac = d.get("ethernet_mac_address")
+                wifi_ips = []
+                if d.get("last_ip_beat"):
+                    wifi_ips.append(d.get("last_ip_beat"))
+                eth_ips = []
+                if d.get("last_lan_ip"):
+                    eth_ips.append(d.get("last_lan_ip"))
 
-            model = d.get("device_model_name") or d.get("model_name") or d.get("device_model") or d.get("model") or ""
-            os_name = d.get("os", "")
-            os_version = d.get("osversion", "")
+                network_interfaces = []
+                
+                if len(wifi_ips) > 0 and wifi_mac:
+                    wifi_iface = build_network_interface(wifi_mac, wifi_ips)
+                    network_interfaces.append(wifi_iface)
+                
+                if len(eth_ips) > 0 and eth_mac:
+                    eth_iface = build_network_interface(eth_mac, eth_ips)
+                    network_interfaces.append(eth_iface)
 
-            used_keys = set([
-                "deviceudid",
-                "serial_number",
-                "device_name",
-                "devicename",
-                "HostName",
-                "LocalHostName",
-                "hostname",
-                "os",
-                "osversion",
-                "wifi_mac_address",
-                "ethernet_mac_address",
-                "last_ip_beat",
-                "last_lan_ip",
-                "device_model_name",
-                "model_name",
-                "device_model",
-                "model",
-            ])
-            custom_attrs = build_custom_attributes(d, used_keys)
+                model = d.get("device_model_name") or d.get("model_name") or d.get("device_model") or d.get("model") or ""
+                os_name = d.get("os", "")
+                os_version = d.get("osversion", "")
+                tags = parse_tags(d.get("tags"), d.get("asset_tag"))
 
-            asset = ImportAsset(
-                id=device_id,
-                hostnames=hostnames,
-                os=os_name,
-                osVersion=os_version,
-                model=model,
-                networkInterfaces=network_interfaces if network_interfaces else None,
-                customAttributes=custom_attrs if custom_attrs else None,
-            )
-            assets.append(asset)
+                used_keys = set([
+                    "deviceudid",
+                    "serial_number",
+                    "device_name",
+                    "devicename",
+                    "HostName",
+                    "LocalHostName",
+                    "hostname",
+                    "os",
+                    "osversion",
+                    "wifi_mac_address",
+                    "ethernet_mac_address",
+                    "last_ip_beat",
+                    "last_lan_ip",
+                    "device_model_name",
+                    "model_name",
+                    "device_model",
+                    "model",
+                    "tags",
+                    "asset_tag",
+                ])
+                custom_attrs = build_custom_attributes(d, used_keys)
 
-        page += 1
+                asset = ImportAsset(
+                    id=device_id,
+                    hostnames=hostnames,
+                    os=os_name,
+                    osVersion=os_version,
+                    model=model,
+                    networkInterfaces=network_interfaces if network_interfaces else None,
+                    tags=tags,
+                    customAttributes=custom_attrs,
+                )
+                assets.append(asset)
+
+            page += 1
 
     return assets

@@ -7,7 +7,7 @@
 ## Moysle Requirements
 
 - Moysle API token (`access_key`).
-- Moysle admin account email and password, combined as `email:password` in the `access_secret` field.
+- Moysle admin account email and password, provided in `access_secret` as a JSON/dict (`{"email": "<EMAIL>", "password": "<PASSWORD>"}` or `{"username": "<EMAIL>", "password": "<PASSWORD>"}`).
 - Account must have permission to access device inventory.
 
 ## Steps
@@ -16,11 +16,11 @@
 
 1. Gather your Moysle API credentials:
    - Obtain your **API token** from the Moysle admin portal.
-   - Use a valid Moysle admin email and password.
+   - Use a valid Moysle admin email and password. The script performs the login and bearer retrieval for you.
 
-2. Test your credentials:
+2. Test your credentials (optional but recommended):
    - Use a tool like Postman or curl to confirm login is working.
-   - Example request (token returned in the `Authorization` response header):
+   - Example request (bearer is returned in the `Authorization` response header; the script handles this automatically):
      ```bash
      curl -i -X POST "https://managerapi.mosyle.com/v2/login" \
      -H "Content-Type: application/json" \
@@ -30,10 +30,9 @@
        "password": "<PASSWORD>"
      }'
      ```
-   - Copy the bearer token from the `Authorization: Bearer <token>` response header.
 
 3. Verify device access:
-   - Use the bearer token and include the access token in the request body:
+   - Use the bearer token returned above and include the access token in the request body (the script loops per-OS over `ios`, `mac`, `tvos`, `visionos`):
      ```bash
      curl -X POST "https://managerapi.mosyle.com/v2/listdevices" \
      -H "Authorization: Bearer <token>" \
@@ -54,7 +53,7 @@
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
    - Select the type `Custom Integration Script Secrets`.
    - Use the `access_key` field for your API token.
-   - Use the `access_secret` field as JSON or a dict with keys: `{"email": "<EMAIL>", "password": "<PASSWORD>"}` (or `username` in place of `email`). You can optionally include a pre-issued bearer token as `bearer`/`token` to skip login parsing.
+   - Use the `access_secret` field as JSON/dict with keys `{"email": "<EMAIL>", "password": "<PASSWORD>"}` (or `username`). Pre-issued bearer tokens are not used by the script.
 
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
    - Add a Name and Icon for the integration (e.g., `moysle`).
