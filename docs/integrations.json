@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-01-07T22:10:57.592250Z",
+  "lastUpdated": "2026-01-08T20:48:01.893869Z",
   "totalIntegrations": 31,
   "integrationDetails": [
     {
@@ -120,7 +120,7 @@
       "name": "Scan Passive Assets",
       "type": "internal",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/custom-integrastion-scan-passive-assets.star"
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/custom-integration-scan-passive-assets.star"
     },
     {
       "name": "NinjaOne",
