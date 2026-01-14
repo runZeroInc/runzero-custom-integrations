@@ -82,7 +82,7 @@ def build_assets(assets):
         agent_labels = agent_info.get('labels', [])
         for label in agent_labels:
             custom_attributes['agent.labels.' + str(agent_labels.index(label))] = label
-        labels = asset.get('lables', [])
+        labels = asset.get('labels', [])
         for label in labels:
             for k, v in label.items():
                 custom_attributes['labels.' + str(labels.index(label)) + '.' + k ] = v
