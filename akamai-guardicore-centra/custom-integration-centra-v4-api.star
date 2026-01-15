@@ -76,9 +76,10 @@ def build_assets(assets, token):
 
         tags = []
         for label in label_names:
-            split_label = label.split(':')
-            tag = split_label[0] + '=' + split_label[1]
-            tags.append(tag)
+            split_tag = label.split(':')
+            reformat = split_tag[0].strip() + '=' + split_tag[1].strip()
+            tag_string = tag_string + ' ' + reformat
+            tags.append(tag_string)
         
 
         custom_attributes = {
