@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-01-08T20:48:01.893869Z",
+  "lastUpdated": "2026-01-15T15:30:47.444549Z",
   "totalIntegrations": 31,
   "integrationDetails": [
     {
@@ -181,6 +181,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/snipeit.star"
+    },
+    {
+      "name": "Solarwinds Information Service",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/custom-integration-swis.star"
     },
     {
       "name": "Proxmox",

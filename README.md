@@ -42,6 +42,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Scale Computing](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scale-computing/)
 - [Snipe-IT](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/)
 - [Snow License Manager](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow-license-manager/)
+- [Solarwinds Information Service](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/)
 - [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
 - [Tailscale](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
