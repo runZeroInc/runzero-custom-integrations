@@ -49,8 +49,10 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Ubiquiti Unifi Network](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/)
 ## Export from runZero 
 - [Audit Log to Webhook](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/)
-- [runZero Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
 - [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)
+## Internal Integrations
+- [Scan Passive Assets](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/)
+- [Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
 ## The boilerplate folder has examples to follow
 
 1. Sample [README.md](./boilerplate/README.md) for contributing

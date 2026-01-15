@@ -41,6 +41,16 @@ for entry in os.listdir("."):
         except Exception as e:
             print(f"⚠️  Failed to read config.json in {entry}: {e}")
 
+    if not integration_type:
+        integration_type = "inbound"
+    integration_type = str(integration_type).lower()
+
+    if integration_type not in {"inbound", "outbound", "internal"}:
+        print(
+            f"⚠️  Unknown integration type '{integration_type}' in {entry}, defaulting to inbound."
+        )
+        integration_type = "inbound"
+
     integration_details.append(
         {
             "name": friendly_name,
@@ -75,11 +85,12 @@ except FileNotFoundError:
 new_lines = []
 in_inbound_section = False
 in_outbound_section = False
-in_section = None
+in_internal_section = False
 
 # Prepare the new sections
 inbound_links = []
 outbound_links = []
+internal_links = []
 
 for integration in sorted(integration_details, key=lambda x: x["name"].lower()):
     link = (
@@ -87,6 +98,8 @@ for integration in sorted(integration_details, key=lambda x: x["name"].lower()):
     )
     if integration["type"] == "outbound":
         outbound_links.append(link)
+    elif integration["type"] == "internal":
+        internal_links.append(link)
     else:
         inbound_links.append(link)
 
@@ -103,10 +116,17 @@ for line in lines:
         new_lines.extend([f"{link}\n" for link in outbound_links])
         in_outbound_section = True
         continue
-    elif stripped.startswith("## ") and (in_inbound_section or in_outbound_section):
-        in_inbound_section = in_outbound_section = False
+    elif stripped == "## Internal Integrations":
+        new_lines.append(line)
+        new_lines.extend([f"{link}\n" for link in internal_links])
+        in_internal_section = True
+        continue
+    elif stripped.startswith("## ") and (
+        in_inbound_section or in_outbound_section or in_internal_section
+    ):
+        in_inbound_section = in_outbound_section = in_internal_section = False
 
-    if not in_inbound_section and not in_outbound_section:
+    if not in_inbound_section and not in_outbound_section and not in_internal_section:
         new_lines.append(line)
 
 with open(readme_path, "w") as f:

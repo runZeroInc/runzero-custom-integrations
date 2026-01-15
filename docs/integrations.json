@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-01-15T15:30:47.444549Z",
-  "totalIntegrations": 31,
+  "lastUpdated": "2026-01-15T15:32:00.895289Z",
+  "totalIntegrations": 32,
   "integrationDetails": [
     {
       "name": "Moysle",
@@ -39,8 +39,8 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/custom-integration-tanium.star"
     },
     {
-      "name": "runZero Vunerability Workflow",
-      "type": "outbound",
+      "name": "Vunerability Workflow",
+      "type": "internal",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/custom-integration-vulnerability-workflow.star"
     },
@@ -115,6 +115,12 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/custom-integration-audit-events.star"
+    },
+    {
+      "name": "Scan Passive Assets",
+      "type": "internal",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/custom-integration-scan-passive-assets.star"
     },
     {
       "name": "NinjaOne",
