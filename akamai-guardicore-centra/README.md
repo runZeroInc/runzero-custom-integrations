@@ -72,3 +72,11 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
 - The task will update the existing assets with the data pulled from the Custom Integration source 
 - The task will create new assets for when there are no existing assets that meet merge criteria (hostname, MAC, etc)
 - You can search for assets enriched by this custom integration with the runZero search `custom_integration:<INSERT_NAME_HERE>`
+
+**!NOTE!** Centra agent IDs are known to change frequently as the agent ID is determined by several factors such as:
+- hostname (minus FQDN)
+- BIOS UUID
+- product_serial file
+- Vendor
+- Network interface names and associated hardware addresses (loopbacks, virtual bonding, vlan, excluded interfaces are not considered)
+-- Commonly NIC configuration changes are responsible for agent ID changing
