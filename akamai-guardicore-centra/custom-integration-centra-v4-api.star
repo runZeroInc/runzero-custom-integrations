@@ -15,7 +15,7 @@ def build_assets(assets, token):
     for asset in assets:
         agent_info = asset.get('agent', {})
         os_info = asset.get('os_info', {})
-        asset_id = agent_info.get('id', str(new_uuid))
+        asset_id = str(asset.get('id', str(new_uuid)))
         hostname = asset.get('name', '')
         os = os_info.get('type', '')
         first_seen = asset.get('first_seen', '')
