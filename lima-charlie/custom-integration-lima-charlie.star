@@ -7,59 +7,97 @@ load('uuid', 'new_uuid')
 LIMACHARLIE_JWT_URL = 'https://jwt.limacharlie.io'
 LIMACHARLIE_BASE_URL = 'https://api.limacharlie.io/v1'
 
-def get_token(oid, access_token):
-    url = '{}/?oid={}&secret={}'.format(LIMACHARLIE_JWT_URL, oid, access_token)
-    token = http_post(url, headers={"Content-Type": "application/json"})
-    if token.status_code != 200:
+# Exclusion list for sensors that you want to ignore by hostname.
+SENSORS_TO_IGNORE = [
+    # sensor_hostname_01,
+    # sensor_hostname_02,
+    # sensor_hostname_03
+]
+
+# List of attributes that are not pulled into runZero. 
+# Note: sid, hostname, mac_addr, int_ip and ext_ip are imported as core asset attributes so 
+# they are ignored for the purpose of custom LimaCharlie attributes.
+CUSTOM_ATTRIBS_TO_IGNORE = [
+    'sid',
+    'hostname',
+    'mac_addr',
+    'int_ip',
+    'ext_ip'
+]
+
+# Filter based on what architectures you want to import into runZero
+# By default, Chromium browsed based extensions are excluded from import
+ARCHITECTURE = {
+    1: True,   # x86
+    2: True,   # x64
+    3: True,   # arm
+    4: True,   # arm64
+    5: True,   # alpine64
+    6: False,  # chromium
+    7: True,   # wireguard
+    8: True,   # arml
+    9: False,  # usp_adapter
+}
+
+def get_token(oid, token):
+    url = '{}/?oid={}'.format(LIMACHARLIE_JWT_URL, oid)
+    headers = {
+        'Content-Type': 'application/json',
+        'X-LC-Secret': token
+    }
+
+    response = http_post(url, headers=headers)
+    if response.status_code != 200:
+        print('Failed to fetch token. ', response)
         return None
-    token_json = json_decode(token.body)
-    return token_json['jwt']
+    else:
+        response_json = json_decode(response.body)
+        return response_json['jwt']
 
 def build_assets(sensors):
     assets = []
     for item in sensors:
-        sid = item.get('sid', new_uuid)        
+        sid = item.get('sid')        
         hostname = item.get('hostname', '')
+        arch_id = item.get('arch', '')
 
-        ips = []
-        int_ip = item.get('int_ip', '')
-        if int_ip:
-            ips.append(int_ip)
-        ext_ip = item.get('ext_ip', '')
-        if ext_ip:
-            ips.append(ext_ip)
-
-        mac = item.get('mac_addr', '')
-        if mac:
-            mac = mac.replace("-", ":")
-            network = build_network_interface(ips=ips, mac=mac)
+        if hostname in SENSORS_TO_IGNORE:
+            print('Skipping sensor because it has been explicitly ignored in custom integration script:', sid, hostname)
+        elif not ARCHITECTURE.get(arch_id):
+            print('Skipping sensor because sensor architecture', arch_id, 'has been set to False in custom integration script:', sid, hostname)
         else:
-            network = build_network_interface(ips=ips, mac=None)
+            # Parse IPs and mac addresses and build network interfaces      
+            ips = []
+            int_ip = item.get('int_ip', '')
+            if int_ip:
+                ips.append(int_ip)
+            ext_ip = item.get('ext_ip', '')
+            if ext_ip:
+                ips.append(ext_ip)
 
-        # handle additional attributes collected for asset
-        custom_attrs = {}
+            mac = item.get('mac_addr', '')
+            if mac:
+                mac = mac.replace("-", ":")
+                network = build_network_interface(ips=ips, mac=mac)
+            else:
+                network = build_network_interface(ips=ips, mac=None)
 
-        custom_attribs_to_ignore = [
-            "sid",
-            "hostname",
-            "mac_addr",
-            "int_ip",
-            "ext_ip"
-        ]
+            # Parse additional attributes collected from sensors, ignore attributes defined in ATTRIBS_TO_IGNORE
+            custom_attrs = {}
+            for key, value in item.items():
+                if type(value) != 'dict':
+                    if key not in CUSTOM_ATTRIBS_TO_IGNORE:
+                        custom_attrs[key] = str(value)[:1023]
 
-        for key, value in item.items():
-            if type(value) != 'dict':
-                if key not in custom_attribs_to_ignore:
-                    custom_attrs[key] = str(value)[:1023]
-
-        assets.append(
-            ImportAsset(
-                id=sid,
-                hostnames=[hostname],
-                networkInterfaces=[network],
-                customAttributes=custom_attrs
+            assets.append(
+                ImportAsset(
+                    id=sid,
+                    hostnames=[hostname],
+                    networkInterfaces=[network],
+                    customAttributes=custom_attrs
+                )
             )
-        )
+
     return assets
 
 def build_network_interface(ips, mac):
@@ -82,21 +120,18 @@ def main(**kwargs):
     oid = kwargs['access_key']
     access_token = kwargs['access_secret']
     token = get_token(oid, access_token)
-    if not token:
-        print('failed to get token')
-        return None
         
     # Get sensors
     url = '{}/{}/{}'.format(LIMACHARLIE_BASE_URL, 'sensors', oid)
     sensors = http_get(url, headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
     if sensors.status_code != 200:
-        print('failed to retrieve sensors')
+        print('Failed to fetch sensors. ', sensors)
         return None
 
     sensors_json = json_decode(sensors.body)['sensors']
 
     assets = build_assets(sensors_json)
     if not assets:
-        print('no assets')
+        print('No sensors were retrieved.')
     
     return assets
