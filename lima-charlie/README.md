@@ -24,8 +24,8 @@
 ### runZero configuration
 
 1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
-    - Modify API calls as needed to filter sensor data.
-    - Modify datapoints uploaded to runZero as needed.
+    - Set CUSTOM_ATTRIBS_TO_IGNORE. By default, sid, hostname, mac_addr, int_ip and ext_ip are ignored because they are redundant with core runZero attributes. All other attributes returned by API will be imported.
+    - Set boolean values in ARCHITECTURE to control what sensor architectures are imported. By default, chromium and usp_adapter sensors are not imported because they do not represent traditional cyber assets. 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
     - Use the `access_key` field for your Lima Charlie Organization ID (`oid`).
