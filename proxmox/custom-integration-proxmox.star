@@ -252,6 +252,7 @@ def main(*args, **kwargs):
                 'cluster':    cluster_name,
                 'node':       node_name,
                 'vm_type':    'qemu',
+                'vm_name':    vm_name,
                 'status':     vm_status,
                 'running':    is_running,
             }
@@ -270,7 +271,7 @@ def main(*args, **kwargs):
 
             assets.append(ImportAsset(
                 id                = "{}-{}-vm-{}".format(cluster_name, node_name, vmid),
-                hostnames         = [vm_name] if vm_name else [],
+                hostnames         = [],
                 networkInterfaces = vm_ifaces,
                 os                = os_name,
                 osVersion         = os_version,
