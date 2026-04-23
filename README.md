@@ -37,6 +37,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Moysle](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/moysle/)
 - [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
+- [pfSense](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/)
 - [Proxmox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/)
 - [runZero Task Sync](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/task-sync/)
 - [Scale Computing](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scale-computing/)
@@ -52,7 +53,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)
 ## Internal Integrations
 - [Scan Passive Assets](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/)
-- [Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
+- [Vulnerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
 ## The boilerplate folder has examples to follow
 
 1. Sample [README.md](./boilerplate/README.md) for contributing
@@ -81,7 +82,7 @@ We welcome contributions to this repository! Whether you're fixing a bug, adding
 
 ## Agents 
 
-Using agents like Gemini CLI, OpenAI Codex, and Claude Code is encouraged! Most of these integraions follow the same structure with the only differences being in the data fetch processes. 
+Using agents like Gemini CLI, OpenAI Codex, and Claude Code is encouraged! Most of these integrations follow the same structure with the only differences being in the data fetch processes. 
 
 There is an [AGENTS.md](./AGENTS.md) file to give your LLM of choice best practices and guidance will building the integrations. 
 

@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-04-15T14:33:48.631070Z",
-  "totalIntegrations": 32,
+  "lastUpdated": "2026-04-20:00:00.000000Z",
+  "totalIntegrations": 33,
   "integrationDetails": [
     {
       "name": "Scan Passive Assets",
@@ -193,6 +193,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
+    },
+    {
+      "name": "pfSense",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/custom-integration-pfsense.star"
     }
   ]
 }
