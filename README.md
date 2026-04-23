@@ -53,7 +53,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)
 ## Internal Integrations
 - [Scan Passive Assets](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scan-passive-assets/)
-- [Vulnerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
+- [Vunerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/vulnerability-workflow/)
 ## The boilerplate folder has examples to follow
 
 1. Sample [README.md](./boilerplate/README.md) for contributing

@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-04-20:00:00.000000Z",
+  "lastUpdated": "2026-04-23T18:51:06.506450Z",
   "totalIntegrations": 33,
   "integrationDetails": [
     {
@@ -147,6 +147,12 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/custom-integration-digital-ocean.star"
     },
     {
+      "name": "pfSense",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/custom-integration-pfsense.star"
+    },
+    {
       "name": "Automox",
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/README.md",
@@ -193,12 +199,6 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
-    },
-    {
-      "name": "pfSense",
-      "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/custom-integration-pfsense.star"
     }
   ]
 }
