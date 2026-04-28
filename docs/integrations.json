@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-04-24T15:11:06.516671Z",
-  "totalIntegrations": 33,
+  "lastUpdated": "2026-04-28T12:49:17.989469Z",
+  "totalIntegrations": 34,
   "integrationDetails": [
     {
       "name": "Scan Passive Assets",
@@ -103,6 +103,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/custom-integration-kandji.star"
+    },
+    {
+      "name": "Bitsight",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/custom-integration-bitsight.star"
     },
     {
       "name": "Cortex XDR",
