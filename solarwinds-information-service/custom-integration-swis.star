@@ -87,12 +87,14 @@ def get_assets(creds):
     # params = {'query': 'SELECT N.NodeID, N.OsVersion, N.Fqdn, N.Vendor, N.IPAddress, N.CpuPercentUtilization, N.DiscoveryProfileId, N.PercentMemoryUsed, N.MemoryUsed, N.Pollers, N.responseTime, N.snmp.port, N.snmp.version, N.status, N.sysObjectId, N.Uptime FROM Orion.Nodes'}
     params = {'query': ''}
     response = http_get(url, headers=headers, params=params)
+    # To skip secure verification, comment the above response line and uncomment the response line below
+    # response = http_get(url, headers=headers, params=params, insecure_skip_verify=True)
     if response.status_code != 200:
         print('failed to retrieve assets',  'status code: ' + str(response.status_code))
     data = json_decode(response.body)
-    assets_all.extend(data)           
+    assets = data['results']          
 
-    return assets_all
+    return assets
 
 def main(*args, **kwargs):
     username = kwargs['access_key']
