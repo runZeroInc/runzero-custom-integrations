@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-05-04T22:17:00.364409Z",
+  "lastUpdated": "2026-05-04T22:28:49.451669Z",
   "totalIntegrations": 34,
   "integrationDetails": [
     {
@@ -109,6 +109,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/custom-integration-kandji.star"
+    },
+    {
+      "name": "Ivanti Neurons",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ivanti_neurons/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ivanti_neurons/custom-integration-neurons.star"
     },
     {
       "name": "Cortex XDR",
