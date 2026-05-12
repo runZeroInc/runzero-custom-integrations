@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-12T15:50:53.579414Z",
-  "totalIntegrations": 35,
+  "lastUpdated": "2026-05-12T15:57:44.869693Z",
+  "totalIntegrations": 36,
   "integrationDetails": [
     {
       "name": "Scan Passive Assets",
@@ -109,6 +109,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/custom-integration-kandji.star"
+    },
+    {
+      "name": "Bitsight",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/custom-integration-bitsight.star"
     },
     {
       "name": "Ivanti Neurons",
