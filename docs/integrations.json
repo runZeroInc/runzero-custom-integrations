@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-05-12T15:43:45.544731Z",
+  "lastUpdated": "2026-05-12T15:50:53.579414Z",
   "totalIntegrations": 35,
   "integrationDetails": [
     {
@@ -69,10 +69,10 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/custom-integration-device42.star"
     },
     {
-      "name": "Solarwinds Information Service",
+      "name": "Ubiquiti Unifi Network",
       "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/custom-integration-swis.star"
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/custom-integration-ubiquiti-unifi-network.star"
     },
     {
       "name": "Solarwinds Information Service",
@@ -177,16 +177,10 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/custom-integrations-extreme-cloud-iq.star"
     },
     {
-      "name": "Sumo Logic",
-      "type": "outbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
-    },
-    {
-      "name": "Digital Ocean",
+      "name": "Netskope",
       "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/custom-integration-digital-ocean.star"
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/custom-integration-netskope.star"
     },
     {
       "name": "NinjaOne",
@@ -213,10 +207,10 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/carbon-black/custom-integration-carbon-black.star"
     },
     {
-      "name": "Automox",
+      "name": "Proxmox",
       "type": "inbound",
-      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/README.md",
-      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/custom-integration-automox.star"
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/custom-integration-proxmox.star"
     }
   ]
 }
