@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-04T22:28:49.451669Z",
-  "totalIntegrations": 34,
+  "lastUpdated": "2026-05-12T15:43:45.544731Z",
+  "totalIntegrations": 35,
   "integrationDetails": [
     {
       "name": "Scan Passive Assets",
@@ -19,6 +19,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/custom_integration_cisco-ise.star"
+    },
+    {
+      "name": "Halycon",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/custom-integration-halycon.star"
     },
     {
       "name": "Stairwell",
