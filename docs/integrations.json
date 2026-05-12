@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-04-28T12:49:17.989469Z",
-  "totalIntegrations": 34,
+  "lastUpdated": "2026-05-12T15:57:44.869693Z",
+  "totalIntegrations": 36,
   "integrationDetails": [
     {
       "name": "Scan Passive Assets",
@@ -19,6 +19,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/custom_integration_cisco-ise.star"
+    },
+    {
+      "name": "Halycon",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/custom-integration-halycon.star"
     },
     {
       "name": "Stairwell",
@@ -109,6 +115,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/custom-integration-bitsight.star"
+    },
+    {
+      "name": "Ivanti Neurons",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ivanti_neurons/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ivanti_neurons/custom-integration-neurons.star"
     },
     {
       "name": "Cortex XDR",
