@@ -38,7 +38,11 @@ def get_all_cortex_endpoints(api_key, api_key_id):
             print("Error retrieving endpoints")
             break
 
-        fetched_endpoints = result["reply"].get("endpoints", [])
+        reply = result["reply"]
+        if type(reply) == "list":
+            fetched_endpoints = reply
+        else:
+            fetched_endpoints = reply.get("endpoints", [])
         all_endpoints.extend(fetched_endpoints)
 
         if len(fetched_endpoints) < page_size:
@@ -56,13 +60,37 @@ def build_assets(api_key, api_key_id):
     assets = []
 
     for endpoint in all_endpoints:
+        endpoint_tags = endpoint.get("tags", {}).get("endpoint_tags", [])
+        server_tags = endpoint.get("tags", {}).get("server_tags", [])
+        group_names = endpoint.get("group_name", endpoint_tags + server_tags)
+
+        last_seen_raw = endpoint.get("last_seen")
+        first_seen_raw = endpoint.get("first_seen")
+
+        last_seen = ""
+        if last_seen_raw != None and str(last_seen_raw) != "":
+            last_seen_int = int(last_seen_raw)
+            if last_seen_int > 9999999999:
+                last_seen = str(int(last_seen_int / 1000))
+            else:
+                last_seen = str(last_seen_int)
+
+        first_seen = ""
+        if first_seen_raw != None and str(first_seen_raw) != "":
+            first_seen_int = int(first_seen_raw)
+            if first_seen_int > 9999999999:
+                first_seen = str(int(first_seen_int / 1000))
+            else:
+                first_seen = str(first_seen_int)
+
         custom_attrs = {
             "operational_status": endpoint.get("operational_status", ""),
-            "agent_status": endpoint.get("endpoint_status", ""),
-            "agent_type": endpoint.get("endpoint_type", ""),
-            "last_seen": str(int(endpoint.get("last_seen", 0) / 1000)),
-            "first_seen": str(int(endpoint.get("first_seen", 0) / 1000)),
-            "groups": ";".join(endpoint.get("group_name", [])),
+            "agent_status": endpoint.get("agent_status", endpoint.get("endpoint_status", "")),
+            "agent_type": endpoint.get("agent_type", endpoint.get("endpoint_type", "")),
+            "last_seen": last_seen,
+            "first_seen": first_seen,
+            "groups": ";".join(group_names),
+            "users": ";".join(endpoint.get("users", [])),
             "assigned_prevention_policy": endpoint.get("assigned_prevention_policy", ""),
             "assigned_extensions_policy": endpoint.get("assigned_extensions_policy", ""),
             "endpoint_version": endpoint.get("endpoint_version", "")
@@ -72,9 +100,9 @@ def build_assets(api_key, api_key_id):
 
         assets.append(
             ImportAsset(
-                id=str(endpoint.get("endpoint_id", new_uuid())),
+                id=str(endpoint.get("agent_id", endpoint.get("endpoint_id", new_uuid()))),
                 networkInterfaces=[build_network_interface(endpoint.get("ip", []) + endpoint.get("ipv6", []), mac_address)],
-                hostnames=[endpoint.get("endpoint_name", "")],
+                hostnames=[endpoint.get("host_name", endpoint.get("endpoint_name", ""))],
                 os_version=endpoint.get("os_version", ""),
                 os=endpoint.get("operating_system", ""),
                 customAttributes=custom_attrs
