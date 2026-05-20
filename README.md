@@ -39,6 +39,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Manage Engine Endpoint Central](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/)
 - [Moysle](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/moysle/)
 - [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
+- [Nexthink](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/nexthink/)
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
 - [pfSense](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/)
 - [Proxmox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/)
