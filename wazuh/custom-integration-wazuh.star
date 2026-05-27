@@ -531,6 +531,8 @@ def main(**kwargs):
     print("Retrieving detailed network information for each agent...")
    
     for agent in agents:
+        if agent.get('status') != "active":
+            continue
         agent_id = agent.get('id')
         if agent_id:
             # Get network interfaces
