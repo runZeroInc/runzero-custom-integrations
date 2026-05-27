@@ -80,18 +80,17 @@ def get_wazuh_agents(host, token):
             'limit': limit
         }
 
-        response = http_get(agents_url, headers=headers, params=params, insecure_skip_verify=True, timeout=600)
+        response = http_get(agents_url, headers=headers, params=params, timeout=600)
 
         if response.status_code != 200:
             print("Failed to fetch agents from Wazuh. Status:", response.status_code)
-            hasNextPage = False
+            break
 
         response_data = json_decode(response.body)
 
         if response_data.get('error', 1) != 0:
             print("Wazuh API error:", response_data.get('message', 'Unknown error'))
-            hasNextPage = False
-
+            break
         agents_batch = response_data.get('data', {}).get('affected_items', [])
 
         if not agents_batch:
