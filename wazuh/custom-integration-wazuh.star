@@ -52,14 +52,14 @@ def authenticate_wazuh(host, username, password):
 
 def get_wazuh_agents(host, token):
     """
-    Retrieve up to 10000 agents from Wazuh using pagination.
+    Retrieve agents from Wazuh using pagination.
 
     Args:
         host: Wazuh host URL
         token: JWT authentication token
 
     Returns:
-        List of agent dictionaries (limited to 10000)
+        List of agent dictionaries
     """
     agents_url = "{}/agents".format(host)
     headers = {
