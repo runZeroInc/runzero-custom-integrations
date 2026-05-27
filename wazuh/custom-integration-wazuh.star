@@ -6,8 +6,7 @@ load('uuid', 'new_uuid')
 load('base64', base64_encode='encode')
 load('time', 'parse_time')
 
-# --- Existing functions (no changes) ---
-
+# --- Wazuh API helpers ---
 def authenticate_wazuh(host, username, password):
     """
     Authenticate with Wazuh API and retrieve JWT token.
