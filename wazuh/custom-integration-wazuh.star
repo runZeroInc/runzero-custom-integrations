@@ -123,7 +123,7 @@ def get_agent_network_interfaces(host, token, agent_id):
         'Content-Type': 'application/json'
     }
 
-    response = http_get(netiface_url, headers=headers, insecure_skip_verify=True, timeout=600)
+    response = http_get(netiface_url, headers=headers, timeout=600)
 
     if response.status_code != 200:
         if response.status_code != 401:  # Don't print for 401, we'll handle that
