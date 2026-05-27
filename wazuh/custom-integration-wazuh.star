@@ -31,7 +31,7 @@ def authenticate_wazuh(host, username, password):
         'Content-Type': 'application/json'
     }
 
-    response = http_post(auth_url, headers=headers, insecure_skip_verify=True, timeout=600)
+    response = http_post(auth_url, headers=headers, timeout=600)
 
     if response.status_code != 200:
         print("Wazuh authentication failed. Status:", response.status_code)
