@@ -516,7 +516,10 @@ def main(**kwargs):
    
     # Authenticate with Wazuh
     token = authenticate_wazuh(wazuh_host, username, password)
-   
+    if not token:
+        print("Authentication to Wazuh failed; no token returned")
+        return []
+
     # Retrieve agents
     agents = get_wazuh_agents(wazuh_host, token)
     if not agents:
