@@ -397,7 +397,7 @@ def build_assets(agents, agent_net_interfaces, agent_net_addresses):
     assets = []
    
     for agent in agents:
-        print(agent)
+        # print(agent)  # Uncomment for debugging
         agent_id = agent.get('id', "")
         agent_name = agent.get('name', "")
         node_name = agent.get('node_name', '')
