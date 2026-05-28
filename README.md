@@ -52,6 +52,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Tailscale](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/)
 - [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
 - [Ubiquiti Unifi Network](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/)
+- [Wazuh](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/wazuh/)
 ## Export from runZero 
 - [Audit Log to Webhook](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/)
 - [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)

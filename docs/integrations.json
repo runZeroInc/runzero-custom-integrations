@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-21T17:58:30.540507Z",
-  "totalIntegrations": 37,
+  "lastUpdated": "2026-05-27T20:41:38.578027Z",
+  "totalIntegrations": 38,
   "integrationDetails": [
     {
       "name": "Moysle",
@@ -187,6 +187,12 @@
       "type": "outbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/custom-integration-sumo.star"
+    },
+    {
+      "name": "Wazuh",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/wazuh/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/wazuh/custom-integration-wazuh.star"
     },
     {
       "name": "Manage Engine Endpoint Central",
