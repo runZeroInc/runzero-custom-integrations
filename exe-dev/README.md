@@ -244,10 +244,10 @@ curl -s -X POST https://exe.dev/exec \
      -H "Authorization: Bearer $TOKEN" \
      -d 'domain ls -a' | jq .
 
-# Verify share shape (if using share show permission)
+# Verify share shape for a specific VM (if using share show permission)
 curl -s -X POST https://exe.dev/exec \
      -H "Authorization: Bearer $TOKEN" \
-     -d 'share show -a' | jq .
+     -d 'share show <vm-name>' | jq .
 ```
 
 ### End-to-end (RunZero sandbox)

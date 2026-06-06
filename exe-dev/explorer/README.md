@@ -120,7 +120,7 @@ ssh <vm>.exe.xyz \
 Or loop over all VMs using the exe.dev API:
 
 ```bash
-EXE_DEV_TOKEN=<token> ./install-tailscale-fleet.sh <tskey-auth-...>
+EXE_DEV_TOKEN=<token> TAILSCALE_AUTH_KEY=<tskey-auth-...> ./install-tailscale-fleet.sh
 ```
 
 ### 2. Deploy the Explorer (same as Architecture A)
@@ -131,11 +131,15 @@ other fleet VMs at their `100.x.x.x` Tailscale addresses.
 ### 3. Generate Tailscale scan targets
 
 ```bash
-EXE_DEV_TOKEN=<token> SCAN_MODE=tailscale ./generate-targets.sh
+EXE_DEV_TOKEN=<token> \
+  SCAN_MODE=tailscale \
+  TAILSCALE_API_KEY=<tskey-api-...> \
+  TAILSCALE_TAILNET=<tailnet> \
+  ./generate-targets.sh
 ```
 
-This queries the Tailscale API (requires a Tailscale API key) for the fleet's
-Tailscale IPs and writes them to `targets.txt`.
+This queries the Tailscale API for the fleet's Tailscale IPs and matches them
+against your exe.dev VM list, writing the results to `targets.txt`.
 
 ### 4. Configure the scan in RunZero
 
