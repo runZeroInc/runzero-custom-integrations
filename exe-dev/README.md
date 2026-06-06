@@ -14,7 +14,7 @@ Tokens generated with `ssh exe.dev ssh-key generate-api-key` carry the default `
 |---|---|
 | `new` | Attacker can spin up VMs at your cost |
 | `ssh-key list` | Exposes your registered public keys |
-| `share show` | Reveals what services you've made public |
+| `share show` | Reveals what services you've made public (grant only if you want proxy visibility enrichment) |
 | `team members` | Enumerates your organisation's users |
 
 At minimum this integration needs `ls`. Optional enrichment commands and what they add:
@@ -39,12 +39,35 @@ Tokens are bearer tokens — possession grants access with no further proof of i
 
 ## Generating a minimal-scope API token
 
+Two methods are available. The web dashboard is simpler but supports fewer
+enrichment commands. Use the SSH key method if you need custom domain hostnames
+or integration/CAASM metadata.
+
+| Method | `ls` | `share show` | `domain ls` | `integrations list` |
+|---|:---:|:---:|:---:|:---:|
+| Web dashboard | ✓ | ✓ | — | — |
+| SSH key signing | ✓ | ✓ | ✓ | ✓ |
+
+### Method A: Web dashboard (simpler)
+
+1. Log in to [exe.dev](https://exe.dev) and go to **API Keys → Create API Key**.
+2. Set a **Label** (e.g. `runzero-integration`) and choose an **Expiry** (30–90 days recommended).
+3. Under **Allowed commands**, uncheck everything, then check only what you need:
+   - **Always required:** `ls`
+   - **Optional — proxy visibility enrichment:** `share show`
+4. Click **Create** and copy the generated token.
+
+> The dashboard does not offer `domain ls` or `integrations list`. If you want
+> custom domain hostnames or CAASM integration metadata, use Method B instead.
+
+### Method B: SSH key signing (full enrichment)
+
 > **All commands in this section run on your local machine** (laptop or
 > workstation), not inside an exe.dev VM or the exe.dev lobby. You need an
 > existing SSH key registered with exe.dev on that machine to run
 > `ssh exe.dev ...` commands.
 
-### 1. Create a dedicated SSH key for this integration
+#### 1. Create a dedicated SSH key for this integration
 
 Using a separate key means you can revoke RunZero's API access independently
 of your regular exe.dev SSH access.
@@ -54,13 +77,13 @@ ssh-keygen -t ed25519 -C runzero-integration -f ~/.ssh/exe_dev_runzero
 cat ~/.ssh/exe_dev_runzero.pub | ssh exe.dev ssh-key add
 ```
 
-### 2. Set a 90-day expiry timestamp
+#### 2. Set a 90-day expiry timestamp
 
 ```bash
 export EXPIRY=$(date -d '+90 days' +%s 2>/dev/null || date -v+90d +%s)
 ```
 
-### 3. Sign a minimal permissions payload
+#### 3. Sign a minimal permissions payload
 
 Choose the permission tier that matches the enrichment you want (see the
 enrichment table above), then run the signing block:
@@ -86,7 +109,7 @@ export SIGBLOB=$(echo "$SIG" | sed '1d;$d' | b64url)
 export TOKEN="exe0.$PAYLOAD.$SIGBLOB"
 ```
 
-### 4. Convert to a short opaque token (recommended)
+#### 4. Convert to a short opaque token (recommended)
 
 The `exe0` token contains your permissions in plaintext. Converting it to an
 `exe1` token makes it opaque and shorter:
@@ -97,7 +120,7 @@ ssh exe.dev exe0-to-exe1 "$TOKEN"
 
 Copy the resulting `exe1.` token — this is what you will store in runZero.
 
-### 5. Verify
+#### 5. Verify
 
 ```bash
 curl -X POST https://exe.dev/exec \
@@ -107,7 +130,9 @@ curl -X POST https://exe.dev/exec \
 
 ### Token rotation
 
-This token expires after 90 days. Set a calendar reminder to rotate it before expiry by repeating steps 2–4 and updating the credential in runZero.
+Tokens expire based on the expiry you set at creation. Set a calendar reminder
+to rotate before expiry by repeating the relevant method above and updating the
+credential in runZero.
 
 ## runZero configuration
 
