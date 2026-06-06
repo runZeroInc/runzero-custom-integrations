@@ -1,3 +1,20 @@
+CONFIG = {
+    "id": "runzero-exe-dev",
+    "name": "exe.dev",
+    "type": "inbound",
+    "description": "Imports exe.dev virtual machines as runZero assets.",
+    "version": "26060600",
+    "params": [
+        {
+            "key": "api_token",
+            "label": "API token",
+            "type": "secret",
+            "required": True,
+            "description": "Minimal-scope exe.dev token (exe1.…). See README for generation steps.",
+        },
+    ],
+}
+
 load("runzero.types", "ImportAsset")
 load("json", json_decode="decode")
 load("http", http_post="post")
@@ -200,9 +217,9 @@ def _summarise_integrations(integrations):
 def main(*args, **kwargs):
     _log("=== EXE.DEV INTEGRATION ===")
 
-    token = kwargs.get("access_key", "")
+    token = kwargs.get("api_token", "")
     if token == "":
-        _log("ERROR: Missing access_key (exe.dev API token)")
+        _log("ERROR: Missing api_token (exe.dev API token)")
         return []
 
     # Use -l for detailed listing: tags, comment, and shelley status
