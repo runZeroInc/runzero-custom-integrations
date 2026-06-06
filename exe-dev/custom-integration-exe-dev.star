@@ -6,7 +6,7 @@ CONFIG = {
     "version": "26060600",
     "params": [
         {
-            "key": "api_token",
+            "key": "access_key",
             "label": "API token",
             "type": "secret",
             "required": True,
@@ -217,9 +217,9 @@ def _summarise_integrations(integrations):
 def main(*args, **kwargs):
     _log("=== EXE.DEV INTEGRATION ===")
 
-    token = kwargs.get("api_token", "")
+    token = kwargs.get("access_key", "")
     if token == "":
-        _log("ERROR: Missing api_token (exe.dev API token)")
+        _log("ERROR: Missing access_key (exe.dev API token)")
         return []
 
     # Use -l for detailed listing: tags, comment, and shelley status

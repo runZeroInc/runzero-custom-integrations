@@ -115,8 +115,9 @@ This token expires after 90 days. Set a calendar reminder to rotate it before ex
 
 2. Paste the contents of `custom-integration-exe-dev.star` as the script.
 
-3. In the credential form, enter:
-   - **API token**: your exe.dev token (the `exe1.` string)
+3. Create a credential of type **Custom Integration Script Secrets** with:
+   - **access_key**: your exe.dev token (the `exe1.` string)
+   - **access_secret**: enter any non-empty value (e.g. `unused`) — the field is required by the platform but is not used by this integration
 
 4. Attach the credential to the integration and save.
 
