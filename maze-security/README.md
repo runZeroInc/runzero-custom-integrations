@@ -1,14 +1,14 @@
-# Maze Security Custom Integration
+# Maze Custom Integration
 
 ## Overview
-This integration imports vulnerability investigation data from the Maze Security API into runZero. Each Maze investigation is mapped to a runZero Vulnerability and grouped by affected asset.
+This integration imports vulnerability investigation data from the Maze API into runZero. Each Maze investigation is mapped to a runZero Vulnerability and grouped by affected asset.
 
 ## Configuration
 
 | Parameter | Value |
 |-----------|-------|
 | **Access Key** | *(not used)* |
-| **Access Secret** | Maze Security API key |
+| **Access Secret** | Maze API key |
 
 ## How It Works
 

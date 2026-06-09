@@ -307,7 +307,7 @@ def build_assets(investigations):
 
         custom_attrs = {
             "maze_finding_count": str(len(vulns)),
-            "source": "maze_security",
+            "source": "maze",
         }
         if asset_data["asset_type"]:
             custom_attrs["maze_asset_type"] = force_string(asset_data["asset_type"])
@@ -341,7 +341,7 @@ def build_assets(investigations):
 
 
 def main(*args, **kwargs):
-    print("=== Maze Security Integration Starting ===")
+    print("=== Maze Integration Starting ===")
     print("kwargs keys: {}".format(list(kwargs.keys())))
 
     api_key = kwargs.get("access_secret")
@@ -360,6 +360,6 @@ def main(*args, **kwargs):
 
     assets = build_assets(investigations)
     print("Built {} assets from {} investigations".format(len(assets), len(investigations)))
-    print("=== Maze Security Integration Complete ===")
+    print("=== Maze Integration Complete ===")
 
     return assets
