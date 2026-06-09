@@ -68,7 +68,7 @@ def build_assets(assets):
             'hardware.Uuid': hw_uuid,
             'isOn': is_on,
             'labels': labels,
-            'firstSeenTS': first_seen
+            'firstSeenTS': first_seen,
             'lastSeenTS': last_seen,
             'recentDomains': recent_domains,
             'status': status,
