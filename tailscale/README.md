@@ -4,8 +4,8 @@
 
 - Superuser access to the [Custom Integrations configuration](https://console.runzero.com/custom-integrations) in runZero.
 - A [Custom Integration Script Secret](https://console.runzero.com/credentials) credential configured with:
-  - `access_key`: your **Tailscale OAuth Client ID** (leave blank if using a standard API key)
-  - `access_secret`: your **Tailscale API key** or **OAuth Client Secret**
+  - `client_id`: your **Tailscale OAuth Client ID** (leave blank if using a standard API key)
+  - `api_key_or_client_secret`: your **Tailscale API key** or **OAuth Client Secret**
 
 ## Tailscale requirements
 
@@ -45,8 +45,8 @@ Update this value inside the script if your environment uses a specific tailnet 
 1. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
 
    * Select **Custom Integration Script Secrets**.
-   * For `access_secret`, enter your **API key** or **OAuth client secret**.
-   * For `access_key`, enter your **OAuth client ID**, or a placeholder value (e.g., `foo`) if using an API key.
+  * For `api_key_or_client_secret`, enter your **API key** or **OAuth client secret**.
+  * For `client_id`, enter your **OAuth client ID**, or leave it blank if using an API key.
 2. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
 
    * Add a descriptive name (e.g., `tailscale-sync`).

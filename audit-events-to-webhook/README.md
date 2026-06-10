@@ -15,8 +15,8 @@ The integration is a Starlark script that performs the following actions:
 To use this integration, you will need to configure a new custom integration in your runZero account.
 
 1.  **Create a new Custom Integration:** In your runZero console, navigate to `Account > Custom Integrations` and create a new custom integration.
-2.  **Copy the Script:** Copy the contents of the `custom-integration-audit-events.star` file and paste it into the script editor for your new custom integration.
-3.  **Set up Credentials:** The script requires the following credentials to be configured in the custom integration's `access_secret` field as a JSON object:
+2.  **Copy the Script:** Copy the contents of the `audit-events.star` file and paste it into the script editor for your new custom integration.
+3.  **Set up Credentials:** The script requires the following credentials to be configured in the custom integration's `legacy_credentials` field as a JSON object:
 
     *   `webhook_url`: The URL of the webhook to which the audit events will be sent.
     *   `rz_account_token`: A runZero account token.
@@ -36,11 +36,11 @@ To use this integration, you will need to configure a new custom integration in 
 
 ## Script Details
 
-The `custom-integration-audit-events.star` script is written in Starlark and uses the built-in `http` and `json` modules to interact with the runZero API and the destination webhook.
+The `audit-events.star` script is written in Starlark and uses the built-in `http` and `json` modules to interact with the runZero API and the destination webhook.
 
 ### `main` function
 
-The `main` function is the entry point for the script. It retrieves the necessary credentials from the `access_secret`, fetches the latest audit events from the runZero API, and then calls the `send_events_to_webhook` function to send the events to the configured webhook.
+The `main` function is the entry point for the script. It retrieves the necessary credentials from `legacy_credentials`, fetches the latest audit events from the runZero API, and then calls the `send_events_to_webhook` function to send the events to the configured webhook.
 
 ### `send_events_to_webhook` function
 

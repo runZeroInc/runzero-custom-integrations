@@ -1,6 +1,7 @@
 import os
 import json
-from datetime import datetime
+import ast
+from datetime import datetime, timezone
 
 # --- Config ---
 BLOCK_LIST = {".github", "boilerplate", "LICENSE", "README.md"}
@@ -8,13 +9,61 @@ BASE_REPO_URL = "https://github.com/runZeroInc/runzero-custom-integrations/blob/
 
 integration_details = []
 
+OPTION_SET_IDENTIFIERS = {"OPTIONS_TLS", "OPTIONS_HTTP"}
+
+
+def find_matching_brace(text, open_idx):
+    depth = 0
+    quote = None
+    escape = False
+    for idx in range(open_idx, len(text)):
+        ch = text[idx]
+        if quote:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == quote:
+                quote = None
+            continue
+        if ch in {"'", '"'}:
+            quote = ch
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return idx
+    return -1
+
+
+def load_embedded_config(script_path):
+    with open(script_path) as sf:
+        text = sf.read()
+
+    marker = "CONFIG"
+    marker_idx = text.find(marker)
+    if marker_idx == -1:
+        return {}
+    equals_idx = text.find("=", marker_idx + len(marker))
+    open_idx = text.find("{", equals_idx)
+    if equals_idx == -1 or open_idx == -1:
+        return {}
+    close_idx = find_matching_brace(text, open_idx)
+    if close_idx == -1:
+        return {}
+
+    literal = text[open_idx : close_idx + 1]
+    for identifier in OPTION_SET_IDENTIFIERS:
+        literal = literal.replace(identifier, repr(identifier))
+    return ast.literal_eval(literal)
+
 for entry in os.listdir("."):
     if entry in BLOCK_LIST or not os.path.isdir(entry):
         continue
 
     folder_path = os.path.join(".", entry)
     readme_path = os.path.join(folder_path, "README.md")
-    config_path = os.path.join(folder_path, "config.json")
     integration_file = None
 
     # Look for the first .star file
@@ -31,15 +80,12 @@ for entry in os.listdir("."):
     friendly_name = entry
     integration_type = "inbound"
 
-    # Override with config.json if available
-    if os.path.isfile(config_path):
-        try:
-            with open(config_path) as cf:
-                config = json.load(cf)
-                friendly_name = config.get("name", entry)
-                integration_type = config.get("type", "inbound")
-        except Exception as e:
-            print(f"⚠️  Failed to read config.json in {entry}: {e}")
+    try:
+        config = load_embedded_config(os.path.join(folder_path, integration_file))
+        friendly_name = config.get("name", entry)
+        integration_type = config.get("type", "inbound")
+    except Exception as e:
+        print(f"⚠️  Failed to read embedded CONFIG in {entry}: {e}")
 
     if not integration_type:
         integration_type = "inbound"
@@ -62,7 +108,7 @@ for entry in os.listdir("."):
 
 # --- Save JSON ---
 output = {
-    "lastUpdated": datetime.utcnow().isoformat() + "Z",
+    "lastUpdated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "totalIntegrations": len(integration_details),
     "integrationDetails": integration_details,
 }

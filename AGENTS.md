@@ -11,25 +11,74 @@ Each integration must be placed in its own directory at the root of the reposito
 ```
 repo-root/
 ├── <integration-name>/
-│   ├── custom-integration-<integration-name>.star  # The main script
-│   ├── config.json                                 # Metadata
-│   └── README.md                                   # Documentation
+│   ├── <integration-name>.star  # The main script (also carries the integration metadata)
+│   └── README.md                # Documentation
 ```
 
-### 1. `config.json`
-This file contains metadata about the integration.
+### 1. Integration metadata (embedded `CONFIG` block)
+
+Every script must declare a top-level `CONFIG = {...}` literal at the top
+of the file. The platform extracts this block (via a strict literal-only
+Starlark walk) to render the credential form, validate user input, apply
+defaults, and route secret fields through encrypted storage. Only literal
+expressions are permitted on the right-hand side — no function calls, no
+variable references, no arithmetic. The only exception is
+`CONFIG["includes"]`, which may reference allowlisted shared option-set
+identifiers such as `OPTIONS_TLS` and `OPTIONS_HTTP`.
 
 **Format:**
-```json
-{
-  "name": "Integration Name",
-  "type": "inbound"
+```python
+CONFIG = {
+    "id": "runzero-example",
+    "name": "Integration Name",
+    "type": "inbound",
+    "description": "Short summary shown in the catalog.",
+    "version": "26052700",
+    "minVersion": "4.9",
+    "params": [
+        {
+            "key": "client_id",
+            "label": "Client ID",
+            "type": "string",
+            "required": True,
+        },
+        {
+            "key": "client_secret",
+            "label": "Client secret",
+            "type": "secret",
+            "required": True,
+        },
+    ],
+    "includes": {
+        "tls_": OPTIONS_TLS,
+        "http_": OPTIONS_HTTP,
+    },
 }
-```
-*   `type`: Use `"inbound"` for importing assets into runZero, `"outbound"` for exporting assets from runZero.
 
-### 2. `custom-integration-<name>.star`
-This is the main script written in Starlark.
+load("runzero.types", "ImportAsset")
+# ...rest of script
+```
+
+**Required rules:**
+- `CONFIG` must be a top-level assignment.
+- All values must be literals (`True`/`False`/`None`, strings, ints, floats, lists, tuples, dicts with string keys, negated numbers via unary `-`).
+- `id` must be a stable lower-case integration identifier, e.g. `runzero-tailscale`.
+- `version` must use the integration version string for the target release, e.g. `26052700`.
+- `minVersion` is optional. When set, it declares the minimum runZero version required to run the script as a dotted numeric version (an optional leading `v` is allowed, e.g. `4.9` or `v4.9.260604`). Before the script runs, the running runZero version is compared against it; if the Explorer is older, the task fails with a clear upgrade message. Omit it (or leave it blank) to impose no requirement. Development builds (version `0.0.0`) skip the check.
+- `type` must be `inbound`, `outbound`, or `internal`.
+- Each `params[].key` must match `^[a-zA-Z_][a-zA-Z0-9_]*$` and must match the kwarg name the script reads.
+- `type: "secret"` (or `secret: True`) marks the field as a credential — never log or print these values, and never set a `default` on them.
+- `includes` expands shared option sets with the dict key as a prefix, for example `{"src_tls_": OPTIONS_TLS, "dst_http_": OPTIONS_HTTP}`.
+
+**Supported top-level CONFIG fields:** `id`, `name`, `type`, `description`, `version`, `minVersion`, `params`, `includes`, `rejectUnknown`, `atLeastOneOf`, `exactlyOneOf`.
+
+**Supported param types:** `string`, `secret`, `int`, `float`, `bool`, `enum` (requires `options`), `url`, `textarea`, `json`.
+
+**Supported param fields:** `key`, `label`, `description`, `type`, `required`, `secret`, `default`, `placeholder`, `options`, `multi`, `min`, `max`, `pattern`, `dependsOn`, `group`.
+
+### 2. `<integration-name>.star`
+This is the main script written in Starlark. Name it after the
+integration directory (e.g. `tailscale/tailscale.star`).
 
 ## Script Development
 
@@ -48,32 +97,103 @@ def main(*args, **kwargs):
     return assets # List of ImportAsset objects (for inbound) or None
 ```
 
-*   **Arguments**:
-    *   `kwargs['access_key']`: Typically the username, client ID, or organization ID.
-    *   `kwargs['access_secret']`: Typically the password, API token, or secret key.
+*   **Arguments** — keys delivered through `**kwargs` are those declared in `CONFIG["params"]`. Reserved keys (those starting with `_`, e.g. `_integration_id`) are stored on the credential but **not** forwarded to the script. The platform applies declared `default` values, coerces `int`/`float`/`bool`/`enum` types, and rejects requests that fail validation (`required`, `min`, `max`, `pattern`, `options`) before `main` runs.
 
-### Return Type
-*   **Inbound**: Must return a `list` of `ImportAsset` objects.
-*   **Outbound**: Typically returns `None` after performing the export operation.
+#### Reading kwargs safely
 
-### Available Libraries
-Load libraries at the top of your script.
+A helper module exposes typed accessors and validators:
 
 ```python
-load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software', 'Vulnerability')
+load("kwargs", "require", "has", "get_string", "get_bool", "get_int", "get_float", "get_list")
+
+def main(*args, **kwargs):
+    require(kwargs, "client_id", "client_secret")
+    client_id = get_string(kwargs, "client_id")
+    client_secret = get_string(kwargs, "client_secret")
+    page_size = get_int(kwargs, "page_size", default=100)
+    include_offline = get_bool(kwargs, "include_offline", default=False)
+    regions = get_list(kwargs, "regions", default=[])
+    if has(kwargs, "region"):
+        ...
+```
+
+Use descriptive parameter keys such as `username`, `password`, `api_token`, `client_id`, or `client_secret`; each `params[].key` must match the kwarg name the script reads.
+
+### Return Type
+*   **Inbound**: Either return a `list` of `ImportAsset` objects from `main`,
+    **or** stream assets incrementally with `report_assets(...)` and return
+    `None`. The two approaches can be combined (anything returned from `main`
+    is imported in addition to whatever was already reported).
+*   **Outbound**: Typically returns `None` after performing the export operation.
+
+### Streaming assets with `report_assets` (large datasets)
+
+Returning one giant `list` from `main` forces the whole result set — every
+`ImportAsset`, plus the raw API responses used to build them — to live in
+memory at once. For integrations that page through large inventories this can
+exhaust the Explorer's memory. Instead, report assets to runZero as you build
+them and let each page be garbage-collected before the next is fetched:
+
+```python
+def main(**kwargs):
+    total = 0
+    cursor = None
+    while True:
+        page, cursor = fetch_page(kwargs, cursor)  # one page of raw records
+        if not page:
+            break
+        assets = build_assets(page)                # build just this page
+        report_assets(assets)                      # stream it to runZero
+        total += len(assets)
+        if not cursor:
+            break
+    print("reported {} assets".format(total))
+    return None                                    # nothing buffered in main
+```
+
+`report_assets` is a predeclared builtin (no `load` required) and accepts any
+combination of:
+
+```python
+report_assets(asset)            # a single ImportAsset
+report_assets(asset1, asset2)   # several as positional args
+report_assets(page_assets)      # a list/tuple of ImportAsset
+report_assets(*page_assets)     # the same, spread
+n = report_assets(batch)        # returns the count reported, for logging
+```
+
+Notes:
+*   Reported assets are merged with any `list` returned from `main`, so a
+    partial migration (report some pages, return the rest) is safe.
+
+
+### Available Libraries
+Load libraries at the top of your script. The list below covers the most
+common modules; see [docs/starlark-helpers.md](docs/starlark-helpers.md)
+for the complete reference (including `kwargs`, `requests`, `re`, `csv`,
+`xml`, `jsonstream`, `jwt`, and the low-level `socket`/`runzero.ssh`/
+`runzero.smb`/`runzero.winrm`/`runzero.wmi`/`runzero.sql` modules).
+
+```python
+load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Service',
+                      'ServiceProtocolData', 'Software', 'Vulnerability',
+                      'to_custom_attributes')
+load('kwargs', 'require', 'has', 'get_string', 'get_bool', 'get_int',
+               'get_list', 'get_http_options')
 load('json', json_encode='encode', json_decode='decode')
-load('net', 'ip_address')
-load('http', http_post='post', http_get='get', 'url_encode')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'resolve')
+load('http', http_post='post', http_get='get', 'get_json', 'post_json',
+             'url_encode', 'bearer', 'basic', 'oauth2_token')
 load('uuid', 'new_uuid')
-load('time', 'parse_time')
+load('time', 'parse_time', 'parse_duration', 'now')
 load('gzip', gzip_decompress='decompress', gzip_compress='compress')
 load('base64', base64_encode='encode', base64_decode='decode')
-load('crypto', 'sha256', 'sha512', 'sha1', 'md5')
+load('crypto', 'sha256', 'sha512', 'sha1', 'md5', 'hmac_sha256')
 load('flatten_json', 'flatten')
 ```
 
 ## runZero SDK Types
-The Starlark `runzero.types` library exposes `ImportAsset`, `NetworkInterface`, `Software`, and `Vulnerability`. The Python SDK wraps the same REST models and also provides `Hostname`, `Tag`, `Service`, `ServiceProtocolData`, `ScanOptions`, `ScanTemplate`, and `ScanTemplateOptions`. These wrappers enforce validation and normalization, so build your payloads to fit the expected shape:
+The Starlark `runzero.types` library exposes `ImportAsset`, `NetworkInterface`, `Service`, `ServiceProtocolData`, `Software`, `Vulnerability`, and the `to_custom_attributes` helper. The Python SDK wraps the same REST models and also provides `Hostname`, `Tag`, `ScanOptions`, `ScanTemplate`, and `ScanTemplateOptions`. These wrappers enforce validation and normalization, so build your payloads to fit the expected shape:
 
 - `ImportAsset`: unique `id`; `hostnames`/`tags` accept plain strings or wrapped types; optional `os`, `osVersion`, `services`, `software`, `vulnerabilities`; `customAttributes` should stay under 1024 entries with keys <=256 chars and values <=1024 chars.
 - `NetworkInterface`: `macAddress`, `ipv4Addresses`, `ipv6Addresses`; IP strings are parsed/validated.
@@ -289,13 +409,97 @@ def flatten_example():
     # Result: {"a.b": 1, "a.c": 2, "d": 3}
 ```
 
+### kwargs
+Typed, validating accessors over the `**kwargs` passed to `main()`.
+
+```python
+load('kwargs', 'require', 'has', 'get_string', 'get_int', 'get_bool', 'get_list')
+
+def kwargs_example(**kwargs):
+    require(kwargs, 'client_id', 'client_secret')   # error if missing/blank
+    page = get_int(kwargs, 'page_size', default=100)
+    regions = get_list(kwargs, 'regions', default=[])  # CSV or list -> list
+```
+
+### get_json / post_json
+Drop-in replacements for `GET` + status-check + `json_decode`, with retry
+and backoff. Return `(data, err)`.
+
+```python
+load('http', 'get_json', 'post_json', 'bearer')
+
+def get_json_example(token):
+    data, err = get_json("https://api.example.com/devices",
+                         headers={"Authorization": bearer(token)},
+                         params={"limit": 100})
+    if err:
+        print("fetch failed:", err)
+        return []
+    return data
+```
+
+### re
+Regular expressions (Go RE2 syntax).
+
+```python
+load('re', re_find_all='find_all', re_sub='sub')
+
+def re_example(s):
+    ids = re_find_all(r"id=(\d+)", s)
+    clean = re_sub(r"\s+", " ", s)
+    return ids, clean
+```
+
+### csv / xml / jsonstream
+Parse non-JSON payloads and stream large responses.
+
+```python
+load('csv', csv_read='read_all')
+load('xml', xml_parse='parse')
+load('jsonstream', 'iter_array')
+
+def parse_examples(csv_text, xml_text, big_json):
+    rows = csv_read(csv_text)                 # list[dict] keyed by header
+    doc = xml_parse(xml_text)                 # element tree
+    name = doc.find("device/name").text if doc else None
+    for item in iter_array(big_json, path="data.items"):  # streamed
+        print(item.get("id"))
+    return rows, name
+```
+
+### runzero.progress
+Report progress and log lines into the runZero UI.
+
+```python
+load('runzero.progress', progress_report='report', progress_info='info')
+
+def progress_example():
+    progress_report(50, "halfway done")   # pct clamped to [0, 100]
+    progress_info("processing next page")
+```
+
+### Low-level protocols (socket / ssh / smb / winrm / wmi / sql)
+For sources without a REST API, open a raw connection and **always
+`close()`** it. See [docs/starlark-helpers.md](docs/starlark-helpers.md)
+for full signatures.
+
+```python
+load('runzero.ssh', ssh_dial='dial')
+
+def ssh_example(host, user, password):
+    sess = ssh_dial(host, username=user, password=password)
+    stdout, stderr, code = sess.run("uname -a")
+    sess.close()
+    return stdout
+```
+
 ## Testing
 
 Use the `runzero` CLI to test your script locally.
 
 1.  **Run with arguments**:
     ```bash
-    runzero script --filename <path/to/script.star> --kwargs access_key=MY_KEY --kwargs access_secret=MY_SECRET
+    runzero script --filename <path/to/script.star> --kwargs client_id=MY_ID --kwargs client_secret=MY_SECRET
     ```
 
 2.  **REPL**:
@@ -326,7 +530,7 @@ def build_network_interface(ips, mac):
     return NetworkInterface(macAddress=mac, ipv4Addresses=ip4s, ipv6Addresses=ip6s)
 
 def main(**kwargs):
-    api_key = kwargs.get('access_secret')
+    api_key = kwargs.get('api_token')
     headers = {"Authorization": "Bearer {}".format(api_key)}
 
     assets = []

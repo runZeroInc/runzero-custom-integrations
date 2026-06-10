@@ -33,7 +33,7 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
 1. Determine the proper Bitsight URL:
     - Assign the URL to `BITSIGHT_BASE_URL` within the starlark script. This field is already populated with the commonly used URL.
 2. Create an API token for API access (Company or User token): 
-    - Copy the API token to the the value for `access_secret` when creating the Custom Integration credentials in the runZero console (see below)
+    - Copy the API token to the value for `api_token` when creating the Custom Integration credentials in the runZero console (see below)
 
 ### runZero configuration
 
@@ -43,9 +43,9 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
     - Modify datapoints uploaded to runZero as needed 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type `Custom Integration Script Secrets`
-    - Both `access_key` and `access_secret` are required, though `access_key` is not used in the starlark integration script
-    - `access_key` can be any string value (e.g. foo) as it is not required in the starlark script but the field does need to be populated in the runZero console 
-    -  `access_secret` corresponds to the Company or User API token created in Bitsight
+    - Both `company_id` and `api_token` are required
+    - `company_id` corresponds to the Bitsight company ID
+    - `api_token` corresponds to the Company or User API token created in Bitsight
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new)
     - Add a Name and Icon 
     - Toggle `Enable custom integration script` to input your finalized script

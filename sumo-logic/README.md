@@ -26,8 +26,7 @@
     - Modify the `SEARCH` variable to adjust the query used to filter assets in runZero.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_secret` field for your runZero API Export Token.
-    - For `access_key`, input a placeholder value like `foo` (unused in this integration).
+    - Use the `runzero_export_token` field for your runZero API Export Token.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "sumo-logic-export").
     - Toggle `Enable custom integration script` to input the finalized script.

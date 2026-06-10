@@ -28,8 +28,8 @@
     - Set boolean values in ARCHITECTURE to control what sensor architectures are imported. By default, chromium and usp_adapter sensors are not imported because they do not represent traditional cyber assets. 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_key` field for your Lima Charlie Organization ID (`oid`).
-    - Use the `access_secret` field for your API Access Token.
+    - Use the `organization_id` field for your Lima Charlie Organization ID (`oid`).
+    - Use the `api_token` field for your API Access Token.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "lima-charlie").
     - Toggle `Enable custom integration script` to input the finalized script.

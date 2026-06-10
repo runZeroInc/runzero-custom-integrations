@@ -6,8 +6,8 @@
 
 ## Kandji requirements
 
+- Kandji API URL.
 - Kandji API Bearer Token.
-- Kandji subdomain.
 
 ## Steps
 
@@ -17,19 +17,18 @@
    - Navigate to **Settings** > **Access** > **Add API Token** to create a new API key in the Kandji console.
    - Note down the **API Token** and tenant-specific **API URL**.
 2. Find your Kandji API URL:
-   - This depends on your region (e.g., `https://SubDomain.api.eu.kandji.io`).
-   - Refer to the [Kandji API Documentation](https://support.kandji.io/kb/kandji-api) for the steps to get your tenet-specific **API URL** when creating an API token.
+    - This depends on your region (e.g., `https://SubDomain.api.eu.kandji.io/api/v1`).
+    - Refer to the [Kandji API Documentation](https://support.kandji.io/kb/kandji-api) for the steps to get your tenant-specific **API URL** when creating an API token.
 
 ### runZero configuration
 
 1. Make any necessary changes to the script to align with your environment.
-    - Update the **Kandji_API_URL** variable in the script and set to your tenant-specific **API URL** from Kandji
     - (OPTIONAL) Modify API queries as needed to filter asset data.
     - (OPTIONAL) Adjust which attributes are included in runZero.
 3. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_secret` field for your **Kandji API Key**.
-    - Use a placeholder value like `foo` for `access_key` (unused in this integration).
+    - Use the `url` field for your tenant-specific Kandji API URL.
+    - Use the `api_token` field for your **Kandji API Key**.
 4. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "kandji").
     - Toggle `Enable custom integration script` to input the finalized script.

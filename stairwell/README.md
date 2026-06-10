@@ -24,8 +24,8 @@
     - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - For the `access_key`, input your Stairwell client ID.
-    - For the `access_secret`, input your Stairwell client secret.
+    - For `environment_id`, input your Stairwell environment ID.
+    - For `api_token`, input your Stairwell API token.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "Stairwell").
     - Upload an image file for the Stairwell icon.

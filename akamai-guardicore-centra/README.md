@@ -35,8 +35,8 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
 2. Determine the proper Guardicore Centra URL:
     - Assign the URL to `CENTRA_BASE_URL` within the starlark script 
 3. Create login credentials with necessary, read-only access to retrieve JWT token for API access: 
-    - Copy the username to the value for `access_key` when creating the Custom Integration credentials in the runZero console (see below)
-    - Copy the password to the the value for `access_secret` when creating the Custom Integration credentials in the runZero console (see below)
+    - Copy the username to the value for `username` when creating the Custom Integration credentials in the runZero console (see below)
+    - Copy the password to the value for `password` when creating the Custom Integration credentials in the runZero console (see below)
 
 ### runZero configuration
 
@@ -51,9 +51,9 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
     - Modify datapoints uploaded to runZero as needed 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type `Custom Integration Script Secrets`
-    - Both `access_key` and `access_secret` are required
-    - `access_key` corresponds to the Client ID provided when creating the Guardicore Centra Application Registration
-    -  `access_secret` corresponds to the Client secret provided when creating the Guardicore Centra Application Registration
+    - Both `username` and `password` are required
+    - `username` corresponds to the username provided for Guardicore Centra
+    - `password` corresponds to the password provided for Guardicore Centra
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new)
     - Add a Name and Icon 
     - Toggle `Enable custom integration script` to input your finalized script
