@@ -8,6 +8,13 @@ CONFIG = {
     "version": "26061000",
     "params": [
         {
+            "key": "api_url",
+            "label": "NinjaOne API URL",
+            "type": "url",
+            "required": True,
+            "placeholder": "https://us2.ninjarmm.com",
+        },
+        {
             "key": "client_id",
             "label": "OAuth client ID",
             "type": "string",
@@ -28,28 +35,26 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'oauth2_token', 'bearer')
-load('kwargs', 'get_http_options')
+load('kwargs', 'get_http_options', 'get_string')
 load('uuid', 'new_uuid')
 
-NINJAONE_API_URL = 'https://us2.ninjarmm.com'
-
-def get_token(client_id, client_secret, config_kwargs):
+def get_token(api_url, client_id, client_secret, config_kwargs):
     return oauth2_token(
-        NINJAONE_API_URL + '/ws/oauth/token',
+        api_url + '/ws/oauth/token',
         client_id=client_id,
         client_secret=client_secret,
         scope="monitoring",
         **get_http_options(config_kwargs)
     )
 
-def get_assets(token, config_kwargs):
+def get_assets(api_url, token, config_kwargs):
     hasNextPage = True
     after = ''
     page_size = 500
     assets = []
     reported = 0
 
-    url = NINJAONE_API_URL + "/v2/devices-detailed"
+    url = api_url + "/v2/devices-detailed"
     headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
     http_options = get_http_options(config_kwargs, headers=headers)
 
@@ -174,17 +179,18 @@ def build_assets(assets_json):
 # build runZero network interfaces; shouldn't need to touch this
 def main(**kwargs):
     # kwargs!!
+    api_url = get_string(kwargs, 'api_url').rstrip('/')
     client_id = kwargs['client_id']
     client_secret = kwargs['client_secret']
 
     # get bearer token
-    token = get_token(client_id, client_secret, kwargs)
+    token = get_token(api_url, client_id, client_secret, kwargs)
     if not token:
         print('failed to retrieve bearer token')
         return None
     
     # get and stream assets page-by-page via report_assets
-    reported = get_assets(token, kwargs)
+    reported = get_assets(api_url, token, kwargs)
     if not reported:
         print('no assets retrieved')
     
