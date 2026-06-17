@@ -19,7 +19,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 # Existing Integrations 
 
 ## Import to runZero 
-- [Akamai Guardicore Centra (v3)](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/)
+- [Akamai Guardicore Centra](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/)
 - [Automox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/)
 - [Bitsight](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/)
 - [Carbon Black](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/carbon-black/)
