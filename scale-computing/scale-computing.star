@@ -181,5 +181,7 @@ def main(*args, **kwargs):
         debug_print("Built asset: {}".format(asset))
         assets.append(asset)
 
-    debug_print(">>> main() complete: returning {} assets".format(len(assets)))
-    return assets
+    # Stream assets to runZero via report_assets instead of returning a list.
+    reported = report_assets(assets)
+    debug_print(">>> main() complete: reported {} assets".format(reported))
+    return None

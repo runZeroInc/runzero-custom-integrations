@@ -116,11 +116,10 @@ def main(*args, **kwargs):
 
     if not sessions:
         print("No sessions found.")
-        return []
+        return None
 
-    assets = build_assets(sessions)
-
-    if not assets:
+    # Stream assets to runZero via report_assets instead of returning a list.
+    if not report_assets(build_assets(sessions)):
         print("No assets created.")
 
-    return assets
+    return None

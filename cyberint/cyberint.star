@@ -92,4 +92,9 @@ def main(*args, **kwargs):
             vulnerabilities=vulns,
     ))
 
-    return assets
+    # Stream assets to runZero via report_assets instead of returning a list.
+    reported = report_assets(assets)
+    if not reported:
+        print("no assets")
+
+    return None

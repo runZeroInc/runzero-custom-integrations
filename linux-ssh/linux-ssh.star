@@ -145,4 +145,6 @@ def main(*args, **kwargs):
             "machine_id": machine_id,
         },
     )
-    return [asset]
+    # Stream the asset to runZero via report_assets instead of returning a list.
+    report_assets(asset)
+    return None

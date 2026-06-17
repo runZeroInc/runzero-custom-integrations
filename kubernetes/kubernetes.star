@@ -268,5 +268,7 @@ def main(*args, **kwargs):
                     svc_count += 1
             _log("services: imported {} asset(s)".format(svc_count))
 
-    _log("SUCCESS: prepared {} ImportAsset(s)".format(len(assets)))
-    return assets
+    # Stream assets to runZero via report_assets instead of returning a list.
+    reported = report_assets(assets)
+    _log("SUCCESS: reported {} ImportAsset(s)".format(reported))
+    return None

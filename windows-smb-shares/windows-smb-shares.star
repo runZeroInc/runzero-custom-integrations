@@ -78,4 +78,6 @@ def main(*args, **kwargs):
         os="Windows",
         customAttributes=attrs,
     )
-    return [asset]
+    # Stream the asset to runZero via report_assets instead of returning a list.
+    report_assets(asset)
+    return None

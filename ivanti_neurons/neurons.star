@@ -132,10 +132,8 @@ def main(*args, **kwargs):
     token = get_token(base_url, tenant_id, client_id, client_secret, kwargs)
     assets = get_assets(base_url, token, kwargs)
     
-    # Format asset list for import into runZero
-    import_assets = build_assets(assets)
-    if not import_assets:
+    # Build and stream asset import via report_assets instead of returning a list
+    if not report_assets(build_assets(assets)):
         print('no assets')
-        return None
 
-    return import_assets
+    return None

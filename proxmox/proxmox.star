@@ -433,5 +433,7 @@ def main(*args, **kwargs):
     if DEBUG:
         print("=" * 60)
         print("Total assets discovered: {}".format(len(assets)))
-    
-    return assets
+
+    # Stream assets to runZero via report_assets instead of returning a list.
+    report_assets(assets)
+    return None

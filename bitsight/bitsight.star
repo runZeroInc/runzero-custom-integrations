@@ -274,10 +274,8 @@ def main(*args, **kwargs):
     http_options = get_http_options(kwargs, headers={'Accept': 'application/json', 'Authorization': 'Basic ' + b64_creds})
     assets = get_assets(company_id, http_options)
 
-    # Format asset list for import into runZero
-    import_assets = build_assets(assets, company_id, http_options)
-    if not import_assets:
+    # Build and stream asset import via report_assets instead of returning a list
+    if not report_assets(build_assets(assets, company_id, http_options)):
         print('no assets')
-        return None
 
-    return import_assets
+    return None

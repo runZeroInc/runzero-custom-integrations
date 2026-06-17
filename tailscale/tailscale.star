@@ -206,5 +206,7 @@ def main(*args, **kwargs):
         if ia != None:
             assets.append(ia)
 
-    _log("SUCCESS: Prepared " + str(len(assets)) + " ImportAsset objects.")
-    return assets
+    # Stream assets to runZero via report_assets instead of returning a list.
+    reported = report_assets(assets)
+    _log("SUCCESS: Reported " + str(reported) + " ImportAsset objects.")
+    return None

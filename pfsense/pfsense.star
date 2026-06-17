@@ -245,7 +245,8 @@ def main(*args, **kwargs):
         attrs["build"] = build_id
 
 
-    return [ImportAsset(
+    # Stream the asset to runZero via report_assets instead of returning a list.
+    report_assets(ImportAsset(
         id=asset_id,
         domain=str(domain) if domain else "",
         hostnames=[hostname],
@@ -257,5 +258,6 @@ def main(*args, **kwargs):
 	trust_device_type=True,
         networkInterfaces=network_interfaces,
         customAttributes=to_custom_attributes(attrs),
-    )]
+    ))
+    return None
 

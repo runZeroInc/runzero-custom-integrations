@@ -91,4 +91,8 @@ def main(*args, **kwargs):
             },
         )
         assets.append(asset)
-    return assets
+
+    # Stream assets to runZero via report_assets instead of returning a list.
+    if not report_assets(assets):
+        print("no assets")
+    return None

@@ -344,4 +344,6 @@ def main(**kwargs):
             customAttributes=custom_attrs,
         ))
 
-    return assets
+    # Stream assets to runZero via report_assets instead of returning a list.
+    report_assets(assets)
+    return None

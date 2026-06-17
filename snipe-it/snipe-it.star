@@ -196,10 +196,8 @@ def main(**kwargs):
 
     assets_json = (data or {}).get('rows', [])
 
-    # build asset import
-    assets_import = build_assets(assets_json)
-    if not assets_import:
+    # build and stream asset import via report_assets instead of returning a list
+    if not report_assets(build_assets(assets_json)):
         print('no assets')
-        return None
 
-    return assets_import
+    return None

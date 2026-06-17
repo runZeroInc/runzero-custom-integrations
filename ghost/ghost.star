@@ -185,4 +185,6 @@ def main(*args, **kwargs):
         asset_map[asset_key].vulnerabilities.append(vuln)
 
     print("Completed. Assets created: {}".format(len(asset_map)))
-    return list(asset_map.values())
+    # Stream assets to runZero via report_assets instead of returning a list.
+    report_assets(list(asset_map.values()))
+    return None

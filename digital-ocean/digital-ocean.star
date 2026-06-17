@@ -101,4 +101,7 @@ def main(**kwargs):
         return None
 
     droplets = (data or {}).get('droplets', [])
-    return build_assets(droplets)
+    # Stream assets to runZero via report_assets instead of returning a list.
+    if not report_assets(build_assets(droplets)):
+        print('no assets')
+    return None

@@ -139,8 +139,10 @@ def main(**kwargs):
 
     sensors_json = (data or {}).get('sensors', [])
 
-    assets = build_assets(sensors_json)
-    if not assets:
+    # Stream assets to runZero via report_assets so the full sensor set is
+    # never held in memory.
+    reported = report_assets(build_assets(sensors_json))
+    if not reported:
         print('No sensors were retrieved.')
-    
-    return assets
+
+    return None
