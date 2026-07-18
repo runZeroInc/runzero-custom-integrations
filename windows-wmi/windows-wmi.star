@@ -4,6 +4,8 @@ CONFIG = {
     "type": "inbound",
     "description": "Collect a Windows host's OS, hardware, network, services, and installed software via WinRM or DCE-RPC WMI.",
     "version": "26052700",
+    "minVersion": "5.1.0",
+    "validationMode": "compile",
     "params": [
         {
             "key": "host",

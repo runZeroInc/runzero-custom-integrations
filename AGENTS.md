@@ -17,7 +17,7 @@ repo-root/
 
 ### 1. Integration metadata (embedded `CONFIG` block)
 
-Every script must declare a top-level `CONFIG = {...}` literal at the top
+Every new script must declare `CONFIG = {...}` as its first top-level statement
 of the file. The platform extracts this block (via a strict literal-only
 Starlark walk) to render the credential form, validate user input, apply
 defaults, and route secret fields through encrypted storage. Only literal
@@ -34,7 +34,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Short summary shown in the catalog.",
     "version": "26052700",
-    "minVersion": "4.9",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "client_id",
@@ -60,27 +60,43 @@ load("runzero.types", "ImportAsset")
 ```
 
 **Required rules:**
-- `CONFIG` must be a top-level assignment.
+- `CONFIG` must be the first top-level statement. Comments and blank lines may precede it; `load(...)`, constants, and other statements may not.
 - All values must be literals (`True`/`False`/`None`, strings, ints, floats, lists, tuples, dicts with string keys, negated numbers via unary `-`).
 - `id` must be a stable lower-case integration identifier, e.g. `runzero-tailscale`.
 - `version` must use the integration version string for the target release, e.g. `26052700`.
-- `minVersion` is optional. When set, it declares the minimum runZero version required to run the script as a dotted numeric version (an optional leading `v` is allowed, e.g. `4.9` or `v4.9.260604`). Before the script runs, the running runZero version is compared against it; if the Explorer is older, the task fails with a clear upgrade message. Omit it (or leave it blank) to impose no requirement. Development builds (version `0.0.0`) skip the check.
+- Scripts in this v2 library must set `minVersion` to `5.1.0` or later. Before the script runs, the Explorer version is compared against it and older releases fail with a clear upgrade message. Development builds using the `0.0.0` sentinel skip the check.
 - `type` must be `inbound`, `outbound`, or `internal`.
 - Each `params[].key` must match `^[a-zA-Z_][a-zA-Z0-9_]*$` and must match the kwarg name the script reads.
-- `type: "secret"` (or `secret: True`) marks the field as a credential — never log or print these values, and never set a `default` on them.
+- `type: "secret"` (or `secret: True`) marks the field for masked input and log redaction; never log or print these values, and never set a `default` on them. All dynamic credential fields are encrypted at rest.
 - `includes` expands shared option sets with the dict key as a prefix, for example `{"src_tls_": OPTIONS_TLS, "dst_http_": OPTIONS_HTTP}`.
 
-**Supported top-level CONFIG fields:** `id`, `name`, `type`, `description`, `version`, `minVersion`, `params`, `includes`, `rejectUnknown`, `atLeastOneOf`, `exactlyOneOf`.
+**Supported top-level CONFIG fields:** `id`, `name`, `type`, `description`, `version`, `minVersion`, `params`, `includes`, `rejectUnknown`, `atLeastOneOf`, `exactlyOneOf`, `validationMode`.
 
 **Supported param types:** `string`, `secret`, `int`, `float`, `bool`, `enum` (requires `options`), `url`, `textarea`, `json`.
 
-**Supported param fields:** `key`, `label`, `description`, `type`, `required`, `secret`, `default`, `placeholder`, `options`, `multi`, `min`, `max`, `pattern`, `dependsOn`, `group`.
+**Supported param fields:** `key`, `label`, `description`, `type`, `required`, `secret`, `default`, `placeholder`, `options`, `multi`, `min`, `max`, `pattern`, `caseInsensitive`, `aliases`, `dependsOn`, `visibleIf`, `visibleIfValue`, `requiredIf`, `requiredIfValue`, `group`.
+
+Enum aliases are normalized to their canonical `options` value before `main`
+runs. CONFIG-based integrations reject unknown kwargs. Use
+`"validationMode": "compile"` only for templates and integrations that use
+direct protocols such as SSH, SMB, WMI, WinRM, or SQL; HTTP integrations should
+omit it and use the default HTTP wiring validation.
+
+Direct-protocol modules execute on the selected Explorer and intentionally can
+connect to internal addresses available from that Explorer. Treat the script
+and its credentials as privileged discovery configuration, and scope the
+Explorer and credential to the intended source system.
 
 ### 2. `<integration-name>.star`
 This is the main script written in Starlark. Name it after the
 integration directory (e.g. `tailscale/tailscale.star`).
 
 ## Script Development
+
+The CONFIG model and standard helper modules are designed to be easy to use
+with external authoring tools, including LLM-based editors. runZero does not run
+an LLM in the Console, Explorer, or Starlark sandbox; generated scripts are
+reviewed and executed like any other source file.
 
 ### Language
 The script is written in **Starlark**, a Python-like language with some key differences:

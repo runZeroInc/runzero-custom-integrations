@@ -6,6 +6,7 @@ CONFIG = {
     "type": "internal",
     "description": "Schedules scans against passively-observed assets.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",

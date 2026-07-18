@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports endpoints from ManageEngine Endpoint Central.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -30,7 +31,6 @@ load('runzero.types', 'ImportAsset', 'NetworkInterface', 'to_custom_attributes')
 load('net', 'ip_address')
 load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options')
-load('uuid', 'new_uuid')
 
 API_VERSION     = '1.4'
 SCAN_ENDPOINT   = '/api/' + API_VERSION + '/inventory/scancomputers'
@@ -57,7 +57,11 @@ def build_network_interfaces(device):
 def build_assets(devices):
     assets = []
     for d in devices:
-        asset_id = str(d.get('resource_id', d.get('id', new_uuid())))
+        raw_id = d.get('resource_id') or d.get('id')
+        if not raw_id:
+            print("endpoint-central: skipping device with no resource_id/id: name=" + str(d.get('resource_name', '')))
+            continue
+        asset_id = str(raw_id)
         hostname = d.get('resource_name') or d.get('resource_name', '') or ''
         # build networkInterfaces
         net_ifaces = build_network_interfaces(d)

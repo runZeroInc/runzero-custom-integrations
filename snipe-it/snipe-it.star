@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports hardware assets from Snipe-IT.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -32,12 +33,14 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_url_base', 'get_http_options')
-load('uuid', 'new_uuid')
 
 def build_assets(assets_json):
     assets_import = []
     for asset in assets_json:
-        id = asset.get(str('id'), new_uuid)
+        id = asset.get('id') or asset.get('asset_tag') or asset.get('serial')
+        if not id:
+            print("snipe-it: skipping hardware with no id/asset_tag/serial")
+            continue
         model_info = asset.get('model', {})
         if model_info:
             model = model_info.get('name', '')

@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports endpoints from the Automox platform.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "organization_hint",
@@ -32,7 +33,6 @@ load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
-load('uuid', 'new_uuid')
 
 AUTOMOX_BASE_URL = "https://console.automox.com/api"
 AUTOMOX_SERVERS_URL = AUTOMOX_BASE_URL + "/servers"
@@ -191,7 +191,10 @@ def build_network_interfaces_from_device(device):
     return [network_interface(ips=ips, mac="")]
 
 def build_device_asset(device, sw_by_server):
-    device_id = device.get("id", new_uuid())
+    device_id = device.get("id")
+    if not device_id:
+        print("automox: skipping device with no id: name=" + str(device.get("name", "")))
+        return None
 
     custom_attrs = {
         "os_version": device.get("os_version", ""),
@@ -246,7 +249,11 @@ def stream_device_assets(http_options, org_hint, sw_by_server):
         if not batch:
             break
 
-        page_assets = [build_device_asset(d, sw_by_server) for d in batch]
+        page_assets = []
+        for device in batch:
+            asset = build_device_asset(device, sw_by_server)
+            if asset:
+                page_assets.append(asset)
         reported += report_assets(page_assets)
 
         page = page + 1

@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices from Snow License Manager.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -44,13 +45,16 @@ load('http', 'get_json', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
 load('net', 'network_interface')
 load('time', 'parse_time')
-load('uuid', 'new_uuid')
 
 def build_assets(base_url, customer_id, assets, creds, config_kwargs):
     assets_import = []
     for entry in assets:
         item = entry.get('Body', {})
-        asset_id = str(item.get('Id', new_uuid))
+        raw_id = item.get('Id') or item.get('BiosSerialNumber')
+        if not raw_id:
+            print("snow: skipping computer with no Id/BiosSerialNumber: name=" + str(item.get('Name', '')))
+            continue
+        asset_id = str(raw_id)
         hostname = item.get('Name', '')
         vendor = item.get('Manufacturer', '')
         model = item.get('Model', '')

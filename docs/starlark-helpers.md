@@ -7,6 +7,25 @@ edge cases (mixed v4/v6 IPs, zone IDs, port suffixes, base64
 encoding, retries, JSON decoding, length limits, ...) so your
 scripts stay short and consistent.
 
+## Local validation boundaries
+
+Run `runzero script --filename <file-or-directory> --validate` before submitting
+an integration. For HTTP integrations, validation parses CONFIG, generates
+type-appropriate placeholder values, initializes the script, calls `main`, and
+routes requests to a local TLS server. It verifies that at least one request was
+made and that declared User-Agent and TLS options reached the HTTP client.
+
+The generated values are not vendor credentials, and the synthetic responses
+do not model vendor authentication, pagination, response schemas, or asset
+mapping. A successful validation is a CONFIG and wiring check, not proof that a
+vendor API accepts the credentials or returns the expected payload. Use
+fixture-driven tests for response parsing and asset construction.
+
+Templates and direct-protocol integrations may declare
+`"validationMode": "compile"`. Compile validation parses CONFIG, initializes
+the script, and verifies that `main` exists without dialing a target. Live SSH,
+SMB, WMI, WinRM, and SQL behavior still requires a controlled test endpoint.
+
 The full list of registered modules is loaded automatically when
 your script runs; you only need a `load(...)` line for the names
 you actually use.
@@ -51,6 +70,11 @@ Lower-level network modules — `socket`, `runzero.ssh`, `runzero.smb`,
 `runzero.winrm`, `runzero.wmi`, and `runzero.sql` — are documented under
 [Low-level network & database](#low-level-network--database) below.
 
+These modules run on the selected Explorer and intentionally can connect to
+internal addresses available from that Explorer. This is the accepted product
+model for collecting from internal management systems; use an appropriately
+scoped Explorer and credential.
+
 ## Shared HTTP/TLS Options
 
 Use `CONFIG["includes"]` for common connection controls instead of copying
@@ -63,6 +87,7 @@ CONFIG = {
   "name": "Example",
   "type": "inbound",
   "version": "26052700",
+  "minVersion": "5.1.0",
   "params": [
     {"key": "url", "type": "url", "required": True},
     {"key": "api_token", "type": "secret", "required": True},

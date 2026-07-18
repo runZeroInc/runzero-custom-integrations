@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports assets from Akamai Guardicore Centra using the v3 API.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -41,15 +42,18 @@ load('http', 'get_json', 'post_json', 'bearer')
 load('kwargs', 'get_url_base', 'get_http_options')
 load('net', 'network_interface')
 load('time', 'parse_time')
-load('uuid', 'new_uuid')
 
 
 def build_assets(assets):
     assets_import = []
     for asset in assets:
-        asset_id = str(asset.get('id', new_uuid))
         agent_info = asset.get('guest_agent_details', {})
         hardware = agent_info.get('hardware', {})
+        raw_id = asset.get('id') or asset.get('bios_uuid') or hardware.get('hw_uuid')
+        if not raw_id:
+            print("centra-v3: skipping asset with no stable id: name=" + str(asset.get('name', '')))
+            continue
+        asset_id = str(raw_id)
         os_info = agent_info.get('os_details', {})
         hostname = agent_info.get('hostname', '')
         os = os_info.get('os_version_name', '')

@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports environment data from Stairwell.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "environment_id",
@@ -29,7 +30,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json')
 load('kwargs', 'get_http_options')
-load('uuid', 'new_uuid')
 
 STAIRWELL_API_URL = 'https://app.stairwell.com'
 

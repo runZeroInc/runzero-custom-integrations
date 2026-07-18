@@ -4,6 +4,8 @@ CONFIG = {
     "type": "inbound",
     "description": "Connects to a SQL Server instance and emits one asset per database with size and recovery model metadata.",
     "version": "26052700",
+    "minVersion": "5.1.0",
+    "validationMode": "compile",
     "params": [
         {"key": "host", "label": "SQL Server host", "type": "string", "required": True},
         {"key": "port", "label": "Port", "type": "int", "required": False, "default": 1433, "min": 1, "max": 65535},

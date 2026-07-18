@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Mirrors tasks between two runZero instances (SaaS to self-hosted, etc.).",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "src_url",

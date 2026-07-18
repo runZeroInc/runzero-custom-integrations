@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports company assets from Bitsight.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "company_id",
@@ -31,7 +32,6 @@ load('kwargs', 'get_http_options')
 load('net', 'network_interface')
 load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
 load('time', 'parse_time')
-load('uuid', 'new_uuid')
 
 #Change the URL to match your Guardicore BITSIGHT server
 BITSIGHT_BASE_URL = 'https://api.bitsighttech.com'
@@ -40,12 +40,15 @@ RUNZERO_REDIRECT = 'https://console.runzero.com/'
 def build_assets(assets, company_id, http_options):
     assets_import = []
     for asset in assets:
-        asset_id = str(asset.get('temporary_id', new_uuid))
         ip_addresses = asset.get('ip_addresses', [])
         bitsight_tags = asset.get('tags') or []
         tags = [tag.strip().replace(' ', '_') for tag in bitsight_tags]
         asset_name = asset.get('asset', '')
         asset_type = asset.get('asset_type', '')
+        if not asset_name:
+            print("bitsight: skipping record with no asset field")
+            continue
+        asset_id = "bitsight:{}:{}".format(asset_type or "unknown", asset_name)
         app_grade = str(asset.get('app_grade', ''))
         country_code = str(asset.get('country_code', ''))
         country = str(asset.get('coutry', ''))

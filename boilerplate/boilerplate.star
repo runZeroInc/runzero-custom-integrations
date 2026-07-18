@@ -6,6 +6,8 @@ CONFIG = {
     "type": "inbound",
     "description": "Replace with your integration description.",
     "version": "26052700",
+    "minVersion": "5.1.0",
+    "validationMode": "compile",
     "params": [
         {
             "key": "client_id",
@@ -95,6 +97,7 @@ def create_asset_example():
         hostnames=["sample-device"],
         os="ExampleOS",
         osVersion="1.0",
+        matchBehavior="no-mac-break no-ip-break no-name-break",
         # match_behavior tells the runZero cruncher how aggressively
         # to merge this asset with existing records. The default is
         # full matching on id+mac+ip+name. When your source provides

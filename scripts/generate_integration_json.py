@@ -4,7 +4,7 @@ import ast
 from datetime import datetime, timezone
 
 # --- Config ---
-BLOCK_LIST = {".github", "boilerplate", "LICENSE", "README.md"}
+BLOCK_LIST = {".github", "boilerplate", "docs", "scripts", "LICENSE", "README.md"}
 BASE_REPO_URL = "https://github.com/runZeroInc/runzero-custom-integrations/blob/main"
 
 integration_details = []
@@ -58,19 +58,16 @@ def load_embedded_config(script_path):
         literal = literal.replace(identifier, repr(identifier))
     return ast.literal_eval(literal)
 
-for entry in os.listdir("."):
+for entry in sorted(os.listdir(".")):
     if entry in BLOCK_LIST or not os.path.isdir(entry):
         continue
 
     folder_path = os.path.join(".", entry)
     readme_path = os.path.join(folder_path, "README.md")
-    integration_file = None
-
-    # Look for the first .star file
-    for f in os.listdir(folder_path):
-        if f.endswith(".star"):
-            integration_file = f
-            break
+    integration_files = sorted(f for f in os.listdir(folder_path) if f.endswith(".star"))
+    # A directory may contain multiple API versions. Prefer the latest filename
+    # deterministically until each version has its own catalog entry.
+    integration_file = integration_files[-1] if integration_files else None
 
     # Skip if required files are missing
     if not (os.path.isfile(readme_path) and integration_file):
@@ -107,13 +104,23 @@ for entry in os.listdir("."):
     )
 
 # --- Save JSON ---
+integration_details.sort(key=lambda item: (item["name"].lower(), item["integration"]))
+output_path = "docs/integrations.json"
+previous = {}
+try:
+    with open(output_path) as f:
+        previous = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    pass
+
+unchanged = previous.get("integrationDetails") == integration_details
 output = {
-    "lastUpdated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "lastUpdated": previous.get("lastUpdated") if unchanged else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     "totalIntegrations": len(integration_details),
     "integrationDetails": integration_details,
 }
 
-with open("docs/integrations.json", "w") as f:
+with open(output_path, "w") as f:
     json.dump(output, f, indent=2)
 
 print("✅ integrations.json created.")

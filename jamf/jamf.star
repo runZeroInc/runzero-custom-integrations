@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports computers and mobile devices from Jamf Pro.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",

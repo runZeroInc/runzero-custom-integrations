@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports nodes, pods, and services from a Kubernetes cluster.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",

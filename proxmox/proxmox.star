@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports VMs, containers, and nodes from Proxmox VE.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "base_url",

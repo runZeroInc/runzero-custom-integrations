@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports droplets from DigitalOcean.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "api_token",
@@ -23,7 +24,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
-load('uuid', 'new_uuid')
 
 DIGITAL_OCEAN_API_URL = 'https://api.digitalocean.com/v2/'
 
@@ -56,6 +56,10 @@ def format_tags(tags):
 def build_assets(assets_json):
     assets = []
     for item in assets_json:
+        item_id = item.get('id')
+        if not item_id:
+            print("digital-ocean: skipping droplet with no id: name=" + str(item.get('name', '')))
+            continue
         nic = network_interface(ips=collect_ips(item.get('networks', {})))
         nics = [nic] if nic else []
 
@@ -63,7 +67,7 @@ def build_assets(assets_json):
         region = item.get('region', {}) or {}
 
         assets.append(ImportAsset(
-            id=str(item.get('id') or new_uuid()),
+            id=str(item_id),
             hostnames=[item.get('name', '')],
             networkInterfaces=nics,
             os=image.get('distribution', ''),

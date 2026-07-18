@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices from Nexthink using the NQL export workflow.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "auth_url",

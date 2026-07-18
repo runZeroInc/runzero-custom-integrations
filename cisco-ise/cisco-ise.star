@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports endpoints from Cisco Identity Services Engine.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",

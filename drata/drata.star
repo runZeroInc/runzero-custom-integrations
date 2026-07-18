@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports assets from Drata.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "api_token",
@@ -23,7 +24,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
-load('uuid', 'new_uuid')
 load('flatten_json', 'flatten')
 
 DRATA_URL = 'https://public-api.drata.com'
@@ -31,7 +31,10 @@ DRATA_URL = 'https://public-api.drata.com'
 def build_assets(assets_json):
     assets_import = []
     for item in assets_json:
-        id = item.get('id', new_uuid) 
+        id = item.get('id')
+        if not id:
+            print("drata: skipping asset with no id: name=" + str(item.get('name', '')))
+            continue
         hostname = item.get('name', '')
         description = item.get('description', '')
         asset_type = item.get('assetType', '')

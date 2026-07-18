@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports endpoints from Palo Alto Cortex XDR.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -38,7 +39,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'post_json')
 load('kwargs', 'get_url_base', 'get_http_options')
-load('uuid', 'new_uuid')
 
 def do_cortex_api_call(base_url, api_key, api_key_id, api_call, post_data={}, config_kwargs={}):
     """Perform API request to Cortex XDR, handling authentication"""
@@ -93,6 +93,10 @@ def build_assets(all_endpoints):
     assets = []
 
     for endpoint in all_endpoints:
+        endpoint_id = endpoint.get("agent_id") or endpoint.get("endpoint_id")
+        if not endpoint_id:
+            print("cortex-xdr: skipping endpoint with no agent_id/endpoint_id: name=" + str(endpoint.get("endpoint_name", "")))
+            continue
         endpoint_tags = endpoint.get("tags", {}).get("endpoint_tags", [])
         server_tags = endpoint.get("tags", {}).get("server_tags", [])
         group_names = endpoint.get("group_name", endpoint_tags + server_tags)
@@ -133,7 +137,7 @@ def build_assets(all_endpoints):
 
         assets.append(
             ImportAsset(
-                id=str(endpoint.get("agent_id", endpoint.get("endpoint_id", new_uuid()))),
+                id=str(endpoint_id),
                 networkInterfaces=[network_interface(ips=endpoint.get("ip", []) + endpoint.get("ipv6", []), mac=mac_address)],
                 hostnames=[endpoint.get("host_name", endpoint.get("endpoint_name", ""))],
                 os_version=endpoint.get("os_version", ""),

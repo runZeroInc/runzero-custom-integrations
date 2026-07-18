@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports agents from a Wazuh manager.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "hostname",
@@ -44,7 +45,6 @@ load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software')
 load('json', json_decode='decode')
 load('net', 'ip_address')
 load('http', http_post='post', http_get='get')
-load('uuid', 'new_uuid')
 load('base64', base64_encode='encode')
 load('time', 'parse_time')
 load('kwargs', 'require', 'get_string', 'get_int', 'get_http_options')

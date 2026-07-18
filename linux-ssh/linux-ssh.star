@@ -4,6 +4,8 @@ CONFIG = {
     "type": "inbound",
     "description": "Collects host facts from Linux/Unix targets over SSH and reports them as assets.",
     "version": "26052700",
+    "minVersion": "5.1.0",
+    "validationMode": "compile",
     "params": [
         {"key": "host", "label": "Target host", "type": "string", "required": True},
         {"key": "port", "label": "SSH port", "type": "int", "required": False, "default": 22, "min": 1, "max": 65535},

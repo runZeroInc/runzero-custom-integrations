@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports endpoints from LimaCharlie.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "organization_id",
@@ -29,7 +30,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'post_json', 'bearer')
 load('kwargs', 'get_http_options')
-load('uuid', 'new_uuid')
 
 LIMACHARLIE_JWT_URL = 'https://jwt.limacharlie.io'
 LIMACHARLIE_BASE_URL = 'https://api.limacharlie.io/v1'

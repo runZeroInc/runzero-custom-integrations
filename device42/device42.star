@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports configuration items from Device42.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "auth_scheme",
@@ -32,7 +33,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json')
 load('kwargs', 'get_http_options')
-load('uuid', 'new_uuid')
 
 DEVICE42_HOST     = 'swaggerdemo.device42.com'
 DEVICE42_ENDPOINT = '/api/1.0/devices/all/'
@@ -60,7 +60,11 @@ def build_network_interfaces(mac_entries, ip_entries):
 def build_assets(devices):
     assets = []
     for d in devices:
-        asset_id = str(d.get('id') or d.get('uuid') or new_uuid())
+        raw_id = d.get('id') or d.get('uuid') or d.get('device_id') or d.get('serial_no')
+        if not raw_id:
+            print("device42: skipping device with no stable id: name=" + str(d.get('name', '')))
+            continue
+        asset_id = str(raw_id)
 
         hostnames = []
         for key in ('name', 'preferred_alias', 'virtual_host_name'):

@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices from Netskope.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -30,7 +31,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options')
-load('uuid', 'new_uuid')
 
 NETSKOPE_API_GROUPBYS = 'nsdeviceuid'
 NETSKOPE_API_ATTRIBUTES = [
@@ -121,9 +121,14 @@ def build_assets(assets_json):
             network = network_interface(ips=ips, mac=None)
             networks.append(network)
 
+        raw_id = item.get('_id', {}).get('nsdeviceuid') or item.get('device_id')
+        if not raw_id:
+            print("netskope: skipping record with no nsdeviceuid/device_id")
+            continue
+
         imported_assets.append(
             ImportAsset(
-                id=item.get('_id', {}).get('nsdeviceuid', new_uuid),
+                id=str(raw_id),
                 hostnames=[item.get('hostname', '')],
                 networkInterfaces=networks,
                 os=os,

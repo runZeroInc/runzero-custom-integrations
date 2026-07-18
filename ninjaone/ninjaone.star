@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices from NinjaOne.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "api_url",
@@ -36,7 +37,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'oauth2_token', 'bearer')
 load('kwargs', 'get_http_options', 'get_string')
-load('uuid', 'new_uuid')
 
 def get_token(api_url, client_id, client_secret, config_kwargs):
     return oauth2_token(
@@ -86,7 +86,10 @@ def get_assets(api_url, token, config_kwargs):
 def build_assets(assets_json):
     imported_assets = []
     for item in assets_json:
-        id = item.get('id', new_uuid)
+        id = item.get('id')
+        if not id:
+            print("ninjaone: skipping device with no id: systemName=" + str(item.get('systemName', '')))
+            continue
 
         display_name = item.get('displayName', '')
         system_name = item.get('systemName', '')

@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports firewall objects and DHCP leases from pfSense.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "base_url",

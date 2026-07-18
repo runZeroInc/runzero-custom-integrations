@@ -70,7 +70,25 @@ If you need help setting up a custom integration, you can create an [issue](http
 2. Sample [script](./boilerplate/boilerplate.star) that shows how to use all of the supported libraries
 3. Embedded `CONFIG` metadata in each script that gives context on the integration for automations to reference
 
+## Create an integration with an AI coding agent
+
+This repository includes the `/create-custom-integration` skill. Invoke it with
+a vendor documentation link and a short statement of the data to import:
+
+```text
+/create-custom-integration https://vendor.example/api/docs -- import managed devices, network interfaces, OS details, and installed software
+```
+
+The workflow blocks implementation until it identifies whether the vendor's
+foreign ID is stable, unique in a documented scope, and one-to-one with the
+asset being imported. It does not permit random ID fallbacks that would create
+duplicate assets on later polls.
+
 ## Asset IDs and match behavior
+
+Asset reconciliation is configurable per imported record. runZero does not
+automatically choose or rewrite a custom integration's identity policy; the
+script author selects `matchBehavior` when the default is not appropriate.
 
 Every `ImportAsset` you return needs an `id` value. runZero uses that
 foreign id as the primary key when correlating subsequent runs of the
@@ -175,11 +193,13 @@ We welcome contributions to this repository! Whether you're fixing a bug, adding
 
 7. **Merge**: Once approved, your PR will be merged by a maintainer.
 
-## Agents 
+## Authoring with external LLM tools
 
-Using agents like Gemini CLI, OpenAI Codex, and Claude Code is encouraged! Most of these integrations follow the same structure with the only differences being in the data fetch processes. 
+External tools such as Gemini CLI, OpenAI Codex, and Claude Code can help draft integrations. runZero does not run an LLM in the Console, Explorer, or integration sandbox. These tools produce source that must pass the same review and validation as hand-written `.star` files.
 
 There is an [AGENTS.md](./AGENTS.md) file to give your LLM of choice best practices and guidance will building the integrations. 
+
+Existing v1 integrations remain supported. See the [v1 to v2 migration guide](./docs/migration-v1-to-v2.md) when moving metadata into `CONFIG`, adopting standard helpers, streaming assets, or tuning match behavior.
 
 ---
 

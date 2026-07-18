@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports Centra agents and assets via the Centra v3 or v4 API.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -40,7 +41,6 @@ load('http', 'get_json', 'post_json', 'bearer')
 load('kwargs', 'get_url_base', 'get_http_options')
 load('net', 'network_interface')
 load('time', 'parse_time')
-load('uuid', 'new_uuid')
 
 
 def build_assets(base_url, assets, token, config_kwargs, label_mapping):
@@ -48,7 +48,11 @@ def build_assets(base_url, assets, token, config_kwargs, label_mapping):
     for asset in assets:
         agent_info = asset.get('agent', {})
         os_info = asset.get('os_info', {})
-        asset_id = str(asset.get('id', str(new_uuid)))
+        raw_id = asset.get('id') or asset.get('bios_uuid') or asset.get('instance_id')
+        if not raw_id:
+            print("centra-v4: skipping asset with no stable id: name=" + str(asset.get('name', '')))
+            continue
+        asset_id = str(raw_id)
         hostname = asset.get('name', '')
         os = os_info.get('type', '')
         first_seen = asset.get('first_seen', '')

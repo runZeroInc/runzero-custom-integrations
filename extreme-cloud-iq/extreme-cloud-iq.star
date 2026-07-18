@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports access points and switches from Extreme CloudIQ.",
     "version": "26061000",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "username",
@@ -28,7 +29,6 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
 load('requests', 'Session')
 load('json', json_encode='encode', json_decode='decode')
-load('uuid', 'new_uuid')
 load('flatten_json', 'flatten')
 load('net', 'ip_address')
 load('kwargs', 'get_bool')
@@ -99,6 +99,11 @@ def main(*args, **kwargs):
         page_assets = []
         for device in devices:
 
+            device_id = device.get("id") or device.get("serial_number")
+            if not device_id:
+                print("Skipping device with no id or serial number.")
+                continue
+
             if device.get("device_admin_state", "") != "MANAGED" and SKIP_UNMANAGED:
                 print("Skipping unmanaged device.")
                 continue
@@ -112,7 +117,7 @@ def main(*args, **kwargs):
             mac = device.get("mac_address", "")
 
             asset = ImportAsset(
-                id=device.get("id") or new_uuid(),
+                id=str(device_id),
                 hostnames=[device.get("hostname", "")],
                 networkInterfaces=[asset_networks(ips, mac)],
                 device_type=device.get("device_function", ""),

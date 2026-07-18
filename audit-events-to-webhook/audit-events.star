@@ -6,6 +6,7 @@ CONFIG = {
     "type": "outbound",
     "description": "Forwards runZero audit events to an external webhook.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "src_url",

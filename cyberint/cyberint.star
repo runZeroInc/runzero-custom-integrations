@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports assets from Cyberint.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -30,7 +31,6 @@ load('requests', 'Session', 'Cookie')
 load('json', json_encode='encode', json_decode='decode')
 load('runzero.types', 'ImportAsset', 'Vulnerability')
 load('kwargs', 'get_url_base', 'get_bool')
-load('uuid', 'new_uuid')
 
 INSECURE_ALLOWED = False
 
@@ -64,10 +64,14 @@ def main(*args, **kwargs):
         data = json_decode(response.body)
         total_assets = data.get("total_assets", 0)
         for item in data.get("alerts", []):
+            alert_id = item.get("id")
+            if not alert_id:
+                print("cyberint: skipping alert with no id")
+                continue
             severity_map = {"critical": 4, "high": 3, "medium": 2, "low": 1}
             risk_rank = severity_map.get(item.get("severity", "low").lower(), 0)
             vuln = Vulnerability(
-                    id=new_uuid(),
+                    id=str(alert_id),
                     name=item.get("title", "No title available"),
                     description=item.get("description", "No description available"),
                     solution=item.get("recommendation", "No recommendation available"),

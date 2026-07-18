@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices from Ivanti Neurons.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -42,12 +43,15 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', http_get='get', http_post='post', 'get_json', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
-load('uuid', 'new_uuid')
 
 def build_assets(assets):
     assets_import = []
     for asset in assets:
-        asset_id = str(asset.get('DiscoveryId', str(new_uuid)))
+        raw_id = asset.get('DiscoveryId') or asset.get('DeviceID')
+        if not raw_id:
+            print("ivanti-neurons: skipping asset with no DiscoveryId/DeviceID: name=" + str(asset.get('DeviceName', '')))
+            continue
+        asset_id = str(raw_id)
         hostname = asset.get('DeviceName', '')
         os = asset.get('OS', {}).get('Name', '')
         os_version = asset.get('OS', {}).get('Version', '')

@@ -6,6 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices via the SolarWinds Information Service (SWIS) API.",
     "version": "26052700",
+    "minVersion": "5.1.0",
     "params": [
         {
             "key": "url",
@@ -37,14 +38,17 @@ load('base64', base64_encode='encode', base64_decode='decode')
 load('http', 'get_json', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options')
 load('net', 'network_interface')
-load('uuid', 'new_uuid')
 
 RUNZERO_REDIRECT = 'https://console.runzero.com/'
 
 def build_assets(assets):
     assets_import = []
     for asset in assets:
-        asset_id = str(asset.get('NodeId', str(new_uuid)))
+        raw_id = asset.get('NodeId') or asset.get('Fqdn') or asset.get('IpAddress')
+        if not raw_id:
+            print("swis: skipping node with no NodeId/Fqdn/IpAddress")
+            continue
+        asset_id = str(raw_id)
         hostname = asset.get('Fqdn', '')
         os = asset.get('OsVersion', '')
         vendor = asset.get('Vendor', '')
