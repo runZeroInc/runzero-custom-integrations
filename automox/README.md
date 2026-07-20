@@ -27,8 +27,8 @@
 2. **Create a Credential for the Custom Integration**:
     - Go to [runZero Credentials](https://console.runzero.com/credentials).
     - Select `Custom Integration Script Secrets`.
-    - Enter your **Automox API Key** as `access_secret`.
-    - Use a placeholder value like `foo` for `access_key` (unused in this integration).
+    - Enter your **Automox API Key** as `api_token`.
+    - Optionally set `organization_hint` to an Automox organization ID or name.
 3. **Create the Custom Integration**:
     - Go to [runZero Custom Integrations](https://console.runzero.com/custom-integrations/new).
     - Add a **Name and Icon** for the integration (e.g., "automox").

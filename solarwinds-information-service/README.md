@@ -47,9 +47,9 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
         >- For a list of "core" attributes that runZero maps, reference the Custom SDK documentation [here](https://runzeroinc.github.io/runzero-sdk-py/autoapi/runzero/types/_data_models_gen/index.html#runzero.types._data_models_gen.ImportAsset). All other attributes provided by Solarwinds should be mapped within 'Custom Attributes'
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type **Custom Integration Script Secrets**
-    - Both **access_key** and **access_secret** are required
-    - **access_key** corresponds to the username to access Solarwinds
-    -  **access_secret** corresponds to the password to access Solarwinds
+    - Both **username** and **password** are required
+    - **username** corresponds to the username to access Solarwinds
+    - **password** corresponds to the password to access Solarwinds
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new)
     - Add a Name (e.g. solarwinds) and Icon 
     - Toggle **Enable custom integration script** to input your finalized script

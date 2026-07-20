@@ -26,8 +26,7 @@
     - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_secret` field for your Drata API Client Token.
-    - For `access_key`, input a placeholder value like `foo` (unused in this integration).
+    - Use the `api_token` field for your Drata API Client Token.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "drata").
     - Toggle `Enable custom integration script` to input the finalized script.

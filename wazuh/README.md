@@ -24,11 +24,14 @@
    - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
    - Select the type `Custom Integration Script Secrets`.
-   - Set `access_key` to your Wazuh hostname or IP (do not include protocol or port).
-   - Set `access_secret` to `username::password`.
+   - Set `password` to your Wazuh API user password.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
    - Add a Name and Icon for the integration (for example: wazuh).
    - Toggle `Enable custom integration script` to input the finalized script.
+   - Configure the integration parameters:
+     - `hostname`: your Wazuh manager hostname or IP (do not include protocol or port).
+     - `port`: the Wazuh API port (defaults to `55000`).
+     - `username`: your Wazuh API username.
    - Click `Validate` to ensure it has valid syntax.
    - Click `Save` to create the Custom Integration.
 4. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).

@@ -7,16 +7,12 @@
 ## Halcyon requirements
 
 - Access to the Halcyon API at `https://api.halcyon.ai` from the runZero Explorer.
-- One of the following authentication methods:
-  - Recommended: Halcyon username in `access_key` and password in `access_secret`.
-  - Supported: pre-issued bearer token in `access_secret` with `access_key` set to a placeholder value.
+- Halcyon username in `username` and password in `password`.
 - Permissions to query the Halcyon asset search and asset detail endpoints.
 
 ## Authentication behavior
 
-- When `access_key` is set, the script authenticates to Halcyon, retrieves a JWT access token, and automatically refreshes that token if the API returns `401 Unauthorized` during asset collection.
-- When `access_key` is omitted, the script treats `access_secret` as an already-issued bearer token.
-- Bearer token mode does not support automatic token refresh because the script does not have credentials to request a new token.
+- The script authenticates to Halcyon, retrieves a JWT access token, and automatically refreshes that token if the API returns `401 Unauthorized` during asset collection.
 
 ## Data imported into runZero
 
@@ -39,21 +35,15 @@
 ### Halcyon configuration
 
 1. Confirm that the runZero Explorer can reach `https://api.halcyon.ai` over HTTPS.
-2. Choose your authentication method:
-   - Preferred: use a Halcyon username and password so the script can automatically refresh expired JWTs.
-   - Alternative: use a pre-issued bearer token if your environment requires token-based authentication.
+2. Confirm your Halcyon username and password can authenticate to the API.
 3. Verify that the credentials can access the Halcyon asset APIs.
 
 ### runZero configuration
 
 1. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
    - Select the type `Custom Integration Script Secrets`.
-   - If using username/password authentication:
-     - Set `access_key` to your Halcyon username.
-     - Set `access_secret` to your Halcyon password.
-   - If using bearer token authentication:
-     - Leave `access_key` blank if allowed, or use a placeholder value like `foo`.
-     - Set `access_secret` to the Halcyon bearer token.
+   - Set `username` to your Halcyon username.
+   - Set `password` to your Halcyon password.
 2. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
    - Add a Name and Icon for the integration, such as `halycon`.
    - Toggle `Enable custom integration script` to input the finalized script.

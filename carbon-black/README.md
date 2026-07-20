@@ -29,8 +29,8 @@
     - Adjust which attributes are included in runZero.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_key` field for your **Carbon Black Org Key**.
-    - Use the `access_secret` field for your **Carbon Black API Key**.
+    - Use the `organization_key` field for your **Carbon Black Org Key**.
+    - Use the `api_key` field for your **Carbon Black API Key**.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "carbonblack").
     - Toggle `Enable custom integration script` to input the finalized script.

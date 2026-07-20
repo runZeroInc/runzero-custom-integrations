@@ -52,15 +52,15 @@ Make note of:
 | Field           | Description                                    |
 | --------------- | ---------------------------------------------- |
 | `base_url`      | Scale API endpoint, e.g. `https://scale.local` |
-| `access_key`    | Your Scale username or token ID                |
-| `access_secret` | Your Scale password or token secret            |
+| `username`      | Your Scale username or token ID                |
+| `password`      | Your Scale password or token secret            |
 
 ### 2. runZero Console
 
 1. **Credentials** → **Add Credential** → **Custom Script Secret**
 
-   * **Access Key**: any placeholder (e.g. `foo`)
-   * **Access Secret**: your JSON config (see below)
+  * **Username**: your Scale username or token ID
+  * **Password**: your Scale password or token secret
 
 2. **Integrations** → **Custom Integrations** → **Add Script**
 
@@ -71,17 +71,17 @@ Make note of:
 
 ## Configuration
 
-**Access Secret** (paste as a single-line JSON string):
+**Password** may also be provided as a single-line JSON string:
 
 ```json
-{"base_url":"https://scale.api.server","access_key":"scale_user","access_secret":"s3cr3tP@ssw0rd"}
+{"base_url":"https://scale.api.server","username":"scale_user","password":"s3cr3tP@ssw0rd"}
 ```
 
 | Field           | Description                                                   |
 | --------------- | ------------------------------------------------------------- |
 | `base_url`      | Scale API URL (no trailing slash), e.g. `https://scale.local` |
-| `access_key`    | Scale username or token ID                                    |
-| `access_secret` | Scale password or token secret                                |
+| `username`      | Scale username or token ID                                    |
+| `password`      | Scale password or token secret                                |
 
 ---
 
@@ -97,10 +97,10 @@ DEBUG = True
 def main(*args, **kwargs):
     """
     Entrypoint for Scale API v1 integration.
-    Expects kwargs['access_secret'] to be a JSON string containing:
+    Expects kwargs['password'] to be a JSON string containing:
       - base_url       : Scale API URL
-      - access_key     : Username or token ID
-      - access_secret  : Password or token secret
+      - username       : Username or token ID
+      - password       : Password or token secret
     Returns: list of ImportAsset objects for clusters and VMs.
     """
     # …script code with debug_print(), json_decode(), base64_encode(), Session, etc.…

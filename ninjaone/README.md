@@ -24,8 +24,8 @@
     - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - For the `access_key`, input your NinjaOne client ID.
-    - For the `access_secret`, input your NinjaOne client secret.
+    - For `client_id`, input your NinjaOne client ID.
+    - For `client_secret`, input your NinjaOne client secret.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "ninjaone").
     - Upload an image file for the NinjaOne icon.

@@ -30,8 +30,8 @@
 2. **Create a Credential for the Custom Integration**:
     - Go to [runZero Credentials](https://console.runzero.com/credentials).
     - Select `Custom Integration Script Secrets`.
-    - Enter your **Cortex XDR API Key** as `access_secret`.
-    - Enter your **Cortex XDR API Key ID** as `access_key`.
+    - Enter your **Cortex XDR API Key** as `api_key`.
+    - Enter your **Cortex XDR API Key ID** as `api_key_id`.
 3. **Create the Custom Integration**:
     - Go to [runZero Custom Integrations](https://console.runzero.com/custom-integrations/new).
     - Add a **Name and Icon** for the integration (e.g., "cortex-xdr").

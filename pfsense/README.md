@@ -6,17 +6,17 @@ This integration imports your pfSense firewall as a runZero `ImportAsset` and ca
 
 - Superuser access to [Custom Integrations](https://console.runzero.com/custom-integrations).
 - A **Custom Integration Script Secret** credential:
-  - `access_key`: your pfSense base URL (example: `https://pfsense.example.local`)
-  - `access_secret`: your pfSense REST API token
+  - `base_url`: your pfSense base URL (example: `https://pfsense.example.local`)
+  - `api_token`: your pfSense REST API token
 
 ## Optional JSON credential mode
 
-If you prefer to keep all settings in `access_secret`, you can store JSON instead:
+If you prefer to keep all settings in `legacy_credentials`, you can store JSON instead:
 
 ```json
 {
   "base_url": "https://pfsense.example.local",
-  "access_secret": "YOUR_API_TOKEN",
+  "api_token": "YOUR_API_TOKEN",
   "auth_header": "authorization",
   "insecure_skip_verify": false
 }
@@ -36,14 +36,14 @@ The script tries these endpoints in order and uses the first successful response
 
 1. In pfSense, generate an API token with read access to status/system data.
 2. In runZero, create the credential values above.
-3. Create a new Custom Integration and paste `custom-integration-pfsense.star`.
+3. Create a new Custom Integration and paste `pfsense.star`.
 4. Validate, save, and attach it to a task.
 
 ## Local test with runZero CLI
 
 ```bash
-runzero script --filename pfsense/custom-integration-pfsense.star --kwargs access_key=https://pfsense.example.local --kwargs access_secret=YOUR_API_TOKEN
+runzero script --filename pfsense/pfsense.star --kwargs base_url=https://pfsense.example.local --kwargs api_token=YOUR_API_TOKEN
 ```
 
-If your API token/header model is different, use the JSON `access_secret` mode so you can switch header behavior.
+If your API token/header model is different, use the JSON `legacy_credentials` mode so you can switch header behavior.
 

@@ -69,17 +69,17 @@ To ensure the script can read node, VM, container, storage, and other resource d
 
 ## Configuration
 
-**Access Secret** (paste as a single-line JSON string):
+**API token secret** may also be provided as a single-line JSON string:
 
 ```json
-{"base_url":"https://your.proxmox.server:8006","access_key":"root@pam!monitoring","access_secret":"123e4567-e89b-12d3-a456-426614174000"}
+{"base_url":"https://your.proxmox.server:8006","api_token_id":"root@pam!monitoring","api_token_secret":"123e4567-e89b-12d3-a456-426614174000"}
 ```
 
 | Field           | Description                                                     |
 | --------------- | --------------------------------------------------------------- |
 | `base_url`      | Proxmox API URL (including port), e.g. `https://pve.local:8006` |
-| `access_key`    | Your API token ID, e.g. `root@pam!monitoring`                   |
-| `access_secret` | UUID secret of your API token                                   |
+| `api_token_id`     | Your API token ID, e.g. `root@pam!monitoring`                |
+| `api_token_secret` | UUID secret of your API token                                |
 
 ---
 
@@ -92,10 +92,10 @@ DEBUG = True
 def main(*args, **kwargs):
     """
     Entrypoint for Proxmox VE integration.
-    Expects kwargs['access_secret'] to be a JSON string containing:
+    Expects kwargs['api_token_secret'] to be a JSON string containing:
       - base_url:      Proxmox URL
-      - access_key:    API token ID
-      - access_secret: API token secret (UUID)
+      - api_token_id:     API token ID
+      - api_token_secret: API token secret (UUID)
     Returns: list of ImportAsset objects for nodes, VMs, containers.
     """
     # (…script code with DEBUG guards…)
@@ -106,7 +106,7 @@ def main(*args, **kwargs):
 ## Running the Integration
 
 1. **Associate** the custom script with a discovery job.
-2. **Select** the credential (Access Key=`foo`, your JSON `access_secret`).
+2. **Select** the credential with your Proxmox API token values.
 3. **Run** the scan.
 4. **Review** discovered assets—nodes, VMs, and containers with IPs and MACs—in runZero.
 

@@ -25,8 +25,8 @@
     - All discovered assets will be enriched with additional metadata using `customAttributes`.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_key` field for your ExtremeCloud IQ username.
-    - Use the `access_secret` field for your ExtremeCloud IQ password.
+    - Use the `username` field for your ExtremeCloud IQ username.
+    - Use the `password` field for your ExtremeCloud IQ password.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "ExtremeCloudIQ").
     - Toggle `Enable custom integration script` and paste in the finalized script.

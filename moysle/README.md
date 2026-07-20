@@ -6,8 +6,8 @@
 
 ## Moysle Requirements
 
-- Moysle API token (`access_key`).
-- Moysle admin account email and password, provided in `access_secret` as a JSON/dict (`{"email": "<EMAIL>", "password": "<PASSWORD>"}` or `{"username": "<EMAIL>", "password": "<PASSWORD>"}`).
+- Moysle API token (`api_token`).
+- Moysle admin account email and password, provided in `email` and `password` fields. The `legacy_credentials` JSON/dict field remains supported for existing credentials.
 - Account must have permission to access device inventory.
 
 ## Steps
@@ -52,8 +52,8 @@
 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
    - Select the type `Custom Integration Script Secrets`.
-   - Use the `access_key` field for your API token.
-   - Use the `access_secret` field as JSON/dict with keys `{"email": "<EMAIL>", "password": "<PASSWORD>"}` (or `username`). Pre-issued bearer tokens are not used by the script.
+   - Use the `api_token` field for your API token.
+   - Use the `email` and `password` fields for the admin login. Existing credentials can continue to use `legacy_credentials` as JSON/dict with keys `{"email": "<EMAIL>", "password": "<PASSWORD>"}` (or `username`). Pre-issued bearer tokens are not used by the script.
 
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
    - Add a Name and Icon for the integration (e.g., `moysle`).

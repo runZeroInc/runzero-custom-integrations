@@ -41,9 +41,7 @@
         - Any additional custom fields tracked in **Snipe-IT** that do not correspond to runZero's [ImportAsset](https://runzeroinc.github.io/runzero-sdk-py/autoapi/runzero/types/_data_models_gen/index.html#runzero.types._data_models_gen.ImportAsset) data model can be mapped to custom attributes following the pattern in the script 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type `Custom Integration Script Secrets`
-    - Both `access_key` and `access_secret` are required, but **Snipe-IT** only requires the bearer token
-        - Input a placeholder value like `foo` for the `access_key` value
-        - Input the **Snipe-IT** bearer token in the `access_secret` field 
+    - Input the **Snipe-IT** bearer token in the `api_token` field.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new)
     - Add a Name and Icon (e.g. snipeit)
         - The name given to the custom integration will correspond to the custom_integration value when creating queries
