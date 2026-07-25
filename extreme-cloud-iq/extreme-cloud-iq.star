@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports access points and switches from Extreme CloudIQ.",
     "version": "26061000",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "username",

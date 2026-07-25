@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports company assets from Bitsight.",
     "version": "26052700",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "company_id",

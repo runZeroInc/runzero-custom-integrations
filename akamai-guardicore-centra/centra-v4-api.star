@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports Centra agents and assets via the Centra v3 or v4 API.",
     "version": "26061000",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "url",

@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports configuration items from Device42.",
     "version": "26061000",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "auth_scheme",

@@ -6,7 +6,7 @@ CONFIG = {
     "type": "outbound",
     "description": "Exports runZero assets into Sumo Logic.",
     "version": "26052700",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "src_url",

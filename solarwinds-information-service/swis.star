@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports devices via the SolarWinds Information Service (SWIS) API.",
     "version": "26052700",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "url",

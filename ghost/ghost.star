@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports assets from Ghost Security.",
     "version": "26052700",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "api_token",

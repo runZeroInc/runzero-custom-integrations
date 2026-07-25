@@ -87,7 +87,7 @@ CONFIG = {
   "name": "Example",
   "type": "inbound",
   "version": "26052700",
-  "minVersion": "5.1.0",
+  "minVersion": "5.0.260723.0",
   "params": [
     {"key": "url", "type": "url", "required": True},
     {"key": "api_token", "type": "secret", "required": True},

@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports hardware assets from Snipe-IT.",
     "version": "26052700",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "url",

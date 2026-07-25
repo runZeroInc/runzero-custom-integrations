@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports VMs and nodes from Scale Computing HC3 clusters.",
     "version": "26052700",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "base_url",

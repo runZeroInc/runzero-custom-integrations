@@ -6,7 +6,7 @@ CONFIG = {
     "type": "inbound",
     "description": "Imports agents from a Wazuh manager.",
     "version": "26061000",
-    "minVersion": "5.1.0",
+    "minVersion": "5.0.260723.0",
     "params": [
         {
             "key": "hostname",
