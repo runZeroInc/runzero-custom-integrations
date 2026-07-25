@@ -29,6 +29,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Device42](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/)
 - [Digital Ocean](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/)
 - [Drata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/)
+- [exe.dev](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/exe-dev/)
 - [Extreme Networks CloudIQ](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/)
 - [Ghost Security](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/)
 - [Halcyon](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/)
