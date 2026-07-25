@@ -1,6 +1,7 @@
 name: Update integrations JSON when relevant files change
 
 on:
+  workflow_dispatch: 
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
