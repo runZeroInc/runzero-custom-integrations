@@ -36,8 +36,8 @@ NA
     - Identify the Customer ID to use for asset retrieval
     - Assign the Customer ID to `SNOW_CUSTOMER_ID` within the starlark script (multiple scripts can be created to import from different Customer IDs)
 2. Create a valid username:password login to be used to authenticate to the API endpoints
-    - Copy the username; this will be used as the value for `access_key` when creating the Custom Integration credentials in the runZero console (see below)
-    - Copy the password; this will be used as the value for `access_secret` when creating the Custom Integration credentials in the runZero console (see below)
+    - Copy the username; this will be used as the value for `username` when creating the Custom Integration credentials in the runZero console (see below)
+    - Copy the password; this will be used as the value for `password` when creating the Custom Integration credentials in the runZero console (see below)
 
 ### runZero configuration
 
@@ -46,9 +46,9 @@ NA
     - Modify datapoints uploaded to runZero as needed 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type `Custom Integration Script Secrets`
-    - Both `access_key` and `access_secret` are required
-    - `access_key` corresponds to the username for the Snow License Manager credentials
-    -  `access_secret` corresponds to the password for the Snow License Manager credentials
+    - Both `username` and `password` are required
+    - `username` corresponds to the username for the Snow License Manager credentials
+    - `password` corresponds to the password for the Snow License Manager credentials
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new)
     - Add a Name and Icon 
     - Toggle `Enable custom integration script` to input your finalized script

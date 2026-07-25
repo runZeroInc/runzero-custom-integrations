@@ -36,8 +36,7 @@
 2. **Create a Credential for the Custom Integration**:
    - Go to [runZero Credentials](https://console.runzero.com/credentials).
    - Select `Custom Integration Script Secrets`.
-   - Input the Base64-encoded string in the `access_secret` field.
-   - Use a placeholder like `foo` for `access_key` (unused).
+   - Input the Base64-encoded string in the `basic_auth_credential` field.
 
 3. **Create the Custom Integration**:
    - Go to [runZero Custom Integrations](https://console.runzero.com/custom-integrations/new).

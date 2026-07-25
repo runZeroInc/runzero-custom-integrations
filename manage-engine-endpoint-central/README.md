@@ -8,7 +8,7 @@
 
 - Valid Endpoint Central URL (`EC_HOST`) for your account.
 - API Version (e.g., `1.4`, default is 1.4).
-- Endpoint Central API token (`access_secret`) with permissions to access inventory data.
+- Endpoint Central API token (`oauth_token`) with permissions to access inventory data.
 
 ## Steps
 
@@ -37,8 +37,8 @@
 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_key` field for your Endpoint Central URL.
-    - Use the `access_secret` field for your API token.
+    - Use the `url` field for your Endpoint Central URL.
+    - Use the `oauth_token` field for your API token.
 
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "endpoint-central").

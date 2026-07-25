@@ -24,8 +24,7 @@
     - Modify datapoints uploaded to runZero as needed 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type `Custom Integration Script Secrets`
-    - Both `access_key` and `access_secret` are required, but not all scripts will use both
-    - Input a placeholde value like `foo` if the value is unused 
+    - Both `client_id` and `client_secret` are required in this template; real integrations should use credential field names that match their API.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new)
     - Add a Name and Icon 
     - Toggle `Enable custom integration script` to input your finalized script

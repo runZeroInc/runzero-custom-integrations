@@ -40,7 +40,7 @@ No manual mapping of repositories to IPs or hostnames is required.
 1. Log in to your **Ghost Security console**.
 2. Navigate to your account or organization **API Keys** section.
 3. Generate a new key with **read permissions** for repositories and findings.
-4. Copy the key — you’ll use it as your `access_secret` in runZero.
+4. Copy the key — you’ll use it as your `api_token` in runZero.
 
 ---
 
@@ -50,8 +50,7 @@ No manual mapping of repositories to IPs or hostnames is required.
 2. Choose **Custom Integration Script Secrets**.
 3. Enter:
 
-   * `access_secret`: your Ghost API key
-   * `access_key`: any placeholder value (unused)
+  * `api_token`: your Ghost API key
 4. Save the credential.
 
 ---
@@ -61,7 +60,7 @@ No manual mapping of repositories to IPs or hostnames is required.
 1. Go to [Custom Integrations](https://console.runzero.com/custom-integrations/new).
 2. Add a **name** (e.g., `ghost-security`) and optional icon.
 3. Enable **Custom integration script**.
-4. Paste in the `custom-integration-ghost.star` script (latest version).
+4. Paste in the `ghost.star` script (latest version).
 5. Click **Validate** to confirm syntax.
 6. Save the integration.
 
@@ -120,7 +119,7 @@ No manual mapping of repositories to IPs or hostnames is required.
 * Run locally for testing:
 
   ```bash
-  runzero script -f custom-integration-ghost.star --kwargs access_secret=<YOUR_GHOST_API_KEY>
+  runzero script -f ghost.star --kwargs api_token=<YOUR_GHOST_API_KEY>
   ```
 * Logs will show:
 

@@ -27,8 +27,7 @@ Custom Integration for retrieving clients and Unifi devices from the Unifi Netwo
     - (OPTIONAL) Modify `UNIFI_CLIENT_API_FILTER`
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
-    - Use the `access_secret` field for your Unifi API token.
-    - For `access_key`, input a placeholder value like `foo` (unused in this integration).
+    - Use the `api_key` field for your Unifi API token.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "unifi").
     - Toggle `Enable custom integration script` to input the finalized script.

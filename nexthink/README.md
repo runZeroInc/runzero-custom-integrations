@@ -48,29 +48,24 @@ The script imports assets from Nexthink using NQL export workflow and maps:
    - `device.first_seen`
    - `device.last_seen`
 
-### 2. Configure the script
-
-Edit [nexthink/custom-integration-nexthink.star](nexthink/custom-integration-nexthink.star) constants:
-
-- `AUTH_URL` format: `https://<instance>-login.<region>.nexthink.cloud`
-- `API_URL` format: `https://<instance>.api.<region>.nexthink.cloud`
-- `QUERY_ID` format: `#<your_query_id>`
-- `SCOPE` usually: `service:integration`
-
-### 3. Configure runZero credential
+### 2. Configure runZero credential
 
 1. In runZero, create a credential of type Custom Integration Script Secrets.
-2. Set:
-   - `access_key` = Nexthink Client ID
-   - `access_secret` = Nexthink Client Secret
+2. Set `client_secret` to your Nexthink Client Secret.
 
-### 4. Configure runZero custom integration
+### 3. Configure runZero custom integration
 
 1. Create a new custom integration in runZero.
-2. Paste the script from [nexthink/custom-integration-nexthink.star](nexthink/custom-integration-nexthink.star).
-3. Validate and save.
+2. Paste the script from [nexthink/nexthink.star](nexthink/nexthink.star).
+3. Configure the integration parameters:
+   - `auth_url`: `https://<instance>-login.<region>.nexthink.cloud`
+   - `api_url`: `https://<instance>.api.<region>.nexthink.cloud`
+   - `client_id`: your Nexthink Client ID
+   - `query_id`: your saved NQL query ID (defaults to `#runzero_integration`)
+   - `scope`: OAuth scope (defaults to `service:integration`)
+4. Validate and save.
 
-### 5. Create an ingest task
+### 4. Create an ingest task
 
 1. Create a custom ingest task.
 2. Select the credential and custom integration.
@@ -88,7 +83,7 @@ Edit [nexthink/custom-integration-nexthink.star](nexthink/custom-integration-nex
 
 - `No rows returned from Nexthink export workflow`:
   - Verify query fields and data availability in Nexthink.
-  - Verify `QUERY_ID` matches a saved Nexthink query.
+  - Verify `query_id` matches a saved Nexthink query.
 - `Failed to download export results ... Only one auth mechanism allowed`:
   - Ensure no `Authorization` header is sent to `resultsFileUrl`.
 - Exactly 1,000 rows imported:
@@ -97,8 +92,7 @@ Edit [nexthink/custom-integration-nexthink.star](nexthink/custom-integration-nex
 ## Preparing a pull request
 
 1. Ensure these files exist:
-   - [nexthink/custom-integration-nexthink.star](nexthink/custom-integration-nexthink.star)
-   - [nexthink/config.json](nexthink/config.json)
+   - [nexthink/nexthink.star](nexthink/nexthink.star)
    - [nexthink/README.md](nexthink/README.md)
 2. Verify your branch is `nexthink` and only intended files changed.
 3. Run a quick manual validation in runZero with test credentials.

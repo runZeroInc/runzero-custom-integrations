@@ -27,7 +27,7 @@
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
     - Leave the `access_client` blank.
-    - Use the `access_secret` field for your Netskope API token.
+    - Use the `api_token` field for your Netskope API token.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "netskope").
     - Toggle `Enable custom integration script` to input the finalized script.

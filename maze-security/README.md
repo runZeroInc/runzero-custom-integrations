@@ -1,7 +1,5 @@
 # Custom Integration: Maze
 
-<img src="maze-icon.png" alt="Maze" width="100">
-
 ## runZero requirements
 
 - Superuser access to the [Custom Integrations configuration](https://console.runzero.com/custom-integrations) in runZero.
@@ -19,20 +17,18 @@
 
 ### runZero configuration
 
-1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
-   - Adjust `DEFAULT_DAYS_BACK` to control how far back investigations are fetched (default: 30 days).
-   - Modify custom attribute mappings as needed.
-2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
-   - Select the type `Custom Integration Script Secrets`.
-   - For `access_key`, input a placeholder value (unused in this integration).
-   - Use the `access_secret` field for your **Maze API Key**.
-3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
-   - Add a Name and Icon for the integration (e.g., "maze"). The icon is included in this directory.
+1. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
+   - Add a Name and Icon for the integration (e.g., "Maze").
    - Toggle `Enable custom integration script` to input the finalized script.
    - Click `Validate` to ensure it has valid syntax.
    - Click `Save` to create the Custom Integration.
-4. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
-   - Select the Credential and Custom Integration created in steps 2 and 3.
+   - The script embeds its `CONFIG` block, so the credential form is generated automatically with the fields below.
+2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
+   - Select the type `Custom Integration Script Secrets`.
+   - **Maze API key** (`api_key`): your Maze API key with access to the Investigations API.
+   - **Lookback window (days)** (`days_back`): optional; how far back to fetch updated investigations (default: 30).
+3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
+   - Select the Credential and Custom Integration created in steps 1 and 2.
    - Update the task schedule to recur at the desired timeframes.
    - Select the Explorer you would like the Custom Integration to run from.
    - Click `Save` to kick off the first task.
@@ -46,7 +42,8 @@
 
 ### Notes
 
-- The integration fetches investigations updated within the last 30 days by default. Adjust `DEFAULT_DAYS_BACK` in the script to change this.
+- The integration fetches investigations updated within the last 30 days by default. Change the **Lookback window (days)** credential field (`days_back`) to adjust this.
 - Each investigation is mapped to a **Vulnerability** on the corresponding asset, including CVE, CVSS scores, exploitability verdict, and root cause analysis.
 - When `related_scanner_findings` data is available, additional metadata (cloud platform, region, scanner type, account ID) is included as custom attributes.
-- The integration includes retry logic for transient API errors (5xx) with up to 3 attempts per request.
+- Assets are grouped from paginated investigations and streamed to runZero in batches via `report_assets`.
+- Transient API errors (429/5xx) are retried automatically with backoff by the shared HTTP helper.

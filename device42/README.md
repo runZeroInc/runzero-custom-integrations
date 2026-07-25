@@ -17,8 +17,8 @@ Device42 supports **Basic** or **Bearer** authentication.
 
 You must configure both fields in your runZero credential:
 
-- `access_key`: must be either `basic` or `bearer`.
-- `access_secret`:  
+- `auth_scheme`: must be either `basic` or `bearer`.
+- `credential`:
   - For `basic`: a base64-encoded string of `username:password`.
   - For `bearer`: your raw API token.
 
@@ -28,11 +28,11 @@ You must configure both fields in your runZero credential:
 echo -n 'myuser:mypassword' | base64
 ```
 
-Use the output as your `access_secret`. Set `access_key` to `basic`.
+Use the output as your `credential`. Set `auth_scheme` to `basic`.
 
 ### Example for Bearer Authentication
 
-Set `access_key` to `bearer`, and `access_secret` to your API token string.
+Set `auth_scheme` to `bearer`, and `credential` to your API token string.
 
 ## Steps
 
@@ -41,8 +41,8 @@ Set `access_key` to `bearer`, and `access_secret` to your API token string.
 - Go to [runZero Credentials](https://console.runzero.com/credentials).
 - Select the type: **Custom Integration Script Secrets**.
 - Set:
-  - `access_key`: `basic` or `bearer`
-  - `access_secret`: base64-encoded `username:password` or API token
+  - `auth_scheme`: `basic` or `bearer`
+  - `credential`: base64-encoded `username:password` or API token
 
 ### 2. Create the Custom Integration
 

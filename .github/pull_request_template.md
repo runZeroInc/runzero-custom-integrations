@@ -31,8 +31,8 @@ Please provide a brief description of your changes and the context for this inte
 
 - [ ] **New Integration Folder:** A new folder has been created for the integration.  
 - [ ] **Updated README:** The README has been updated based on the boilerplate to reflect the new integration details.  
-- [ ] **custom-integration.star File:** The `custom-integration-<name>.star` file has been created/updated as required.  
-- [ ] **config.json File:** The `config.json` is updated with the `name` (product name) and `type` (inbound or outbound) of integration.
+- [ ] **Integration script:** The `<name>.star` file has been created/updated as required.  
+- [ ] **Embedded CONFIG:** The script's `CONFIG` block declares the `name` (product name), `type` (inbound, outbound, or internal), parameters, and any shared option-set includes.
 
 ---
 

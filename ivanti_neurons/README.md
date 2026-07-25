@@ -44,8 +44,8 @@ The URL scheme is `https://<NEURONS_AUTH_URL>/<NEURONS_TENANT_ID>/`
 6. Click Register to generate the authentication settings.
 7. In the Complete this registration panel, the authentication settings, required to complete the registration, are provided:
    - *Neurons Auth URL* - Copy this to the value for the `NEURONS_AUTH_URL` variable in the custom integration script.
-   - *Client ID* - Copy the Client ID to the value for `access_key` when creating the Custom Integration credentials in the runZero console (see below).
-   - *Client secret* - Copy the Client secret to the the value for `access_secret` when creating the Custom Integration credentials in the runZero console (see below)
+    - *Client ID* - Copy the Client ID to the value for `client_id` when creating the Custom Integration credentials in the runZero console (see below).
+    - *Client secret* - Copy the Client secret to the value for `client_secret` when creating the Custom Integration credentials in the runZero console (see below)
 
 ***Warning***: For security reasons, the Client Secret will not be visible again once you close this panel, so make sure you copy it before clicking 
 
@@ -61,9 +61,9 @@ The URL scheme is `https://<NEURONS_AUTH_URL>/<NEURONS_TENANT_ID>/`
     - Modify datapoints uploaded to runZero as needed 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials)
     - Select the type `Custom Integration Script Secrets`
-    - Both `access_key` and `access_secret` are required
-    - `access_key` corresponds to the Client ID provided when creating the app registration in the Neurons Console.
-    -  `access_secret` corresponds to the Client secret provided when creating the app registration in the Neurons Console.
+    - Both `client_id` and `client_secret` are required
+    - `client_id` corresponds to the Client ID provided when creating the app registration in the Neurons Console.
+    - `client_secret` corresponds to the Client secret provided when creating the app registration in the Neurons Console.
 
 Paste the parameters to pass on the field below as described in documentation.
 
