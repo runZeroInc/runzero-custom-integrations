@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-25T05:22:05.646022Z",
-  "totalIntegrations": 44,
+  "lastUpdated": "2026-07-25T05:46:25.476142Z",
+  "totalIntegrations": 45,
   "integrationDetails": [
     {
       "name": "Akamai Guardicore Centra",
@@ -133,6 +133,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/endpoint-central.star"
+    },
+    {
+      "name": "Maze",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/maze-security.star"
     },
     {
       "name": "Microsoft SQL Server databases",
