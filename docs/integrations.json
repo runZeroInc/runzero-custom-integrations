@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-18T20:03:31.924651Z",
-  "totalIntegrations": 43,
+  "lastUpdated": "2026-07-25T05:22:05.646022Z",
+  "totalIntegrations": 44,
   "integrationDetails": [
     {
       "name": "Akamai Guardicore Centra",
@@ -67,6 +67,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/drata.star"
+    },
+    {
+      "name": "exe.dev",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/exe-dev/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/exe-dev/exe-dev.star"
     },
     {
       "name": "Extreme Networks CloudIQ",
