@@ -40,6 +40,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [LimaCharlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)
 - [Linux via SSH](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/linux-ssh/)
 - [ManageEngine Endpoint Central](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/)
+- [Maze](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/)
 - [Microsoft SQL Server databases](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mssql-databases/)
 - [Mosyle](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/moysle/)
 - [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
