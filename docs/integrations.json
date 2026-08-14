@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-25T05:46:25.476142Z",
-  "totalIntegrations": 45,
+  "lastUpdated": "2026-08-14T12:06:30.063985Z",
+  "totalIntegrations": 46,
   "integrationDetails": [
     {
       "name": "Akamai Guardicore Centra",
@@ -217,6 +217,12 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/swis.star"
+    },
+    {
+      "name": "Sophos EDR",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sophos-edr/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sophos-edr/sophos-edr.star"
     },
     {
       "name": "Stairwell",
