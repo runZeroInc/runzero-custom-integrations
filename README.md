@@ -32,6 +32,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [exe.dev](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/exe-dev/)
 - [Extreme Networks CloudIQ](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/)
 - [Ghost Security](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/)
+- [Greenbone (GMP) Import](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone/)
 - [Halcyon](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/)
 - [Ivanti Neurons](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ivanti_neurons/)
 - [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
@@ -64,6 +65,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Audit Log to Webhook](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/)
 - [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)
 ## Internal Integrations
+- [Greenbone (GMP) Scan Launch](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone-scan/)
 - [Scan Passive Assets](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-scan-passive-assets/)
 - [Vulnerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-vulnerability-workflow/)
 ## The boilerplate folder has examples to follow

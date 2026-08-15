@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-25T05:46:25.476142Z",
-  "totalIntegrations": 45,
+  "lastUpdated": "2026-08-15T04:45:59.953297Z",
+  "totalIntegrations": 47,
   "integrationDetails": [
     {
       "name": "Akamai Guardicore Centra",
@@ -85,6 +85,18 @@
       "type": "inbound",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/ghost.star"
+    },
+    {
+      "name": "Greenbone (GMP) Import",
+      "type": "inbound",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone/greenbone-import.star"
+    },
+    {
+      "name": "Greenbone (GMP) Scan Launch",
+      "type": "internal",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone-scan/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone-scan/runzero-greenbone-scan.star"
     },
     {
       "name": "Halcyon",

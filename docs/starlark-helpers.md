@@ -497,10 +497,30 @@ load("runzero.sql", sql_connect="connect")
 - `socket.tcp(host, port, timeout=30, tls=False, ...)` / `socket.udp(...)`
   / `socket.tls(...)` return a socket with `send`, `recv`, `recv_exact`,
   `recv_line`, `recv_until`, `starttls`, `set_timeout`, `close` and
-  attributes `local_addr`, `remote_addr`, `is_tls`, `closed`.
+  attributes `local_addr`, `remote_addr`, `is_tls`, `closed`. The `tls`
+  argument on `socket.tcp` (and the `tls=` kwarg on `socket.tls` /
+  `.starttls`) accepts either a bool or a dict of TLS overrides in the same
+  shape as the `http` module (`insecure`, `server_name`, `ca_pem`,
+  `client_cert_pem`, `client_key_pem`, `thumbprints`), so you can splat
+  `get_http_tls(kwargs, "tls_")` straight into a raw TLS socket:
+  ```python
+  conn = tls(host, 9390, timeout=60, tls=get_http_tls(kwargs, "tls_"))
+  ```
 - `runzero.ssh.dial(host, username, password=None, private_key=None,
   port=22, timeout=30)` → session with `run(command) -> (stdout, stderr,
-  exit_code)`.
+  exit_code)`. The session also offers:
+  - `open_unix(path)` — forward to a UNIX-domain socket on the remote host
+    (the SSH `direct-streamlocal` extension, i.e. `ssh -L
+    localport:/remote.sock`) and return a `socket` value. Speak a raw
+    protocol (e.g. GMP to `/run/gvmd/gvmd.sock`) with no remote helper such
+    as `socat`/`netcat`.
+  - `open_tcp(host, port)` — forward to a TCP address reachable from the
+    remote host (`direct-tcpip`, i.e. `ssh -L localport:host:port`) and
+    return a `socket` value; call `.starttls(...)` to speak TLS over it.
+  - `stream(command, stdin=None, timeout=0)` — start a long-lived remote
+    command and return a stream object with `send`, `recv(max, timeout)`
+    (`b""` at EOF), `close_stdin`, `close`, and `exit_code` / `stderr`
+    attributes, for incrementally consuming large command output.
 - `runzero.smb.dial(host, username, password="", nt_hash=None, port=445)`
   → session with `mount(share)`, `list_shares()`; a mounted share offers
   `read`, `list`, `stat`, `exists`.
