@@ -14,7 +14,7 @@ Please describe the changes made to the existing integration and why they were n
 
 ### Checklist
 
-- [ ] **Validated in Customer Environment:** Changes have been tested in a customer environment and verified to work as expected.  
+- [ ] **Validated in Real Environment:** Changes have been tested in a real environment and verified to work as expected.  
 - [ ] **Updated README:** The README has been updated to reflect any changes to configuration, setup, or usage.
 
 ---
