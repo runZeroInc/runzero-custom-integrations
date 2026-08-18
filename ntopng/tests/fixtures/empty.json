@@ -1,0 +1,84 @@
+{
+  "name": "empty",
+  "integration": "ntopng",
+  "description": "An interface that is monitored but currently has no active hosts. Must report zero assets rather than failing.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_macs": "false"
+  },
+  "routes": [
+    {
+      "name": "interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/ntopng/interfaces.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [
+              {
+                "ifid": 1,
+                "ifname": "eth0",
+                "name": "eth0",
+                "is_packet_interface": true,
+                "is_pcap_interface": false,
+                "is_zmq_interface": false
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": {
+              "perPage": 250,
+              "currentPage": 1,
+              "data": [],
+              "sort": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "rc": -1,
+      "rc_str": "NOT_FOUND",
+      "rc_str_hr": "Not found",
+      "rsp": {}
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "ntopng: reported 0 assets from interface 1",
+      "ntopng: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

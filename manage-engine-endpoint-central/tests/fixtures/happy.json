@@ -1,0 +1,88 @@
+{
+  "name": "happy",
+  "integration": "manage-engine-endpoint-central",
+  "kwargs": {
+    "url": "$BASE",
+    "oauth_token": "Zoho-oauthtoken fixture-token"
+  },
+  "routes": [
+    {
+      "name": "scancomputers",
+      "match": {
+        "method": "GET",
+        "path": "/api/1.4/inventory/scancomputers"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "message_response": {
+              "scancomputers": [
+                {
+                  "resource_id": "301",
+                  "resource_name": "syn-ec-01",
+                  "ip_address": "10.91.1.11",
+                  "mac_address": "00:50:56:00:e0:01",
+                  "os_name": "Windows 11 Enterprise",
+                  "domain_netbios_name": "SYNCORP",
+                  "scan_status": "success"
+                },
+                {
+                  "resource_id": "302",
+                  "resource_name": "syn-ec-02",
+                  "ip_address": "10.91.1.12,10.91.2.12",
+                  "mac_address": "00:50:56:00:e0:02",
+                  "os_name": "Ubuntu 22.04"
+                },
+                {
+                  "id": "303",
+                  "resource_name": "syn-ec-03",
+                  "ip_address": "10.91.1.13",
+                  "mac_address": "00:50:56:00:e0:03"
+                },
+                {
+                  "resource_name": "syn-ec-noid",
+                  "ip_address": "10.91.1.14"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "message_response": {
+              "scancomputers": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "301",
+      "302",
+      "303"
+    ],
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/1.4/inventory/scancomputers",
+        "query_contains": "page=1"
+      }
+    ],
+    "log_contains": [
+      "skipping device with no resource_id/id: name=syn-ec-noid"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  },
+  "script": "manage-engine-endpoint-central/manage-engine-endpoint-central.star"
+}

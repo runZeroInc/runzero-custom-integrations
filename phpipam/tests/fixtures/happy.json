@@ -1,0 +1,220 @@
+{
+  "name": "happy",
+  "integration": "phpipam",
+  "description": "Full walk against response bodies captured verbatim from a real phpIPAM 1.8.1 container (phpipam/phpipam-www:v1.8.1 + mariadb:11.4.4, synthetic seed data). Proves the token login, the sections/tags/locations/device_types/vlans lookups, the per-subnet address walk, and the device import. Also proves the two records that cannot correlate are skipped, and that the cleartext SNMP credentials phpIPAM returns from /devices/ never reach an asset.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "app_id": "runzero",
+    "username": "fixture-user",
+    "password": "fixture-pass"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/api/runzero/user/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": {"token": "tplNt0Zf5GvUs1rdh5RRVpKa", "expires": "2036-08-16 11:03:55"}, "time": 0.005}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/sections/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 2, "name": "IPv6", "description": "Section for IPv6 addresses", "masterSection": 0, "strictMode": "1", "showSubnet": 1},
+          {"id": 1, "name": "Customers", "description": "Section for customers", "masterSection": 0, "strictMode": "1", "showSubnet": 1},
+          {"id": 10, "name": "Lab Campus", "description": "Synthetic lab section", "masterSection": 0, "strictMode": "1", "showSubnet": 1}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/tools/tags/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 1, "type": "Offline", "showtag": 1, "locked": "Yes", "updateTag": 1},
+          {"id": 2, "type": "Used", "showtag": 0, "locked": "Yes", "updateTag": 1},
+          {"id": 3, "type": "Reserved", "showtag": 1, "locked": "Yes", "updateTag": 1},
+          {"id": 4, "type": "DHCP", "showtag": 1, "locked": "Yes", "updateTag": 1}
+        ], "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/tools/locations/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 3, "name": "Lab Rack A", "description": "Synthetic location", "address": "1 Example Way", "lat": "", "long": ""}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/tools/device_types/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"tid": 1, "tname": "Switch", "tdescription": "Switch"},
+          {"tid": 2, "tname": "Router", "tdescription": "Router"},
+          {"tid": 3, "tname": "Firewall", "tdescription": "Firewall"},
+          {"tid": 4, "tname": "Hub", "tdescription": "Hub"},
+          {"tid": 5, "tname": "Wireless", "tdescription": "Wireless"},
+          {"tid": 6, "tname": "Database", "tdescription": "Database"},
+          {"tid": 7, "tname": "Workstation", "tdescription": "Workstation"},
+          {"tid": 8, "tname": "Laptop", "tdescription": "Laptop"},
+          {"tid": 9, "tname": "Other", "tdescription": "Other"}
+        ], "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/vlans/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 1, "domainId": 1, "name": "IPv6 private 1", "number": 2001, "description": "IPv6 private 1 subnets", "editDate": null, "customer_id": null},
+          {"id": 5, "domainId": 1, "name": "LAB-USERS", "number": 100, "description": "Lab user VLAN", "editDate": null, "customer_id": null},
+          {"id": 6, "domainId": 1, "name": "LAB-SRV", "number": 200, "description": "Lab server VLAN", "editDate": null, "customer_id": null}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/devices/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 50, "hostname": "sw01.lab.example", "ip": "10.42.0.2", "type": 2, "description": "Lab access switch", "sections": "10", "snmp_community": "labsecretcommunity", "snmp_version": "2", "snmp_port": 161, "snmp_timeout": 1000, "snmp_queries": null, "snmp_v3_sec_level": "authPriv", "snmp_v3_auth_protocol": "SHA", "snmp_v3_auth_pass": "labauthpass", "snmp_v3_priv_protocol": "AES", "snmp_v3_priv_pass": "labprivpass", "snmp_v3_ctx_name": null, "snmp_v3_ctx_engine_id": null, "rack": null, "rack_start": null, "rack_size": null, "rack_deep": 0, "location": 3, "editDate": null},
+          {"id": 51, "hostname": "fw01.lab.example", "ip": "10.42.0.3", "type": 4, "description": "Lab firewall", "sections": "10", "snmp_community": "anothersecret", "snmp_version": "2", "snmp_port": 161, "snmp_timeout": 1000, "snmp_queries": null, "snmp_v3_sec_level": "none", "snmp_v3_auth_protocol": "none", "snmp_v3_auth_pass": null, "snmp_v3_priv_protocol": "none", "snmp_v3_priv_pass": null, "snmp_v3_ctx_name": null, "snmp_v3_ctx_engine_id": null, "rack": null, "rack_start": null, "rack_size": null, "rack_deep": 0, "location": 3, "editDate": null},
+          {"id": 52, "hostname": "nohost.lab", "ip": null, "type": 0, "description": "Device with no address", "sections": "10", "snmp_community": null, "snmp_version": "0", "snmp_port": 161, "snmp_timeout": 1000, "snmp_queries": null, "snmp_v3_sec_level": "none", "snmp_v3_auth_protocol": "none", "snmp_v3_auth_pass": null, "snmp_v3_priv_protocol": "none", "snmp_v3_priv_pass": null, "snmp_v3_ctx_name": null, "snmp_v3_ctx_engine_id": null, "rack": null, "rack_start": null, "rack_size": null, "rack_deep": 0, "location": null, "editDate": null}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/subnets/20/addresses/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 100, "subnetId": 20, "ip": "10.42.0.1", "is_gateway": 1, "description": "Lab gateway", "hostname": "gw01.lab.example", "mac": "00:11:22:33:44:01", "owner": "NetOps", "tag": 1, "deviceId": 50, "location": 3, "port": null, "note": null, "lastSeen": "2026-08-15 09:12:00", "excludePing": 0, "PTRignore": 0, "PTR": 0, "firewallAddressObject": null, "editDate": null, "customer_id": null},
+          {"id": 101, "subnetId": 20, "ip": "10.42.0.10", "is_gateway": 0, "description": "Engineering laptop", "hostname": "laptop01.lab.example", "mac": "aa:bb:cc:dd:ee:01", "owner": "Engineering", "tag": 1, "deviceId": null, "location": 3, "port": "Gi1/0/12", "note": "desk 12", "lastSeen": "2026-08-15 09:30:00", "excludePing": 0, "PTRignore": 0, "PTR": 0, "firewallAddressObject": null, "editDate": null, "customer_id": null},
+          {"id": 102, "subnetId": 20, "ip": "10.42.0.11", "is_gateway": 0, "description": "Reserved for printer", "hostname": "prn01.lab.example", "mac": null, "owner": "Facilities", "tag": 2, "deviceId": null, "location": null, "port": null, "note": null, "lastSeen": "1970-01-01 00:00:01", "excludePing": 0, "PTRignore": 0, "PTR": 0, "firewallAddressObject": null, "editDate": null, "customer_id": null},
+          {"id": 103, "subnetId": 20, "ip": "10.42.0.12", "is_gateway": 0, "description": "No hostname or mac", "hostname": null, "mac": null, "owner": null, "tag": 2, "deviceId": null, "location": null, "port": null, "note": null, "lastSeen": "1970-01-01 00:00:01", "excludePing": 0, "PTRignore": 0, "PTR": 0, "firewallAddressObject": null, "editDate": null, "customer_id": null}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/subnets/21/addresses/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 104, "subnetId": 21, "ip": "10.42.1.20", "is_gateway": 0, "description": "App server", "hostname": "app01.lab.example", "mac": "02:00:5e:10:00:01", "owner": "Platform", "tag": 1, "deviceId": null, "location": 3, "port": null, "note": null, "lastSeen": "2026-08-15 08:00:00", "excludePing": 0, "PTRignore": 0, "PTR": 0, "firewallAddressObject": null, "editDate": null, "customer_id": null},
+          {"id": 105, "subnetId": 21, "ip": "10.42.1.21", "is_gateway": 0, "description": "Placeholder hostname and unparseable MAC", "hostname": "localhost", "mac": "ZZ:NOT:A:MAC", "owner": "Platform", "tag": 1, "deviceId": null, "location": null, "port": null, "note": null, "lastSeen": "2026-08-15 08:05:00", "excludePing": 0, "PTRignore": 0, "PTR": 0, "firewallAddressObject": null, "editDate": null, "customer_id": null}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/subnets/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 1, "subnet": "fd13:6d20:29dc:cf27::", "mask": "64", "sectionId": 2, "description": "Private subnet 1", "vlanId": 1, "masterSubnetId": 0, "isFolder": 0, "isFull": 0, "tag": 2, "location": [], "editDate": null},
+          {"id": 3, "subnet": "10.10.1.0", "mask": "24", "sectionId": 1, "description": "Customer 1", "vlanId": 0, "masterSubnetId": 2, "isFolder": 0, "isFull": 0, "tag": 2, "location": [], "editDate": null},
+          {"id": 7, "subnet": "0.0.0.0", "mask": "0", "sectionId": 10, "description": "Folder node, holds no addresses", "vlanId": 0, "masterSubnetId": 0, "isFolder": 1, "isFull": 0, "tag": 2, "location": [], "editDate": null},
+          {"id": 20, "subnet": "10.42.0.0", "mask": "24", "sectionId": 10, "description": "Lab user subnet", "vlanId": 5, "masterSubnetId": 0, "isFolder": 0, "isFull": 0, "tag": 2, "location": {"id": 3, "name": "Lab Rack A", "description": "Synthetic location", "address": "1 Example Way", "lat": "", "long": ""}, "editDate": null},
+          {"id": 21, "subnet": "10.42.1.0", "mask": "24", "sectionId": 10, "description": "Lab server subnet", "vlanId": 6, "masterSubnetId": 0, "isFolder": 0, "isFull": 0, "tag": 2, "location": {"id": 3, "name": "Lab Rack A", "description": "Synthetic location", "address": "1 Example Way", "lat": "", "long": ""}, "editDate": null}
+        ], "time": 0.004}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/api/runzero/subnets/"},
+      "responses": [
+        {"status": 404, "json": {"code": 404, "success": false, "message": "No addresses found", "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 7,
+    "ids": [
+      "phpipam:$HOST:address:100",
+      "phpipam:$HOST:address:101",
+      "phpipam:$HOST:address:102",
+      "phpipam:$HOST:address:104",
+      "phpipam:$HOST:device:50",
+      "phpipam:$HOST:device:51",
+      "phpipam:$HOST:device:52"
+    ],
+    "ids_absent": [
+      "phpipam:$HOST:address:103",
+      "phpipam:$HOST:address:105"
+    ],
+    "assets": [
+      {
+        "id": "phpipam:$HOST:address:100",
+        "fields": {
+          "_attrType": "address",
+          "phpipam_tag": "Offline",
+          "phpipam_subnet": "10.42.0.0/24",
+          "phpipam_section": "Lab Campus",
+          "phpipam_vlan_number": "100",
+          "phpipam_vlan_name": "LAB-USERS",
+          "phpipam_location": "Lab Rack A",
+          "phpipam_device_hostname": "sw01.lab.example",
+          "phpipam_last_seen_raw": "2026-08-15 09:12:00"
+        }
+      },
+      {
+        "id": "phpipam:$HOST:address:102",
+        "comment": "lastSeen is phpIPAM's 1970 never-seen sentinel; it must not become a real sighting.",
+        "fields": {
+          "_attrType": "address",
+          "phpipam_tag": "Used",
+          "phpipam_last_seen_raw": "1970-01-01 00:00:01"
+        }
+      },
+      {
+        "id": "phpipam:$HOST:device:50",
+        "comment": "phpIPAM returns snmp_community and the snmp_v3 passwords in cleartext from /devices/. None of them may reach an asset.",
+        "fields": {
+          "_attrType": "device",
+          "deviceType": "Router",
+          "phpipam_type": "Router",
+          "phpipam_sections": "Lab Campus",
+          "phpipam_location": "Lab Rack A",
+          "phpipam_snmp_version": "2"
+        },
+        "fields_absent": [
+          "phpipam_snmp_community",
+          "phpipam_snmp_v3_auth_pass",
+          "phpipam_snmp_v3_priv_pass",
+          "phpipam_snmp_v3_ctx_engine_id"
+        ]
+      },
+      {
+        "id": "phpipam:$HOST:device:52",
+        "comment": "No IP at all; the hostname is the only correlator.",
+        "fields": {"_attrType": "device",
+          "phpipam_hostname": "nohost.lab"}
+      }
+    ],
+    "requests_include": [
+      {"method": "POST", "path_contains": "/api/runzero/user/"},
+      {"header_contains": "tplNt0Zf5GvUs1rdh5RRVpKa"},
+      {"path_contains": "/api/runzero/subnets/20/addresses/"},
+      {"path_contains": "/api/runzero/subnets/21/addresses/"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/runzero/addresses/all/"}
+    ],
+    "log_contains": [
+      "phpipam: skipping address 103 with no hostname or MAC",
+      "phpipam: skipping address 105 with no hostname or MAC",
+      "phpipam: reported 4 addresses",
+      "phpipam: reported 3 registered devices"
+    ]
+  },
+
+  "check_determinism": true
+}

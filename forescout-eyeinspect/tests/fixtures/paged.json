@@ -1,0 +1,1532 @@
+{
+  "name": "paged",
+  "integration": "forescout-eyeinspect",
+  "description": "The hosts listing pages with offset/limit at a limit this integration hardcodes to 100, so the only way to reach page two is to hand back exactly 100 rows. Page one is exactly full and page two is short. This proves three things a wiring check cannot: the second request carries offset=100 rather than repeating offset=0, every row on BOTH pages is parsed into an asset (202 in total), and the walk stops on the short page instead of asking for offset=200. The third route answers 500 so a walk that runs on would fail loudly rather than quietly looping.\n\nEvery host advertises alert_count 0, which suppresses the per-host alerts call, so the request sequence here is purely the paging walk.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "last_seen_days": "0",
+    "include_alerts": "true",
+    "include_cve_details": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts-offset-0",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts",
+        "query_contains": "offset=0"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 102,
+            "results": [
+              {
+                "id": 10001,
+                "ip": "10.81.0.2",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:01"
+                ],
+                "main_name": "syn-bulk-001",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10002,
+                "ip": "10.81.0.3",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:02"
+                ],
+                "main_name": "syn-bulk-002",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10003,
+                "ip": "10.81.0.4",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:03"
+                ],
+                "main_name": "syn-bulk-003",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10004,
+                "ip": "10.81.0.5",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:04"
+                ],
+                "main_name": "syn-bulk-004",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10005,
+                "ip": "10.81.0.6",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:05"
+                ],
+                "main_name": "syn-bulk-005",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10006,
+                "ip": "10.81.0.7",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:06"
+                ],
+                "main_name": "syn-bulk-006",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10007,
+                "ip": "10.81.0.8",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:07"
+                ],
+                "main_name": "syn-bulk-007",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10008,
+                "ip": "10.81.0.9",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:08"
+                ],
+                "main_name": "syn-bulk-008",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10009,
+                "ip": "10.81.0.10",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:09"
+                ],
+                "main_name": "syn-bulk-009",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10010,
+                "ip": "10.81.0.11",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:0a"
+                ],
+                "main_name": "syn-bulk-010",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10011,
+                "ip": "10.81.0.12",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:0b"
+                ],
+                "main_name": "syn-bulk-011",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10012,
+                "ip": "10.81.0.13",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:0c"
+                ],
+                "main_name": "syn-bulk-012",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10013,
+                "ip": "10.81.0.14",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:0d"
+                ],
+                "main_name": "syn-bulk-013",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10014,
+                "ip": "10.81.0.15",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:0e"
+                ],
+                "main_name": "syn-bulk-014",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10015,
+                "ip": "10.81.0.16",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:0f"
+                ],
+                "main_name": "syn-bulk-015",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10016,
+                "ip": "10.81.0.17",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:10"
+                ],
+                "main_name": "syn-bulk-016",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10017,
+                "ip": "10.81.0.18",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:11"
+                ],
+                "main_name": "syn-bulk-017",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10018,
+                "ip": "10.81.0.19",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:12"
+                ],
+                "main_name": "syn-bulk-018",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10019,
+                "ip": "10.81.0.20",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:13"
+                ],
+                "main_name": "syn-bulk-019",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10020,
+                "ip": "10.81.0.21",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:14"
+                ],
+                "main_name": "syn-bulk-020",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10021,
+                "ip": "10.81.0.22",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:15"
+                ],
+                "main_name": "syn-bulk-021",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10022,
+                "ip": "10.81.0.23",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:16"
+                ],
+                "main_name": "syn-bulk-022",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10023,
+                "ip": "10.81.0.24",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:17"
+                ],
+                "main_name": "syn-bulk-023",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10024,
+                "ip": "10.81.0.25",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:18"
+                ],
+                "main_name": "syn-bulk-024",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10025,
+                "ip": "10.81.0.26",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:19"
+                ],
+                "main_name": "syn-bulk-025",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10026,
+                "ip": "10.81.0.27",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:1a"
+                ],
+                "main_name": "syn-bulk-026",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10027,
+                "ip": "10.81.0.28",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:1b"
+                ],
+                "main_name": "syn-bulk-027",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10028,
+                "ip": "10.81.0.29",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:1c"
+                ],
+                "main_name": "syn-bulk-028",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10029,
+                "ip": "10.81.0.30",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:1d"
+                ],
+                "main_name": "syn-bulk-029",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10030,
+                "ip": "10.81.0.31",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:1e"
+                ],
+                "main_name": "syn-bulk-030",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10031,
+                "ip": "10.81.0.32",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:1f"
+                ],
+                "main_name": "syn-bulk-031",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10032,
+                "ip": "10.81.0.33",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:20"
+                ],
+                "main_name": "syn-bulk-032",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10033,
+                "ip": "10.81.0.34",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:21"
+                ],
+                "main_name": "syn-bulk-033",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10034,
+                "ip": "10.81.0.35",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:22"
+                ],
+                "main_name": "syn-bulk-034",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10035,
+                "ip": "10.81.0.36",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:23"
+                ],
+                "main_name": "syn-bulk-035",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10036,
+                "ip": "10.81.0.37",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:24"
+                ],
+                "main_name": "syn-bulk-036",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10037,
+                "ip": "10.81.0.38",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:25"
+                ],
+                "main_name": "syn-bulk-037",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10038,
+                "ip": "10.81.0.39",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:26"
+                ],
+                "main_name": "syn-bulk-038",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10039,
+                "ip": "10.81.0.40",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:27"
+                ],
+                "main_name": "syn-bulk-039",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10040,
+                "ip": "10.81.0.41",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:28"
+                ],
+                "main_name": "syn-bulk-040",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10041,
+                "ip": "10.81.0.42",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:29"
+                ],
+                "main_name": "syn-bulk-041",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10042,
+                "ip": "10.81.0.43",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:2a"
+                ],
+                "main_name": "syn-bulk-042",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10043,
+                "ip": "10.81.0.44",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:2b"
+                ],
+                "main_name": "syn-bulk-043",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10044,
+                "ip": "10.81.0.45",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:2c"
+                ],
+                "main_name": "syn-bulk-044",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10045,
+                "ip": "10.81.0.46",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:2d"
+                ],
+                "main_name": "syn-bulk-045",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10046,
+                "ip": "10.81.0.47",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:2e"
+                ],
+                "main_name": "syn-bulk-046",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10047,
+                "ip": "10.81.0.48",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:2f"
+                ],
+                "main_name": "syn-bulk-047",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10048,
+                "ip": "10.81.0.49",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:30"
+                ],
+                "main_name": "syn-bulk-048",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10049,
+                "ip": "10.81.0.50",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:31"
+                ],
+                "main_name": "syn-bulk-049",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10050,
+                "ip": "10.81.0.51",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:32"
+                ],
+                "main_name": "syn-bulk-050",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10051,
+                "ip": "10.81.0.52",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:33"
+                ],
+                "main_name": "syn-bulk-051",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10052,
+                "ip": "10.81.0.53",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:34"
+                ],
+                "main_name": "syn-bulk-052",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10053,
+                "ip": "10.81.0.54",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:35"
+                ],
+                "main_name": "syn-bulk-053",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10054,
+                "ip": "10.81.0.55",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:36"
+                ],
+                "main_name": "syn-bulk-054",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10055,
+                "ip": "10.81.0.56",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:37"
+                ],
+                "main_name": "syn-bulk-055",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10056,
+                "ip": "10.81.0.57",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:38"
+                ],
+                "main_name": "syn-bulk-056",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10057,
+                "ip": "10.81.0.58",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:39"
+                ],
+                "main_name": "syn-bulk-057",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10058,
+                "ip": "10.81.0.59",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:3a"
+                ],
+                "main_name": "syn-bulk-058",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10059,
+                "ip": "10.81.0.60",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:3b"
+                ],
+                "main_name": "syn-bulk-059",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10060,
+                "ip": "10.81.0.61",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:3c"
+                ],
+                "main_name": "syn-bulk-060",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10061,
+                "ip": "10.81.0.62",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:3d"
+                ],
+                "main_name": "syn-bulk-061",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10062,
+                "ip": "10.81.0.63",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:3e"
+                ],
+                "main_name": "syn-bulk-062",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10063,
+                "ip": "10.81.0.64",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:3f"
+                ],
+                "main_name": "syn-bulk-063",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10064,
+                "ip": "10.81.0.65",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:40"
+                ],
+                "main_name": "syn-bulk-064",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10065,
+                "ip": "10.81.0.66",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:41"
+                ],
+                "main_name": "syn-bulk-065",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10066,
+                "ip": "10.81.0.67",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:42"
+                ],
+                "main_name": "syn-bulk-066",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10067,
+                "ip": "10.81.0.68",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:43"
+                ],
+                "main_name": "syn-bulk-067",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10068,
+                "ip": "10.81.0.69",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:44"
+                ],
+                "main_name": "syn-bulk-068",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10069,
+                "ip": "10.81.0.70",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:45"
+                ],
+                "main_name": "syn-bulk-069",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10070,
+                "ip": "10.81.0.71",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:46"
+                ],
+                "main_name": "syn-bulk-070",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10071,
+                "ip": "10.81.0.72",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:47"
+                ],
+                "main_name": "syn-bulk-071",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10072,
+                "ip": "10.81.0.73",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:48"
+                ],
+                "main_name": "syn-bulk-072",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10073,
+                "ip": "10.81.0.74",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:49"
+                ],
+                "main_name": "syn-bulk-073",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10074,
+                "ip": "10.81.0.75",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:4a"
+                ],
+                "main_name": "syn-bulk-074",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10075,
+                "ip": "10.81.0.76",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:4b"
+                ],
+                "main_name": "syn-bulk-075",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10076,
+                "ip": "10.81.0.77",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:4c"
+                ],
+                "main_name": "syn-bulk-076",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10077,
+                "ip": "10.81.0.78",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:4d"
+                ],
+                "main_name": "syn-bulk-077",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10078,
+                "ip": "10.81.0.79",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:4e"
+                ],
+                "main_name": "syn-bulk-078",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10079,
+                "ip": "10.81.0.80",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:4f"
+                ],
+                "main_name": "syn-bulk-079",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10080,
+                "ip": "10.81.0.81",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:50"
+                ],
+                "main_name": "syn-bulk-080",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10081,
+                "ip": "10.81.0.82",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:51"
+                ],
+                "main_name": "syn-bulk-081",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10082,
+                "ip": "10.81.0.83",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:52"
+                ],
+                "main_name": "syn-bulk-082",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10083,
+                "ip": "10.81.0.84",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:53"
+                ],
+                "main_name": "syn-bulk-083",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10084,
+                "ip": "10.81.0.85",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:54"
+                ],
+                "main_name": "syn-bulk-084",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10085,
+                "ip": "10.81.0.86",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:55"
+                ],
+                "main_name": "syn-bulk-085",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10086,
+                "ip": "10.81.0.87",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:56"
+                ],
+                "main_name": "syn-bulk-086",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10087,
+                "ip": "10.81.0.88",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:57"
+                ],
+                "main_name": "syn-bulk-087",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10088,
+                "ip": "10.81.0.89",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:58"
+                ],
+                "main_name": "syn-bulk-088",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10089,
+                "ip": "10.81.0.90",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:59"
+                ],
+                "main_name": "syn-bulk-089",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10090,
+                "ip": "10.81.0.91",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:5a"
+                ],
+                "main_name": "syn-bulk-090",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10091,
+                "ip": "10.81.0.92",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:5b"
+                ],
+                "main_name": "syn-bulk-091",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10092,
+                "ip": "10.81.0.93",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:5c"
+                ],
+                "main_name": "syn-bulk-092",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10093,
+                "ip": "10.81.0.94",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:5d"
+                ],
+                "main_name": "syn-bulk-093",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10094,
+                "ip": "10.81.0.95",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:5e"
+                ],
+                "main_name": "syn-bulk-094",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10095,
+                "ip": "10.81.0.96",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:5f"
+                ],
+                "main_name": "syn-bulk-095",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10096,
+                "ip": "10.81.0.97",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:60"
+                ],
+                "main_name": "syn-bulk-096",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10097,
+                "ip": "10.81.0.98",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:61"
+                ],
+                "main_name": "syn-bulk-097",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10098,
+                "ip": "10.81.0.99",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:62"
+                ],
+                "main_name": "syn-bulk-098",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10099,
+                "ip": "10.81.0.100",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:63"
+                ],
+                "main_name": "syn-bulk-099",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10100,
+                "ip": "10.81.0.101",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:64"
+                ],
+                "main_name": "syn-bulk-100",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts-offset-100",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts",
+        "query_contains": "offset=100"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 102,
+            "results": [
+              {
+                "id": 10101,
+                "ip": "10.81.0.102",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:65"
+                ],
+                "main_name": "syn-bulk-101",
+                "role": "PLC",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              },
+              {
+                "id": 10102,
+                "ip": "10.81.0.103",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:66"
+                ],
+                "main_name": "syn-bulk-102",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0,
+                "open_ports": [
+                  502
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts-walked-too-far",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts"
+      },
+      "responses": [
+        {
+          "status": 500,
+          "text": "the hosts walk ran past the short final page"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 102,
+    "ids": [
+      "forescout-eyeinspect:127.0.0.1:10001",
+      "forescout-eyeinspect:127.0.0.1:10100",
+      "forescout-eyeinspect:127.0.0.1:10101",
+      "forescout-eyeinspect:127.0.0.1:10102"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1/hosts",
+        "query_contains": "limit=100&offset=0"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/hosts",
+        "query_contains": "limit=100&offset=100"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/api/v1/hosts",
+        "query_contains": "offset=200"
+      },
+      {
+        "path": "/api/v1/alerts"
+      }
+    ],
+    "log_contains": [
+      "reported 102 assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

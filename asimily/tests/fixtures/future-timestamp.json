@@ -1,0 +1,115 @@
+{
+  "name": "future-timestamp",
+  "integration": "asimily",
+  "description": "REGRESSION LOCK for the unclamped lastDiscoveredAt. _parse_ts converted lastDiscoveredAt straight onto asset.lastSeenTS with no ceiling. runZero fails an ImportAsset whose last-seen time is ahead of now, and that failure ends the RUN, not the record -- so one clinical device with a skewed clock on page 0 took every later page of the estate down with it. Device 71001 carries a permanently future lastDiscoveredAt (year 2999), and 71002 a future nvdPublishDate/openDate on its CVE, both of which must now be capped at the current time. Page 1 is where the proof is: 71003 and 71004 only arrive if page 0 did not abort the run.\n\ncheck_determinism is off and ids are asserted with $BASE_HOST rather than compared across runs, because the asimily id is scoped on the portal host -- 127.0.0.1:<ephemeral port> under the fixture server, and the second run binds a different port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "include_vulnerabilities": "true",
+    "page_size": "2"
+  },
+  "default_response": {"status": 400, "json": {"error": "missing or malformed source header"}},
+  "routes": [
+    {
+      "name": "device-cves",
+      "match": {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceId": 71002,
+                "cves": [
+                  {"cveName": "CVE-2025-71002", "productName": "SkewedFW", "score": 7.5,
+                   "cvssBaseScore": 7.5, "isFixed": 56,
+                   "nvdPublishDate": "2999-03-04T00:00:00Z",
+                   "openDate": "2999-03-05T00:00:00Z"}
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 2,
+            "content": [
+              {
+                "deviceID": 71001,
+                "hostName": "clock-ahead-01",
+                "macAddr": "00:1B:44:71:00:01",
+                "v4IpAddrs": ["192.0.2.11"],
+                "deviceType": "Infusion Pump",
+                "deviceClass": "Medical",
+                "lastDiscoveredAt": "2999-01-01T00:00:00Z"
+              },
+              {
+                "deviceID": 71002,
+                "hostName": "future-cve-02",
+                "macAddr": "00:1B:44:71:00:02",
+                "v4IpAddrs": ["192.0.2.12"],
+                "deviceType": "Ventilator",
+                "deviceClass": "Medical",
+                "lastDiscoveredAt": 32503680000
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 2,
+            "content": [
+              {
+                "deviceID": 71003,
+                "hostName": "later-page-03",
+                "macAddr": "00:1B:44:71:00:03",
+                "v4IpAddrs": ["192.0.2.13"],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              },
+              {
+                "deviceID": 71004,
+                "hostName": "later-page-04",
+                "macAddr": "00:1B:44:71:00:04",
+                "v4IpAddrs": ["192.0.2.14"],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T06:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "asimily:$BASE_HOST:71001",
+      "asimily:$BASE_HOST:71002",
+      "asimily:$BASE_HOST:71003",
+      "asimily:$BASE_HOST:71004"
+    ],
+    "min_vulnerabilities_total": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/extapi/assets", "query_contains": "page=1"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

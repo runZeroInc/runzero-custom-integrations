@@ -1,0 +1,71 @@
+{
+  "name": "restricted-user",
+  "integration": "opnsense",
+  "description": "A non-administrator API user. OPNsense's ACL has no privilege that covers api/diagnostics/interface/get_interface_config - no pattern in any ACL.xml matches it - so only a user holding 'All pages' can call it, while the ARP and NDP tables have privileges of their own. This scenario models exactly that split: both firewall-identifying calls are refused with 403 while the neighbor tables answer normally. The firewall record would then carry no hostname, no address, and no MAC, so it must NOT be emitted: an asset with nothing to correlate on can never merge with anything and is worse than no asset. The discovered hosts must import regardless, which is the whole value of a restricted credential. Note the permanent-entry filter still works without the interface list, because it keys on the ARP entry's own permanent flag rather than on knowing the firewall's MACs.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "restricted-key",
+    "api_secret": "restricted-secret",
+    "collect_leases": "false"
+  },
+  "routes": [
+    {
+      "name": "system-information-denied",
+      "match": {"method": "GET", "path": "/api/diagnostics/system/systemInformation"},
+      "responses": [{"status": 403, "text": ""}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interface-config-denied",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getInterfaceConfig"},
+      "responses": [{"status": 403, "text": ""}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getArp"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"mac": "00:0d:b9:41:2a:50", "ip": "192.0.2.1", "intf": "igb1", "expired": false, "expires": -1, "permanent": true, "type": "ethernet", "manufacturer": "PC Engines GmbH", "hostname": "", "intf_description": "LAN"},
+            {"mac": "aa:bb:cc:00:44:01", "ip": "192.0.2.121", "intf": "igb1", "expired": false, "expires": 900, "permanent": false, "type": "ethernet", "manufacturer": "", "hostname": "kiosk-01.example.com", "intf_description": "LAN"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ndp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getNdp"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 403, "text": ""},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["opnsense:$HOST:host:aa:bb:cc:00:44:01"],
+    "ids_absent": [
+      "opnsense:$HOST:appliance",
+      "opnsense:$HOST:host:00:0d:b9:41:2a:50"
+    ],
+    "assets": [
+      {
+        "id": "opnsense:$HOST:host:aa:bb:cc:00:44:01",
+        "fields": {
+          "hostnames": "kiosk-01.example.com",
+          "ipAddresses": "192.0.2.121"
+        }
+      }
+    ],
+    "log_contains": [
+      "the firewall itself could not be identified",
+      "reported 0 firewall and 1 discovered hosts"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

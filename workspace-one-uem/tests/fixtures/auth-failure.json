@@ -1,0 +1,66 @@
+{
+  "name": "auth-failure",
+  "integration": "workspace-one-uem",
+  "description": "Workspace ONE UEM requires the aw-tenant-code header AND Basic auth together; supplying only one answers 403 and yields nothing. Here page 0 succeeds and page 1 answers 403, which is what a mid-run credential or role change looks like. The run must keep the devices it already reported, emit the API-key-specific diagnostic rather than the password one, and stop cleanly instead of retrying forever or aborting. check_determinism is off because the id is scoped by the tenant host, which under the fixture server carries an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-admin",
+    "password": "fixture-password",
+    "api_key": "fixture-tenant-code",
+    "page_size": "1"
+  },
+  "routes": [
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/mdm/devices/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Total": 3,
+            "Devices": [
+              {
+                "Id": {"Value": 7001},
+                "Uuid": "4d3e0000-0000-4000-8000-000000000001",
+                "SerialNumber": "AUTHFIXTURE01",
+                "MacAddress": "00:18:51:00:03:01",
+                "Platform": "WindowsDesktop",
+                "Model": "Latitude 5540",
+                "OperatingSystem": "10.0.19045.3803",
+                "HostName": "auth-desk-01",
+                "Ownership": "C",
+                "EnrollmentStatus": "Enrolled",
+                "LastSeen": "2026-08-09T00:00:00Z",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "00:18:51:00:03:01", "IPAddress": "10.140.3.1"}
+                ]
+              }
+            ]
+          }
+        },
+        {"status": 403, "json": {"errorCode": 401, "message": "aw-tenant-code header missing or the account holds no API role"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "min_requests": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=0"},
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=1"},
+      {"header_contains": "Basic"}
+    ],
+    "requests_absent": [
+      {"path": "/api/mdm/devices/search", "query_contains": "page=2"}
+    ],
+    "log_contains": [
+      "workspace-one-uem: failed to fetch devices on page 1",
+      "workspace-one-uem: check the API key and that the account holds a read-only API role"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

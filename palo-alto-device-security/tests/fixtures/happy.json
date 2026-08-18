@@ -1,0 +1,152 @@
+{
+  "name": "happy",
+  "integration": "palo-alto-device-security",
+  "description": "OAuth token exchange, one page of confirmed vulnerabilities, one page of devices. Covers a MAC-shaped deviceid, a static-IP-shaped deviceid, and a device that exists only in vulnerability data. no_mac_in_id is skipped because IoT Security documents deviceid AS the device MAC (or its IP for static-IP-only devices); that is exactly why the script sets no-id-match no-id-break, and the id is still emitted so the record has a stable key.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "tsg_id": "1234567890",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "lookback_days": "30"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/oauth2/access_token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "token_type": "Bearer", "expires_in": 899}}
+      ]
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/iot/pub/v1/vulnerability/list"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "items": [
+              {
+                "deviceid": "00:11:22:33:44:55",
+                "name": "clinic-pump-01",
+                "ip": "10.44.0.10",
+                "vendor": "Acme Medical",
+                "model": "PumpMaster 3000",
+                "os": "AcmeOS",
+                "zb_ticketid": "TICKET-1001",
+                "vulnerability_name": "CVE-2025-11001",
+                "risk_level": "Critical",
+                "risk_score": 92,
+                "ticketState": "Confirmed",
+                "detected_date": "2026-07-30T09:15:00Z",
+                "remediate_instruction": "Apply vendor firmware 4.2.1.",
+                "display_profile_category": "Infusion System",
+                "siteid": "site-north"
+              },
+              {
+                "deviceid": "00:11:22:33:44:55",
+                "name": "clinic-pump-01",
+                "ip": "10.44.0.10",
+                "zb_ticketid": "TICKET-1002",
+                "vulnerability_name": "Weak TLS configuration",
+                "risk_level": "Medium",
+                "detected_date": "2026-08-01T11:00:00Z"
+              },
+              {
+                "deviceid": "10.44.0.99",
+                "name": "lab-analyzer-07",
+                "ip": "10.44.0.99",
+                "vendor": "Beta Diagnostics",
+                "model": "Analyzer X",
+                "zb_ticketid": "TICKET-1003",
+                "vulnerability_name": "CVE-2025-11003",
+                "risk_level": "High",
+                "detected_date": "2026-08-05T08:00:00Z",
+                "display_profile_category": "Lab Analyzer"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"items": []}}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/iot/pub/v2/device/list"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "devices": [
+              {
+                "deviceid": "00:11:22:33:44:55",
+                "hostname": "clinic-pump-01",
+                "ip_address": "10.44.0.10",
+                "mac_address": "00:11:22:33:44:55",
+                "vendor": "Acme Medical",
+                "model": "PumpMaster 3000",
+                "osGroup": "AcmeOS",
+                "os_ver": "4.1.9",
+                "category": "Infusion System",
+                "profile": "Acme PumpMaster",
+                "profile_vertical": "Healthcare",
+                "site_name": "North Clinic",
+                "siteid": "site-north",
+                "risk_level": "Critical",
+                "risk_score": 92,
+                "vlan": "440",
+                "subnet": "10.44.0.0/24",
+                "Serial_Number": "PM3K-000123",
+                "first_seen_date": "2025-03-04T10:00:00Z",
+                "last_activity": "2026-08-14T22:10:00Z",
+                "allTags": [{"tagValue": "biomed"}, {"tagValue": "pci-out-of-scope"}],
+                "customAttributes": [{"Purdue Level": "Level 2"}, {"Asset Criticality": "High"}]
+              },
+              {
+                "deviceid": "10.44.7.5",
+                "hostname": "hvac-controller-2",
+                "ip_address": "10.44.7.5",
+                "vendor": "Gamma Controls",
+                "model": "HVAC-9",
+                "osGroup": "Embedded Linux",
+                "category": "Building Automation",
+                "profile": "Gamma HVAC-9",
+                "site_name": "North Clinic",
+                "risk_level": "Low",
+                "first_seen_date": "2025-11-20T07:30:00Z",
+                "last_activity": "2026-08-13T06:45:00Z"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"devices": []}}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "palo-alto-device-security:1234567890:00:11:22:33:44:55",
+      "palo-alto-device-security:1234567890:10.44.7.5",
+      "palo-alto-device-security:1234567890:10.44.0.99"
+    ],
+    "min_requests": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/oauth2/access_token", "body_contains": "tsg_id"},
+      {"method": "GET", "path": "/iot/pub/v1/vulnerability/list", "query_contains": "groupby=device"},
+      {"method": "GET", "path": "/iot/pub/v2/device/list", "query_contains": "pagelength=500"},
+      {"header_contains": "fixture-access-token"}
+    ],
+    "log_contains": [
+      "indexed 3 vulnerabilities across 2 devices",
+      "reported 1 devices seen only in vulnerability data"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

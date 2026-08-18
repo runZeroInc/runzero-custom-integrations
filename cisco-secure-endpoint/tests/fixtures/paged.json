@@ -1,0 +1,85 @@
+{
+  "name": "paged",
+  "integration": "cisco-secure-endpoint",
+  "description": "Two-page offset walk with page_size=2. Page 1 returns a full page so a second call must be issued carrying offset=2; page 2 is short, which is the documented stop condition, so no third call may be made. The active_only filter is on, proving a filtered-out row still counts toward the page-fullness test (it is the raw row count, not the kept count, that drives pagination) and that dropping it does not truncate the walk.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "client_id": "fixture-client-id",
+    "api_key": "fixture-api-key",
+    "page_size": "2",
+    "active_only": "true"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"results": {"total": 3, "items_per_page": 2, "index": 0}},
+            "data": [
+              {
+                "connector_guid": "bbbbbbbb-2222-4000-8000-000000000001",
+                "hostname": "page1-host-a",
+                "active": true,
+                "operating_system": "Windows 10",
+                "os_version": "10.0.19045.3803",
+                "last_seen": "2026-08-10T00:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:b2:00:01", "ip": "10.40.0.1"}]
+              },
+              {
+                "connector_guid": "bbbbbbbb-2222-4000-8000-000000000002",
+                "hostname": "page1-host-inactive",
+                "active": false,
+                "operating_system": "Windows 10",
+                "last_seen": "2026-06-01T00:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:b2:00:02", "ip": "10.40.0.2"}]
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"results": {"total": 3, "items_per_page": 2, "index": 2}},
+            "data": [
+              {
+                "connector_guid": "bbbbbbbb-2222-4000-8000-000000000003",
+                "hostname": "page2-host-c",
+                "active": true,
+                "operating_system": "Linux",
+                "os_version": "5.15.0",
+                "last_seen": "2026-08-12T00:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:b2:00:03", "ip": "10.40.0.3"}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cisco-secure-endpoint:127.0.0.1:bbbbbbbb-2222-4000-8000-000000000001",
+      "cisco-secure-endpoint:127.0.0.1:bbbbbbbb-2222-4000-8000-000000000003"
+    ],
+    "ids_absent": [
+      "cisco-secure-endpoint:127.0.0.1:bbbbbbbb-2222-4000-8000-000000000002"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/v1/computers", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/v1/computers", "query_contains": "offset=2"}
+    ],
+    "requests_absent": [
+      {"path": "/v1/computers", "query_contains": "offset=4"}
+    ],
+    "log_contains": ["cisco-secure-endpoint: reported 2 computers"]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "name": "bad-source",
+  "integration": "asimily",
+  "description": "Asserts the script refuses to start on a `source` value Asimily would reject. Its rule permits alphabetic characters only, and 'run-zero' breaks it with a hyphen -- one of the characters the vendor names as forbidden. Deliberately the mirror image of source-header.json: the routes here are NOT gated on the header and answer any request with real devices, so the fixture server would happily import two assets if the script sent the bad value. request_count 0 is therefore the whole point -- it proves the value is screened before the first call rather than discovered from a rejected response, which matters because a bad value fails every request in the run, not one. Removing the check in main() makes this scenario fail on all three of request_count, asset_count, and log_contains. check_determinism is off because a refused run produces no ids to compare.\n\nWHERE THE REFUSAL NOW COMES FROM. CONFIG declares a pattern on `source`, and the scanner enforces CONFIG param validation on the run path, not only under --validate. So the run is refused before main() executes and the script's own message never prints -- the assertion is the platform's 'params invalid: source: does not match required pattern'. The point of the scenario is unchanged and is still request_count 0: the value is screened before the first call rather than discovered from a rejected response. The equivalent check inside main() is kept as a defence for any path that reaches the script without CONFIG validation (legacy JSON credentials), which is why it is not removed.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "source": "run-zero",
+    "include_vulnerabilities": "true",
+    "page_size": "10"
+  },
+  "routes": [
+    {
+      "name": "device-cves",
+      "match": {
+        "method": "POST",
+        "path": "/api/extapi/assets/device-cves"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceId": 75001,
+                "cves": [
+                  {
+                    "cveName": "CVE-2025-75001",
+                    "productName": "PumpOS",
+                    "score": 7.7,
+                    "cvssBaseScore": 8.2,
+                    "isFixed": 56
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/api/extapi/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceID": 75001,
+                "hostName": "pump-ward9-01",
+                "macAddr": "00:1B:44:75:00:01",
+                "v4IpAddrs": [
+                  "10.75.1.1"
+                ],
+                "deviceType": "Infusion Pump",
+                "manufacturer": "Acme Medical",
+                "lastDiscoveredAt": "2026-08-14T09:00:00Z"
+              },
+              {
+                "deviceID": 75002,
+                "hostName": "monitor-ward9-02",
+                "macAddr": "00:1B:44:75:00:02",
+                "v4IpAddrs": [
+                  "10.75.1.2"
+                ],
+                "deviceType": "Patient Monitor",
+                "manufacturer": "Beta Diagnostics",
+                "lastDiscoveredAt": "2026-08-14T09:05:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 0,
+    "log_contains": [
+      "params invalid: source: does not match required pattern"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

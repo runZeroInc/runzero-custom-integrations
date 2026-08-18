@@ -1,0 +1,86 @@
+{
+  "name": "system-tree",
+  "integration": "trellix-epo",
+  "description": "system-tree collection mode walks every group returned by system.findGroups with one epogroup.findSystems call each, in sorted group order. Group 5 answers with an ePO error envelope ('Error 1234:' in place of 'OK:'), which must be reported and skipped without abandoning the rest of the tree - group 2's systems still arrive.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collection_mode": "system-tree"
+  },
+  "routes": [
+    {
+      "name": "find-groups",
+      "match": {
+        "method": "GET",
+        "path": "/remote/system.findGroups"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "OK:\r\n[\n  {\n    \"groupId\": 2,\n    \"groupPath\": \"My Organization\"\n  },\n  {\n    \"groupId\": 5,\n    \"groupPath\": \"My Organization\\\\Servers\"\n  }\n]"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "group-2-systems",
+      "match": {
+        "method": "GET",
+        "path": "/remote/epogroup.findSystems",
+        "query_contains": "groupId=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "OK:\r\n[\n  {\n    \"EPOComputerProperties.ParentID\": 1001,\n    \"EPOComputerProperties.ComputerName\": \"WS-0001\",\n    \"EPOComputerProperties.IPHostName\": \"ws-0001.corp.example.com\",\n    \"EPOComputerProperties.DomainName\": \"CORP\",\n    \"EPOComputerProperties.OSType\": \"Windows 10\",\n    \"EPOComputerProperties.OSVersion\": \"10.0\",\n    \"EPOComputerProperties.OSBuildNum\": 19045,\n    \"EPOComputerProperties.OSServicePackVer\": \"N/A\",\n    \"EPOComputerProperties.OSPlatform\": \"Workstation\",\n    \"EPOComputerProperties.NetAddress\": \"001122334455\",\n    \"EPOComputerProperties.IPV4x\": -1978393048,\n    \"EPOComputerProperties.IPAddress\": \"N/A\",\n    \"EPOComputerProperties.IPV6\": \"(none)\",\n    \"EPOComputerProperties.SubnetAddress\": \"10.20.30.0\",\n    \"EPOComputerProperties.SubnetMask\": \"255.255.255.0\",\n    \"EPOComputerProperties.CPUType\": \"Intel(R) Core(TM) i7-1185G7\",\n    \"EPOComputerProperties.CPUSpeed\": 2800,\n    \"EPOComputerProperties.NumOfCPU\": 4,\n    \"EPOComputerProperties.TotalPhysicalMemory\": 17179869184,\n    \"EPOComputerProperties.UserName\": \"CORP\\\\jdoe\",\n    \"EPOComputerProperties.Description\": \"<null>\",\n    \"EPOLeafNode.ManagedState\": 1,\n    \"EPOLeafNode.AgentGUID\": \"AAAAAAAA-0000-0000-0000-000000001001\",\n    \"EPOLeafNode.AgentVersion\": \"5.7.9.123\",\n    \"EPOLeafNode.Tags\": \"Workstation, Managed Laptops\",\n    \"EPOLeafNode.LastUpdate\": \"2026-08-01T10:00:00Z\",\n    \"EPOBranchNode.AutoID\": 2\n  },\n  {\n    \"EPOComputerProperties.ParentID\": 1003,\n    \"EPOComputerProperties.ComputerName\": \"UNMANAGED-01\",\n    \"EPOComputerProperties.IPHostName\": \"N/A\",\n    \"EPOComputerProperties.IPV4x\": 0,\n    \"EPOComputerProperties.IPAddress\": \"N/A\",\n    \"EPOComputerProperties.NetAddress\": \"(none)\",\n    \"EPOComputerProperties.OSPlatform\": \"N/A\",\n    \"EPOLeafNode.ManagedState\": 0,\n    \"EPOLeafNode.AgentGUID\": \"<null>\",\n    \"EPOBranchNode.AutoID\": 2\n  }\n]"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "group-5-systems",
+      "match": {
+        "method": "GET",
+        "path": "/remote/epogroup.findSystems",
+        "query_contains": "groupId=5"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "Error 1234:\r\nthe requested group is not accessible"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "trellix-epo:127.0.0.1:1001",
+      "trellix-epo:127.0.0.1:1003"
+    ],
+    "ids_absent": [
+      "trellix-epo:127.0.0.1:1002"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/remote/epogroup.findSystems",
+        "query_contains": "groupId=2"
+      },
+      {
+        "method": "GET",
+        "path": "/remote/epogroup.findSystems",
+        "query_contains": "groupId=5"
+      }
+    ],
+    "log_contains": [
+      "trellix-epo: failed to fetch systems in group 5: Error 1234: the requested group is not accessible"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

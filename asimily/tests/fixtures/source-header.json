@@ -1,0 +1,122 @@
+{
+  "name": "source-header",
+  "integration": "asimily",
+  "description": "Covers Asimily's mandatory `source` header, which the API has rejected requests without since its enforcement date of 1 May 2026. Every route is gated on the header, so a script that stops sending it gets the 400 in default_response instead of data and the asset assertions fail. The configured value here is a customer-assigned identifier rather than the built-in default, which is what proves the header carries the `source` parameter through instead of a hardcoded constant. All three endpoints are exercised -- assets, device-cves, and the per-MAC applications call -- because the header is required on every REST call, and the applications fetch is the one issued from a different code path (fetch_software) than the two paged walks. check_determinism is off for the same reason as the other scenarios: the asset id is scoped by the portal host, which under the fixture server is an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "source": "acmehealth",
+    "include_vulnerabilities": "true",
+    "include_software": "true",
+    "software_device_limit": "5",
+    "page_size": "10"
+  },
+  "default_response": {"status": 400, "json": {"error": "missing or malformed source header"}},
+  "routes": [
+    {
+      "name": "device-cves",
+      "match": {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "acmehealth"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceId": 74001,
+                "cves": [
+                  {
+                    "cveName": "CVE-2025-74001",
+                    "productName": "VentOS",
+                    "description": "A synthetic finding used only by the fixture suite.",
+                    "score": 8.1,
+                    "cvssBaseScore": 8.8,
+                    "isFixed": 56,
+                    "exploitableInWild": true
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "applications",
+      "match": {"method": "GET", "path": "/api/extapi/assets/application", "header": {"source": "acmehealth"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "applications": [
+                {"application": "VentOS Runtime", "version": "2.4.0"},
+                {"application": "OpenSSL", "version": "3.0.14"}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "acmehealth"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceID": 74001,
+                "hostName": "vent-icu-07",
+                "macAddr": "00:1B:44:74:00:01",
+                "v4IpAddrs": ["10.74.1.7"],
+                "deviceType": "Ventilator",
+                "deviceClass": "Medical",
+                "manufacturer": "Acme Medical",
+                "deviceModel": "BreatheEasy 5",
+                "os": "VentOS",
+                "osVersion": "2.4.0",
+                "facility": "Acme Health",
+                "lastDiscoveredAt": "2026-08-14T11:00:00Z"
+              },
+              {
+                "deviceID": 74002,
+                "hostName": "analyzer-lab-02",
+                "macAddr": "00:1B:44:74:00:02",
+                "v4IpAddrs": ["10.74.2.2"],
+                "deviceType": "Lab Analyzer",
+                "deviceClass": "Medical",
+                "manufacturer": "Beta Diagnostics",
+                "lastDiscoveredAt": "2026-08-14T12:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "min_vulnerabilities_total": 1,
+    "min_software_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "acmehealth"}},
+      {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "acmehealth"}},
+      {"method": "GET", "path": "/api/extapi/assets/application", "header": {"source": "acmehealth"}}
+    ],
+    "requests_absent": [
+      {"header": {"source": "runzero"}}
+    ],
+    "log_contains": ["asimily: fetched software for 2 devices"]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

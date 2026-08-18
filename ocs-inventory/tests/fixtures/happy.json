@@ -1,0 +1,118 @@
+{
+  "name": "happy",
+  "integration": "ocs-inventory",
+  "description": "One page of the /computers collection with the inventory sections OCS returns inline. Proves the id-keyed object (not a list) is walked correctly, that a computer group row is recognised by its reserved DEVICEID and never becomes an asset, that the SMBIOS chassis type maps to a device type both as a number (10 = notebook) and through the virtual-machine fallback when the chassis says Other, that the DEVICEID's trailing timestamp recovers a first-seen time, and that WORKGROUP is not imported as a domain while a real workgroup name is. The networks section carries the four adapter shapes that matter: a real one, a VMware virtual adapter whose MAC belongs to the hypervisor stack and must not be imported, a loopback flagged VIRTUALDEV, and a down adapter that keeps its MAC (stable hardware) but loses its address (no longer bound to anything). The third computer has no networks section at all, so its interface comes from the joined hardware.IPADDR list, with the 127.0.0.1 in that list dropped.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-pass",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/ocsapi/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "101": {
+              "hardware": {
+                "ID": "101",
+                "DEVICEID": "wks-042-2026-01-15-08-30-00",
+                "NAME": "wks-042",
+                "WORKGROUP": "WORKGROUP",
+                "OSNAME": "Microsoft Windows 11 Pro",
+                "OSVERSION": "10.0.22631",
+                "ARCH": "x86_64",
+                "IPADDR": "10.60.0.11/192.168.56.1",
+                "IPSRC": "198.51.100.9",
+                "USERID": "jane",
+                "MEMORY": "16384",
+                "PROCESSORT": "12th Gen Intel(R) Core(TM) i7-1265U",
+                "PROCESSORN": "1",
+                "LASTCOME": "2026-08-14 22:10:00",
+                "LASTDATE": "2026-08-14 06:00:00",
+                "USERAGENT": "OCS-NG_WINDOWS_AGENT_v2.10.1.0"
+              },
+              "bios": [{"SSN": "5CD1234ABC", "SMANUFACTURER": "HP", "SMODEL": "EliteBook 840 G8", "TYPE": "10", "ASSETTAG": "To Be Filled By O.E.M.", "BVERSION": "T76 Ver. 01.12.00"}],
+              "networks": [
+                {"DESCRIPTION": "Intel(R) Ethernet Connection I219-LM", "TYPE": "Ethernet", "MACADDR": "00:11:22:44:55:01", "IPADDRESS": "10.60.0.11", "IPMASK": "255.255.255.0", "IPGATEWAY": "10.60.0.1", "STATUS": "Up", "SPEED": "1000", "VIRTUALDEV": "0"},
+                {"DESCRIPTION": "VMware Virtual Ethernet Adapter for VMnet8", "TYPE": "Ethernet", "MACADDR": "00:50:56:c0:00:08", "IPADDRESS": "192.168.56.1", "STATUS": "Up", "VIRTUALDEV": "0"},
+                {"DESCRIPTION": "Loopback Pseudo-Interface 1", "MACADDR": "00:00:00:00:00:00", "IPADDRESS": "127.0.0.1", "STATUS": "Up", "VIRTUALDEV": "1"},
+                {"DESCRIPTION": "Intel(R) Wi-Fi 6 AX201", "TYPE": "Wireless", "MACADDR": "00:11:22:44:55:02", "IPADDRESS": "10.60.9.9", "STATUS": "Down", "VIRTUALDEV": "0"}
+              ],
+              "cpus": [{"TYPE": "Intel(R) Core(TM) i7-1265U", "MANUFACTURER": "Intel", "CORES": "10", "SPEED": "2700"}],
+              "memories": [{"CAPACITY": "8192", "TYPE": "DDR4"}, {"CAPACITY": "8192", "TYPE": "DDR4"}],
+              "storages": [{"MODEL": "SAMSUNG MZVL2512", "DISKSIZE": "488386", "SERIALNUMBER": "S64ANE0R123456"}],
+              "drives": [{"FILESYSTEM": "NTFS", "TOTAL": "488386", "FREE": "201455"}],
+              "accountinfo": [{"TAG": "finance"}]
+            },
+            "102": {
+              "hardware": {
+                "ID": "102",
+                "DEVICEID": "srv-app02-2025-11-02-14-05-09",
+                "NAME": "srv-app02",
+                "WORKGROUP": "corp.example.com",
+                "OSNAME": "Debian GNU/Linux 12 (bookworm)",
+                "OSVERSION": "6.1.0-18-amd64",
+                "ARCH": "x86_64",
+                "IPADDR": "10.60.1.12",
+                "LASTCOME": "2026-08-15 03:00:00",
+                "USERAGENT": "OCS-NG_unified_unix_agent_v2.10.0"
+              },
+              "bios": [{"SSN": "VMware-42 0a bc de", "SMANUFACTURER": "VMware, Inc.", "SMODEL": "VMware Virtual Platform", "TYPE": "Other"}],
+              "networks": [
+                {"DESCRIPTION": "ens192", "TYPE": "Ethernet", "MACADDR": "00:50:56:aa:12:34", "IPADDRESS": "10.60.1.12", "STATUS": "Up", "VIRTUALDEV": "0"},
+                {"DESCRIPTION": "lo", "MACADDR": "00:00:00:00:00:00", "IPADDRESS": "127.0.0.1", "STATUS": "Up", "VIRTUALDEV": "1"},
+                {"DESCRIPTION": "docker0", "MACADDR": "02:42:9f:11:22:33", "IPADDRESS": "172.17.0.1", "STATUS": "Up", "VIRTUALDEV": "1"}
+              ],
+              "cpus": [{"TYPE": "Intel(R) Xeon(R) Gold 6338", "CORES": "4"}],
+              "virtualmachines": []
+            },
+            "103": {
+              "hardware": {
+                "ID": "103",
+                "DEVICEID": "prn-hr-2024-05-06-07-08-09",
+                "NAME": "prn-hr",
+                "OSNAME": "Linux",
+                "IPADDR": "10.60.2.13/127.0.0.1",
+                "LASTCOME": "2026-08-13 10:00:00"
+              },
+              "bios": [{"SSN": "0", "SMANUFACTURER": "Unknown", "SMODEL": "Default string", "TYPE": "3"}]
+            },
+            "104": {
+              "hardware": {
+                "ID": "104",
+                "DEVICEID": "_SYSTEMGROUP_",
+                "NAME": "All Windows workstations",
+                "IPADDR": ""
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "ocs-inventory:127.0.0.1:101",
+      "ocs-inventory:127.0.0.1:102",
+      "ocs-inventory:127.0.0.1:103"
+    ],
+    "ids_absent": ["ocs-inventory:127.0.0.1:104"],
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/ocsapi/v1/computers", "query_contains": "start=0"},
+      {"method": "GET", "path": "/ocsapi/v1/computers", "query_contains": "limit=50"},
+      {"header_contains": "Basic "}
+    ],
+    "requests_absent": [
+      {"path_contains": "/software"}
+    ],
+    "log_contains": ["ocs-inventory: reported 3 computers"]
+  },
+  "invariants": {"skip": []}
+}

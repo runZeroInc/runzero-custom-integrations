@@ -5,8 +5,9 @@ CONFIG = {
     "name": "Akamai Guardicore Centra (v3)",
     "type": "inbound",
     "description": "Imports assets from Akamai Guardicore Centra using the v3 API.",
-    "version": "26061000",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "url",
@@ -30,6 +31,15 @@ CONFIG = {
             "required": True,
             "description": "Centra API password.",
         },
+        {
+            "key": "max_pages",
+            "label": "Maximum pages to retrieve",
+            "type": "int",
+            "required": False,
+            "default": 10000,
+            "min": 1,
+            "description": "Safety ceiling on the paging walk. Raise it if a run reports hitting the limit.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -39,9 +49,56 @@ CONFIG = {
 
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('http', 'get_json', 'post_json', 'bearer')
-load('kwargs', 'get_url_base', 'get_http_options')
+load('kwargs', 'get_int', 'get_url_base', 'get_http_options')
 load('net', 'network_interface')
 load('time', 'parse_time')
+
+RESULTS_PER_PAGE = 1000
+
+# A BACKSTOP, not the primary guard. The walk's real runaway protection is the
+# repeated-page check in the loop below, which notices a Centra that ignores
+# start_at after two requests. A page ceiling is a poor first line of defence:
+# it lets a stuck appliance be hammered for the whole ceiling before anything
+# stops it.
+#
+# The number is derived from a record target rather than hand-picked, so it
+# scales with the page size instead of encoding a guess about deployment size:
+# 10,000 pages x 1,000 results per page = 10,000,000 assets per status, past any
+# real Centra deployment. With the repeated-page check in front of it this
+# should never be reached; reaching it anyway is logged, because a truncated
+# import that says nothing looks exactly like a complete one.
+MAX_PAGES = 10000
+
+
+def retrieved_of(retrieved, total):
+    """The retrieved/available half of a truncation message.
+
+    A truncated run has to say how much of the estate it actually got: a bare
+    count tells the reader nothing about whether the import is nearly complete
+    or stopped at the first percent. Where the API reports no total, say so
+    plainly rather than printing a bare slash or inventing a denominator.
+    """
+    if type(total) == 'int' and total > 0:
+        return 'retrieved {}/{} available assets'.format(retrieved, total)
+    return 'retrieved {} assets, total not reported'.format(retrieved)
+
+
+def page_signature(rows):
+    """A cheap fingerprint of one page: its length and the ids at either end.
+
+    Two consecutive pages sharing a fingerprint means the appliance re-served
+    one page rather than advancing through the inventory. Comparing ends rather
+    than every row keeps this O(1) per page, and it is enough for the failure it
+    guards against -- a Centra that ignores start_at returns byte-identical
+    responses, not a rearrangement of one.
+    """
+    if not rows:
+        return 'empty'
+    first = rows[0]
+    last = rows[-1]
+    first_id = first.get('id', '') if type(first) == 'dict' else ''
+    last_id = last.get('id', '') if type(last) == 'dict' else ''
+    return '{}|{}|{}'.format(len(rows), first_id, last_id)
 
 
 def build_assets(assets):
@@ -66,7 +123,9 @@ def build_assets(assets):
         for network in networks:
             ips = [address.get('address', '') for address in network.get('ip_addresses', [])]
             interface = network_interface(ips=ips, mac=network.get('hardware_address', None))
-            interfaces.append(interface)
+            # See the v4 script: a None interface here aborts the whole run.
+            if interface:
+                interfaces.append(interface)
 
         # Retrieve and map custom attributes
         active = asset.get('active', '')
@@ -154,7 +213,10 @@ def stream_assets(base_url, token, config_kwargs):
     via report_assets so the full asset set is never held in memory. Returns the
     number of assets reported."""
     reported = 0
-    results_per_page = 1000
+    results_per_page = RESULTS_PER_PAGE
+    # The ceiling is a parameter so an operator whose estate outgrows the
+    # record target can move it without editing the script.
+    max_pages = get_int(config_kwargs, 'max_pages', default=MAX_PAGES)
 
     # The 'on' and 'off' status queries historically target different API
     # versions; preserve those endpoints exactly.
@@ -164,7 +226,13 @@ def stream_assets(base_url, token, config_kwargs):
         # Remove the 'off' entry above to restrict import to only status 'on'
         # assets.
         start = 0
-        while True:
+        capped = True
+        last_signature = ''
+        # Centra reports the size of the whole result set alongside every page.
+        # It is captured so a truncated run can say what fraction of the estate
+        # it got, rather than a bare count the reader cannot judge.
+        total_count = None
+        for _page in range(0, max_pages):
             headers = {'Accept': 'application/json',
                         'Authorization': bearer(token)}
             http_options = get_http_options(config_kwargs, headers=headers)
@@ -174,13 +242,45 @@ def stream_assets(base_url, token, config_kwargs):
             data, err = get_json(url, params=params, **http_options)
             if err:
                 print('failed to retrieve "' + status + '" assets ' + str(start) + ' to ' + str(start + results_per_page) + ': ' + err)
+                capped = False
                 break
-            assets = (data or {}).get('objects', [])
+            envelope = data or {}
+            reported_total = envelope.get('total_count')
+            if type(reported_total) == 'int' and reported_total >= 0:
+                total_count = reported_total
+
+            assets = envelope.get('objects', [])
+
+            # THE PRIMARY RUNAWAY GUARD. A page identical to the one before it
+            # means Centra is ignoring start_at and re-serving the same rows, so
+            # the walk is not advancing and continuing can only re-report assets
+            # already reported. Checked BEFORE the page is reported, so the
+            # repeated rows never reach runZero, and it can never truncate
+            # genuine data: it only fires on a page that adds nothing. It
+            # catches the stuck appliance in two requests where the page ceiling
+            # would take 10,000.
+            signature = page_signature(assets)
+            if assets and signature == last_signature:
+                capped = False
+                # No quotes around the status: the runtime escapes them in the
+                # log line, which makes the message awkward to assert and grep.
+                print('centra-v3: paging stopped after {} pages (API returned the same page twice walking status={}, {})'.format(
+                    _page + 1, status, retrieved_of(reported, total_count)))
+                break
+            last_signature = signature
+
             reported += report_assets(build_assets(assets))
             last_return = len(assets)
             start += last_return
             if last_return < results_per_page:
+                capped = False
                 break
+
+        if capped:
+            # No quotes around the status: the runtime escapes them in the log
+            # line, which makes the message awkward to assert on and to grep.
+            print('centra-v3: page limit of {} hit (integration safety limit, walking status={}, {}) - raise the max_pages parameter to import the rest'.format(
+                max_pages, status, retrieved_of(reported, total_count)))
 
     return reported
 

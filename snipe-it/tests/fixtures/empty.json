@@ -1,0 +1,24 @@
+{
+  "name": "empty",
+  "integration": "snipe-it",
+  "description": "An instance with no hardware records. /api/v1/hardware answers 200 with total 0 and an empty rows array, which must produce zero assets, one request and the 'no assets' notice rather than an error.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-snipe-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v1/hardware"},
+      "responses": [{"status": 200, "json": {"total": 0, "rows": []}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["no assets"]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

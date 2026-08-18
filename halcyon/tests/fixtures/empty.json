@@ -1,0 +1,63 @@
+{
+  "name": "empty",
+  "integration": "halcyon",
+  "description": "A tenant with no registered endpoints. The search returns an empty items list and the run must stop after one page, report zero assets and log cleanly rather than looping the `range(1000000000000)` walk or failing the task. Also proves no detail call is attempted when there is nothing to enrich.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/identity/auth/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "accessToken": "fixture-access-token"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "search-empty",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [],
+            "pagination": {
+              "currentPage": 1,
+              "totalPages": 1
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_absent": [
+      {
+        "method": "GET"
+      }
+    ],
+    "log_contains": [
+      "no assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

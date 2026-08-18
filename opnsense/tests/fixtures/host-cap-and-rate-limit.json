@@ -1,0 +1,79 @@
+{
+  "name": "host-cap-and-rate-limit",
+  "integration": "opnsense",
+  "description": "Two things at once, because they exercise different layers. (1) max_hosts=2 against a four-entry ARP table: exactly two hosts are imported and the run says how many it dropped, so a large firewall cannot silently truncate. (2) The ARP endpoint answers 429 once before succeeding: get_json retries transient statuses three times by default and honours Retry-After, so the run must recover without the script hand-rolling any backoff. The 429 is served first, which also proves the retry happens on the first call rather than being masked by a later one. no_mac_in_id is skipped for the reason recorded in happy.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "api_secret": "fixture-secret",
+    "collect_ndp": "false",
+    "collect_leases": "false",
+    "max_hosts": "2"
+  },
+  "routes": [
+    {
+      "name": "system-information",
+      "match": {"method": "GET", "path": "/api/diagnostics/system/systemInformation"},
+      "responses": [
+        {"status": 200, "json": {"name": "fw04.example.com", "versions": ["OPNsense 25.7.1-amd64"], "updates": ""}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interface-config",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getInterfaceConfig"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "igb0": {"device": "igb0", "macaddr": "00:0d:b9:41:2a:40", "ipv4": [{"ipaddr": "198.51.100.40", "subnetbits": 24}], "ipv6": []}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getArp"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"status": "error", "message": "too many requests"}},
+        {
+          "status": 200,
+          "json": [
+            {"mac": "aa:bb:cc:00:33:01", "ip": "192.0.2.101", "intf": "igb1", "permanent": false, "expired": false, "hostname": "host-a.example.com", "intf_description": "LAN"},
+            {"mac": "aa:bb:cc:00:33:02", "ip": "192.0.2.102", "intf": "igb1", "permanent": false, "expired": false, "hostname": "host-b.example.com", "intf_description": "LAN"},
+            {"mac": "aa:bb:cc:00:33:03", "ip": "192.0.2.103", "intf": "igb1", "permanent": false, "expired": false, "hostname": "host-c.example.com", "intf_description": "LAN"},
+            {"mac": "aa:bb:cc:00:33:04", "ip": "192.0.2.104", "intf": "igb1", "permanent": false, "expired": false, "hostname": "host-d.example.com", "intf_description": "LAN"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "opnsense:$HOST:appliance",
+      "opnsense:$HOST:host:aa:bb:cc:00:33:01",
+      "opnsense:$HOST:host:aa:bb:cc:00:33:02"
+    ],
+    "ids_absent": [
+      "opnsense:$HOST:host:aa:bb:cc:00:33:03",
+      "opnsense:$HOST:host:aa:bb:cc:00:33:04"
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/diagnostics/interface/getNdp"},
+      {"path_contains": "/api/kea/leases4/search"}
+    ],
+    "log_contains": [
+      "ARP entries read: 4",
+      "reported 1 firewall and 2 discovered hosts",
+      "host limit of 2 reached; 2 further hosts were not imported"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

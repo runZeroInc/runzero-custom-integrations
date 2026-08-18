@@ -1,0 +1,204 @@
+{
+  "name": "paged",
+  "integration": "itop",
+  "description": "Two full pages of Servers followed by the null objects map iTop answers a query that matched nothing with. Proves the second request asks for page 2 and that paging stops on the short page rather than on an empty one.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "page_size": "2",
+    "include_interfaces": "false",
+    "classes": "Server"
+  },
+  "routes": [
+    {
+      "name": "servers-p1",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22page%22%3A1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::11": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 11,
+                "fields": {
+                  "id": "11",
+                  "name": "srv-db-01.example.com",
+                  "description": "Primary database node",
+                  "organization_name": "Demo",
+                  "business_criticity": "high",
+                  "move2production": "2024-03-11",
+                  "serialnumber": "SN-11-ABC",
+                  "location_name": "Paris DC",
+                  "status": "production",
+                  "brand_name": "Dell",
+                  "model_name": "PowerEdge R750",
+                  "asset_number": "AST-0011",
+                  "purchase_date": "2024-01-05",
+                  "end_of_warranty": "2027-01-05",
+                  "managementip": "10.10.0.11",
+                  "rack_name": "R14",
+                  "enclosure_name": "",
+                  "nb_u": "2",
+                  "osfamily_name": "Linux",
+                  "osversion_name": "RHEL 9",
+                  "oslicence_name": "",
+                  "cpu": "2 x Xeon Gold 6338",
+                  "ram": "256"
+                }
+              },
+              "Server::12": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 12,
+                "fields": {
+                  "id": "12",
+                  "name": "Unnamed rack unit",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "low",
+                  "move2production": "",
+                  "serialnumber": "",
+                  "location_name": "",
+                  "status": "stock",
+                  "brand_name": "",
+                  "model_name": "",
+                  "asset_number": "",
+                  "purchase_date": "",
+                  "end_of_warranty": "",
+                  "managementip": "",
+                  "rack_name": "",
+                  "enclosure_name": "",
+                  "nb_u": "0",
+                  "osfamily_name": "",
+                  "osversion_name": "",
+                  "oslicence_name": "",
+                  "cpu": "",
+                  "ram": ""
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 2"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "servers-p2",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22page%22%3A2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::13": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 13,
+                "fields": {
+                  "id": "13",
+                  "name": "srv-web-03.example.com",
+                  "status": "production",
+                  "managementip": "10.10.0.13",
+                  "serialnumber": "SN-13",
+                  "osfamily_name": "Linux",
+                  "brand_name": "Supermicro",
+                  "model_name": "SYS-1029P"
+                }
+              },
+              "Server::14": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 14,
+                "fields": {
+                  "id": "14",
+                  "name": "srv-web-04.example.com",
+                  "status": "production",
+                  "managementip": "10.10.0.14",
+                  "serialnumber": "SN-14",
+                  "osfamily_name": "Linux",
+                  "brand_name": "Supermicro",
+                  "model_name": "SYS-1029P"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 2"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "servers-p3",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22page%22%3A3"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "itop:$HOST:Server:11",
+      "itop:$HOST:Server:13",
+      "itop:$HOST:Server:14"
+    ],
+    "requests_include": [
+      {
+        "body_contains": "%22page%22%3A2"
+      },
+      {
+        "body_contains": "%22page%22%3A3"
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "PhysicalInterface"
+      }
+    ],
+    "log_contains": [
+      "itop: reported 3 assets from Server"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

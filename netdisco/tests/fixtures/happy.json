@@ -1,0 +1,422 @@
+{
+  "name": "happy",
+  "integration": "netdisco",
+  "description": "The full shape of a Netdisco collection: token login, one page of devices, per-device IP aliases, per-device located nodes, and the IP Inventory report joining node MACs to addresses. Row shapes come from the DBIC result classes that define the tables the API serialises - lib/App/Netdisco/DB/Result/Device.pm, DeviceIp.pm, Node.pm - and from the IpInventory report's own select list (ip, mac, dns, time_last, time_first, active, node, age, vendor, nbname). Proves: the api_key from POST /login is carried as a PLAIN Authorization header rather than a Bearer token; a device merges its management IP with its device_ip aliases; a node seen by two switches produces ONE asset whose primary location is the more recent sighting; the IP Inventory report attaches an address and a DNS name to a node that had only a MAC; and Netdisco's zone-less local timestamps are parsed without aborting. The age filter is disabled here (max_age_days=0) so this scenario cannot rot: an assertion that a node is 'too old' would depend on how long ago the fixture was written. The age filter has its own scenario, node-age. no_mac_in_id is skipped for every netdisco scenario: a located node has no identifier but its MAC, and the id is deliberately paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "ip_inventory_subnets": "192.0.2.0/24",
+    "page_size": "200",
+    "max_age_days": "0"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api_key": "9d8ff4b68dbedb804c90e9b375eea48a"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-search",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/search/device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "ip": "198.51.100.11",
+              "dns": "core-sw01.example.com",
+              "name": "core-sw01",
+              "description": "Cisco IOS Software, C3750E Software (C3750E-UNIVERSALK9-M), Version 15.2(4)E10",
+              "location": "Building A / MDF",
+              "contact": "netops@example.com",
+              "model": "WS-C3750X-48P",
+              "os": "ios",
+              "os_ver": "15.2(4)E10",
+              "vendor": "cisco",
+              "serial": "FDO1234ABCD",
+              "chassis_id": "0011.2233.4455",
+              "layers": "00000110",
+              "uptime": 1043200000,
+              "mac": "00:11:22:33:44:55",
+              "num_ports": 52,
+              "snmp_ver": 2,
+              "snmp_class": "SNMP::Info::Layer3::C3550",
+              "is_pseudo": false,
+              "creation": "2023-04-11 09:12:44",
+              "last_discover": "2026-08-15 03:00:11",
+              "last_macsuck": "2026-08-15 03:05:02",
+              "last_arpnip": "2026-08-15 03:07:19",
+              "module_serials": [
+                "FDO1234ABCD",
+                "0011.2233.4455"
+              ],
+              "first_seen_stamp": "2023-04-11 09:12",
+              "last_discover_stamp": "2026-08-15 03:00"
+            },
+            {
+              "ip": "198.51.100.12",
+              "dns": "edge-rtr01.example.com",
+              "name": "edge-rtr01",
+              "description": "Juniper Networks, Inc. mx204 internet router, kernel JUNOS 21.4R3-S4.9",
+              "location": "Building A / Comms",
+              "contact": "netops@example.com",
+              "model": "mx204",
+              "os": "junos",
+              "os_ver": "21.4R3-S4.9",
+              "vendor": "juniper",
+              "serial": "JN123456AB",
+              "chassis_id": "",
+              "layers": "00010100",
+              "uptime": 55123400,
+              "mac": "3c:61:04:aa:bb:01",
+              "num_ports": 16,
+              "snmp_ver": 3,
+              "snmp_class": "SNMP::Info::Layer3::Juniper",
+              "is_pseudo": false,
+              "creation": "2024-01-30 17:44:02",
+              "last_discover": "2026-08-15 03:01:55",
+              "last_macsuck": null,
+              "last_arpnip": "2026-08-15 03:09:41",
+              "module_serials": [
+                "JN123456AB"
+              ],
+              "first_seen_stamp": "2024-01-30 17:44",
+              "last_discover_stamp": "2026-08-15 03:01"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-ips-core",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/object/device/198.51.100.11/device_ips"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "ip": "198.51.100.11",
+              "alias": "198.51.100.11",
+              "subnet": "198.51.100.0/24",
+              "port": "Vlan10",
+              "dns": "core-sw01.example.com",
+              "creation": "2023-04-11 09:12:44"
+            },
+            {
+              "ip": "198.51.100.11",
+              "alias": "192.0.2.2",
+              "subnet": "192.0.2.0/24",
+              "port": "Vlan20",
+              "dns": "core-sw01-v20.example.com",
+              "creation": "2023-04-11 09:12:44"
+            },
+            {
+              "ip": "198.51.100.11",
+              "alias": "127.0.0.1",
+              "subnet": "127.0.0.0/8",
+              "port": "Loopback0",
+              "dns": null,
+              "creation": "2023-04-11 09:12:44"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-ips-edge",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/object/device/198.51.100.12/device_ips"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "nodes-core",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/object/device/198.51.100.11/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "mac": "00:50:56:9a:1b:2c",
+              "switch": "198.51.100.11",
+              "port": "GigabitEthernet1/0/12",
+              "active": true,
+              "time_first": "2025-11-02 08:14:01",
+              "time_recent": "2026-08-15 02:59:00",
+              "time_last": "2026-08-15 02:59:00",
+              "vlan": "20"
+            },
+            {
+              "mac": "3c:22:fb:aa:bb:cc",
+              "switch": "198.51.100.11",
+              "port": "GigabitEthernet1/0/24",
+              "active": true,
+              "time_first": "2026-06-01 11:02:33",
+              "time_recent": "2026-08-15 02:59:00",
+              "time_last": "2026-08-15 02:59:00",
+              "vlan": "20"
+            },
+            {
+              "mac": "b8:27:eb:44:55:66",
+              "switch": "198.51.100.11",
+              "port": "GigabitEthernet1/0/48",
+              "active": true,
+              "time_first": "2024-02-14 15:00:00",
+              "time_recent": "2026-08-15 02:59:00",
+              "time_last": "2026-08-15 02:59:00",
+              "vlan": "30"
+            },
+            {
+              "mac": "aa:bb:cc:dd:ee:99",
+              "switch": "198.51.100.11",
+              "port": "GigabitEthernet1/0/9",
+              "active": false,
+              "time_first": "2024-03-01 09:00:00",
+              "time_recent": "2025-01-04 22:15:00",
+              "time_last": "2025-01-04 22:15:00",
+              "vlan": "20"
+            },
+            {
+              "mac": "ff:ff:ff:ff:ff:ff",
+              "switch": "198.51.100.11",
+              "port": "GigabitEthernet1/0/1",
+              "active": true,
+              "time_first": "2026-08-01 00:00:00",
+              "time_recent": "2026-08-15 02:59:00",
+              "time_last": "2026-08-15 02:59:00",
+              "vlan": "1"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "nodes-edge",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/object/device/198.51.100.12/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "mac": "00:50:56:9a:1b:2c",
+              "switch": "198.51.100.12",
+              "port": "xe-0/0/3",
+              "active": true,
+              "time_first": "2026-08-14 22:00:00",
+              "time_recent": "2026-08-15 03:01:00",
+              "time_last": "2026-08-15 03:01:00",
+              "vlan": "20"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-inventory",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/report/ip/ipinventory"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "ip": "192.0.2.31",
+              "mac": "00:50:56:9a:1b:2c",
+              "dns": "app01.example.com",
+              "time_last": "2026-08-15 03:00:00",
+              "time_first": "2025-11-02 08:14:01",
+              "active": true,
+              "node": true,
+              "age": "00:05:00",
+              "vendor": "VMware, Inc.",
+              "nbname": "APP01"
+            },
+            {
+              "ip": "192.0.2.40",
+              "mac": "3c:22:fb:aa:bb:cc",
+              "dns": null,
+              "time_last": "2026-08-15 03:00:00",
+              "time_first": "2026-06-01 11:02:33",
+              "active": true,
+              "node": true,
+              "age": "00:05:00",
+              "vendor": "Apple, Inc.",
+              "nbname": null
+            },
+            {
+              "ip": "192.0.2.2",
+              "mac": "00:11:22:33:44:55",
+              "dns": "core-sw01-v20.example.com",
+              "time_last": "2026-08-15 03:00:11",
+              "time_first": "2023-04-11 09:12:44",
+              "active": true,
+              "node": false,
+              "age": "00:05:00",
+              "vendor": "cisco",
+              "nbname": null
+            },
+            {
+              "ip": "192.0.2.77",
+              "mac": "00:00:00:00:00:00",
+              "dns": null,
+              "time_last": "2026-08-15 03:00:00",
+              "time_first": "2026-08-01 00:00:00",
+              "active": false,
+              "node": true,
+              "age": "3 days",
+              "vendor": null,
+              "nbname": null
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "error": "no fixture route"
+    }
+  },
+  "expect": {
+    "asset_count": 6,
+    "ids": [
+      "netdisco:$HOST:device:198.51.100.11",
+      "netdisco:$HOST:device:198.51.100.12",
+      "netdisco:$HOST:node:00:50:56:9a:1b:2c",
+      "netdisco:$HOST:node:3c:22:fb:aa:bb:cc",
+      "netdisco:$HOST:node:b8:27:eb:44:55:66",
+      "netdisco:$HOST:node:aa:bb:cc:dd:ee:99"
+    ],
+    "ids_absent": [
+      "netdisco:$HOST:node:ff:ff:ff:ff:ff:ff"
+    ],
+    "assets": [
+      {
+        "id": "netdisco:$HOST:device:198.51.100.11",
+        "fields": {
+          "deviceType": "Switch",
+          "os": "ios",
+          "osVersion": "15.2(4)E10",
+          "manufacturer": "cisco",
+          "model": "WS-C3750X-48P",
+          "macAddresses": "00:11:22:33:44:55",
+          "netdisco_location": "Building A / MDF",
+          "netdisco_num_ports": "52"
+        }
+      },
+      {
+        "id": "netdisco:$HOST:device:198.51.100.12",
+        "fields": {
+          "deviceType": "Router",
+          "os": "junos",
+          "manufacturer": "juniper"
+        }
+      },
+      {
+        "id": "netdisco:$HOST:node:00:50:56:9a:1b:2c",
+        "fields": {
+          "netdisco_switch": "198.51.100.12",
+          "netdisco_port": "xe-0/0/3",
+          "netdisco_sighting_count": "2",
+          "ipAddresses": "192.0.2.31",
+          "hostnames": "APP01\tapp01.example.com",
+          "manufacturer": "VMware, Inc."
+        }
+      },
+      {
+        "id": "netdisco:$HOST:node:b8:27:eb:44:55:66",
+        "fields": {
+          "netdisco_switch": "198.51.100.11",
+          "netdisco_vlan": "30"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path_contains": "/login",
+        "header_contains": "Basic"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v1/search/device",
+        "query_contains": "offset=0"
+      },
+      {
+        "method": "GET",
+        "query_contains": "limit=200"
+      },
+      {
+        "header": {
+          "Authorization": "9d8ff4b68dbedb804c90e9b375eea48a"
+        }
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v1/object/device/198.51.100.11/nodes",
+        "query_contains": "active_only=true"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v1/report/ip/ipinventory",
+        "query_contains": "subnet=192.0.2.0"
+      }
+    ],
+    "log_contains": [
+      "reported 2 devices",
+      "reported 4 located nodes"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  },
+  "check_determinism": true
+}

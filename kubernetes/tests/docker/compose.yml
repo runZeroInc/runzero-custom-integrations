@@ -1,0 +1,33 @@
+# k3s is a real, conformant Kubernetes API server in a single container, so the
+# integration talks to the same endpoints it would talk to in a production
+# cluster -- no shim, no recorded responses.
+#
+# The image tag is pinned. A floating :latest would silently move the cluster to
+# a new Kubernetes minor version and turn any resulting API change into a flaky
+# test rather than the deliberate upgrade it should be.
+services:
+  k3s:
+    image: rancher/k3s:v1.31.5-k3s1
+    # The node takes its name from the container hostname. Pinning it keeps the
+    # emitted hostname assertable; the default is the random container id.
+    hostname: rz-k3s-node
+    command:
+      - server
+      # The API server certificate is issued for the addresses named here. The
+      # integration connects via the published port on 127.0.0.1, which is not
+      # a name k3s would otherwise put in the SAN list.
+      - --tls-san=127.0.0.1
+      # Neither is needed to serve nodes or services, and both slow startup.
+      # servicelb (klipper) is deliberately left enabled: it is what assigns a
+      # real ingress address to the seeded LoadBalancer service.
+      - --disable=traefik
+      - --disable=metrics-server
+    privileged: true
+    environment:
+      K3S_TOKEN: rz-integration-test
+      K3S_KUBECONFIG_MODE: "666"
+    tmpfs:
+      - /run
+      - /var/run
+    ports:
+      - "${RZ_HOST_PORT}:6443"

@@ -1,0 +1,73 @@
+{
+  "name": "detail-cap",
+  "integration": "foreman",
+  "description": "The per-host interface fetch is N+1, so it is capped. With detail_limit=1 over three hosts, only the first host may be fetched (the route errors if a second is asked for), the remaining two are still imported from the host list alone, and the number skipped is logged.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-token",
+    "include_facts": "false",
+    "include_interfaces": "true",
+    "include_packages": "false",
+    "detail_limit": "1"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v2/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "per_page": 100,
+            "results": [
+              {"id": 51, "name": "cap-51.corp.example.net", "ip": "10.240.0.51", "mac": "00:1a:2b:00:cc:51", "domain_name": "corp.example.net", "operatingsystem_name": "Debian 12", "managed": true, "created_at": "2025-02-01T10:00:00.000Z", "last_report": "2026-08-14T06:00:00.000Z"},
+              {"id": 52, "name": "cap-52.corp.example.net", "ip": "10.240.0.52", "mac": "00:1a:2b:00:cc:52", "domain_name": "corp.example.net", "operatingsystem_name": "Debian 12", "managed": true, "created_at": "2025-02-02T10:00:00.000Z", "last_report": "2026-08-14T06:01:00.000Z"},
+              {"id": 53, "name": "cap-53.corp.example.net", "ip": "10.240.0.53", "mac": "00:1a:2b:00:cc:53", "domain_name": "corp.example.net", "operatingsystem_name": "Debian 12", "managed": true, "created_at": "2025-02-03T10:00:00.000Z", "last_report": "2026-08-14T06:02:00.000Z"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "host-detail-51",
+      "match": {"method": "GET", "path": "/api/v2/hosts/51"},
+      "responses": [
+        {"status": 200, "json": {"interfaces": [{"identifier": "eth0", "mac": "00:1a:2b:00:cc:51", "ip": "10.240.0.51", "type": "Nic::Managed"}, {"identifier": "eth1", "mac": "00:1a:2b:00:cc:61", "ip": "10.241.0.51", "type": "Nic::Managed"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host-detail-past-the-cap",
+      "match": {"method": "GET", "path_regex": "/api/v2/hosts/5[23]$"},
+      "responses": [
+        {"status": 500, "text": "the per-host request limit was not honoured"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "foreman:127.0.0.1:51",
+      "foreman:127.0.0.1:52",
+      "foreman:127.0.0.1:53"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/hosts/51"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2/hosts/52"},
+      {"path": "/api/v2/hosts/53"}
+    ],
+    "log_contains": [
+      "foreman: per-host request limit of 1 reached; interfaces and packages were not fetched for 2 hosts"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

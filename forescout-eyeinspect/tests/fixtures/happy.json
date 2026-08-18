@@ -1,0 +1,151 @@
+{
+  "name": "happy",
+  "integration": "forescout-eyeinspect",
+  "description": "One page of OT hosts with the per-host alerts fetch behind it. Proves the {total_count, results} envelope is unwrapped, that ids are namespaced by the Command Center hostname, that open_ports is accepted in all three shapes eyeInspect emits (a bare int, a \"502/tcp\" string, and a {port, protocol} object) with a missing transport recorded as assumed tcp, that a host record's complex_cves become CVE findings and its alerts become severity-ranked findings bound to the port they targeted, that vendor_model/firmware_version become a Software row, and that a host advertising alert_count 0 costs NO alerts request at all.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "last_seen_days": "0",
+    "include_alerts": "true",
+    "include_cve_details": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 3,
+            "results": [
+              {
+                "id": 9001,
+                "ip": "10.80.1.11",
+                "mac_addresses": ["00:1b:1b:00:90:01", "00:1b:1b:00:90:02"],
+                "main_name": "syn-plc-01",
+                "role": "PLC",
+                "purdue_level": "1",
+                "criticality": "high",
+                "os_version": "VxWorks 6.9",
+                "vendor_model": "Synthetic Controls S7-1500",
+                "firmware_version": "2.9.2",
+                "hardware_version": "R3",
+                "serial_number": "SYNPLC0000001",
+                "project": "line-a",
+                "vlan": 110,
+                "first_seen": "2026-01-05T08:15:00Z",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 2,
+                "open_ports": [102, "502/tcp", {"port": 44818, "protocol": "udp"}, {"port": 80}],
+                "complex_cves": "CVE-2022-38465, CVE-2020-15782",
+                "security_risk": "high",
+                "operational_risk": "medium"
+              },
+              {
+                "id": 9002,
+                "ip": "10.80.1.12",
+                "mac_addresses": "00:1b:1b:00:90:12",
+                "main_name": "syn-hmi-01",
+                "role": "HMI",
+                "purdue_level": "2",
+                "os_version": "Windows 7 Embedded",
+                "first_seen": "2026-02-11T11:00:00Z",
+                "last_seen": "2026-08-02T14:30:00Z",
+                "alert_count": 0,
+                "open_ports": ["3389/tcp", "445/tcp"]
+              },
+              {
+                "id": 9003,
+                "ip": "10.80.1.13",
+                "main_name": "syn-rtu-01",
+                "role": "RTU",
+                "last_seen": "2026-08-03T02:00:00Z",
+                "alert_count": 1,
+                "open_ports": []
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"total_count": 3, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "alerts-9001",
+      "match": {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=9001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 2,
+            "results": [
+              {
+                "alert_id": 5501,
+                "severity": "5",
+                "timestamp": "2026-07-30T18:22:11Z",
+                "engine": "Industrial Threat Library",
+                "profile_module_name": "modbus",
+                "description": "Synthetic fixture alert: unauthorized write to a holding register.",
+                "event_type_names": ["Unauthorized Modbus write"],
+                "event_type_ids": ["ITL-1001"],
+                "src_ip": "10.80.9.99",
+                "dst_ip": "10.80.1.11",
+                "dst_port": 502,
+                "l4_proto": "tcp",
+                "l7_proto": "modbus",
+                "status": "open",
+                "sensor_id": 7,
+                "sensor_name": "syn-sensor-a"
+              },
+              {
+                "alert_id": 5502,
+                "severity": "2",
+                "timestamp": "2026-07-31T04:05:00Z",
+                "engine": "Network Behavior",
+                "description": "Synthetic fixture alert referencing CVE-2020-15782 in its text.",
+                "event_type_names": ["New host communication"],
+                "src_ip": "10.80.1.11",
+                "dst_ip": "10.80.2.50",
+                "dst_port": 443,
+                "l4_proto": "tcp",
+                "status": "acknowledged"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "alerts-9003",
+      "match": {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=9003"},
+      "responses": [{"status": 200, "json": {"total_count": 0, "results": []}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "forescout-eyeinspect:127.0.0.1:9001",
+      "forescout-eyeinspect:127.0.0.1:9002",
+      "forescout-eyeinspect:127.0.0.1:9003"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/hosts", "query_contains": "sort_field=id"},
+      {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=9001"},
+      {"method": "GET", "path": "/api/v1/alerts", "query_contains": "limit=100"},
+      {"header_contains": "Basic"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1/alerts", "query_contains": "host_id=9002"},
+      {"path_contains": "/api/v1/cve_info/"}
+    ],
+    "min_services_total": 6,
+    "min_software_total": 1,
+    "log_contains": ["reported 3 assets"]
+  },
+  "invariants": {"skip": []}
+}

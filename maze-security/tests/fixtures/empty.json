@@ -1,0 +1,23 @@
+{
+  "name": "empty",
+  "integration": "maze-security",
+  "description": "A tenant with no investigations in the lookback window. One request, zero assets, a clean exit rather than a failure.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "days_back": "1"
+  },
+  "routes": [
+    {
+      "name": "investigations-search",
+      "match": {"method": "POST", "path": "/v1/investigations/search"},
+      "responses": [{"status": 200, "json": {"data": [], "has_more": false, "next_cursor": null}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["Reported 0 assets from 0 investigations"]
+  }
+}

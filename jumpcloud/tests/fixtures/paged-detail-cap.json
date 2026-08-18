@@ -1,0 +1,109 @@
+{
+  "name": "paged-detail-cap",
+  "integration": "jumpcloud",
+  "description": "Three systems walked two at a time with the per-system detail limit set to two. Proves the offset pagination advances (the second /api/systems call carries skip=2, not skip=0 again) and that the sort is pinned on every call -- paging on skip alone walks an unstable ordering and silently drops systems. It also proves the N+1 detail cap: only the first two systems cost a bound-users request, the third is still imported without that detail, and the skipped count is logged rather than silently swallowed. requests_absent pins that no request was made for the third system's bindings.",
+  "kwargs": {
+    "url": "$BASE",
+    "org_id": "fixture-org",
+    "api_key": "fixture-api-key",
+    "include_bound_users": "true",
+    "detail_system_limit": "2",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "user-directory",
+      "match": {"method": "GET", "path": "/api/systemusers"},
+      "responses": [
+        {"status": 200, "json": {"totalCount": 1, "results": [{"_id": "6600000000000000000000a1", "username": "jane", "email": "jane@example.com"}]}}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "systems",
+      "match": {"method": "GET", "path": "/api/systems"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 3,
+            "results": [
+              {
+                "_id": "6600000000000000000000c1",
+                "hostname": "lab-01",
+                "os": "Ubuntu",
+                "version": "22.04",
+                "active": true,
+                "created": "2026-02-01T08:00:00Z",
+                "lastContact": "2026-08-15T02:00:00Z",
+                "networkInterfaces": [{"name": "eth0", "address": "10.51.0.11", "internal": false}]
+              },
+              {
+                "_id": "6600000000000000000000c2",
+                "hostname": "lab-02",
+                "os": "Ubuntu",
+                "version": "22.04",
+                "active": true,
+                "created": "2026-02-01T08:05:00Z",
+                "lastContact": "2026-08-15T02:05:00Z",
+                "networkInterfaces": [{"name": "eth0", "address": "10.51.0.12", "internal": false}]
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 3,
+            "results": [
+              {
+                "_id": "6600000000000000000000c3",
+                "hostname": "lab-03",
+                "os": "Ubuntu",
+                "version": "22.04",
+                "active": true,
+                "created": "2026-02-01T08:10:00Z",
+                "lastContact": "2026-08-15T02:10:00Z",
+                "networkInterfaces": [{"name": "eth0", "address": "10.51.0.13", "internal": false}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "bound-users",
+      "match": {"method": "GET", "path_prefix": "/api/v2/systems/"},
+      "responses": [
+        {"status": 200, "json": [{"id": "6600000000000000000000a1", "paths": [[{"type": "system"}]]}]}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "jumpcloud:fixture-org:6600000000000000000000c1",
+      "jumpcloud:fixture-org:6600000000000000000000c2",
+      "jumpcloud:fixture-org:6600000000000000000000c3"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/systems", "query_contains": "skip=0"},
+      {"method": "GET", "path": "/api/systems", "query_contains": "skip=2"},
+      {"method": "GET", "path": "/api/systems", "query_contains": "sort=_id"},
+      {"method": "GET", "path": "/api/v2/systems/6600000000000000000000c1/users"},
+      {"method": "GET", "path": "/api/v2/systems/6600000000000000000000c2/users"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2/systems/6600000000000000000000c3/users"},
+      {"method": "GET", "path": "/api/systems", "query_contains": "skip=4"}
+    ],
+    "log_contains": [
+      "jumpcloud: fetched per-system detail for 2 systems",
+      "jumpcloud: skipped per-system detail for 1 systems; raise the per-system detail limit (2) to cover more"
+    ]
+  },
+  "invariants": {"skip": []}
+}

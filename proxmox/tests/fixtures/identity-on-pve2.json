@@ -1,0 +1,108 @@
+{
+  "name": "identity-on-pve2",
+  "integration": "proxmox",
+  "description": "Identity stability, half two of two: the same cluster one poll later. VM 100 and container 200 have live-migrated from pve1 to pve2, the surviving node is pve2, and both guests picked up new addresses on the way. The asset ids asserted here are identical to identity-on-pve1.json, proving the id is derived from the cluster name and the VMID alone. A node-qualified id would have produced a second, duplicate asset for each guest. Skips namespaced_ids: the cluster name scopes the id but is joined with '-' rather than ':'.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "svc@pve!runzero",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api2/json/version"},
+      "responses": [{"status": 200, "json": {"data": {"release": "8.2"}}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/cluster/status"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"type": "cluster", "name": "lab-cluster", "quorate": 1}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/cluster/config/nodes"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"node": "pve2", "nodeid": 2, "ring0_addr": "10.30.0.12"}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/cluster/resources"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"type": "node", "node": "pve2", "status": "online", "maxcpu": 16}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/qemu"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"vmid": 100, "name": "app01", "status": "running"}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/qemu/100/config"},
+      "responses": [{"status": 200, "json": {"data": {
+        "name": "app01", "net0": "virtio=AA:BB:CC:00:01:10,bridge=vmbr0"
+      }}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/qemu/100/agent/network-get-interfaces"},
+      "responses": [{"status": 200, "json": {"data": {"result": [
+        {"name": "eth0", "hardware-address": "aa:bb:cc:00:01:10",
+         "ip-addresses": [{"ip-address": "10.31.44.77", "prefix": 24}]}
+      ]}}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/qemu/100/agent/get-osinfo"},
+      "responses": [{"status": 200, "json": {"data": {"result": {
+        "pretty-name": "Debian GNU/Linux 12 (bookworm)", "version-id": "12"
+      }}}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/lxc"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"vmid": 200, "name": "dns01", "status": "running"}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/lxc/200/config"},
+      "responses": [{"status": 200, "json": {"data": {
+        "hostname": "dns01.lab.example.com", "ostype": "debian"
+      }}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/lxc/200/interfaces"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"name": "eth0", "hwaddr": "BC:24:11:AA:BB:01",
+         "ip-addresses": [{"ip-address": "10.31.55.88", "prefix": 24}]}
+      ]}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "lab-cluster-vm-100",
+        "fields": {"proxmox_node": "pve2", "proxmox_cluster": "lab-cluster", "ipAddresses": "10.31.44.77", "macAddresses": "a8:bb:cc:00:01:10"}
+      },
+      {
+        "id": "lab-cluster-ct-200",
+        "fields": {"proxmox_node": "pve2", "proxmox_cluster": "lab-cluster", "ipAddresses": "10.31.55.88", "hostnames": "dns01.lab.example.com"}
+      }
+    ],
+    "ids": [
+      "lab-cluster-node-pve2",
+      "lab-cluster-vm-100",
+      "lab-cluster-ct-200"
+    ],
+    "ids_absent": [
+      "lab-cluster-pve2-vm-100",
+      "lab-cluster-vm-pve2-100",
+      "lab-cluster-pve2-ct-200",
+      "lab-cluster-ct-pve2-200"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api2/json/nodes/pve2/qemu"}
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "name": "paged-with-sessions",
+  "integration": "aruba-clearpass",
+  "description": "A two-page endpoint walk with the active-session join enabled, at page_size 2. Proves the offset advances by the page size on the second call rather than restarting at zero, that the walk stops when _links.next disappears, and that the session index is built before the endpoints are read. The session table exercises the join rules: two active rows for aa:bb:cc:dd:ee:11 (the later acctstarttime wins and contributes 10.32.9.11), one stale row that must be ignored even though the server was asked to filter on state, one row that is not an object at all, and one row with no MAC anywhere. The 'indexed 1 active sessions (3 rows ignored)' line is the assertion that all three were rejected. sess-02's framedipaddress is 169.254.7.7, a link-local address a client self-assigned after DHCP failed, which must not reach the interface.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "status_filter": "known",
+    "include_sessions": "true",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 28800}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "sessions",
+      "match": {"method": "GET", "path": "/api/session"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": "sess-01",
+                  "state": "active",
+                  "mac_address": "aabbccddee11",
+                  "callingstationid": "aa:bb:cc:dd:ee:11",
+                  "acctsessionid": "0000B001",
+                  "acctstarttime": "2026-08-15 06:00:00",
+                  "username": "alice",
+                  "framedipaddress": "10.32.9.11",
+                  "nasipaddress": "10.32.0.1",
+                  "nas_name": "cs-idf-2",
+                  "nasportid": "GigabitEthernet1/0/8",
+                  "ssid": "CORP-WIFI",
+                  "ap_name": "ap-floor2",
+                  "arubauserrole": "employee",
+                  "visitor_name": "SHOULD NOT BE IMPORTED",
+                  "sponsor_email": "SHOULD NOT BE IMPORTED"
+                },
+                {
+                  "id": "sess-02",
+                  "state": "active",
+                  "mac_address": "aa:bb:cc:dd:ee:11",
+                  "acctsessionid": "0000B000",
+                  "acctstarttime": "2026-08-14 06:00:00",
+                  "username": "alice",
+                  "framedipaddress": "169.254.7.7",
+                  "ssid": "CORP-WIFI"
+                },
+                {
+                  "id": "sess-03",
+                  "state": "stale",
+                  "mac_address": "aa:bb:cc:dd:ee:22",
+                  "acctstarttime": "2026-08-01 06:00:00",
+                  "framedipaddress": "10.32.9.99"
+                },
+                "not-a-session-object",
+                {
+                  "id": "sess-05",
+                  "state": "active",
+                  "acctstarttime": "2026-08-15 07:00:00",
+                  "framedipaddress": "10.32.9.5"
+                }
+              ]
+            },
+            "_links": {"self": {"href": "/api/session?offset=0"}}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 5001,
+                  "mac_address": "aa:bb:cc:dd:ee:11",
+                  "status": "Known",
+                  "randomized_mac": true,
+                  "added_at": "2026-05-01 10:00:00",
+                  "updated_at": "2026-08-15 06:01:00",
+                  "profile": {"ipv4_address": "10.32.4.11", "host_name": "wks-alice", "device_category": "Computer", "last_profiled_at": "2026-08-15 05:00:00"}
+                },
+                {
+                  "id": 5002,
+                  "mac_address": "aa:bb:cc:dd:ee:22",
+                  "status": "Known",
+                  "added_at": "2026-05-02 10:00:00",
+                  "updated_at": "2026-08-15 06:02:00",
+                  "profile": {"ipv4_address": "10.32.4.22", "host_name": "wks-bob", "last_profiled_at": "2026-08-15 05:01:00"}
+                }
+              ]
+            },
+            "_links": {"next": {"href": "/api/endpoint?offset=2&limit=2"}}
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 5003,
+                  "mac_address": "aa:bb:cc:dd:ee:33",
+                  "status": "Known",
+                  "added_at": "2026-05-03 10:00:00",
+                  "updated_at": "2026-08-15 06:03:00",
+                  "profile": {"ipv4_address": "10.32.4.33", "host_name": "prn-idf2", "device_category": "Printer", "last_profiled_at": "2026-08-15 05:02:00"}
+                }
+              ]
+            },
+            "_links": {"self": {"href": "/api/endpoint?offset=2"}}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "aruba-clearpass:127.0.0.1:aa:bb:cc:dd:ee:11",
+      "aruba-clearpass:127.0.0.1:aa:bb:cc:dd:ee:22",
+      "aruba-clearpass:127.0.0.1:aa:bb:cc:dd:ee:33"
+    ],
+    "min_requests": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/session", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "offset=2"},
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "limit=2"},
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "Known"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "offset=4"}
+    ],
+    "log_contains": [
+      "aruba-clearpass: indexed 1 active sessions (3 rows ignored)",
+      "aruba-clearpass: reported 3 endpoints from 127.0.0.1"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

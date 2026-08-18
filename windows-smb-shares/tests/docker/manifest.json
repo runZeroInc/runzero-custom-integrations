@@ -1,0 +1,113 @@
+{
+  "name": "samba",
+  "integration": "windows-smb-shares",
+  "description": "Runs the example against a real SMB2 file server -- NTLM authentication, srvsvc share enumeration, tree connect, directory query -- and asserts the single asset it builds from eight shares: three it reads, one it reads and reports as empty, one it mounts through a named exception, one it is refused and carries on past, and two it skips by name.",
+  "compose": "compose.yml",
+  "service": "samba",
+  "scheme": "tcp",
+  "_scheme_reason": "There is no HTTP here at all -- windows-smb-shares.star loads `runzero.smb` and never loads `http` or `requests`, which is why it can have no fixture scenario: tests/harness/server.py is a plain HTTP server and has no SMB server to offer. `scheme` only builds the $BASE string, which this manifest never uses; the integration takes a host and a port as separate parameters, so kwargs use $HOST and ${seed.port} instead. Recorded as `tcp` so nothing reads the manifest and assumes a URL, the same as the mssql-databases and linux-ssh stacks.",
+  "ready": [
+    {
+      "name": "smbd accepting connections",
+      "exec": [
+        "sh",
+        "-c",
+        "nc -z 127.0.0.1 445 && echo rz-smbd-listening"
+      ],
+      "contains": "rz-smbd-listening",
+      "timeout": 120,
+      "interval": 2
+    },
+    {
+      "name": "polling account can authenticate and enumerate",
+      "exec": [
+        "smbclient",
+        "-L",
+        "127.0.0.1",
+        "-U",
+        "runzero%runZero-Test-Pw-2026!"
+      ],
+      "contains": "IPC$",
+      "timeout": 120,
+      "interval": 2
+    }
+  ],
+  "_ready_reason": "Two gates, for the reason the mssql-databases stack needs a real login rather than a port check: an open port proves a listener exists, not that it will serve anybody. The first gate is cheap and fails fast when smbd never starts at all. The second is a real NTLM session over SMB2 followed by a real srvsvc enumeration, performed with the same credential the integration will use -- which is exactly what the seed script does next and what the integration does after that. IPC$ is the string checked because Samba publishes it itself: matching on a share this stack configured would pass on a smb.conf that parsed and an smbd that had not finished reading it.",
+  "seed": "seed.py",
+  "seed_timeout": 180,
+  "kwargs": {
+    "host": "$HOST",
+    "port": "${seed.port}",
+    "username": "${seed.username}",
+    "password": "${seed.password}",
+    "timeout": "30"
+  },
+  "_kwargs_port_reason": "The harness allocates the published port at run time, and this integration takes host and port as separate parameters rather than a URL, so neither $BASE nor $BASE_HOST fits. The seed echoes RZ_HOST_PORT back as ${seed.port}, which is the documented way to get a run-time value into kwargs.",
+  "_kwargs_credential_reason": "Read back through ${seed.username} and ${seed.password} rather than written here, even though both are constants: the seed authenticates with them before the integration runs, so the values asserted against are values something already proved work. A password written independently in this file could drift from compose.yml and the failure would surface as an empty share list rather than as a bad credential. The password is deliberately free of ',' -- which the runZero CLI's --kwargs flag would split into a fabricated second parameter, and which the container harness rejects outright -- and of '\\', which runzero.smb reads as the DOMAIN\\user separator and would silently split into a different account.",
+  "_domain_and_nt_hash_untested": "Two of the integration's parameters are NOT exercised here and should be said out loud rather than left to look covered. `domain` is empty: Samba is configured as a standalone server, so there is no domain to authenticate against, and the DOMAIN\\user shorthand runzero.smb implements is unreached. `nt_hash` is likewise unused -- pass-the-hash against this image is possible in principle but would test the NTLM initiator rather than anything in this script. Both belong in a stack with a Samba AD DC in it, which is a much heavier thing than this one.",
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "smb://$HOST:${seed.port}",
+        "fields": {
+          "hostnames": "$HOST",
+          "os": "Windows",
+          "smb.target": "$HOST:${seed.port}",
+          "smb.share_count": "8",
+          "smb.accessible_share_count": "4",
+          "share.public": "listed",
+          "share.public.entries": "${seed.public_entries}",
+          "share.reports": "listed",
+          "share.reports.entries": "${seed.reports_entries}",
+          "share.bulk": "listed",
+          "share.bulk.entries": "${seed.bulk_entries}",
+          "share.ADMIN$": "listed",
+          "share.ADMIN$.entries": "${seed.admin_entries}",
+          "share.empty": "listed",
+          "share.restricted$": "listed",
+          "share.IPC$": "listed",
+          "share.finance": "denied"
+        },
+        "fields_absent": [
+          "share.empty.entries",
+          "share.restricted$.entries",
+          "share.finance.entries",
+          "share.IPC$.entries",
+          "ipAddresses",
+          "macAddresses"
+        ]
+      }
+    ]
+  },
+  "_expect_reason": {
+    "asset_count": "One asset for the whole server, not one per share. The integration reports the host and folds every share into custom attributes on it, which is why `share_count` and the per-share keys carry all the information this case can check.",
+    "smb.share_count": "Eight: the seven shares compose.yml configures plus the IPC$ Samba publishes on its own. The number is a literal rather than a ${seed.*} value on purpose -- it is the claim under test, and reading it back from the same place the script reads it would make the assertion circular. It is not unanchored either: seed.py enumerates the server with smbclient and dies unless the server reports exactly these eight names, so a literal that stopped matching reality fails in the seed with both lists printed.",
+    "smb.accessible_share_count": "Four: `public`, `reports`, `bulk` and `ADMIN$`. Note what is NOT counted and why, because the number reads as a permissions summary and is not quite one. `empty` mounts and lists successfully, but the example increments its counter only when a share yields at least one entry (`if len(entries) > 0`), so a readable empty share does not count. `finance` does not count either, but for a real reason -- it was refused. The two are distinguishable in the attributes even though they are not in this number: a refused share is marked `denied`, an empty one stays `listed`. Asserting 4 pins the current rule; a script that counted successful mounts instead would report 5 and fail here, which is the right time to look at it.",
+    "share.<name>": "Three states, and the vocabulary is worth reading carefully. Every enumerated share gets `share.<name>`. It holds `listed` when the share was enumerated but not read -- either because the script skipped it on its name (`IPC$`, `restricted$`) or because it was read and turned out to be empty (`empty`). It holds `denied` when the script tried to mount it and the server refused (`finance`). The presence of a matching `.entries` key is what separates a share that was actually read from one that was not. The `$` in `share.ADMIN$` and `share.restricted$` survives to the emitted attribute name unchanged -- verified against this stack, and worth pinning because nothing else in the repository puts a `$` in a custom attribute key.",
+    "share.<name>.entries": "Read back through ${seed.*} rather than hard-coded, and built by the seed from a real listing of what ended up on disk behind each share -- not from the list the seed meant to write. So these assert that SMB enumeration returned exactly the files that exist. `public` holds a directory (`subdir`) alongside two files, and it appears in the string exactly like a file does: the script appends `e[\"name\"]` and never consults `e[\"is_dir\"]`, so nothing in the asset distinguishes a folder from a document. `reports` holds `Quarterly.pdf` next to `q3.txt` and `q4.txt` to pin sort ORDER as byte-wise rather than locale-aware -- go-smb2's ReadDir ends in a `sort.Slice` on `Name()`, so the capital Q sorts first, where a dictionary collation would put it last. `.` and `..` are absent: smbclient shows both, the runtime's ReadDir does not.",
+    "share.bulk.entries": "`bulk` holds 25 files and the attribute holds 20 of them, because the example caps the list at `entries[:20]`. A cap is a reasonable thing for an example to do; what this pins is that it is SILENT -- file-21.dat through file-25.dat are dropped with no marker, so the attribute is a well-formed list that simply is not the whole list. Anyone adapting this for real inventory should know that before they rely on the value. The seed refuses to run if `bulk` ever stops holding more than the limit, so the case cannot quietly decay into asserting an untruncated string, and it echoes the dropped names as ${seed.bulk_dropped} so a failure shows what went missing.",
+    "share.ADMIN$.entries": "The one `$` share the example deliberately mounts: its skip is `if name.endswith(\"$\") and name != \"ADMIN$\": continue`, so ADMIN$ is carved out of the rule that skips every other administrative share. This asserts the carve-out really does perform a tree connect and a directory query. ADMIN$ is readable by the polling account here; when it is not -- the ordinary case on a real Windows host, where it needs local Administrators, though that is documented behaviour rather than something this stack checked -- the share is simply reported `denied` and the run continues. That is what the mount guard bought; see _mount_guard below.",
+    "share.empty.entries": "Absent: the share mounts, the listing succeeds and returns zero entries, and the example writes no `.entries` key. So an accessible empty share carries `share.empty = \"listed\"` with nothing after it, which is the same shape as a share that was skipped by name. The refused share is the one that is distinguishable, because it is marked `denied`.",
+    "share.restricted$.entries": "Absent because the share was never mounted, and never mounted because its name ends in `$` -- the skip fires before any attempt, so `share.restricted$` stays `listed` rather than becoming `denied`. seed.py proves the refusal underneath is real anyway (NT_STATUS_ACCESS_DENIED to the polling account, readable by the other one), so the skip is demonstrably protecting something rather than guarding an empty case. Contrast `finance` directly below: same denial, no `$`, different path through the script.",
+    "share.IPC$.entries": "Absent for the same reason, and IPC$ is the only one of these Samba publishes by itself. It is an IPC pipe rather than a disk share, so a directory query against it is meaningless; the script's `$` rule skips it correctly, and that is worth pinning because IPC$ is present on every SMB server in existence and is the one share this skip is guaranteed to meet in production.",
+    "hostnames": "The `host` kwarg, verbatim -- the example does `hostnames=[host]` and does not inspect it. Reached over a published port that is the literal string `127.0.0.1`, so this asset's only name is an IP address, which is why `no_placeholder_hostnames` is skipped below. For an example whose whole input is one target host that is a fair simplification, and the container harness cannot demonstrate anything else because it always reaches the container on loopback. Worth knowing before reusing the pattern: `hostnames` is a correlation key, so an operator who types an address rather than a name gets an asset that can correlate with every other host anyone recorded the same way. Asserted rather than avoided so the value stays visible, and so a script that starts validating `host` has to come back through this expectation.",
+    "ipAddresses_and_macAddresses": "The example emits no network interfaces -- it never constructs one -- so a file server reached over SMB arrives with no address and no MAC, and its only correlator is its own `smb://host:port` id. `_match.behavior` is left at the default `id-match id-break mac-match mac-break ip-match ip-break name-match name-break`. Asserted as absent so that a version which starts reporting the dialled address has to come back through this expectation.",
+    "share.finance": "`denied`, and this is the assertion the whole stack is built around. `finance` is a plain-named share the polling account is refused -- the ordinary shape of the problem, a departmental share the account is not a member of. The example attempts the mount, the server answers NT_STATUS_ACCESS_DENIED, `mount()` returns None, and the script records the refusal and carries on to report the other seven shares. Every other assertion in this manifest is downstream of that: before the runtime change described in _mount_guard, this share aborted the script and the run emitted ZERO assets, so no stack containing one could assert anything at all."
+  },
+  "invariants": {
+    "skip": [
+      "no_placeholder_hostnames"
+    ]
+  },
+  "_invariants_skip_reason": {
+    "no_placeholder_hostnames": "Skipped because it is RIGHT, not because it is wrong -- the only such skip in the suite. The invariant rejects a bare IPv4 address in `hostnames`, and this asset carries `127.0.0.1` there, so it fires exactly as designed. It cannot be satisfied without hiding the behaviour: the harness always reaches the container on loopback, and the example copies the `host` kwarg into `hostnames` without inspecting it, so there is no value this case could pass that both reaches the container and is a name. Nothing is swept up by skipping it -- this asset has exactly one hostname, and the expectation above asserts it is `127.0.0.1`, so the behaviour stays visible in the manifest and fails loudly the day the script starts validating `host`. Delete both together."
+  },
+  "_no_namespaced_ids_skip_reason": "Unlike the linux-ssh stack this one does NOT skip `namespaced_ids`: `smb://127.0.0.1:31234` carries a scope, so the invariant passes. Worth naming because the scope it carries is weak in the same way linux-ssh's fallback id is -- host and port are what the operator dialled, so two different file servers each reached on 127.0.0.1 through a forwarded port collide on it. The invariant only checks that a scope separator is present, and a present-but-ambiguous scope is not something it can see.",
+  "_not_heavy_reason": "`heavy` is omitted rather than set to false, which is how every light stack in the suite declares itself -- only mssql-databases and puppetdb carry the flag. Recorded here so nobody adds it out of caution: the image is 26MB, ships a native arm64 build alongside amd64 so nothing runs under emulation, and smbd is listening a couple of seconds after `compose up`. The whole case runs in well under a minute, which is the profile tests/README.md asks for.",
+  "check_determinism": true,
+  "startup_timeout": 300,
+  "timeout": 180,
+  "_what_this_covers": "windows-smb-shares.star is a deliberately small EXAMPLE: it shows how to reach a non-HTTP protocol from a custom integration and turn what it finds -- a list of share names -- into a new kind of asset. It is not a full file-server inventory, and this manifest does not review it as one. Several of its choices are simplifications an example is entitled to (a 20-entry cap, counting a share as accessible only when it lists something, reporting the `host` parameter as the hostname); those are recorded below as behaviour, so the case pins what the script does without pretending each one is a bug. The suite's own rule still applies to all of it: assert what the software actually returns.",
+  "_mount_guard": "This stack found that one unreadable share aborted the entire run, and the fix landed in the runtime rather than here. The example called `session.mount()` bare; runzero.smb returned a Go error on a refused tree connect; Starlark has no exceptions, so the thread died and the scanner logged `failed to call main function: mount: permission denied` with `Exported 0 assets`. Not the share -- the run, including every share that WAS readable. Reproduced against this exact image two ways: denying `ADMIN$` to the polling account, and dropping the `$` from `restricted$`. FIXED 2026-08-16 in the platform (runzero/foreigndata/starlark/module/smb.go): mount() and list() now return None when the server refuses on permissions -- STATUS_ACCESS_DENIED, which go-smb2 maps to os.ErrPermission -- while a bad share name, a dropped connection or a protocol fault still raises and still stops the script. list() is guarded as well as mount() because Windows routinely grants the tree connect and then denies the root listing through an ACL. None rather than an empty list, so a caller can tell an unreadable directory from an empty one. NOTE THE DEPENDENCY: the `finance` assertions require a scanner built from a platform checkout carrying that change. On an older runtime this case fails at the seed's own scenario -- the script aborts and no asset is emitted -- which is the inverse of the linux-ssh stack, where the fixes are pending and the manifest still asserts pre-fix behaviour. The script degrades honestly on an old runtime rather than breaking differently: it checks `if share == None`, and adds no new keyword argument that an older runtime would reject outright."
+}

@@ -1,0 +1,75 @@
+{
+  "name": "malformed-cve",
+  "integration": "uptycs",
+  "description": "upt_vulnerabilities_state.cve_list is plural: a row that maps to several CVEs returns a JSON array, and str() renders it as the literal '[\"CVE-2026-77777\", \"CVE-2026-77778\"]'. Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and a miss fails the whole ImportAsset, aborting the run and losing every asset already parsed. A tenant-local advisory id ('UPTYCS-2026-0001') misses the same way. Both findings must still be imported, named by the raw value, with only the cve field dropped.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixturecust",
+    "api_key": "fixture-key",
+    "api_secret": "fixture-secret",
+    "include_host_details": "false",
+    "include_software": "false",
+    "include_services": "false",
+    "include_vulnerabilities": "true",
+    "vulnerability_table": "upt_vulnerabilities_state"
+  },
+  "routes": [
+    {
+      "name": "upt-assets",
+      "match": {"method": "POST", "path": "/public/api/customers/fixturecust/query", "body_contains": "FROM upt_assets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "b1",
+                "host_name": "web-b1",
+                "os": "Ubuntu",
+                "os_version": "22.04",
+                "status": "active",
+                "created_at": "2025-02-01 10:00:00.000",
+                "last_activity_at": "2026-08-14 12:00:00.000"
+              },
+              {
+                "id": "b2",
+                "host_name": "web-b2",
+                "os": "Ubuntu",
+                "os_version": "22.04",
+                "status": "active",
+                "created_at": "2025-02-01 10:00:00.000",
+                "last_activity_at": "2026-08-14 12:00:00.000"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "POST", "body_contains": "FROM upt_vulnerabilities_state"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"upt_asset_id": "b1", "cve_list": ["CVE-2026-77777", "CVE-2026-77778"], "title": "OpenSSL multi-CVE advisory", "uptycs_severity": "HIGH", "cvss_score": 8.8, "package_name": "openssl"},
+              {"upt_asset_id": "b1", "cve_list": "UPTYCS-2026-0001", "title": "Tenant-local advisory", "uptycs_severity": "MEDIUM", "cvss_score": 5.4, "package_name": "openssl"},
+              {"upt_asset_id": "b2", "cve_list": "CVE-2026-77779", "title": "Single well-formed CVE", "uptycs_severity": "LOW", "cvss_score": 2.0, "package_name": "curl"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["uptycs:fixturecust:b1", "uptycs:fixturecust:b2"],
+    "min_vulnerabilities_total": 3
+  },
+  "invariants": {
+    "skip": []
+  }
+}

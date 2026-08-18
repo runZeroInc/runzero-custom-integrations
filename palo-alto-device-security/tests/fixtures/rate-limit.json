@@ -1,0 +1,80 @@
+{
+  "name": "rate-limit",
+  "integration": "palo-alto-device-security",
+  "description": "Both IoT Security endpoints are capped at 60 requests per minute. A 429 on the vulnerability list and a 429 on the device list must be absorbed by the shared HTTP helper's retry budget (the script sets retries=3) rather than ending the import, so the same run still emits every asset. no_mac_in_id is skipped because IoT Security deviceid is the device MAC.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "tsg_id": "tsg-ratelimit",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "lookback_days": "30"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/oauth2/access_token"},
+      "responses": [{"status": 200, "json": {"access_token": "ratelimit-token"}}]
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/iot/pub/v1/vulnerability/list"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"msg": "rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "deviceid": "00:cc:dd:ee:ff:01",
+                "name": "throttled-host",
+                "ip": "10.80.0.1",
+                "zb_ticketid": "TCK-RL-1",
+                "vulnerability_name": "CVE-2025-50001",
+                "risk_level": "High",
+                "detected_date": "2026-07-15T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/iot/pub/v2/device/list"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"msg": "rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "deviceid": "00:cc:dd:ee:ff:01",
+                "hostname": "throttled-host",
+                "ip_address": "10.80.0.1",
+                "mac_address": "00:cc:dd:ee:ff:01",
+                "category": "Sensor",
+                "vendor": "Synthetic Devices",
+                "last_activity": "2026-08-12T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["palo-alto-device-security:tsg-ratelimit:00:cc:dd:ee:ff:01"],
+    "min_requests": 5,
+    "requests_absent": [
+      {"path_contains": "/iot/pub/v2/device/list", "query_contains": "offset=500"}
+    ],
+    "log_contains": ["indexed 1 vulnerabilities across 1 devices"]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

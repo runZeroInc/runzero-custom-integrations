@@ -1,0 +1,77 @@
+{
+  "name": "identity-stability",
+  "integration": "cisco-secure-endpoint",
+  "description": "Regression pair for the happy scenario. The same two connector GUIDs come back with every mutable field changed -- new hostname, new MAC, new IP, new policy, new group, a moved OS build -- and the emitted foreign ids must be byte-identical to the ones happy.json asserts. That is what proves the id is built from the connector GUID and the regional API host alone and has not quietly absorbed an address, a name, or a policy. The regional host is also the only other id input, so this doubles as a check that the scope survives a tenant whose records changed.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "client_id": "fixture-client-id",
+    "api_key": "fixture-api-key",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"results": {"total": 2}},
+            "data": [
+              {
+                "connector_guid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "hostname": "fin-ws-014-renamed",
+                "active": true,
+                "demo": false,
+                "connector_version": "8.2.0.21587",
+                "operating_system": "Windows 11 (Build 22631.3155)",
+                "os_version": "10.0.22631.3155",
+                "external_ip": "198.51.100.200",
+                "group_guid": "gggggggg-0000-4000-8000-000000000099",
+                "policy": {"guid": "pppppppp-0000-4000-8000-000000000099", "name": "Audit Workstations"},
+                "isolation": {"available": true, "status": "not_isolated"},
+                "install_date": "2025-04-11T09:12:00Z",
+                "last_seen": "2026-08-15T07:00:00Z",
+                "network_addresses": [
+                  {"mac": "00:50:56:ff:ee:dd", "ip": "192.168.77.14"}
+                ],
+                "internal_ips": ["192.168.77.14"],
+                "groups": [{"name": "Audit Workstations"}]
+              },
+              {
+                "connector_guid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "hostname": "eng-mbp-221-reimaged",
+                "active": true,
+                "demo": false,
+                "connector_version": "1.26.0",
+                "operating_system": "OS X 14.4.1",
+                "os_version": "14.4.1",
+                "policy": {"guid": "pppppppp-0000-4000-8000-000000000098", "name": "Protect Macs v2"},
+                "isolation": {"available": true, "status": "not_isolated"},
+                "install_date": "2025-09-02T14:00:00Z",
+                "last_seen": "2026-08-15T07:30:00Z",
+                "network_addresses": [
+                  {"mac": "8c:85:90:ff:ee:cc", "ip": "172.20.9.4"}
+                ],
+                "internal_ips": ["172.20.9.4"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000001",
+      "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000002"
+    ],
+    "request_count": 1,
+    "log_contains": ["cisco-secure-endpoint: reported 2 computers"]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

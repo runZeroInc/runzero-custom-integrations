@@ -1,0 +1,66 @@
+{
+  "name": "malformed",
+  "integration": "netskope",
+  "description": "Wrong types where the documented shape is something else, to prove the run survives them: an empty hostname string, a null nsdeviceuid that falls back to device_id, null device_make/device_model/os_version, a numeric os_version, groups and usergroup arriving as scalars rather than arrays, and a quoted boolean for deleted. The two records with a usable identifier must still be imported and the record with none must still be skipped. A null `os` is deliberately NOT included here because it aborts the whole script; that case has its own scenario, null-os.json. Skips namespaced_ids: netskope uses the bare nsdeviceuid as the foreign id, with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-netskope-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "ok": 1,
+          "result": [
+            {
+              "_id": {"nsdeviceuid": "NSDEV-MALFORMED-0001"},
+              "hostname": "",
+              "mac_addresses": ["00:1B:44:11:3A:B7"],
+              "os": "",
+              "os_version": null,
+              "device_make": null,
+              "device_model": null,
+              "groups": "corp-managed",
+              "usergroup": "engineering",
+              "deleted": "false"
+            },
+            {
+              "_id": {"nsdeviceuid": null},
+              "device_id": "DEV-MALFORMED-0002",
+              "hostname": "field-kiosk-02",
+              "mac_addresses": ["00:1B:44:11:3A:B8"],
+              "os": "Windows",
+              "os_version": 11,
+              "ns_tenant_id": "fixture-tenant"
+            },
+            {
+              "_id": {"nsdeviceuid": ""},
+              "device_id": "",
+              "hostname": "orphan-03",
+              "mac_addresses": ["00:1B:44:11:3A:B9"],
+              "os": "Windows"
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "NSDEV-MALFORMED-0001",
+      "DEV-MALFORMED-0002"
+    ],
+    "ids_absent": ["orphan-03"],
+    "request_count": 1,
+    "log_contains": [
+      "netskope: skipping record with no nsdeviceuid/device_id"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

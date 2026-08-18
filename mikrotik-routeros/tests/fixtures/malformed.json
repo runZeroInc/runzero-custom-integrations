@@ -1,0 +1,199 @@
+{
+  "name": "malformed",
+  "integration": "mikrotik-routeros",
+  "description": "Junk in every table, plus the RouterOS-specific traps. Rows that are strings instead of objects; a lease whose mac-address is null; an ARP entry whose MAC is a multicast address; a neighbor with no MAC at all (which cannot be keyed and is skipped rather than invented); an unparseable duration in last-seen, which must NOT abort the run and must NOT produce a timestamp; and 'disabled':'true' on an address, which is a STRING and must be read as a boolean rather than as truthiness. Also pins the bound_leases_only filter and the default-identity rule: this router still reports the factory identity 'MikroTik', which every unconfigured RouterOS device shares, so it is not imported as a hostname - with a host-derived id there is nothing else stopping two such routers merging on the name. Everything valid still imports.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-runzero",
+    "password": "fixture-password",
+    "bound_leases_only": "true"
+  },
+  "routes": [
+    {
+      "name": "system-resource",
+      "match": {"method": "GET", "path": "/rest/system/resource"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"board-name": "hEX S", "platform": "MikroTik", "uptime": "not-a-duration", "version": "7.6", "architecture-name": "mmips"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-identity",
+      "match": {"method": "GET", "path": "/rest/system/identity"},
+      "responses": [{"status": 200, "json": [{"name": "MikroTik"}]}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-routerboard",
+      "match": {"method": "GET", "path": "/rest/system/routerboard"},
+      "responses": [
+        {"status": 200, "json": [{"routerboard": "true", "model": "RB760iGS", "serial-number": "", "board-name": "hEX S"}]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interfaces",
+      "match": {"method": "GET", "path": "/rest/interface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "name": "bridge", "type": "bridge", "mac-address": "64:D1:54:00:AA:01", "disabled": "false"},
+            "this should have been an object",
+            {".id": "*2", "name": "ether5", "type": "ether", "mac-address": "not-a-mac", "disabled": "false"},
+            {".id": "*3", "name": "lo", "type": "loopback", "mac-address": "00:00:00:00:00:00", "disabled": "false"},
+            {".id": "*4", "name": "phantom", "type": "ether", "disabled": "true"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-address",
+      "match": {"method": "GET", "path": "/rest/ip/address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "address": "172.16.4.1/24", "actual-interface": "bridge", "interface": "bridge", "disabled": "false", "invalid": "false"},
+            {".id": "*2", "address": "172.16.9.1/24", "actual-interface": "bridge", "interface": "bridge", "disabled": "true", "invalid": "false"},
+            {".id": "*3", "address": "172.16.10.1/24", "actual-interface": "bridge", "interface": "bridge", "disabled": "false", "invalid": "true"},
+            "this should have been an object",
+            {".id": "*4", "address": "garbage/24", "actual-interface": "bridge", "interface": "bridge", "disabled": "false", "invalid": "false"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-arp",
+      "match": {"method": "GET", "path": "/rest/ip/arp"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "address": "172.16.4.20", "mac-address": "01:00:5E:00:00:FB", "interface": "bridge", "complete": "true", "status": "reachable"},
+            {".id": "*2", "address": "172.16.4.21", "mac-address": "00:00:00:00:00:00", "interface": "bridge", "complete": "true", "status": "reachable"},
+            "this should have been an object",
+            {".id": "*3", "address": "garbage", "mac-address": "B4:2E:99:12:34:56", "interface": "bridge", "complete": "true", "status": "stale"},
+            {".id": "*4", "address": "172.16.4.23", "mac-address": "B4:2E:99:AA:BB:CC", "interface": "bridge", "complete": "true", "status": "reachable"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases",
+      "match": {"method": "GET", "path": "/rest/ip/dhcp-server/lease"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*A", "address": "172.16.4.90", "mac-address": null, "host-name": "no-mac-lease", "status": "bound"},
+            {".id": "*B", "address": "172.16.4.91", "mac-address": "2C:C8:1B:11:22:33", "host-name": "waiting-host", "status": "waiting", "last-seen": "3d"},
+            {".id": "*C", "active-address": "172.16.4.23", "active-mac-address": "B4:2E:99:AA:BB:CC", "address": "172.16.4.23", "mac-address": "B4:2E:99:AA:BB:CC", "host-name": "printer-hp", "status": "bound", "last-seen": "wat", "expires-after": "1d2h"},
+            "this should have been an object"
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-neighbor",
+      "match": {"method": "GET", "path": "/rest/ip/neighbor"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "address": "172.16.4.2", "identity": "no-mac-neighbor", "platform": "Ubiquiti", "interface": "bridge"},
+            "this should have been an object",
+            {".id": "*2", "address": "172.16.4.3", "mac-address": "78:8A:20:44:55:66", "identity": "voip-1", "platform": "Yealink", "board": "T46S", "system-caps": "telephone", "discovered-by": "lldp"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "no-wireless-anywhere",
+      "match": {"method": "GET", "path_prefix": "/rest/"},
+      "responses": [
+        {"status": 406, "json": {"error": 406, "message": "Not Acceptable", "detail": "no such command or directory (wireless)"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {"error": 404, "message": "Not Found"}
+  },
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "mikrotik:$HOST:router",
+      "mikrotik:$HOST:host:b4:2e:99:12:34:56",
+      "mikrotik:$HOST:host:b4:2e:99:aa:bb:cc",
+      "mikrotik:$HOST:host:78:8a:20:44:55:66"
+    ],
+    "ids_absent": [
+      "mikrotik:$HOST:host:01:00:5e:00:00:fb",
+      "mikrotik:$HOST:host:00:00:00:00:00:00",
+      "mikrotik:$HOST:host:2c:c8:1b:11:22:33",
+      "mikrotik:routerboard:"
+    ],
+    "assets": [
+      {
+        "id": "mikrotik:$HOST:router",
+        "fields": {
+          "deviceType": "Router",
+          "model": "RB760iGS",
+          "ipAddresses": "172.16.4.1",
+          "macAddresses": "64:d1:54:00:aa:01"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "mikrotik:$HOST:host:b4:2e:99:aa:bb:cc",
+        "fields": {
+          "hostnames": "printer-hp",
+          "ipAddresses": "172.16.4.23",
+          "mikrotik_observed_by": "arp,dhcp-lease",
+          "mikrotik_lease_status": "bound"
+        }
+      },
+      {
+        "id": "mikrotik:$HOST:host:b4:2e:99:12:34:56",
+        "fields": {
+          "mikrotik_arp_status": "stale"
+        },
+        "fields_absent": ["ipAddresses", "hostnames"]
+      },
+      {
+        "id": "mikrotik:$HOST:host:78:8a:20:44:55:66",
+        "fields": {
+          "deviceType": "IP Phone",
+          "manufacturer": "Yealink",
+          "model": "T46S",
+          "hostnames": "voip-1",
+          "ipAddresses": "172.16.4.3"
+        }
+      }
+    ],
+    "log_contains": [
+      "ARP contributed 2 entries",
+      "DHCP leases contributed 1 entries (1 filtered as not bound)",
+      "discovery neighbors contributed 1 entries (1 had no MAC and were skipped)",
+      "0 of 3 wireless registration tables were present",
+      "no RouterBOARD serial is available",
+      "reported 1 router and 3 observed devices"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

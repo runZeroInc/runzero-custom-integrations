@@ -1,0 +1,75 @@
+{
+  "name": "snipe-it",
+  "integration": "snipe-it",
+  "description": "Imports three hardware rows created over a real Snipe-IT REST API, proving the per-row MAC custom-field mapping, that a row without a MAC does not inherit the previous row's, and that the foreign id carries the instance scope rather than being the bare auto-increment primary key.",
+  "compose": "compose.yml",
+  "service": "snipeit",
+  "port": 80,
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "web server answering",
+      "http": {"path": "/", "status": [200, 302]},
+      "timeout": 600,
+      "interval": 4
+    }
+  ],
+
+  "seed": "seed.py",
+  "seed_timeout": 900,
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "${seed.api_token}"
+  },
+
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "snipe-it:$HOST:hardware:${seed.web_id}",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:55",
+          "deviceType": "Servers",
+          "manufacturer": "Dell Inc.",
+          "model": "PowerEdge R640",
+          "name": "web01",
+          "asset.tag": "RZ-0001",
+          "serial.number": "SVC12345",
+          "status.name": "Ready to Deploy",
+          "status.type": "deployable",
+          "model.number": "R640"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "snipe-it:$HOST:hardware:${seed.db_id}",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:66",
+          "name": "db01",
+          "asset.tag": "RZ-0002"
+        }
+      },
+      {
+        "id": "snipe-it:$HOST:hardware:${seed.monitor_id}",
+        "fields": {
+          "name": "monitor01",
+          "asset.tag": "RZ-0003"
+        },
+        "fields_absent": ["macAddresses", "ipAddresses"]
+      }
+    ]
+  },
+
+  "invariants": {
+    "skip": ["has_correlator"]
+  },
+  "_invariants_skip_reason": {
+    "has_correlator": "KNOWN DEFECT, and this scenario is the evidence. RZ-0003 has no MAC, and a real Snipe-IT v7 hardware payload carries no address data of its own -- addresses live in a custom field on the model's fieldset, and this row has none. The asset's `name` goes to a custom attribute rather than to hostnames, so the row emits with nothing to correlate on. The dead read of asset['networks'] that used to stand in for an address source is gone; giving a nameless row a correlator is an unresolved data-model question rather than a bug fix."
+  },
+
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

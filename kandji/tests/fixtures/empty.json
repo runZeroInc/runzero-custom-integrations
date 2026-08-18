@@ -1,0 +1,34 @@
+{
+  "name": "empty",
+  "integration": "kandji",
+  "description": "A tenant with no enrolled devices. The device list is a bare JSON array, and an empty array is the only stop condition the paginator has, so this proves the first empty page ends the walk immediately, no details call is attempted, and the run reports zero assets without raising an error.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-kandji-token"
+  },
+  "routes": [
+    {
+      "name": "device-list",
+      "match": {"method": "GET", "path": "/devices"},
+      "responses": [
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/devices", "query_contains": "offset=0"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/details"},
+      {"path": "/devices", "query_contains": "offset=300"}
+    ],
+    "log_contains": ["No assets found in Kandji"]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "name": "happy",
+  "integration": "kandji",
+  "description": "One page of the device list plus the per-device details fetch it fans out to, then an empty page to end the walk. Proves the N+1 detail call is made per device, that a device whose details call fails is skipped rather than emitted half-built, and that the offset advances by the fixed 300-record page size. namespaced_ids is skipped because the script emits the bare Kandji device_id as the foreign id with no tenant scope, so two Kandji tenants imported into one runZero account would collide; that is a real defect, reported separately.\n\nIt also pins both deviceType paths. platform iPad names a form factor outright and becomes Tablet, while platform Mac names none and has to be resolved from general.model, so \"MacBook Pro (16-inch, 2023)\" becomes Laptop instead of the device being left untyped. Both values are asserted on the emitted asset, and both are drawn from the vocabulary runZero accepts. A fourth row carries no device_id at all. It used to be passed to the detail fetch anyway, which requested /devices//details -- a URL for no device -- and left only a generic 'Error fetching details for device:' line with an empty id in it. It is now skipped before the request is made, and named in the log.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-kandji-token"
+  },
+  "routes": [
+    {
+      "name": "details-1",
+      "match": {
+        "method": "GET",
+        "path": "/devices/k0000000-0000-4000-8000-000000000001/details"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {
+              "model": "MacBook Pro (16-inch, 2023)",
+              "os_version": "14.4.1",
+              "device_name": "eng-mbp-01"
+            },
+            "network": {
+              "local_hostname": "eng-mbp-01",
+              "mac_address": "AC:DE:48:00:11:01",
+              "ip_address": "10.130.1.10",
+              "public_ip": "198.51.100.7"
+            },
+            "hardware_overview": {
+              "serial_number": "C02KANDJI001",
+              "processor_name": "Apple M3 Pro"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "details-2",
+      "match": {
+        "method": "GET",
+        "path": "/devices/k0000000-0000-4000-8000-000000000002/details"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {
+              "model": "iPad Air (5th generation)",
+              "os_version": "17.4"
+            },
+            "network": {
+              "local_hostname": "field-ipad-02",
+              "mac_address": "AC:DE:48:00:11:02",
+              "ip_address": [
+                "10.130.1.11",
+                "10.130.1.12"
+              ]
+            },
+            "hardware_overview": {
+              "serial_number": "DMPKANDJI002"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "details-3-unavailable",
+      "match": {
+        "method": "GET",
+        "path": "/devices/k0000000-0000-4000-8000-000000000003/details"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "detail": "Not found."
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-list",
+      "match": {
+        "method": "GET",
+        "path": "/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "device_id": "k0000000-0000-4000-8000-000000000001",
+              "device_name": "eng-mbp-01",
+              "platform": "Mac"
+            },
+            {
+              "device_id": "k0000000-0000-4000-8000-000000000002",
+              "device_name": "field-ipad-02",
+              "platform": "iPad"
+            },
+            {
+              "device_id": "k0000000-0000-4000-8000-000000000003",
+              "device_name": "gone-device-03",
+              "platform": "Mac"
+            },
+            {
+              "device_name": "half-enrolled-04",
+              "platform": "Mac"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "k0000000-0000-4000-8000-000000000001",
+      "k0000000-0000-4000-8000-000000000002"
+    ],
+    "ids_absent": [
+      "k0000000-0000-4000-8000-000000000003"
+    ],
+    "assets": [
+      {
+        "id": "k0000000-0000-4000-8000-000000000001",
+        "fields": {
+          "deviceType": "Laptop"
+        }
+      },
+      {
+        "id": "k0000000-0000-4000-8000-000000000002",
+        "fields": {
+          "deviceType": "Tablet"
+        }
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "limit=300"
+      },
+      {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "offset=0"
+      },
+      {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "offset=300"
+      },
+      {
+        "method": "GET",
+        "path": "/devices/k0000000-0000-4000-8000-000000000001/details"
+      },
+      {
+        "header_contains": "fixture-kandji-token"
+      }
+    ],
+    "log_contains": [
+      "Error fetching details for device: k0000000-0000-4000-8000-000000000003",
+      "kandji: skipping device with no device_id: name=half-enrolled-04"
+    ],
+    "requests_absent": [
+      {
+        "path": "/devices//details"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

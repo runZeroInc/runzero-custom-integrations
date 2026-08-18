@@ -1,0 +1,69 @@
+{
+  "name": "rpc-error",
+  "integration": "zabbix",
+  "description": "Zabbix reports failures inside a 200 response, not with an HTTP status, so an integration that only checks status codes reports success while importing nothing. This scenario returns the JSON-RPC error envelope on both the group listing and the host read: hostgroup.get answers -32500 'Application error.' with data 'No permissions to referred object or it does not exist!', which is what an under-privileged token really produces (permission failures map to ZBX_API_ERROR_PERMISSIONS / -32500, NOT to -32602 as an auth failure does), and the fallback host.get answers -32602 'Invalid params.' with 'Not authorized.'. Both messages must reach the log, the fallback must be attempted, and the run must end with zero assets rather than an abort. It also proves the streamed host.get path decodes an error envelope safely: jsonstream.iter_array ABORTS the script when its path is missing, so the body is checked for a result member before it is ever streamed.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "under-privileged-token"
+  },
+  "routes": [
+    {
+      "name": "apiinfo",
+      "match": {"method": "POST", "body_contains": "apiinfo.version"},
+      "responses": [{"status": 200, "json": {"jsonrpc": "2.0", "result": "6.4.18", "id": 1}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostgroup-get",
+      "match": {"method": "POST", "body_contains": "hostgroup.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32500,
+              "message": "Application error.",
+              "data": "No permissions to referred object or it does not exist!"
+            },
+            "id": 2
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-get",
+      "match": {"method": "POST", "body_contains": "host.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32602,
+              "message": "Invalid params.",
+              "data": "Not authorized."
+            },
+            "id": 3
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "log_contains": [
+      "hostgroup.get returned an error",
+      "No permissions to referred object",
+      "falling back to a single unfiltered host.get",
+      "host.get returned an error",
+      "Not authorized.",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

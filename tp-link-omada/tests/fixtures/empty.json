@@ -1,0 +1,61 @@
+{
+  "name": "empty",
+  "integration": "tp-link-omada",
+  "description": "A site with no adopted devices and no attached clients, and an explicitly configured site list so the sites collection is never called. Proves a configured siteId is used verbatim -- which is what an Open API application without site-list privileges needs -- and that an empty estate reports zero assets rather than failing.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret",
+    "site_ids": "660293f1ae766909a69251d4"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/openapi/authorize/token"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {"accessToken": "AT-empty", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT-empty"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {"totalRows": 0, "currentPage": 1, "currentSize": 0, "data": []}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"errorCode": -1600, "msg": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/openapi/authorize/token"},
+      {"method": "GET", "path_contains": "/sites/660293f1ae766909a69251d4/devices"},
+      {"method": "GET", "path_contains": "/sites/660293f1ae766909a69251d4/clients"}
+    ],
+    "requests_absent": [
+      {"path": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites"}
+    ]
+  },
+
+  "check_determinism": true
+}

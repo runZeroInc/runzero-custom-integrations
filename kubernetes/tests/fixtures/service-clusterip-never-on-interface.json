@@ -1,0 +1,95 @@
+{
+  "name": "service-clusterip-never-on-interface",
+  "integration": "kubernetes",
+  "description": "Proves ClusterIPs stay off Service interfaces while LoadBalancer ingress addresses reach them. The service CIDR defaults to the same range on virtually every install, so a ClusterIP identifies a different Service in each cluster and importing two clusters would IP-match kube-dns in one onto kube-dns in the other. The proof is by presence: 'ready-lb' has both a ClusterIP and an allocated ingress IP and is imported, while 'pending-lb' and 'nodeport-only' have a ClusterIP and nothing else and are NOT imported at all -- if the ClusterIP were placed on the interface those two would have produced assets. 'hostname-lb' additionally shows that an AWS-style hostname-only ingress yields no asset either, because network_interface needs an address. The node list is empty so the counts are entirely services. Skips namespaced_ids: kubernetes ids are 'k8s-svc-' plus the object UID and carry no ':'.",
+  "kwargs": {
+    "url": "$BASE",
+    "bearer_token": "fixture-sa-token",
+    "include_loadbalancer_services": "true"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v1/nodes"},
+      "responses": [{"status": 200, "json": {"kind": "NodeList", "items": []}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api/v1/services"},
+      "responses": [{"status": 200, "json": {
+        "kind": "ServiceList",
+        "items": [
+          {
+            "metadata": {"name": "ready-lb", "namespace": "edge", "uid": "cc000000-0000-4000-8000-00000000cc01", "creationTimestamp": "2026-03-01T10:00:00Z"},
+            "spec": {
+              "type": "LoadBalancer",
+              "clusterIP": "10.96.66.66",
+              "clusterIPs": ["10.96.66.66"],
+              "sessionAffinity": "None",
+              "ports": [{"name": "https", "port": 443, "protocol": "TCP", "nodePort": 32443}]
+            },
+            "status": {"loadBalancer": {"ingress": [{"ip": "203.0.113.77"}]}}
+          },
+          {
+            "metadata": {"name": "pending-lb", "namespace": "edge", "uid": "cc000000-0000-4000-8000-00000000cc02", "creationTimestamp": "2026-03-01T10:01:00Z"},
+            "spec": {
+              "type": "LoadBalancer",
+              "clusterIP": "10.96.55.55",
+              "clusterIPs": ["10.96.55.55"],
+              "ports": [{"name": "http", "port": 80, "protocol": "TCP", "nodePort": 32080}]
+            },
+            "status": {"loadBalancer": {}}
+          },
+          {
+            "metadata": {"name": "nodeport-only", "namespace": "edge", "uid": "cc000000-0000-4000-8000-00000000cc03", "creationTimestamp": "2026-03-01T10:02:00Z"},
+            "spec": {
+              "type": "NodePort",
+              "clusterIP": "10.96.77.77",
+              "clusterIPs": ["10.96.77.77"],
+              "ports": [{"name": "http", "port": 8080, "protocol": "TCP", "nodePort": 32180}]
+            },
+            "status": {}
+          },
+          {
+            "metadata": {"name": "hostname-lb", "namespace": "edge", "uid": "cc000000-0000-4000-8000-00000000cc04", "creationTimestamp": "2026-03-01T10:03:00Z"},
+            "spec": {
+              "type": "LoadBalancer",
+              "clusterIP": "10.96.88.88",
+              "clusterIPs": ["10.96.88.88"],
+              "ports": [{"name": "https", "port": 443, "protocol": "TCP", "nodePort": 32543}]
+            },
+            "status": {"loadBalancer": {"ingress": [{"hostname": "a1b2c3.elb.us-east-1.amazonaws.example"}]}}
+          }
+        ]
+      }}]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "k8s-svc-cc000000-0000-4000-8000-00000000cc01",
+        "fields": {
+          "ipAddresses": "203.0.113.77",
+          "hostnames": "ready-lb.edge.svc",
+          "k8s.service.cluster_ip": "10.96.66.66",
+          "k8s.service.cluster_ips": "[\"10.96.66.66\"]",
+          "deviceType": "Kubernetes Service"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "ids": ["k8s-svc-cc000000-0000-4000-8000-00000000cc01"],
+    "ids_absent": [
+      "k8s-svc-cc000000-0000-4000-8000-00000000cc02",
+      "k8s-svc-cc000000-0000-4000-8000-00000000cc03",
+      "k8s-svc-cc000000-0000-4000-8000-00000000cc04"
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "kubernetes: imported 0 nodes",
+      "kubernetes: imported 1 services"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

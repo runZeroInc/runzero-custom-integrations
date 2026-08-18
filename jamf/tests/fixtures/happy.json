@@ -1,0 +1,213 @@
+{
+  "name": "happy",
+  "integration": "jamf",
+  "description": "A full run over both inventories: OAuth client-credentials bootstrap, computers-inventory paged listing, the per-computer computers-inventory-detail enrichment, then the mobile-device equivalents. Proves the detail response is merged onto the inventory row (udid, hardware, and operatingSystem all come from the detail call), that the udid rather than the numeric inventory id becomes the asset id, that only PRIVATE addresses are imported so a remote endpoint's ISP address never lands on an asset, and that the three skip paths -- an inventory row with no id, a detail call that 404s, and a detail body with no udid -- each drop one device and let the run continue.\n\nnamespaced_ids is skipped because this integration emits the bare Jamf udid with no tenant scope. That is a real defect: two Jamf Pro tenants imported into one runZero account collide on any shared udid. Reported rather than fixed here.\n\nThe run also pins deviceType. Jamf carries no chassis field, so the type comes from the hardware model Apple names the device with: MacBookPro18,3 is a Laptop and iPad13,1 a Tablet, both taken from the model identifier rather than a marketing name. The Apple TV proves the documented `type` field is consulted first -- tvos answers on its own, without reading the model -- and the Apple Watch proves the other direction: watchos has no counterpart in runZero's device-type vocabulary, so that asset must carry NO deviceType rather than an approximation or an empty string, either of which would displace the fingerprint.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth/token"},
+      "responses": [{"status": 200, "json": {"access_token": "fixture-token-1", "expires_in": 3600, "token_type": "Bearer", "scope": ""}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-page-0",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory", "query_contains": "page=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 4,
+            "results": [
+              {"id": "101", "general": {"name": "syn-mac-101"}},
+              {"general": {"name": "syn-mac-no-inventory-id"}},
+              {"id": "103", "general": {"name": "syn-mac-103"}},
+              {"id": "104", "general": {"name": "syn-mac-104"}}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "computers-drained",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory"},
+      "responses": [{"status": 200, "json": {"totalCount": 4, "results": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-101",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/101"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "AAAA1111-0000-4000-8000-000000000101",
+            "general": {
+              "displayName": "syn-mac-101",
+              "lastIpAddress": "10.40.1.101",
+              "lastReportedIp": "203.0.113.55",
+              "platform": "Mac",
+              "supervised": false
+            },
+            "hardware": {
+              "macAddress": "00:50:56:00:40:01",
+              "altMacAddress": "00:50:56:00:40:02",
+              "serialNumber": "SYNSER0000101",
+              "model": "MacBookPro18,3",
+              "make": "Apple",
+              "totalRamMegabytes": 16384
+            },
+            "operatingSystem": {"name": "macOS", "version": "14.4.1", "build": "23E224"},
+            "security": {"sipStatus": "ENABLED", "gatekeeperStatus": "APP_STORE_AND_IDENTIFIED_DEVELOPERS"},
+            "extensionAttributes": [{"name": "Asset Tag", "values": ["SYN-0101"]}],
+            "userAndLocation": {"username": "syn.user", "extensionAttributes": [{"name": "Cost Center", "values": ["CC-42"]}]}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-103-gone",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/103"},
+      "responses": [{"status": 404, "json": {"httpStatus": 404, "errors": [{"code": "NOT_FOUND"}]}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-104-no-udid",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/104"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {"displayName": "syn-mac-104", "lastIpAddress": "10.40.1.104"},
+            "hardware": {"macAddress": "00:50:56:00:40:04", "model": "iMac21,1", "make": "Apple"},
+            "operatingSystem": {"name": "macOS", "version": "13.6.6"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-page-0",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/detail", "query_contains": "page=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 3,
+            "results": [
+              {"mobileDeviceId": "201", "name": "syn ipad 201"},
+              {"mobileDeviceId": "202", "name": "syn appletv 202"},
+              {"mobileDeviceId": "203", "name": "syn watch 203"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "mobile-drained",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/detail"},
+      "responses": [{"status": 200, "json": {"totalCount": 3, "results": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-detail-201",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/201/detail"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "BBBB2222-0000-4000-8000-000000000201",
+            "name": "syn ipad 201",
+            "model": "iPad13,1",
+            "modelIdentifier": "iPad13,1",
+            "wifiMacAddress": "00:50:56:00:40:11",
+            "serialNumber": "SYNSER0000201",
+            "managed": true,
+            "supervised": true,
+            "general": {"osVersion": "17.4.1", "displayName": "syn ipad 201", "ipAddress": "10.40.2.201", "lastInventoryUpdateDate": "2026-08-01T09:00:00Z"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-detail-202",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/202/detail"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "BBBB2222-0000-4000-8000-000000000202",
+            "name": "syn appletv 202",
+            "type": "tvos",
+            "model": "Apple TV 4K",
+            "modelIdentifier": "AppleTV14,1",
+            "wifiMacAddress": "00:50:56:00:40:12",
+            "serialNumber": "SYNSER0000202",
+            "general": {"osVersion": "17.4", "displayName": "syn appletv 202", "ipAddress": "10.40.2.202"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-detail-203",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/203/detail"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "BBBB2222-0000-4000-8000-000000000203",
+            "name": "syn watch 203",
+            "type": "watchos",
+            "model": "Apple Watch Series 9",
+            "modelIdentifier": "Watch7,1",
+            "wifiMacAddress": "00:50:56:00:40:13",
+            "serialNumber": "SYNSER0000203",
+            "general": {"osVersion": "10.4", "displayName": "syn watch 203", "ipAddress": "10.40.2.203"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "AAAA1111-0000-4000-8000-000000000101",
+      "BBBB2222-0000-4000-8000-000000000201",
+      "BBBB2222-0000-4000-8000-000000000202",
+      "BBBB2222-0000-4000-8000-000000000203"
+    ],
+    "assets": [
+      {"id": "AAAA1111-0000-4000-8000-000000000101", "fields": {"model": "MacBookPro18,3", "deviceType": "Laptop"}},
+      {"id": "BBBB2222-0000-4000-8000-000000000201", "fields": {"model": "iPad13,1", "deviceType": "Tablet"}},
+      {"id": "BBBB2222-0000-4000-8000-000000000202", "fields": {"deviceType": "Smart TV"}},
+      {"id": "BBBB2222-0000-4000-8000-000000000203", "fields_absent": ["deviceType"]}
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/oauth/token", "body_contains": "grant_type=client_credentials"},
+      {"method": "GET", "path": "/api/v1/computers-inventory", "query_contains": "page-size=100"},
+      {"method": "GET", "path": "/api/v1/computers-inventory-detail/101", "header_contains": "fixture-token-1"},
+      {"method": "GET", "path": "/api/v2/mobile-devices/201/detail"},
+      {"method": "GET", "path": "/api/v2/mobile-devices/202/detail"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/computers-inventory-detail/102"}
+    ],
+    "log_contains": [
+      "jamf: skipping inventory item with no id: name=syn-mac-no-inventory-id",
+      "jamf: skipped 1 inventory item(s) with no id",
+      "Failed to retrieve details for ID: 103",
+      "jamf: skipping detail record with no udid/mobileDeviceId: name=syn-mac-104",
+      "jamf: skipped 1 detail record(s) with no udid/mobileDeviceId",
+      "jamf: read 4 computer and 3 mobile inventory item(s), reported 4 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

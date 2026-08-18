@@ -1,0 +1,66 @@
+{
+  "name": "auth-oauth",
+  "integration": "tailscale",
+  "description": "OAuth client-credentials mode. Supplying a client_id switches the script off API-key mode and makes it exchange the secret at /api/v2/oauth/token first; this proves the bootstrap call happens, that the returned access token (not the client secret) is what authorizes the device call, and that the devices:core:read scope is requested. namespaced_ids is skipped because the script emits a bare \"tailscale-<device id>\" with no tenant scope, reported separately as a defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "tailnet": "T1234CNTRL",
+    "client_id": "fixture-oauth-client",
+    "api_key_or_client_secret": "fixture-oauth-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v2/oauth/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "ts-oauth-access-token", "token_type": "Bearer", "expires_in": 3600}}
+      ]
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v2/tailnet/T1234CNTRL/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "id": "90211000000001",
+                "name": "oauth-node-01.example.ts.net",
+                "hostname": "oauth-node-01",
+                "user": "svc@example.invalid",
+                "os": "linux",
+                "clientVersion": "1.62.1",
+                "addresses": ["100.102.20.1"],
+                "authorized": true,
+                "created": "2026-01-05T00:00:00Z",
+                "tags": ["tag:server"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["tailscale-90211000000001"],
+    "min_requests": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v2/oauth/token"},
+      {"method": "GET", "path": "/api/v2/tailnet/T1234CNTRL/devices", "query_contains": "fields=all"},
+      {"header_contains": "ts-oauth-access-token"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "header_contains": "fixture-oauth-secret"}
+    ],
+    "log_contains": [
+      "tailscale: using OAuth client credentials",
+      "tailscale: reported 1 assets"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

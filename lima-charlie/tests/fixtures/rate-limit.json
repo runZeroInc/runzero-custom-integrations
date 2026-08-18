@@ -1,0 +1,54 @@
+{
+  "name": "rate-limit",
+  "integration": "lima-charlie",
+  "description": "LimaCharlie answers the token exchange and the sensors call with 429 once each, then relents. get_json/post_json retry transient statuses three times by default, so the script must absorb both without hand-rolling a retry loop and still import the sensor. Proves the retry re-sends the same request (the oid query on the exchange, the bearer on the data call).\n\nnamespaced_ids is skipped: id=sid carries no organization scope, a previously reported defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "jwt_url": "$BASE",
+    "organization_id": "8bd1f0e2-0000-4000-8000-000000000001",
+    "api_token": "fixture-lc-secret"
+  },
+  "routes": [
+    {
+      "name": "jwt-throttled-then-ok",
+      "match": {"method": "POST", "path": "/"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "rate limited"}},
+        {"status": 200, "json": {"jwt": "fixture-lc-jwt"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-throttled-then-ok",
+      "match": {"method": "GET", "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "rate limited"}},
+        {
+          "status": 200,
+          "json": {
+            "sensors": [
+              {
+                "sid": "aaaa0009-0000-4000-8000-000000000009",
+                "hostname": "syn-lc-throttled.example.com",
+                "arch": 2,
+                "int_ip": "192.0.2.90",
+                "mac_addr": "00-11-22-33-44-09"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["aaaa0009-0000-4000-8000-000000000009"],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "query_contains": "oid=8bd1f0e2-0000-4000-8000-000000000001"},
+      {"method": "GET", "header_contains": "fixture-lc-jwt"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

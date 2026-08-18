@@ -1,0 +1,104 @@
+{
+  "name": "multi-view",
+  "integration": "infoblox",
+  "description": "Two network views carrying the SAME RFC 1918 network and the SAME address. On a Grid with overlapping address space these are different devices, so the network view has to be part of the imported id. Two assets must come out, not one: if the view were dropped from the id both rows would collide and the unique_ids invariant would fire. Also proves each per-view read is scoped by network_view and that the enumeration walks every view rather than only the default one.\n\ncheck_determinism is disabled and expect.ids is unused because this integration namespaces ids by the Grid host AND PORT and the fixture server binds a fresh ephemeral port per run; see the happy scenario for the full reasoning.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_leases": "true",
+    "include_host_records": "false"
+  },
+  "routes": [
+    {
+      "name": "network-views",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/networkview"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "networkview/a:default/true", "name": "default", "is_default": true},
+              {"_ref": "networkview/b:dmz/false", "name": "dmz", "is_default": false}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "leases",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/lease"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "lease/a:10.70.0.5/default", "address": "10.70.0.5", "binding_state": "ACTIVE", "hardware": "00:1a:2b:70:00:05", "client_hostname": "corp-host-5", "starts": 1754000000, "cltt": 1755100000}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "lease/b:10.70.0.5/dmz", "address": "10.70.0.5", "binding_state": "ACTIVE", "hardware": "00:1a:2b:70:00:99", "client_hostname": "dmz-host-5", "starts": 1754000000, "cltt": 1755100000}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/network"},
+      "responses": [
+        {"status": 200, "json": {"result": [{"_ref": "network/a:10.70.0.0/24/default", "network": "10.70.0.0/24", "network_view": "default"}]}},
+        {"status": 200, "json": {"result": [{"_ref": "network/b:10.70.0.0/24/dmz", "network": "10.70.0.0/24", "network_view": "dmz"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/ipv4address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "ipv4address/a:10.70.0.5", "ip_address": "10.70.0.5", "network": "10.70.0.0/24", "network_view": "default", "status": "USED", "usage": ["DHCP"], "names": ["corp-host-5.corp.example.net"]}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "ipv4address/b:10.70.0.5", "ip_address": "10.70.0.5", "network": "10.70.0.0/24", "network_view": "dmz", "status": "USED", "usage": ["DHCP"], "names": ["dmz-host-5.dmz.example.net"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 7,
+    "requests_include": [
+      {"method": "GET", "path": "/wapi/v2.13.1/lease", "query_contains": "network_view=default"},
+      {"method": "GET", "path": "/wapi/v2.13.1/lease", "query_contains": "network_view=dmz"},
+      {"method": "GET", "path": "/wapi/v2.13.1/ipv4address", "query_contains": "network_view=dmz"}
+    ],
+    "log_contains": [
+      "infoblox: view default: 1 networks, 1 leases, 0 host addresses",
+      "infoblox: view dmz: 1 networks, 1 leases, 0 host addresses",
+      "infoblox: view default: reported 1 addresses",
+      "infoblox: view dmz: reported 1 addresses"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

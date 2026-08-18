@@ -1,0 +1,166 @@
+{
+  "name": "empty",
+  "integration": "pihole",
+  "description": "A freshly installed Pi-hole that has served no clients. Must report zero assets, still release the API seat, and not fail the task.",
+  "kwargs": {
+    "url": "$BASE",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {
+        "method": "POST",
+        "path": "/api/auth"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "session": {
+              "valid": true,
+              "totp": false,
+              "sid": "vFA+EP4MQ5JJvJg+3Q2Jnw=",
+              "csrf": "Ux87YTIiMOf/GKCefVIOMw=",
+              "validity": 300,
+              "message": "correct password"
+            },
+            "took": 0.003
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "version",
+      "match": {
+        "method": "GET",
+        "path": "/api/info/version"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": {
+              "core": {
+                "local": {
+                  "branch": "master",
+                  "version": "v6.1.2",
+                  "hash": "955e36a9"
+                },
+                "remote": {
+                  "version": "v6.1.2",
+                  "hash": "955e36a9"
+                }
+              },
+              "web": {
+                "local": {
+                  "branch": "master",
+                  "version": "v6.1",
+                  "hash": "f69f7e88"
+                },
+                "remote": {
+                  "version": "v6.1",
+                  "hash": "f69f7e88"
+                }
+              },
+              "ftl": {
+                "local": {
+                  "branch": "master",
+                  "version": "v6.1.3",
+                  "hash": "64441ed6"
+                },
+                "remote": {
+                  "version": "v6.1.3",
+                  "hash": "64441ed6"
+                }
+              },
+              "docker": {
+                "local": null,
+                "remote": null
+              }
+            },
+            "took": 0.003
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "leases",
+      "match": {
+        "method": "GET",
+        "path": "/api/dhcp/leases"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "leases": [],
+            "took": 0.001
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/api/network/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [],
+            "took": 0.001
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "logout",
+      "match": {
+        "method": "DELETE",
+        "path": "/api/auth"
+      },
+      "responses": [
+        {
+          "status": 204,
+          "text": ""
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "error": {
+        "key": "not_found",
+        "message": "Not found",
+        "hint": null
+      },
+      "took": 0.001
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "requests_include": [
+      {
+        "method": "DELETE",
+        "path": "/api/auth"
+      }
+    ],
+    "log_contains": [
+      "the network device table is empty",
+      "pihole: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,152 @@
+{
+  "name": "zabbix",
+  "integration": "zabbix",
+  "description": "Imports six hosts from a real Zabbix 7.0 over its JSON-RPC API, including the 'Zabbix server' host the product ships with itself, and proves the four decisions no hand-written fixture would think to test: an empty-ip DNS interface emits no service, a {$MACRO} port emits no service, free-text inventory MACs never reach an interface, and a 169.254/16 interface is filtered even though the platform would keep it.",
+  "compose": "compose.yml",
+  "service": "web",
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "frontend serving",
+      "http": {"path": "/", "status": [200, 302]},
+      "timeout": 300,
+      "interval": 3
+    },
+    {
+      "name": "schema imported",
+      "service": "db",
+      "exec": ["psql", "-U", "zabbix", "-d", "zabbix", "-tAc",
+               "select count(*) from users where username='Admin'"],
+      "contains": "1",
+      "timeout": 600,
+      "interval": 5
+    }
+  ],
+  "_ready_note": "Two layers, in order. nginx answers / within a second or two of `compose up`, long before the server daemon has finished importing several thousand schema statements into an empty database -- so the HTTP gate proves the web tier and the psql gate proves the data tier. Admin is inserted at the END of create.sql.gz, which is what makes it a signal that the import ran to completion rather than merely started. The seed then polls apiinfo.version itself, because a readiness gate can only issue a GET and every Zabbix API call is a POST.",
+
+  "seed": "seed.py",
+  "seed_timeout": 600,
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "${seed.api_token}",
+    "group_chunk": "2",
+    "include_disabled": "false"
+  },
+  "_kwargs_note": "group_chunk is deliberately set far below the number of host groups a stock Zabbix ships. Host groups are the only bound this integration has -- the Zabbix API has no offset or cursor of any kind -- so a chunk size of 2 against 8 groups makes the run issue four host.get calls instead of one, and exercises the cross-chunk dedupe on a host that belongs to more than one group. url is passed WITHOUT /api_jsonrpc.php so the endpoint-appending path is what runs; the frontend image serves at the root, a package install serves it under /zabbix, and the integration has to cope with both.",
+
+  "expect": {
+    "asset_count": 6,
+
+    "assets": [
+      {
+        "id": "zabbix:$HOST:${seed.switch_id}",
+        "fields": {
+          "hostnames": "rz-core-switch",
+          "ipAddresses": "10.211.55.21",
+          "macAddresses": "0c:c4:7a:1b:2c:3d\t0c:c4:7a:1b:2c:3e",
+          "macPairs": "10.211.55.21=0c:c4:7a:1b:2c:3d",
+          "deviceType": "Switch",
+          "os": "Cisco IOS",
+          "osVersion": "Cisco IOS 15.2(4)E7",
+          "manufacturer": "Cisco",
+          "model": "Catalyst 2960X",
+          "tags": "critical\tenv:lab\tgroup:runZero Container Test\tserial:FDO1234X5YZ\tzabbix",
+          "zabbix_hostid": "${seed.switch_id}",
+          "zabbix_server": "$HOST",
+          "zabbix_interface_count": "2",
+          "zabbix_inventory_present": "true",
+          "zabbix_inventory_mode": "0",
+          "zabbix_inventory_macaddress_a": "0C:C4:7A:1B:2C:3D",
+          "zabbix_inventory_macaddress_b": "0c-c4-7a-1b-2c-3e"
+        }
+      },
+
+      {
+        "id": "zabbix:$HOST:${seed.dns_id}",
+        "fields": {
+          "hostnames": "ns1.lab.example.com\trz-dns-by-name",
+          "deviceType": "Server",
+          "os": "Debian GNU/Linux",
+          "zabbix_interface_count": "1"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "_services", "_software"]
+      },
+
+      {
+        "id": "zabbix:$HOST:${seed.apipa_id}",
+        "fields": {
+          "hostnames": "rz-apipa-only",
+          "zabbix_interface_count": "1",
+          "zabbix_inventory_mode": "-1",
+          "zabbix_inventory_present": "false"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "_services"]
+      },
+
+      {
+        "id": "zabbix:$HOST:${seed.junk_mac_id}",
+        "fields": {
+          "hostnames": "rz-junk-mac",
+          "ipAddresses": "10.211.55.25",
+          "zabbix_inventory_macaddress_a": "see label on rear panel",
+          "zabbix_inventory_macaddress_b": "00:00:00:00:00:00"
+        },
+        "fields_absent": ["macAddresses", "macPairs"]
+      },
+
+      {
+        "id": "zabbix:$HOST:${seed.macro_port_id}",
+        "fields": {
+          "hostnames": "rz-macro-port",
+          "ipAddresses": "10.211.55.26",
+          "zabbix_interface_count": "1"
+        },
+        "fields_absent": ["_services"]
+      },
+
+      {
+        "id": "zabbix:$HOST:${seed.builtin_id}",
+        "fields": {
+          "hostnames": "${seed.builtin_name}",
+          "tags": "group:Zabbix servers\tzabbix",
+          "zabbix_status": "monitored",
+          "zabbix_inventory_mode": "1",
+          "zabbix_inventory_present": "true",
+          "zabbix_inventory_location_lat": "56.95387",
+          "zabbix_inventory_location_lon": "24.22067",
+          "zabbix_interface_count": "1"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "_services", "_software"]
+      }
+    ],
+
+    "ids_absent": ["zabbix:$HOST:${seed.disabled_id}"],
+
+    "min_services_total": 3,
+    "min_software_total": 2,
+
+    "log_contains": [
+      "zabbix: server API version ${seed.api_version}",
+      "zabbix: walking ${seed.group_count} host groups in chunks of 2",
+      "zabbix: reported 6 hosts"
+    ]
+  },
+
+  "_expect_notes": {
+    "builtin": "Not seeded -- discovered. Zabbix ships a host called 'Zabbix server' on 127.0.0.1:10050 with inventory_mode 1, and its shipped inventory really does carry Zabbix's own office coordinates in Riga (56.95387, 24.22067). Asserting them proves the run reached the product's own data rather than only the rows this test wrote. Its interface is loopback, so the platform filters the address away and the host emits with no address and no service -- which is also what makes it the case that proves an asset here can survive on a hostname alone.",
+    "dns": "useip=0 means Zabbix stores the ip column as the EMPTY STRING and polls the DNS name instead. A Service needs an address, so the interface must produce none rather than being bound to a guessed one. Around a third of a real Zabbix estate is addressed this way, and no fixture author invents an interface with a blank ip.",
+    "apipa": "169.254.10.5 is what a host reports when DHCP failed. The platform's IsUnicast deliberately KEEPS link-local, so this address would reach the asset if the integration did not filter it -- and two unrelated APIPA hosts would then correlate to each other. fields_absent on ipAddresses is the real assertion; the no_loopback_interfaces invariant only has something to catch because a genuine 169.254 address is present in the source.",
+    "junk_mac": "macaddress_a and macaddress_b are free-text inventory fields that Zabbix validates in no way at all. A prose note and an all-zero MAC are both things sites really put there. Both survive as attributes and neither reaches a NetworkInterface, which is why macAddresses and macPairs are asserted absent while the raw values are asserted present.",
+    "macro_port": "The interface port is '{$AGENT_PORT}', a user macro only the server can resolve. Zabbix accepts it as a port; it is not a number. The host keeps its address and emits no service.",
+    "macs": "macAddresses shows 0c:c4:7a:1b:2c:3d while the source attribute keeps the raw 0C:C4:7A:1B:2C:3D, and macaddress_b was written in the hyphen form 0c-c4-7a-1b-2c-3e yet normalizes to the same colon form. 0c has the locally-administered bit clear, so unlike the docker-bridge 02:42:... MACs in the pihole and adguard-home cases, network_interface() leaves these bytes unchanged.",
+    "disabled": "rz-disabled is created with status=1 and must not appear while include_disabled is false. The integration re-decides this client-side as well as asking the server to filter, because the filter is server-side and a proxied or older frontend can ignore it."
+  },
+
+  "invariants": {"skip": []},
+
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

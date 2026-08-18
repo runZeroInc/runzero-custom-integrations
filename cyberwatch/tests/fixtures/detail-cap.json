@@ -1,0 +1,122 @@
+{
+  "name": "detail-cap",
+  "integration": "cyberwatch",
+  "description": "Opt-in N+1 enrichment capped at one asset over three. Proves the cap is honoured (both detail routes error if asked for a second asset), that the two assets past the cap are still imported from the listing alone, and that the skip count is logged. The unenriched assets also carry mixed addresses[] arrays, proving the per-element IP/hostname sniff runs on the listing path and not only on the detail path.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_access_key": "fixture-access",
+    "api_secret_key": "fixture-secret",
+    "include_details": "true",
+    "detail_limit": "1"
+  },
+  "routes": [
+    {
+      "name": "server-list",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 201,
+              "hostname": "app-201",
+              "category": "server",
+              "created_at": "2025-03-01T00:00:00.000Z",
+              "last_communication": "2026-08-12T06:00:00.000Z",
+              "addresses": ["10.71.0.11"],
+              "os": {"name": "Debian 12", "short_name": "debian12", "type": "Os::Debian"}
+            },
+            {
+              "id": 202,
+              "hostname": "app-202",
+              "category": "desktop",
+              "created_at": "2025-03-02T00:00:00.000Z",
+              "last_communication": "2026-08-12T06:05:00.000Z",
+              "addresses": ["10.71.0.12", "app-202.corp.example.net", "0.0.0.0", "169.254.7.7"],
+              "os": {"name": "Windows 11 Pro", "type": "Os::Windows"}
+            },
+            {
+              "id": 203,
+              "hostname": "app-203",
+              "category": "hypervisor",
+              "created_at": "2025-03-03T00:00:00.000Z",
+              "last_communication": "2026-08-12T06:10:00.000Z",
+              "addresses": ["::1", "app-203.corp.example.net"],
+              "os": {"name": "VMware ESXi 8.0", "type": "Os::Esxi"}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vuln-detail-201",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers/201"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 201,
+            "addresses": ["10.71.0.11", "app-201.corp.example.net"],
+            "analyzed_at": "2026-08-12T05:55:00.000Z",
+            "cve_announcements": [
+              {"cve_code": "CVE-2026-44444", "score": 7.5, "published": "2026-01-10T00:00:00.000Z", "detected_at": "2026-01-20T00:00:00.000Z", "active": true}
+            ],
+            "updates": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-detail-201",
+      "match": {"method": "GET", "path": "/api/v3/assets/servers/201"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 201,
+            "packages": [{"product": "nginx", "version": "1.24.0", "type": "Packages::Deb", "vendor": "Debian"}],
+            "ports": [{"port": 443, "protocol": "tcp", "package": {"product": "nginx", "version": "1.24.0"}}],
+            "services": [{"name": "nginx", "status": "running"}]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-past-the-cap",
+      "match": {"method": "GET", "path_regex": "/servers/20[23]$"},
+      "responses": [
+        {"status": 500, "text": "the detail cap was not honoured"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "cyberwatch:127.0.0.1:201",
+      "cyberwatch:127.0.0.1:202",
+      "cyberwatch:127.0.0.1:203"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v3/vulnerabilities/servers/201"},
+      {"method": "GET", "path": "/api/v3/assets/servers/201"},
+      {"method": "GET", "path": "/api/v3/vulnerabilities/servers", "query_contains": "page=2"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/servers/202"},
+      {"path_contains": "/servers/203"}
+    ],
+    "min_software_total": 1,
+    "min_services_total": 1,
+    "log_contains": [
+      "detail limit of 1 reached; software, services, and CVEs were not imported for 2 of 3 assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "empty",
+  "integration": "slurpit",
+  "description": "A portal that has been installed but has not discovered anything yet, and whose site table is also empty. Slurp'it's free tier parses data for a limited device count even though discovery is unlimited, so a thin or empty result set is a normal operating state rather than a fault. It must report zero assets and exit cleanly.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/platform/ping"},
+      "responses": [{"status": 200, "json": {"status": "up"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/sites"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/devices"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "requests_include": [
+      {"path_contains": "/api/devices", "query_contains": "offset=0"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=512"}
+    ],
+    "log_contains": [
+      "slurpit: reported 0 devices",
+      "slurpit: no assets retrieved"
+    ]
+  },
+
+  "check_determinism": true
+}

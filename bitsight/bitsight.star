@@ -5,9 +5,20 @@ CONFIG = {
     "name": "Bitsight",
     "type": "inbound",
     "description": "Imports company assets from Bitsight.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
+    "matchBehavior": "no-id-match no-id-break",
     "params": [
+        {
+            "key": "url",
+            "label": "Bitsight API URL",
+            "type": "url",
+            "required": False,
+            "default": "https://api.bitsighttech.com",
+            "placeholder": "https://api.bitsighttech.com",
+            "description": "Bitsight's API endpoint. Override only for a regional or self-hosted deployment.",
+        },
         {
             "key": "company_id",
             "label": "Company ID",
@@ -30,15 +41,32 @@ load('base64', base64_encode='encode', base64_decode='decode')
 load('http', 'get_json', 'basic')
 load('kwargs', 'get_http_options')
 load('net', 'network_interface')
+load('re', re_match='match')
 load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
 load('time', 'parse_time')
 
-#Change the URL to match your Guardicore BITSIGHT server
-BITSIGHT_BASE_URL = 'https://api.bitsighttech.com'
-RUNZERO_REDIRECT = 'https://console.runzero.com/'
+# Used when the url parameter is unset. The endpoint stays configurable rather
+# than compiled in, so a regional or non-production deployment can be reached
+# without editing the script.
+DEFAULT_BITSIGHT_URL = 'https://api.bitsighttech.com'
 
-def build_assets(assets, company_id, http_options):
+# parse_time ABORTS the script on a value it cannot parse rather than returning
+# an error, and Starlark has no exception handling -- so a timestamp is screened
+# against this before the call. Testing the result instead does not work:
+# parse_time never returns, so a `!= None` check after it is dead code.
+RFC3339_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$"
+
+# A hard bound on either cursor walk. Bitsight pages 100 rows at a time, so this
+# is well past any real company's asset or finding count, and it means a cursor
+# that never resolves cannot spin forever.
+MAX_PAGES = 1001
+
+def build_assets(assets, base_url, company_id, http_options):
     assets_import = []
+    # `asset` is the record's whole identity here, so a row without one cannot
+    # be imported. Counted rather than logged per record: a bad export would
+    # otherwise be one line per row across the whole company.
+    skipped = 0
     for asset in assets:
         ip_addresses = asset.get('ip_addresses', [])
         bitsight_tags = asset.get('tags') or []
@@ -46,12 +74,12 @@ def build_assets(assets, company_id, http_options):
         asset_name = asset.get('asset', '')
         asset_type = asset.get('asset_type', '')
         if not asset_name:
-            print("bitsight: skipping record with no asset field")
+            skipped += 1
             continue
         asset_id = "bitsight:{}:{}".format(asset_type or "unknown", asset_name)
         app_grade = str(asset.get('app_grade', ''))
         country_code = str(asset.get('country_code', ''))
-        country = str(asset.get('coutry', ''))
+        country = str(asset.get('country') or '')
         hosted_by = asset.get('hosted_by') or {}
         hosted_by_guid = hosted_by.get('guid', '')
         hosted_by_name = hosted_by.get('name', '')
@@ -123,18 +151,23 @@ def build_assets(assets, company_id, http_options):
         vulns = []
         if ip_addresses:
             for address in ip_addresses:
-                findings = get_findings(address, company_id, http_options)
+                findings = get_findings(address, base_url, company_id, http_options)
                 for finding in findings:
                     vuln = build_vuln(finding)
                     vulns.append(vuln)
         elif not ip_addresses and asset_name:
-            findings = get_findings(asset_name, company_id, http_options)
+            findings = get_findings(asset_name, base_url, company_id, http_options)
             for finding in findings:
                 vuln = build_vuln(finding)
                 vulns.append(vuln)
         
         # create the network interfaces
+        # network_interface returns None when no address survives -- a domain or
+        # CIDR asset has none, and Bitsight returns those whenever the is_ip
+        # filter is relaxed. Passing [None] to ImportAsset aborts the entire
+        # run, so such an asset gets no interface and correlates on its name.
         interface = network_interface(ips=ip_addresses, mac=None)
+        interfaces = [interface] if interface else []
 
         # Build assets for import
         assets_import.append(
@@ -142,12 +175,13 @@ def build_assets(assets, company_id, http_options):
                 id=asset_id,
                 hostnames=[asset_name],
                 tags=tags,
-                networkInterfaces=[interface],
+                networkInterfaces=interfaces,
                 customAttributes=to_custom_attributes(custom_attributes),
                 vulnerabilities=vulns,
-                matchBehavior="no-id-match no-id-break",
             )
         )
+    if skipped > 0:
+        print("bitsight: skipped {} records with no asset field".format(skipped))
     return assets_import
 
 def build_vuln(vuln):
@@ -166,10 +200,15 @@ def build_vuln(vuln):
         service_address = service_address.split(':')[0]
     service_port = int(details.get('dest_port', 0))
     service_transport = diligence_annotations.get('transport', '')
+    # Bitsight reports first_seen as a bare date, so it is padded out to RFC 3339
+    # before parsing. The value is then screened rather than parsed on trust:
+    # parse_time aborts the script on anything it cannot handle, so a finding
+    # with no first_seen -- or one carrying a shape Bitsight has never
+    # documented -- used to take the whole import down along with every finding
+    # and asset already built.
     first_seen = vuln.get('first_seen')
-    # reformat timestamp if it is not in proper format
-    if first_seen and 'T' not in first_seen: first_seen = first_seen + 'T00:00:00Z'
-    first_detected_ts = parse_time(first_seen)
+    if type(first_seen) == "string" and 'T' not in first_seen:
+        first_seen = first_seen + 'T00:00:00Z'
     cvss2_base_score = details.get('cvss', {}).get('base', [])
     cvss2_base_score = float(cvss2_base_score[0]) if cvss2_base_score else 0
     severity_score = float(vuln.get('severity') or 0)
@@ -215,57 +254,101 @@ def build_vuln(vuln):
                     'threatActivityScoreLabel': threat_activity_score_label
                     }
     
-    return Vulnerability(id=identifier,
-                        name=name,
-                        description=description,
-                        firstDetectedTS=first_detected_ts,
-                        serviceAddress=service_address,
-                        servicePort=service_port,
-                        serviceTransport=service_transport,
-                        cvss2BaseScore=cvss2_base_score,
-                        riskRank=risk_rank,
-                        severityScore=severity_score,
-                        solution=solution,
-                        customAttributes=to_custom_attributes(custom_attributes)
-                        )
+    vuln_args = {
+                'id': identifier,
+                'name': name,
+                'description': description,
+                'serviceAddress': service_address,
+                'servicePort': service_port,
+                'serviceTransport': service_transport,
+                'cvss2BaseScore': cvss2_base_score,
+                'riskRank': risk_rank,
+                'severityScore': severity_score,
+                'solution': solution,
+                'customAttributes': to_custom_attributes(custom_attributes)
+                }
 
-def get_assets(company_id, http_options):
+    # Omitted rather than set from an unscreened value, so a finding with an
+    # unusable first_seen still becomes a vulnerability instead of ending the run.
+    if type(first_seen) == "string" and re_match(RFC3339_RE, first_seen):
+        vuln_args['firstDetectedTS'] = parse_time(first_seen)
+
+    return Vulnerability(**vuln_args)
+
+def get_page(url, http_options, params):
+    """Fetch one page, omitting `params` entirely when there is nothing to send.
+
+    Bitsight's links.next is an absolute URL that already carries its own limit
+    and offset. The HTTP helper REPLACES a URL's query string with `params`
+    rather than merging into it, so re-sending the filter on the cursor discarded
+    the offset and re-fetched page one on every iteration -- every asset and
+    every finding arriving as many times as there were pages. The cursor is
+    followed verbatim instead; the filter it already encodes is preserved.
+    """
+    options = dict(http_options)
+    if params:
+        options['params'] = params
+    return get_json(url, **options)
+
+def get_assets(base_url, company_id, http_options):
     assets_all = []
-    total_count = 10000
-    url = BITSIGHT_BASE_URL + '/ratings/v1/companies/' + company_id + '/assets?'
+    total_count = None
+    url = base_url + '/ratings/v1/companies/' + company_id + '/assets'
     params = {'is_ip': 'true'}
     # The default operation is to return only IP-based assets (i.e. filter out domains and CIDRs) comment the above params variable and uncomment the following params variable if you wish to import all asset types.
     # params = {}
 
-    while len(assets_all) < total_count - 1:
-        data, err = get_json(url, params=params, **http_options)
+    for _page in range(1, MAX_PAGES):
+        data, err = get_page(url, http_options, params)
         if err:
-            print('failed to retrieve assets:', err)
+            print('bitsight: failed to retrieve assets: {}'.format(err))
             break
         if not data:
             break
-        url = data.get('links', {}).get('next', '')
-        total_count = data.get('count', 1)
         assets_all.extend(data.get('results', []))
+
+        # `count` is a backstop rather than the loop driver. The walk used to be
+        # bounded by len(assets_all) < count - 1, which stops one row short of
+        # the reported total and so drops the last page; an absent count made it
+        # one instead, ending the walk after a single page.
+        count = data.get('count')
+        if type(count) == "int":
+            total_count = count
+
+        url = str((data.get('links') or {}).get('next', '') or '')
+        if not url:
+            break
+        params = {}
+        if total_count != None and len(assets_all) >= total_count:
+            break
 
     return assets_all
 
-def get_findings(asset, company_id, http_options):
+def get_findings(asset, base_url, company_id, http_options):
     vulns_all = []
-    vulns_count = 10000
-    url = BITSIGHT_BASE_URL + '/ratings/v1/companies/' + company_id + '/findings?'
+    total_count = None
+    url = base_url + '/ratings/v1/companies/' + company_id + '/findings'
     params = {'assets.asset': asset}
 
-    while len(vulns_all) < vulns_count - 1:
-        data, err = get_json(url, params=params, **http_options)
+    for _page in range(1, MAX_PAGES):
+        data, err = get_page(url, http_options, params)
         if err:
-            print('failed to retrieve findings:', err)
+            print('bitsight: failed to retrieve findings: {}'.format(err))
             break
         if not data:
             break
-        url = data.get('links', {}).get('next', '')
-        vulns_count = data.get('count', 1)
         vulns_all.extend(data.get('results', []))
+
+        count = data.get('count')
+        if type(count) == "int":
+            total_count = count
+
+        url = str((data.get('links') or {}).get('next', '') or '')
+        if not url:
+            break
+        params = {}
+        if total_count != None and len(vulns_all) >= total_count:
+            break
 
     return vulns_all
 
@@ -273,12 +356,15 @@ def get_findings(asset, company_id, http_options):
 def main(*args, **kwargs):
     company_id = kwargs['company_id']
     token = kwargs['api_token']
+    # The platform applies the CONFIG default, but fall back explicitly so the
+    # script still works if it is invoked without one.
+    base_url = (kwargs.get('url') or DEFAULT_BITSIGHT_URL).rstrip('/')
     b64_creds = base64_encode(token + ':')
     http_options = get_http_options(kwargs, headers={'Accept': 'application/json', 'Authorization': 'Basic ' + b64_creds})
-    assets = get_assets(company_id, http_options)
+    assets = get_assets(base_url, company_id, http_options)
 
     # Build and stream asset import via report_assets instead of returning a list
-    if not report_assets(build_assets(assets, company_id, http_options)):
-        print('no assets')
+    reported = report_assets(build_assets(assets, base_url, company_id, http_options))
+    print('bitsight: reported {} assets'.format(reported))
 
     return None

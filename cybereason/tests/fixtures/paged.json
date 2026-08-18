@@ -1,0 +1,109 @@
+{
+  "name": "paged",
+  "integration": "cybereason",
+  "description": "Three sensor pages at page_size 2. Proves the offset advances by the page size and is carried in the request body of the following call (offset 0, then 2, then 4), that hasMoreResults drives the walk, and that the repeated-page guard fires: the third response replays the second page verbatim, which is what a deployment that ignores offset would do, and the run stops there instead of looping forever. Four assets are imported, not six.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/login.html"},
+      "responses": [{
+        "status": 200,
+        "headers": {"Set-Cookie": "JSESSIONID=FIXTUREPAGED01; Path=/", "Content-Type": "text/html"},
+        "text": "<html>ok</html>"
+      }],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "sensors-page-1",
+      "match": {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":0"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {"sensorId": "page1-a", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-P1A_0800270000A1",
+             "machineName": "HOST-P1A", "fqdn": "HOST-P1A", "internalIpAddress": "10.70.1.1",
+             "osType": "WINDOWS", "osVersionType": "Windows_10", "status": "ONLINE"},
+            {"sensorId": "page1-b", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-P1B_0800270000B2",
+             "machineName": "HOST-P1B", "fqdn": "HOST-P1B", "internalIpAddress": "10.70.1.2",
+             "osType": "LINUX", "status": "ONLINE"}
+          ],
+          "totalResults": 6,
+          "hasMoreResults": true
+        }
+      }],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-2",
+      "match": {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":2"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {"sensorId": "page2-a", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-P2A_0800270000C3",
+             "machineName": "HOST-P2A", "fqdn": "HOST-P2A", "internalIpAddress": "10.70.2.1",
+             "osType": "LINUX", "status": "ONLINE"},
+            {"sensorId": "page2-b", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-P2B_0800270000D4",
+             "machineName": "HOST-P2B", "fqdn": "HOST-P2B", "internalIpAddress": "10.70.2.2",
+             "osType": "LINUX", "status": "ONLINE"}
+          ],
+          "totalResults": 6,
+          "hasMoreResults": true
+        }
+      }],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-3-replays-page-2",
+      "match": {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":4"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {"sensorId": "page2-a", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-P2A_0800270000C3",
+             "machineName": "HOST-P2A", "fqdn": "HOST-P2A", "internalIpAddress": "10.70.2.1",
+             "osType": "LINUX", "status": "ONLINE"},
+            {"sensorId": "page2-b", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-P2B_0800270000D4",
+             "machineName": "HOST-P2B", "fqdn": "HOST-P2B", "internalIpAddress": "10.70.2.2",
+             "osType": "LINUX", "status": "ONLINE"}
+          ],
+          "totalResults": 6,
+          "hasMoreResults": true
+        }
+      }],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "cybereason:127.0.0.1:page1-a",
+      "cybereason:127.0.0.1:page1-b",
+      "cybereason:127.0.0.1:page2-a",
+      "cybereason:127.0.0.1:page2-b"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":0"},
+      {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":2"},
+      {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":4"},
+      {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"limit\":2"}
+    ],
+    "requests_absent": [
+      {"body_contains": "\"offset\":6"}
+    ],
+    "log_contains": [
+      "cybereason: 6 sensors reported by the tenant",
+      "cybereason: the tenant repeated the page at offset 4, stopping",
+      "cybereason: reported 4 sensors from 127.0.0.1"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

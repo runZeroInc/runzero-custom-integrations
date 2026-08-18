@@ -1,0 +1,560 @@
+{
+  "name": "happy",
+  "integration": "openwrt",
+  "description": "A full ubus collection against a stock OpenWrt install. Every response shape here was CAPTURED FROM A REAL OpenWrt 24.10.8 (aarch64_generic rootfs container, image digest sha256:f6dd33c1d9b7...) over POST /ubus, then scrubbed: the board model, hostname, and MACs were replaced with router-shaped synthetic values, and the container's own eth0/docker0 addresses were replaced with a plausible LAN. The envelope, the acls block, the result:[0,payload] framing, the upper-case MACs, and the getDHCPLeases/getHostHints/getNetworkDevices field names are verbatim from that capture. Proves: session.login returns the session id at result[1].ubus_rpc_session; the ACL list in the login reply gates which objects are attempted; the router asset is built from system.board plus system.info plus getNetworkDevices; loopback (flags.loopback) and docker0 are dropped from the router's interfaces while br-lan is kept, because on OpenWrt the LAN bridge is where the device's real address lives; the router's OWN MAC appearing in getHostHints does not produce a second asset; one host seen by host hints, a DHCP lease, and a wireless association folds into ONE asset carrying all three sources; and a host whose only addresses are APIPA and IPv6 link-local imports with its MAC alone rather than with an address that identifies nothing. It also pins the one place the id and the interface deliberately DISAGREE: the locally administered MAC de:ad:be:ef:00:01 keeps its LAA bit in the foreign id, because the id must stay lossless, while the emitted NetworkInterface carries dc:ad:be:ef:00:01 because net.network_interface clears that bit to help cross-source matching. If a future change routed the id through normalize_mac, this assertion is what would catch it. no_mac_in_id is skipped: an observed host has no identifier but its MAC, and the id is deliberately paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-root",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "\"session\",\"login\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [
+              0,
+              {
+                "ubus_rpc_session": "c4511b5f0af76d802c6a993945457ea4",
+                "timeout": 900,
+                "expires": 900,
+                "acls": {
+                  "access-group": {
+                    "luci-base": ["read", "write"],
+                    "unauthenticated": ["read"]
+                  },
+                  "ubus": {
+                    "iwinfo": ["assoclist", "countrylist", "freqlist", "txpowerlist", "scan", "info"],
+                    "luci-rpc": ["getBoardJSON", "getHostHints", "getNetworkDevices", "getWirelessDevices", "getDHCPLeases", "getDUIDHints"],
+                    "network.interface": ["dump"],
+                    "session": ["access", "login"],
+                    "system": ["board", "info", "validate_firmware_image", "reboot"]
+                  }
+                },
+                "data": {
+                  "username": "fixture-root"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "system-board",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "\"system\",\"board\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": [
+              0,
+              {
+                "kernel": "6.6.93",
+                "hostname": "gw-branch01",
+                "system": "Qualcomm Atheros QCA956X ver 1 rev 0",
+                "model": "TP-Link Archer C7 v2",
+                "board_name": "tplink,archer-c7-v2",
+                "release": {
+                  "distribution": "OpenWrt",
+                  "version": "24.10.8",
+                  "revision": "r29233-443ec4032a",
+                  "target": "ath79/generic",
+                  "description": "OpenWrt 24.10.8 r29233-443ec4032a",
+                  "builddate": "1784877710"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-info",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "\"system\",\"info\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": [
+              0,
+              {
+                "localtime": 1786856432,
+                "uptime": 987654,
+                "load": [22016, 9664, 3392],
+                "memory": {
+                  "total": 134217728,
+                  "free": 71303168,
+                  "shared": 1077248,
+                  "buffered": 6059212,
+                  "available": 83886080,
+                  "cached": 17673461
+                },
+                "swap": {
+                  "total": 0,
+                  "free": 0
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-devices",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "getNetworkDevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": [
+              0,
+              {
+                "lo": {
+                  "name": "lo",
+                  "wireless": false,
+                  "up": true,
+                  "mtu": 65536,
+                  "devtype": "ethernet",
+                  "mac": "00:00:00:00:00:00",
+                  "ipaddrs": [{"address": "127.0.0.1", "netmask": "255.0.0.0"}],
+                  "ip6addrs": [{"address": "::1", "netmask": "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"}],
+                  "type": 772,
+                  "ifindex": 1,
+                  "flags": {"up": true, "broadcast": false, "promisc": false, "loopback": true, "noarp": false, "multicast": false, "pointtopoint": false}
+                },
+                "br-lan": {
+                  "name": "br-lan",
+                  "wireless": false,
+                  "up": true,
+                  "mtu": 1500,
+                  "devtype": "bridge",
+                  "mac": "AA:BB:CC:00:11:01",
+                  "ipaddrs": [{"address": "192.168.1.1", "netmask": "255.255.255.0", "broadcast": "192.168.1.255"}],
+                  "ip6addrs": [{"address": "fe80::a8bb:ccff:fe00:1101", "netmask": "ffff:ffff:ffff:ffff::"}],
+                  "type": 1,
+                  "ifindex": 7,
+                  "flags": {"up": true, "broadcast": true, "promisc": false, "loopback": false, "noarp": false, "multicast": true, "pointtopoint": false}
+                },
+                "eth0.2": {
+                  "name": "eth0.2",
+                  "wireless": false,
+                  "up": true,
+                  "mtu": 1500,
+                  "devtype": "vlan",
+                  "mac": "AA:BB:CC:00:11:02",
+                  "ipaddrs": [{"address": "203.0.113.42", "netmask": "255.255.255.0", "broadcast": "203.0.113.255"}],
+                  "ip6addrs": [],
+                  "type": 1,
+                  "ifindex": 9,
+                  "flags": {"up": true, "broadcast": true, "promisc": false, "loopback": false, "noarp": false, "multicast": true, "pointtopoint": false}
+                },
+                "docker0": {
+                  "name": "docker0",
+                  "wireless": false,
+                  "up": true,
+                  "mtu": 1500,
+                  "devtype": "bridge",
+                  "mac": "02:42:8B:1C:44:F0",
+                  "ipaddrs": [{"address": "172.17.0.1", "netmask": "255.255.0.0", "broadcast": "172.17.255.255"}],
+                  "ip6addrs": [],
+                  "type": 1,
+                  "ifindex": 11,
+                  "flags": {"up": true, "broadcast": true, "promisc": false, "loopback": false, "noarp": false, "multicast": true, "pointtopoint": false}
+                },
+                "wlan0": {
+                  "name": "wlan0",
+                  "wireless": true,
+                  "up": true,
+                  "mtu": 1500,
+                  "devtype": "wlan",
+                  "mac": "AA:BB:CC:00:11:03",
+                  "ipaddrs": [],
+                  "ip6addrs": [],
+                  "type": 1,
+                  "ifindex": 12,
+                  "flags": {"up": true, "broadcast": true, "promisc": false, "loopback": false, "noarp": false, "multicast": true, "pointtopoint": false}
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-hints",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "getHostHints"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": [
+              0,
+              {
+                "00:11:22:33:44:99": {
+                  "ipaddrs": ["192.168.1.77"],
+                  "ip6addrs": []
+                },
+                "3C:22:FB:66:77:88": {
+                  "ipaddrs": ["192.168.1.202"],
+                  "ip6addrs": ["2001:db8:1234::202"],
+                  "name": "johns-macbook"
+                },
+                "44:65:0D:AA:11:22": {
+                  "ipaddrs": ["192.168.1.114"],
+                  "ip6addrs": [],
+                  "name": "nest-thermostat"
+                },
+                "B8:27:EB:33:44:55": {
+                  "ipaddrs": ["192.168.1.150"],
+                  "ip6addrs": [],
+                  "name": "raspberrypi"
+                },
+                "DE:AD:BE:EF:00:01": {
+                  "ipaddrs": ["169.254.10.5"],
+                  "ip6addrs": ["fe80::dcad:beff:feef:1"],
+                  "name": "stranded-printer"
+                },
+                "AA:BB:CC:00:11:01": {
+                  "ipaddrs": ["192.168.1.1"],
+                  "ip6addrs": [],
+                  "name": "gw-branch01"
+                },
+                "01:00:5E:7F:FF:FA": {
+                  "ipaddrs": ["239.255.255.250"],
+                  "ip6addrs": []
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "getDHCPLeases"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": [
+              0,
+              {
+                "dhcp_leases": [
+                  {
+                    "expires": 39600,
+                    "hostname": "nest-thermostat",
+                    "macaddr": "44:65:0D:AA:11:22",
+                    "duid": "0144650daa1122",
+                    "ipaddr": "192.168.1.114"
+                  },
+                  {
+                    "expires": 21600,
+                    "hostname": "raspberrypi",
+                    "macaddr": "B8:27:EB:33:44:55",
+                    "ipaddr": "192.168.1.150"
+                  },
+                  {
+                    "expires": 43100,
+                    "hostname": "johns-macbook",
+                    "macaddr": "3C:22:FB:66:77:88",
+                    "duid": "013c22fb667788",
+                    "ipaddr": "192.168.1.202"
+                  },
+                  {
+                    "expires": 0,
+                    "macaddr": "00:11:22:33:44:99",
+                    "ipaddr": "192.168.1.77"
+                  }
+                ],
+                "dhcp6_leases": [
+                  {
+                    "expires": 86000,
+                    "hostname": "office-nas",
+                    "macaddr": "00:11:32:AA:BB:CC",
+                    "duid": "00030001001132aabbcc",
+                    "ip6addr": "2001:db8:1234::50",
+                    "ip6addrs": ["2001:db8:1234::50", "fe80::211:32ff:feaa:bbcc"]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "wireless-devices",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "getWirelessDevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": [
+              0,
+              {
+                "radio0": {
+                  "up": true,
+                  "pending": false,
+                  "autostart": true,
+                  "disabled": false,
+                  "config": {"channel": "36", "band": "5g", "htmode": "HE80"},
+                  "interfaces": [
+                    {
+                      "section": "default_radio0",
+                      "ifname": "wlan0",
+                      "config": {"mode": "ap", "ssid": "branch-wifi", "encryption": "psk2", "network": ["lan"]}
+                    }
+                  ]
+                },
+                "radio1": {
+                  "up": true,
+                  "pending": false,
+                  "autostart": true,
+                  "disabled": false,
+                  "config": {"channel": "6", "band": "2g", "htmode": "HT20"},
+                  "interfaces": [
+                    {
+                      "section": "default_radio1",
+                      "ifname": "wlan1",
+                      "config": {"mode": "ap", "ssid": "branch-iot", "encryption": "psk2", "network": ["lan"]}
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assoclist-wlan0",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "\"device\":\"wlan0\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": [
+              0,
+              {
+                "results": [
+                  {
+                    "mac": "3C:22:FB:66:77:88",
+                    "signal": -54,
+                    "noise": -95,
+                    "inactive": 120,
+                    "connected_time": 8412,
+                    "rx": {"rate": 866700, "mhz": 80},
+                    "tx": {"rate": 866700, "mhz": 80}
+                  },
+                  {
+                    "mac": "F0:18:98:11:22:33",
+                    "signal": -71,
+                    "noise": -95,
+                    "inactive": 3400,
+                    "connected_time": 155,
+                    "rx": {"rate": 292500, "mhz": 40},
+                    "tx": {"rate": 292500, "mhz": 40}
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assoclist-wlan1",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "\"device\":\"wlan1\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "result": [
+              0,
+              {
+                "results": [
+                  {
+                    "mac": "44:65:0D:AA:11:22",
+                    "signal": -63,
+                    "noise": -92,
+                    "inactive": 900,
+                    "connected_time": 302011,
+                    "rx": {"rate": 65000, "mhz": 20},
+                    "tx": {"rate": 65000, "mhz": 20}
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "jsonrpc": "2.0",
+      "id": 99,
+      "error": {"code": -32000, "message": "Object not found"}
+    }
+  },
+  "expect": {
+    "asset_count": 8,
+    "ids": [
+      "openwrt:$HOST:router",
+      "openwrt:$HOST:host:00:11:22:33:44:99",
+      "openwrt:$HOST:host:3c:22:fb:66:77:88",
+      "openwrt:$HOST:host:44:65:0d:aa:11:22",
+      "openwrt:$HOST:host:b8:27:eb:33:44:55",
+      "openwrt:$HOST:host:de:ad:be:ef:00:01",
+      "openwrt:$HOST:host:00:11:32:aa:bb:cc",
+      "openwrt:$HOST:host:f0:18:98:11:22:33"
+    ],
+    "ids_absent": [
+      "openwrt:$HOST:host:aa:bb:cc:00:11:01",
+      "openwrt:$HOST:host:01:00:5e:7f:ff:fa",
+      "openwrt:$HOST:host:02:42:8b:1c:44:f0"
+    ],
+    "assets": [
+      {
+        "id": "openwrt:$HOST:router",
+        "fields": {
+          "deviceType": "Router",
+          "os": "OpenWrt",
+          "osVersion": "24.10.8",
+          "model": "TP-Link Archer C7 v2",
+          "hostnames": "gw-branch01",
+          "openwrt_board_name": "tplink,archer-c7-v2",
+          "openwrt_target": "ath79/generic",
+          "openwrt_kernel": "6.6.93",
+          "openwrt_uptime_seconds": "987654"
+        }
+      },
+      {
+        "id": "openwrt:$HOST:host:3c:22:fb:66:77:88",
+        "fields": {
+          "hostnames": "johns-macbook",
+          "macAddresses": "3c:22:fb:66:77:88",
+          "openwrt_observed_by": "host-hints,dhcp-lease,wireless",
+          "openwrt_wifi_ssid": "branch-wifi",
+          "openwrt_wifi_ifname": "wlan0",
+          "openwrt_wifi_signal_dbm": "-54",
+          "openwrt_lease_duid": "013c22fb667788"
+        }
+      },
+      {
+        "id": "openwrt:$HOST:host:de:ad:be:ef:00:01",
+        "fields": {
+          "hostnames": "stranded-printer",
+          "macAddresses": "dc:ad:be:ef:00:01"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      },
+      {
+        "id": "openwrt:$HOST:host:f0:18:98:11:22:33",
+        "fields": {
+          "openwrt_observed_by": "wireless",
+          "openwrt_wifi_ssid": "branch-wifi"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "hostnames"
+        ]
+      },
+      {
+        "id": "openwrt:$HOST:host:00:11:32:aa:bb:cc",
+        "fields": {
+          "hostnames": "office-nas",
+          "openwrt_observed_by": "dhcpv6-lease",
+          "openwrt_lease_family": "ipv6"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "POST", "path_contains": "/ubus", "body_contains": "\"session\",\"login\""},
+      {"body_contains": "\"timeout\":900"},
+      {"body_contains": "c4511b5f0af76d802c6a993945457ea4"},
+      {"body_contains": "getDHCPLeases"},
+      {"body_contains": "\"family\":0"},
+      {"body_contains": "\"device\":\"wlan1\""}
+    ],
+    "log_contains": [
+      "reported 1 router and 7 observed hosts"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  },
+  "check_determinism": true
+}

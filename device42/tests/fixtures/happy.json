@@ -1,0 +1,102 @@
+{
+  "name": "happy",
+  "description": "Proves the new url parameter reaches the appliance and that devices, MACs and IPs parse. namespaced_ids is skipped: the id is the bare Device42 id with no appliance scope, and it falls back through four different id spaces (reported defect). Also pins tag import. Device42's tags reached the script fine but were dropped by `type(raw_tags) == list`, which compares against the Starlark `list` BUILTIN -- type() returns a string, so that test was always false and no asset has ever carried a tag since the integration shipped. It failed silently: no error, no log line, just an empty list. Device 9001 now carries three tags that must all survive.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_scheme": "basic",
+    "credential": "Zml4dHVyZTpmaXh0dXJl"
+  },
+  "routes": [
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api/1.0/devices/all/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "code": 0,
+            "msg": "ok",
+            "Devices": [
+              {
+                "id": 9001,
+                "name": "syn-srv-a",
+                "os": "Ubuntu",
+                "osver": "22.04",
+                "hw_model": "PowerEdge R640",
+                "manufacturer": "Dell",
+                "type": "physical",
+                "ip_addresses": [
+                  {
+                    "ip": "10.90.0.10",
+                    "macaddress": "00:11:22:33:44:c1"
+                  }
+                ],
+                "mac_addresses": [
+                  {
+                    "mac": "00:11:22:33:44:c2"
+                  }
+                ],
+                "tags": [
+                  "prod",
+                  "pci-scope",
+                  "owner:platform-team"
+                ]
+              },
+              {
+                "id": 9002,
+                "name": "syn-srv-b",
+                "os": "Windows",
+                "osver": "2019",
+                "ip_addresses": [
+                  {
+                    "ip": "10.90.0.11",
+                    "macaddress": "00:11:22:33:44:c3"
+                  }
+                ],
+                "mac_addresses": []
+              },
+              {
+                "name": "syn-no-id",
+                "os": "Linux",
+                "ip_addresses": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "9001",
+      "9002"
+    ],
+    "log_contains": [
+      "device42: skipped 1 devices with no stable id"
+    ],
+    "requests_include": [
+      {
+        "header_contains": "Zml4dHVyZTpmaXh0dXJl"
+      }
+    ],
+    "assets": [
+      {
+        "id": "9001",
+        "fields": {
+          "ipAddresses": "10.90.0.10",
+          "os": "Ubuntu",
+          "tags": "owner:platform-team\tpci-scope\tprod"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

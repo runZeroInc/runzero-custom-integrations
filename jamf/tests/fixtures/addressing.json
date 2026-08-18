@@ -1,0 +1,132 @@
+{
+  "name": "addressing",
+  "integration": "jamf",
+  "description": "The two addressing defects, in one run.\n\n(1) ONE ADDRESS, ONE INTERFACE. Jamf reports addresses at the DEVICE level and MACs at the HARDWARE level, and nothing ties either to the other. The old shape built one interface per MAC and put the FULL address list on every one of them, so a Mac with a Thunderbolt dock -- two MACs, one address -- claimed that address on both NICs. Device 301 is that Mac, and `macPairs` is where it shows: it must read exactly `00:50:56:00:41:01=10.41.0.31`, the primary MAC alone. (macPairs is MAC=IP: runZero pins that order, and the reversed form is discarded by CleanMACPairs so it never reaches _macs.ipmap.) The old code produced a second pair binding the same address to the alternate MAC. Both MACs must still reach the asset, because a MAC is worth correlating on with or without an address beside it.\n\n(2) THE FILTER MISSED TWO WHOLE RANGES. The old is_private_ip() was eighteen startswith() tests, which cannot express a range that does not fall on a dotted boundary and had no way to reach IPv6 at all:\n  - 302 carries 100.100.5.20, RFC 6598 carrier-grade NAT. Every Apple device on a mobile carrier reports one of these; all of them were discarded.\n  - 303 carries fd12:3456:789a::20, an RFC 4193 unique local address. NO IPv6 address of any kind survived the old filter -- every one failed all eighteen tests.\nBoth must now import.\n\nAnd the replacement must not over-reach, which is what 304 and 305 are for. 172.32.0.5 is OUTSIDE 172.16.0.0/12 and must still be dropped -- a naive `172.` prefix would have taken it -- as must the public 203.0.113.99 beside it, leaving 304 with its MAC and no address at all. 305's 172.20.5.6 is inside the /12 and must survive, so the rewrite is proved to have kept what the enumeration got right.\n\nnamespaced_ids is skipped for the same reason as the happy scenario: the id is the bare Jamf udid with no tenant scope, a pre-existing defect reported rather than fixed here.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth/token"},
+      "responses": [{"status": 200, "json": {"access_token": "fixture-token-1", "expires_in": 3600, "token_type": "Bearer"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-page-0",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory", "query_contains": "page=0"},
+      "responses": [{"status": 200, "json": {"totalCount": 5, "results": [
+        {"id": "301", "general": {"name": "syn-mac-301"}},
+        {"id": "302", "general": {"name": "syn-mac-302"}},
+        {"id": "303", "general": {"name": "syn-mac-303"}},
+        {"id": "304", "general": {"name": "syn-mac-304"}},
+        {"id": "305", "general": {"name": "syn-mac-305"}}
+      ]}}]
+    },
+    {
+      "name": "computers-drained",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory"},
+      "responses": [{"status": 200, "json": {"totalCount": 5, "results": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-301",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/301"},
+      "responses": [{"status": 200, "json": {
+        "udid": "CCCC3333-0000-4000-8000-000000000301",
+        "general": {"displayName": "syn-mac-301", "lastIpAddress": "10.41.0.31"},
+        "hardware": {"macAddress": "00:50:56:00:41:01", "altMacAddress": "00:50:56:00:41:02", "model": "MacBookPro18,3", "make": "Apple"},
+        "operatingSystem": {"name": "macOS", "version": "14.4.1"}
+      }}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-302-cgnat",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/302"},
+      "responses": [{"status": 200, "json": {
+        "udid": "CCCC3333-0000-4000-8000-000000000302",
+        "general": {"displayName": "syn-mac-302", "lastIpAddress": "100.100.5.20"},
+        "hardware": {"macAddress": "00:50:56:00:41:03", "model": "MacBookAir10,1", "make": "Apple"},
+        "operatingSystem": {"name": "macOS", "version": "14.4.1"}
+      }}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-303-ula",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/303"},
+      "responses": [{"status": 200, "json": {
+        "udid": "CCCC3333-0000-4000-8000-000000000303",
+        "general": {"displayName": "syn-mac-303", "lastIpAddress": "fd12:3456:789a::20"},
+        "hardware": {"macAddress": "00:50:56:00:41:04", "model": "Macmini9,1", "make": "Apple"},
+        "operatingSystem": {"name": "macOS", "version": "14.4.1"}
+      }}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-304-public-only",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/304"},
+      "responses": [{"status": 200, "json": {
+        "udid": "CCCC3333-0000-4000-8000-000000000304",
+        "general": {"displayName": "syn-mac-304", "lastIpAddress": "172.32.0.5", "lastReportedIp": "203.0.113.99"},
+        "hardware": {"macAddress": "00:50:56:00:41:05", "model": "MacBookPro18,3", "make": "Apple"},
+        "operatingSystem": {"name": "macOS", "version": "14.4.1"}
+      }}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-305-rfc1918-172",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/305"},
+      "responses": [{"status": 200, "json": {
+        "udid": "CCCC3333-0000-4000-8000-000000000305",
+        "general": {"displayName": "syn-mac-305", "lastIpAddress": "172.20.5.6"},
+        "hardware": {"macAddress": "00:50:56:00:41:06", "model": "iMac21,1", "make": "Apple"},
+        "operatingSystem": {"name": "macOS", "version": "14.4.1"}
+      }}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-empty",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/detail"},
+      "responses": [{"status": 200, "json": {"totalCount": 0, "results": []}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "assets": [
+      {
+        "id": "CCCC3333-0000-4000-8000-000000000301",
+        "fields": {
+          "ipAddresses": "10.41.0.31",
+          "macAddresses": "00:50:56:00:41:01\t00:50:56:00:41:02",
+          "macPairs": "00:50:56:00:41:01=10.41.0.31"
+        }
+      },
+      {
+        "id": "CCCC3333-0000-4000-8000-000000000302",
+        "fields": {"ipAddresses": "100.100.5.20", "macAddresses": "00:50:56:00:41:03"}
+      },
+      {
+        "id": "CCCC3333-0000-4000-8000-000000000303",
+        "fields": {"ipAddresses": "fd12:3456:789a::20", "macAddresses": "00:50:56:00:41:04"}
+      },
+      {
+        "id": "CCCC3333-0000-4000-8000-000000000304",
+        "fields": {"macAddresses": "00:50:56:00:41:05"},
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "CCCC3333-0000-4000-8000-000000000305",
+        "fields": {"ipAddresses": "172.20.5.6", "macAddresses": "00:50:56:00:41:06"}
+      }
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/oauth/token"},
+      {"method": "GET", "path": "/api/v1/computers-inventory-detail/301"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]},
+  "check_determinism": true
+}

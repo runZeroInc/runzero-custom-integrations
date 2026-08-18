@@ -1,0 +1,114 @@
+{
+  "name": "happy",
+  "integration": "cybereason",
+  "description": "A form login that sets JSESSIONID, then one page of sensors. Proves the login cookie is replayed as a plain Cookie header on the REST call, that ids are namespaced by the tenant host, that only internalIpAddress reaches the interface while externalIpAddress/serverIp/privateServerIp stay attributes, that a loopback internalIpAddress is dropped without dropping the asset, that a sensor with no sensorId is skipped, and that a lastPylumUpdateTimestampMs far in the future is clamped to now rather than making the platform reject the whole record.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password",
+    "page_size": "200"
+  },
+  "routes": [
+    {
+      "name": "form-login",
+      "match": {"method": "POST", "path": "/login.html", "body_contains": "username=svc-runzero"},
+      "responses": [{
+        "status": 200,
+        "headers": {"Set-Cookie": "JSESSIONID=FIXTURESESSION01; Path=/; HttpOnly", "Content-Type": "text/html"},
+        "text": "<html><body>redirecting</body></html>"
+      }],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "sensors",
+      "match": {"method": "POST", "path": "/rest/sensors/query"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {
+              "sensorId": "9f3c1a2b4d5e-11223344",
+              "guid": "Yy1hYmMxMjM0",
+              "pylumId": "PYLUMCLIENT_FIXTURE_DESKTOP-VG9KE2U_0800273ADC2F",
+              "machineName": "DESKTOP-VG9KE2U",
+              "fqdn": "desktop-vg9ke2u.corp.example.com",
+              "internalIpAddress": "10.50.1.24",
+              "externalIpAddress": "198.51.100.9",
+              "serverIp": "10.50.0.5",
+              "privateServerIp": "10.50.0.5",
+              "osType": "WINDOWS",
+              "osVersionType": "Windows_10",
+              "deviceModel": "OptiPlex 7090",
+              "deviceType": "workstation",
+              "serialNumber": "SN-FIXTURE-0001",
+              "siteName": "HQ",
+              "groupName": "Default Group",
+              "policyName": "Standard",
+              "status": "ONLINE",
+              "isolated": false,
+              "outdated": "false",
+              "customTags": null,
+              "version": "23.1.62.0",
+              "firstSeenTime": 1767225600000,
+              "lastPylumUpdateTimestampMs": 4070908800000,
+              "lastPylumInfoMsgUpdateTime": 1767312000000
+            },
+            {
+              "sensorId": "7b1d0e9f8a6c-55667788",
+              "guid": "Yy1kZWY1Njc4",
+              "pylumId": "PYLUMCLIENT_FIXTURE_APP-NODE-3_ACDE480011AA",
+              "machineName": "app-node-3",
+              "fqdn": "app-node-3.svc.example.com",
+              "internalIpAddress": "127.0.0.1",
+              "externalIpAddress": "198.51.100.10",
+              "osType": "LINUX",
+              "osVersionType": "Linux",
+              "status": "ONLINE",
+              "siteName": "DC1",
+              "isolated": "false",
+              "firstSeenTime": 1767225600000,
+              "lastPylumUpdateTimestampMs": 1767398400000
+            },
+            {
+              "sensorId": "",
+              "guid": "Yy1ub3NlbnNvcmlk",
+              "pylumId": "PYLUMCLIENT_FIXTURE_ORPHAN-01_0800271234AB",
+              "machineName": "ORPHAN-01",
+              "internalIpAddress": "10.50.1.99",
+              "osType": "WINDOWS"
+            },
+            "this record is a string, not an object"
+          ],
+          "totalResults": 3,
+          "hasMoreResults": false
+        }
+      }],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cybereason:127.0.0.1:9f3c1a2b4d5e-11223344",
+      "cybereason:127.0.0.1:7b1d0e9f8a6c-55667788"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/login.html", "body_contains": "password=fixture-password"},
+      {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":0"},
+      {"header_contains": "JSESSIONID=FIXTURESESSION01"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/rest/visualsearch/"}
+    ],
+    "log_contains": [
+      "cybereason: 3 sensors reported by the tenant",
+      "cybereason: skipping non-object sensor record",
+      "cybereason: skipping sensor with no sensorId: guid=Yy1ub3NlbnNvcmlk",
+      "cybereason: reported 2 sensors from 127.0.0.1"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

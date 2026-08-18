@@ -1,0 +1,255 @@
+{
+  "name": "happy",
+  "integration": "zabbix",
+  "description": "A full Zabbix collection: an unauthenticated apiinfo.version probe, a hostgroup.get to enumerate the groups that bound the response, and one host.get carrying interfaces, the extended inventory, tags, and host groups. Every scalar in the host rows is a JSON STRING, which is what Zabbix really returns ('the Zabbix API always returns values as strings or arrays only'); the field set and the string typing follow a real 22-host production dump from a Zabbix 7.x server, and the interface and inventory shapes follow the vendor's own host.get and hostinterface.get examples. Proves: the version probe carries NO Authorization header while every other call does; selectInventory answering with an empty ARRAY on a host with inventory disabled does not abort; a free-text macaddress_a that is not a MAC is rejected instead of reaching an interface; an interface addressed by DNS with an empty ip produces no Service; a port that is a {$MACRO} reference produces no Service; a status-1 host is dropped even though the server returned it; and the inventory date_hw_expiry sitting in the year 2030 is kept as an attribute and never becomes a timestamp, because a future timestamp makes the platform reject the entire asset record.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-api-token-0123456789abcdef"
+  },
+  "routes": [
+    {
+      "name": "apiinfo",
+      "match": {"method": "POST", "path": "/api_jsonrpc.php", "body_contains": "apiinfo.version"},
+      "responses": [{"status": 200, "json": {"jsonrpc": "2.0", "result": "7.0.13", "id": 1}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostgroup-get",
+      "match": {"method": "POST", "path": "/api_jsonrpc.php", "body_contains": "hostgroup.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "result": [
+              {"groupid": "4", "name": "Zabbix servers"},
+              {"groupid": "19", "name": "Linux servers"}
+            ],
+            "id": 2
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-get",
+      "match": {"method": "POST", "path": "/api_jsonrpc.php", "body_contains": "host.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "result": [
+              {
+                "hostid": "10084",
+                "host": "zbx-srv01",
+                "name": "Zabbix server",
+                "status": "0",
+                "description": "Primary Zabbix server",
+                "flags": "0",
+                "maintenance_status": "0",
+                "active_available": "1",
+                "inventory_mode": "1",
+                "interfaces": [
+                  {"interfaceid": "1", "ip": "192.0.2.10", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "1", "error": ""},
+                  {"interfaceid": "2", "ip": "192.0.2.10", "dns": "", "port": "161", "type": "2", "main": "1", "useip": "1", "available": "1", "error": ""}
+                ],
+                "inventory": {
+                  "type": "Server",
+                  "type_full": "Rack server",
+                  "name": "zbx-srv01.example.com",
+                  "alias": "zbx-srv01",
+                  "os": "Linux",
+                  "os_full": "Ubuntu 24.04.2 LTS",
+                  "os_short": "Ubuntu",
+                  "serialno_a": "CZJ1234ABC",
+                  "serialno_b": "",
+                  "tag": "monitoring",
+                  "asset_tag": "AST-000112",
+                  "macaddress_a": "00:50:56:9A:1B:2C",
+                  "macaddress_b": "00:50:56:9A:1B:2D",
+                  "hardware": "ProLiant DL360 Gen10",
+                  "hardware_full": "HPE ProLiant DL360 Gen10 / 2x Xeon Silver 4210R / 128GB",
+                  "software": "Ubuntu 24.04.2 LTS",
+                  "software_full": "",
+                  "software_app_a": "Zabbix Server 7.0.13",
+                  "software_app_b": "PostgreSQL 16.4",
+                  "software_app_c": "",
+                  "software_app_d": "",
+                  "software_app_e": "",
+                  "contact": "netops@example.com",
+                  "location": "Building A / Rack 12",
+                  "location_lat": "",
+                  "location_lon": "",
+                  "notes": "",
+                  "chassis": "Rack Mount Chassis",
+                  "model": "DL360 Gen10",
+                  "hw_arch": "x86_64",
+                  "vendor": "HPE",
+                  "contract_number": "SUP-99881",
+                  "installer_name": "",
+                  "deployment_status": "Production",
+                  "url_a": "",
+                  "url_b": "",
+                  "url_c": "",
+                  "host_networks": "192.0.2.0/24",
+                  "host_netmask": "255.255.255.0",
+                  "host_router": "192.0.2.1",
+                  "oob_ip": "198.51.100.10",
+                  "oob_netmask": "255.255.255.0",
+                  "oob_router": "198.51.100.1",
+                  "date_hw_purchase": "2022-03-04",
+                  "date_hw_install": "2022-04-01",
+                  "date_hw_expiry": "2030-04-01",
+                  "date_hw_decomm": "",
+                  "site_city": "Austin",
+                  "site_state": "TX",
+                  "site_country": "US",
+                  "site_rack": "R12",
+                  "poc_1_name": "Net Ops",
+                  "poc_1_email": "netops@example.com"
+                },
+                "tags": [
+                  {"tag": "env", "value": "prod", "automatic": "0"},
+                  {"tag": "critical", "value": "", "automatic": "0"}
+                ],
+                "hostgroups": [
+                  {"groupid": "4", "name": "Zabbix servers"}
+                ]
+              },
+              {
+                "hostid": "10658",
+                "host": "clinkonesync",
+                "name": "clinkonesync",
+                "status": "0",
+                "description": "",
+                "flags": "4",
+                "maintenance_status": "0",
+                "active_available": "0",
+                "inventory_mode": "-1",
+                "interfaces": [
+                  {"interfaceid": "9", "ip": "", "dns": "clinkonesync.example.com", "port": "10050", "type": "1", "main": "1", "useip": "0", "available": "0", "error": ""}
+                ],
+                "inventory": [],
+                "tags": [],
+                "hostgroups": [{"groupid": "19", "name": "Linux servers"}]
+              },
+              {
+                "hostid": "10701",
+                "host": "sw-core-01",
+                "name": "Core switch 01",
+                "status": "0",
+                "description": "",
+                "flags": "0",
+                "maintenance_status": "1",
+                "active_available": "0",
+                "inventory_mode": "0",
+                "interfaces": [
+                  {"interfaceid": "11", "ip": "192.0.2.20", "dns": "", "port": "{$SNMP_PORT}", "type": "2", "main": "1", "useip": "1", "available": "1", "error": ""},
+                  {"interfaceid": "12", "ip": "127.0.0.1", "dns": "", "port": "10050", "type": "1", "main": "0", "useip": "1", "available": "0", "error": "no route to host"}
+                ],
+                "inventory": {
+                  "type": "Switch",
+                  "name": "sw-core-01",
+                  "os": "IOS-XE",
+                  "os_full": "17.09.04a",
+                  "macaddress_a": "see label on chassis",
+                  "macaddress_b": "",
+                  "vendor": "Cisco",
+                  "model": "C9300-48P",
+                  "serialno_a": "FDO2345BCDE",
+                  "location": "Building A / MDF"
+                },
+                "tags": [{"tag": "layer", "value": "core", "automatic": "0"}],
+                "hostgroups": [{"groupid": "19", "name": "Linux servers"}]
+              },
+              {
+                "hostid": "10999",
+                "host": "retired-host",
+                "name": "retired-host",
+                "status": "1",
+                "description": "decommissioned",
+                "flags": "0",
+                "maintenance_status": "0",
+                "active_available": "0",
+                "inventory_mode": "-1",
+                "interfaces": [{"interfaceid": "40", "ip": "192.0.2.90", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "0", "error": ""}],
+                "inventory": [],
+                "tags": [],
+                "hostgroups": [{"groupid": "19", "name": "Linux servers"}]
+              }
+            ],
+            "id": 3
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "zabbix:$HOST:10084",
+      "zabbix:$HOST:10658",
+      "zabbix:$HOST:10701"
+    ],
+    "ids_absent": ["zabbix:$HOST:10999"],
+    "assets": [
+      {
+        "id": "zabbix:$HOST:10084",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Linux",
+          "osVersion": "Ubuntu 24.04.2 LTS",
+          "manufacturer": "HPE",
+          "model": "DL360 Gen10",
+          "ipAddresses": "192.0.2.10",
+          "macAddresses": "00:50:56:9a:1b:2c\t00:50:56:9a:1b:2d",
+          "zabbix_inventory_date_hw_expiry": "2030-04-01",
+          "zabbix_inventory_present": "true",
+          "zabbix_inventory_site_rack": "R12"
+        }
+      },
+      {
+        "id": "zabbix:$HOST:10658",
+        "fields": {
+          "hostnames": "clinkonesync\tclinkonesync.example.com",
+          "zabbix_inventory_present": "false"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "os"]
+      },
+      {
+        "id": "zabbix:$HOST:10701",
+        "fields": {
+          "deviceType": "Switch",
+          "manufacturer": "Cisco",
+          "ipAddresses": "192.0.2.20"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "min_services_total": 2,
+    "min_software_total": 3,
+    "requests_include": [
+      {"method": "POST", "body_contains": "apiinfo.version"},
+      {"method": "POST", "body_contains": "hostgroup.get"},
+      {"method": "POST", "body_contains": "selectHostGroups"},
+      {"method": "POST", "body_contains": "\"selectInventory\":\"extend\""},
+      {"method": "POST", "body_contains": "\"groupids\""},
+      {"method": "POST", "header_contains": "Bearer fixture-api-token-0123456789abcdef"},
+      {"method": "POST", "header": {"Content-Type": "application/json-rpc"}}
+    ],
+    "requests_absent": [
+      {"body_contains": "selectParentTemplates"},
+      {"body_contains": "user.login"},
+      {"body_contains": "apiinfo.version", "header_contains": "Bearer"}
+    ],
+    "log_contains": [
+      "server API version 7.0.13",
+      "walking 2 host groups in chunks of 20",
+      "reported 3 hosts"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,190 @@
+{
+  "name": "system-insights",
+  "integration": "jumpcloud",
+  "description": "Software and MAC addresses from System Insights across the four platform cases. Proves the macOS host is read from the apps table and the Windows host from the programs table (each is asked for exactly the one that covers it, and requests_absent pins that neither is asked for the other), that a Linux host costs no software request at all because neither table covers it, and that a host whose systemInsights.state is not 'enabled' costs no System Insights request of any kind and is counted in the log line instead. It also proves the MAC join: the JumpCloud system inventory publishes no MAC, so en0's address only gains one because interface_details reported it, and the all-zero loopback MAC and a malformed one are both rejected rather than turned into interfaces that every host would appear to share.\n\nThe Linux host doubles as the second device-type case: 'Red Hat Enterprise Linux' contains no 'server' token, so its Server type can only come from the distribution itself being a server platform. Windows 11 and the two Macs must carry no deviceType -- a client OS says nothing about desktop versus laptop.",
+  "kwargs": {
+    "url": "$BASE",
+    "org_id": "fixture-org",
+    "api_key": "fixture-api-key",
+    "include_bound_users": "false",
+    "include_software": "true",
+    "include_mac_addresses": "true",
+    "page_size": "100"
+  },
+  "routes": [
+    {
+      "name": "systems",
+      "match": {"method": "GET", "path": "/api/systems"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 4,
+            "results": [
+              {
+                "_id": "6600000000000000000000d1",
+                "hostname": "mac-01",
+                "os": "Mac OS X",
+                "version": "14.5",
+                "active": true,
+                "systemInsights": {"state": "enabled"},
+                "created": "2026-03-01T08:00:00Z",
+                "lastContact": "2026-08-15T03:00:00Z",
+                "networkInterfaces": [
+                  {"name": "lo0", "address": "127.0.0.1", "internal": true},
+                  {"name": "en0", "address": "10.52.0.21", "internal": false}
+                ]
+              },
+              {
+                "_id": "6600000000000000000000d2",
+                "hostname": "win-01",
+                "os": "Windows 11",
+                "version": "10.0.22631",
+                "active": true,
+                "systemInsights": {"state": "enabled"},
+                "created": "2026-03-02T08:00:00Z",
+                "lastContact": "2026-08-15T03:05:00Z",
+                "networkInterfaces": [{"name": "Ethernet", "address": "10.52.0.22", "internal": false}]
+              },
+              {
+                "_id": "6600000000000000000000d3",
+                "hostname": "lin-01",
+                "os": "Red Hat Enterprise Linux",
+                "version": "9.4",
+                "active": true,
+                "systemInsights": {"state": "enabled"},
+                "created": "2026-03-03T08:00:00Z",
+                "lastContact": "2026-08-15T03:10:00Z",
+                "networkInterfaces": [{"name": "eth0", "address": "10.52.0.23", "internal": false}]
+              },
+              {
+                "_id": "6600000000000000000000d4",
+                "hostname": "mac-02",
+                "os": "Mac OS X",
+                "version": "13.6",
+                "active": true,
+                "systemInsights": {"state": "deferred"},
+                "created": "2026-03-04T08:00:00Z",
+                "lastContact": "2026-08-15T03:15:00Z",
+                "networkInterfaces": [{"name": "en0", "address": "10.52.0.24", "internal": false}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "insights-apps",
+      "match": {"method": "GET", "path": "/api/v2/systeminsights/apps"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "system_id": "6600000000000000000000d1",
+              "name": "Slack.app",
+              "bundle_name": "Slack",
+              "bundle_short_version": "4.38.121",
+              "bundle_version": "4.38.121.0",
+              "bundle_identifier": "com.tinyspeck.slackmacgap",
+              "path": "/Applications/Slack.app",
+              "category": "public.app-category.business",
+              "collection_time": "2026-08-15T02:00:00Z"
+            },
+            {
+              "system_id": "6600000000000000000000d1",
+              "name": "Xcode.app",
+              "bundle_name": "Xcode",
+              "bundle_short_version": "16.2",
+              "bundle_identifier": "com.apple.dt.Xcode",
+              "path": "/Applications/Xcode.app"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "insights-programs",
+      "match": {"method": "GET", "path": "/api/v2/systeminsights/programs"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "system_id": "6600000000000000000000d2",
+              "name": "7-Zip 24.08 (x64)",
+              "version": "24.08",
+              "publisher": "Igor Pavlov",
+              "install_location": "C:\\Program Files\\7-Zip\\",
+              "identifying_number": "{23170F69-40C1-2702-2408-000001000000}",
+              "install_date": "20260714"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "insights-interfaces",
+      "match": {"method": "GET", "path": "/api/v2/systeminsights/interface_details"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"system_id": "6600000000000000000000d1", "interface": "lo0", "mac": "00:00:00:00:00:00"},
+            {"system_id": "6600000000000000000000d1", "interface": "en0", "mac": "3c:22:fb:11:22:33"}
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {"system_id": "6600000000000000000000d2", "interface": "Ethernet", "mac": "not-a-mac"}
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {"system_id": "6600000000000000000000d3", "interface": "eth0", "mac": "00:50:56:aa:bb:cc"}
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "jumpcloud:fixture-org:6600000000000000000000d1",
+      "jumpcloud:fixture-org:6600000000000000000000d2",
+      "jumpcloud:fixture-org:6600000000000000000000d3",
+      "jumpcloud:fixture-org:6600000000000000000000d4"
+    ],
+    "min_software_total": 3,
+    "assets": [
+      {"id": "jumpcloud:fixture-org:6600000000000000000000d3", "fields": {"deviceType": "Server"}},
+      {"id": "jumpcloud:fixture-org:6600000000000000000000d1", "fields_absent": ["deviceType"]},
+      {"id": "jumpcloud:fixture-org:6600000000000000000000d2", "fields_absent": ["deviceType"]},
+      {"id": "jumpcloud:fixture-org:6600000000000000000000d4", "fields_absent": ["deviceType"]}
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/systeminsights/apps", "query_contains": "system_id%3Aeq%3A6600000000000000000000d1"},
+      {"method": "GET", "path": "/api/v2/systeminsights/programs", "query_contains": "system_id%3Aeq%3A6600000000000000000000d2"},
+      {"method": "GET", "path": "/api/v2/systeminsights/interface_details", "query_contains": "system_id%3Aeq%3A6600000000000000000000d3"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2/systeminsights/programs", "query_contains": "system_id%3Aeq%3A6600000000000000000000d1"},
+      {"path": "/api/v2/systeminsights/apps", "query_contains": "system_id%3Aeq%3A6600000000000000000000d2"},
+      {"path": "/api/v2/systeminsights/apps", "query_contains": "system_id%3Aeq%3A6600000000000000000000d3"},
+      {"path": "/api/v2/systeminsights/apps", "query_contains": "system_id%3Aeq%3A6600000000000000000000d4"},
+      {"path": "/api/v2/systeminsights/interface_details", "query_contains": "system_id%3Aeq%3A6600000000000000000000d4"},
+      {"path": "/api/systemusers"}
+    ],
+    "log_contains": [
+      "jumpcloud: System Insights is not enabled on 1 systems",
+      "jumpcloud: reported 4 of 4 systems"
+    ]
+  },
+  "invariants": {"skip": []}
+}

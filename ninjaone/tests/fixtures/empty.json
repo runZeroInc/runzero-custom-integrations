@@ -1,0 +1,42 @@
+{
+  "name": "empty",
+  "integration": "ninjaone",
+  "description": "A tenant with no devices. The token exchange succeeds, the first devices-detailed page is an empty array, and the run must end cleanly with zero assets and no second page request rather than looping or erroring.",
+  "kwargs": {
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/ws/oauth/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "token_type": "Bearer", "expires_in": 3600}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-detailed",
+      "match": {"method": "GET", "path": "/v2/devices-detailed"},
+      "responses": [
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/ws/oauth/token"},
+      {"method": "GET", "path": "/v2/devices-detailed"}
+    ],
+    "log_contains": [
+      "no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

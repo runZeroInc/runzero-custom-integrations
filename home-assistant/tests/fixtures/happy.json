@@ -1,0 +1,423 @@
+{
+  "name": "happy",
+  "integration": "home-assistant",
+  "description": "A realistic Home Assistant install: eleven entities of which only four carry an address, and a device registry holding six entries of which four are real network hardware. Entity payload shapes follow the State._as_dict serialization in home-assistant/core (entity_id, state, attributes, last_changed, last_reported, last_updated, context) and the ScannerEntity attribute keys ip/mac/host_name, with UniFi's raw client fields (oui, ap_mac, essid, vlan) riding along as extra_state_attributes. Timestamps use the +00:00 offset form Home Assistant actually emits - never Z - and one deliberately omits the fractional part, which is what happens when the microsecond is zero. This is the scenario that proves the scope decision: automations, the sun, a light, a temperature sensor, a legacy tracker with no MAC, a Zigbee bulb whose only connection is an IEEE address, and a cloud service entry are all skipped, while the access point, camera, smart plug, printer, phone, and absent laptop are imported. It also proves entity claiming - the printer's device_tracker entity enriches the registry device rather than becoming a second asset, which would be permanent because two foreign ids from one integration can never merge onto one asset.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-long-lived-token",
+    "device_page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "states",
+      "match": {
+        "method": "GET",
+        "path": "/api/states"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "entity_id": "sun.sun",
+              "state": "above_horizon",
+              "attributes": {
+                "next_dawn": "2026-08-16T05:12:00+00:00",
+                "elevation": 41.2,
+                "friendly_name": "Sun"
+              },
+              "last_changed": "2026-08-15T06:12:00.000000+00:00",
+              "last_reported": "2026-08-15T12:00:00.000000+00:00",
+              "last_updated": "2026-08-15T12:00:00.000000+00:00",
+              "context": {
+                "id": "01J0000000000000000000000A",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "automation.morning_lights",
+              "state": "on",
+              "attributes": {
+                "last_triggered": "2026-08-15T06:30:00+00:00",
+                "mode": "single",
+                "current": 0,
+                "id": "1690000000000",
+                "friendly_name": "Morning lights"
+              },
+              "last_changed": "2026-08-01T00:00:00.000000+00:00",
+              "last_updated": "2026-08-15T06:30:00.000000+00:00",
+              "context": {
+                "id": "01J0000000000000000000000B",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "light.kitchen",
+              "state": "off",
+              "attributes": {
+                "supported_color_modes": [
+                  "color_temp"
+                ],
+                "friendly_name": "Kitchen",
+                "supported_features": 0
+              },
+              "last_changed": "2026-08-15T09:00:00.000000+00:00",
+              "last_updated": "2026-08-15T09:00:00.000000+00:00",
+              "context": {
+                "id": "01J0000000000000000000000C",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "sensor.living_room_temperature",
+              "state": "21.4",
+              "attributes": {
+                "state_class": "measurement",
+                "unit_of_measurement": "\u00b0C",
+                "device_class": "temperature",
+                "friendly_name": "Living room temperature"
+              },
+              "last_changed": "2026-08-15T11:58:00.000000+00:00",
+              "last_updated": "2026-08-15T11:58:00.000000+00:00",
+              "context": {
+                "id": "01J0000000000000000000000D",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "update.living_room_ap_firmware",
+              "state": "off",
+              "attributes": {
+                "installed_version": "6.6.65",
+                "latest_version": "6.6.65",
+                "title": "UniFi Device",
+                "device_class": "firmware",
+                "friendly_name": "Living Room AP Firmware"
+              },
+              "last_changed": "2026-08-10T00:00:00.000000+00:00",
+              "last_updated": "2026-08-10T00:00:00.000000+00:00",
+              "context": {
+                "id": "01J0000000000000000000000E",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "camera.front_door",
+              "state": "recording",
+              "attributes": {
+                "access_token": "abc123",
+                "frontend_stream_type": "hls",
+                "friendly_name": "Front Door",
+                "supported_features": 2
+              },
+              "last_changed": "2026-08-15T07:00:00.000000+00:00",
+              "last_updated": "2026-08-15T07:00:00.000000+00:00",
+              "context": {
+                "id": "01J0000000000000000000000F",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "switch.shelly_plug",
+              "state": "on",
+              "attributes": {
+                "device_class": "outlet",
+                "friendly_name": "Shelly Plug"
+              },
+              "last_changed": "2026-08-14T18:00:00.000000+00:00",
+              "last_updated": "2026-08-14T18:00:00.000000+00:00",
+              "context": {
+                "id": "01J00000000000000000000010",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "device_tracker.legacy_thing",
+              "state": "home",
+              "attributes": {
+                "source_type": "router",
+                "scanner": "UbusDeviceScanner",
+                "friendly_name": "Legacy Thing"
+              },
+              "last_changed": "2026-08-15T10:00:00.000000+00:00",
+              "last_updated": "2026-08-15T10:00:00.000000+00:00",
+              "context": {
+                "id": "01J00000000000000000000011",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "device_tracker.johns_iphone",
+              "state": "home",
+              "attributes": {
+                "source_type": "router",
+                "mac": "00:11:22:33:44:01",
+                "ip": "192.0.2.101",
+                "host_name": "johns-iphone",
+                "oui": "Apple, Inc.",
+                "ap_mac": "f4:92:bf:00:aa:11",
+                "essid": "HomeNet",
+                "vlan": 10,
+                "radio": "na",
+                "radio_proto": "ax",
+                "is_guest": false,
+                "authorized": true,
+                "friendly_name": "Johns iPhone"
+              },
+              "last_changed": "2026-08-15T11:00:00+00:00",
+              "last_reported": "2026-08-15T12:01:00.000000+00:00",
+              "last_updated": "2026-08-15T12:01:00.000000+00:00",
+              "context": {
+                "id": "01J00000000000000000000012",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "device_tracker.office_printer",
+              "state": "home",
+              "attributes": {
+                "source_type": "router",
+                "mac": "00:11:22:33:44:02",
+                "ip": "192.0.2.102",
+                "host_name": "office-printer",
+                "friendly_name": "Office Printer"
+              },
+              "last_changed": "2026-08-15T08:00:00.000000+00:00",
+              "last_updated": "2026-08-15T12:02:00.000000+00:00",
+              "context": {
+                "id": "01J00000000000000000000013",
+                "parent_id": null,
+                "user_id": null
+              }
+            },
+            {
+              "entity_id": "device_tracker.away_laptop",
+              "state": "not_home",
+              "attributes": {
+                "source_type": "router",
+                "mac": "00:11:22:33:44:03",
+                "ip": "192.0.2.103",
+                "host_name": "away-laptop",
+                "friendly_name": "Away Laptop"
+              },
+              "last_changed": "2026-08-15T04:00:00.000000+00:00",
+              "last_updated": "2026-08-15T04:00:00.000000+00:00",
+              "context": {
+                "id": "01J00000000000000000000014",
+                "parent_id": null,
+                "user_id": null
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "config-entries",
+      "match": {
+        "method": "GET",
+        "path": "/api/config/config_entries/entry"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "entry_id": "ce00000000000000000000000000unif",
+              "domain": "unifi",
+              "title": "Default",
+              "source": "user",
+              "state": "loaded",
+              "disabled_by": null
+            },
+            {
+              "entry_id": "ce0000000000000000000000000reol",
+              "domain": "reolink",
+              "title": "Front Door",
+              "source": "user",
+              "state": "loaded",
+              "disabled_by": null
+            },
+            {
+              "entry_id": "ce0000000000000000000000000shel",
+              "domain": "shelly",
+              "title": "Shelly Plug S",
+              "source": "zeroconf",
+              "state": "loaded",
+              "disabled_by": null
+            },
+            {
+              "entry_id": "ce0000000000000000000000000brot",
+              "domain": "brother",
+              "title": "HL-L2350DW",
+              "source": "zeroconf",
+              "state": "loaded",
+              "disabled_by": null
+            },
+            {
+              "entry_id": "ce0000000000000000000000000hue0",
+              "domain": "hue",
+              "title": "Philips hue",
+              "source": "user",
+              "state": "loaded",
+              "disabled_by": null
+            },
+            {
+              "entry_id": "ce0000000000000000000000000met0",
+              "domain": "met",
+              "title": "Home",
+              "source": "user",
+              "state": "loaded",
+              "disabled_by": null
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-registry",
+      "match": {
+        "method": "POST",
+        "path": "/api/template"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "[{\"id\": \"b1f2c3d4e5f60718293a4b5c6d7e8f90\", \"name\": \"Living Room AP\", \"name_by_user\": null, \"manufacturer\": \"Ubiquiti Inc.\", \"model\": \"U6-Lite\", \"model_id\": \"U6L\", \"sw_version\": \"6.6.65\", \"hw_version\": null, \"serial_number\": \"F492BF00AA11\", \"area_id\": \"living_room\", \"entry_type\": \"None\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"http://192.0.2.10\", \"config_entry_id\": \"ce00000000000000000000000000unif\", \"connections\": [[\"mac\", \"f4:92:bf:00:aa:11\"]], \"identifiers\": [[\"unifi\", \"f4:92:bf:00:aa:11\"]], \"entities\": [\"update.living_room_ap_firmware\"]}, {\"id\": \"c2e3d4f506172839405162738495a6b7\", \"name\": \"Front Door\", \"name_by_user\": null, \"manufacturer\": \"Reolink\", \"model\": \"RLC-810A\", \"model_id\": null, \"sw_version\": \"v3.1.0.951\", \"hw_version\": \"IPC_523128M8MP\", \"serial_number\": null, \"area_id\": \"entry\", \"entry_type\": \"None\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"None\", \"config_entry_id\": \"ce0000000000000000000000000reol\", \"connections\": [[\"mac\", \"00:11:22:33:44:22\"]], \"identifiers\": [[\"reolink\", \"00:11:22:33:44:22\"]], \"entities\": [\"camera.front_door\"]}, {\"id\": \"d3f4e5061728394a5b6c7d8e9f001122\", \"name\": \"Shelly Plug S\", \"name_by_user\": \"Desk Plug\", \"manufacturer\": \"Allterco Robotics\", \"model\": \"SNPL-00112EU\", \"model_id\": null, \"sw_version\": \"1.4.4\", \"hw_version\": null, \"serial_number\": null, \"area_id\": \"office\", \"entry_type\": \"None\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"http://192.0.2.40:80/\", \"config_entry_id\": \"ce0000000000000000000000000shel\", \"connections\": [[\"mac\", \"00:11:22:33:44:33\"]], \"identifiers\": [[\"shelly\", \"shellyplusplugs-001122334433\"]], \"entities\": [\"switch.shelly_plug\"]}, {\"id\": \"e4051627384950a1b2c3d4e5f6071829\", \"name\": \"HL-L2350DW\", \"name_by_user\": null, \"manufacturer\": \"Brother\", \"model\": \"HL-L2350DW series\", \"model_id\": null, \"sw_version\": \"1.62\", \"hw_version\": null, \"serial_number\": \"U63877K1N123456\", \"area_id\": \"office\", \"entry_type\": \"None\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"None\", \"config_entry_id\": \"ce0000000000000000000000000brot\", \"connections\": [[\"mac\", \"00:11:22:33:44:02\"]], \"identifiers\": [[\"brother\", \"U63877K1N123456\"]], \"entities\": [\"device_tracker.office_printer\"]}, {\"id\": \"f50617283940a1b2c3d4e5f607182930\", \"name\": \"Kitchen Bulb\", \"name_by_user\": null, \"manufacturer\": \"Signify Netherlands B.V.\", \"model\": \"LCT015\", \"model_id\": null, \"sw_version\": \"1.104.2\", \"hw_version\": null, \"serial_number\": null, \"area_id\": \"kitchen\", \"entry_type\": \"None\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"None\", \"config_entry_id\": \"ce0000000000000000000000000hue0\", \"connections\": [[\"zigbee\", \"00:12:4b:00:11:22:33:44\"]], \"identifiers\": [[\"hue\", \"0017880109abcdef\"]], \"entities\": [\"light.kitchen\"]}, {\"id\": \"0617283940a1b2c3d4e5f60718293040\", \"name\": \"Forecast Home\", \"name_by_user\": null, \"manufacturer\": \"Met.no\", \"model\": \"Forecast\", \"model_id\": null, \"sw_version\": null, \"hw_version\": null, \"serial_number\": null, \"area_id\": null, \"entry_type\": \"service\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"None\", \"config_entry_id\": \"ce0000000000000000000000000met0\", \"connections\": [], \"identifiers\": [[\"met\", \"home\"]], \"entities\": [\"weather.forecast_home\"]}]"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 6,
+    "assets": [
+      {
+        "id": "home-assistant:$HOST:device:b1f2c3d4e5f60718293a4b5c6d7e8f90",
+        "fields": {
+          "macAddresses": "f4:92:bf:00:aa:11",
+          "ipAddresses": "192.0.2.10",
+          "manufacturer": "Ubiquiti Inc.",
+          "model": "U6-Lite",
+          "hass_integration": "unifi",
+          "hass_sw_version": "6.6.65",
+          "hass_serial_number": "F492BF00AA11",
+          "hass_area_id": "living_room"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      },
+      {
+        "id": "home-assistant:$HOST:device:c2e3d4f506172839405162738495a6b7",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:22",
+          "deviceType": "IP Camera",
+          "manufacturer": "Reolink",
+          "hass_integration": "reolink"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      },
+      {
+        "id": "home-assistant:$HOST:device:d3f4e5061728394a5b6c7d8e9f001122",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:33",
+          "ipAddresses": "192.0.2.40",
+          "hass_integration": "shelly",
+          "hass_name_by_user": "Desk Plug"
+        }
+      },
+      {
+        "id": "home-assistant:$HOST:device:e4051627384950a1b2c3d4e5f6071829",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:02",
+          "ipAddresses": "192.0.2.102",
+          "hostnames": "HL-L2350DW\toffice-printer",
+          "deviceType": "Printer",
+          "manufacturer": "Brother",
+          "hass_integration": "brother"
+        }
+      },
+      {
+        "id": "home-assistant:$HOST:entity:device_tracker.johns_iphone",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:01",
+          "ipAddresses": "192.0.2.101",
+          "hostnames": "johns-iphone",
+          "manufacturer": "Apple, Inc.",
+          "hass_state": "home",
+          "hass_attr_essid": "HomeNet",
+          "hass_attr_ap_mac": "f4:92:bf:00:aa:11",
+          "hass_attr_vlan": "10"
+        }
+      },
+      {
+        "id": "home-assistant:$HOST:entity:device_tracker.away_laptop",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:03",
+          "ipAddresses": "192.0.2.103",
+          "hostnames": "away-laptop",
+          "hass_state": "not_home"
+        }
+      }
+    ],
+    "ids_absent": [
+      "home-assistant:$HOST:device:f50617283940a1b2c3d4e5f607182930",
+      "home-assistant:$HOST:device:0617283940a1b2c3d4e5f60718293040",
+      "home-assistant:$HOST:entity:device_tracker.office_printer",
+      "home-assistant:$HOST:entity:device_tracker.legacy_thing",
+      "home-assistant:$HOST:entity:sun.sun",
+      "home-assistant:$HOST:entity:light.kitchen"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/states"
+      },
+      {
+        "method": "GET",
+        "path": "/api/config/config_entries/entry"
+      },
+      {
+        "method": "POST",
+        "path": "/api/template",
+        "body_contains": "device_attr(did, 'connections') | list"
+      },
+      {
+        "method": "POST",
+        "path": "/api/template",
+        "body_contains": "dids[0:50]"
+      },
+      {
+        "header_contains": "Bearer fixture-long-lived-token"
+      }
+    ],
+    "log_contains": [
+      "home-assistant: read 11 entities, 3 of which carry an address (3 device trackers)",
+      "home-assistant: imported 4 devices from the registry; skipped 1 with no MAC or IP and 1 service entries",
+      "home-assistant: imported 2 device trackers; 1 already covered by a registry device, 0 not on the network"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

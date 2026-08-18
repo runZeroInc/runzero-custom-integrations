@@ -1,0 +1,27 @@
+{
+  "name": "empty",
+  "integration": "cortex-xdr",
+  "description": "A tenant with no endpoints, answered in the bare-list reply shape the script also accepts. The run must make exactly one call, report zero assets, and finish cleanly rather than looping on an empty page or treating the empty result as a failure.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key_id": "42",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "get-endpoint",
+      "match": {"method": "POST", "path": "/public_api/v1/endpoints/get_endpoint"},
+      "responses": [{"status": 200, "json": {"reply": []}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "Loaded 0 endpoints",
+      "No assets retrieved from Cortex XDR"
+    ]
+  },
+  "invariants": {"skip": []}
+}

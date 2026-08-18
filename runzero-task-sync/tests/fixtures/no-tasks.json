@@ -1,0 +1,45 @@
+{
+  "name": "no-tasks",
+  "integration": "runzero-task-sync",
+  "script": "runzero-task-sync/runzero-task-sync.star",
+  "description": "The source search matches no tasks -- the normal outcome of a scheduled sync that has already mirrored everything, and of a search filter that was typed wrong, which look identical from here. GET /api/v1.0/org/tasks is a bare array with no envelope and no pagination, so zero tasks is `[]`. The run must stop after the one listing request: nothing to download, nothing to import, and in particular nothing to HIDE, because hiding is keyed off a successful sync and a run that hid tasks it never transferred would destroy the operator's only view of what is still outstanding.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "src_org_id": "aaaaaaaa-1111-4222-8333-444444444444",
+    "src_task_search_filter": "type:scan",
+    "dst_url": "$BASE",
+    "dst_org_id": "bbbbbbbb-5555-4666-8777-888888888888",
+    "dst_site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+    "hide_tasks_on_sync": "true",
+    "src_api_token": "OT-source-fixture-token",
+    "dst_api_token": "OT-destination-fixture-token"
+  },
+
+  "routes": [
+    {
+      "name": "source task list, no matches",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks"},
+      "responses": [{"status": 200, "json": []}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/org/tasks"}
+    ],
+    "requests_absent": [
+      {"method": "PUT"},
+      {"method": "POST"},
+      {"path_contains": "/data"}
+    ],
+    "log_contains": [
+      "Got 0 task(s) to sync",
+      "No tasks found."
+    ]
+  }
+}

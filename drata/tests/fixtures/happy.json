@@ -1,0 +1,33 @@
+{
+  "name": "happy",
+  "description": "Proves Drata imports at all. Pagination previously advanced only when total was the sentinel 9999999, so any realistic response imported nothing; this asserts a normal total is now paged correctly. Also proves the loopback placeholder is gone and that real MACs from device.macAddress reach an interface. namespaced_ids is skipped: the id is the bare Drata asset id with no tenant scope (reported defect).",
+  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/public/assets"},
+      "responses": [
+        {"status": 200, "json": {"total": 2, "data": [
+          {"id": 501, "name": "syn-laptop-a", "assetType": "HARDWARE",
+           "device": {"osVersion": "macOS 14.2", "serialNumber": "SYN-A-001",
+                      "model": "MacBook Pro", "macAddress": ["00:11:22:33:44:a1"],
+                      "complianceChecks": []}},
+          {"id": 502, "name": "syn-laptop-b", "assetType": "HARDWARE",
+           "device": {"osVersion": "Windows 11", "serialNumber": "SYN-B-002",
+                      "model": "ThinkPad X1", "macAddress": "00:11:22:33:44:b2",
+                      "complianceChecks": []}}
+        ]}}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["501", "502"],
+    "requests_include": [{"header_contains": "fixture-token"}],
+    "assets": [
+      {"id": "501", "fields": {"macAddresses": "00:11:22:33:44:a1"}, "fields_absent": ["ipAddresses"]},
+      {"id": "502", "fields": {"macAddresses": "00:11:22:33:44:b2"}, "fields_absent": ["ipAddresses"]}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

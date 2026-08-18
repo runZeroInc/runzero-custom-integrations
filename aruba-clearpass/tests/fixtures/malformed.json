@@ -1,0 +1,79 @@
+{
+  "name": "malformed",
+  "integration": "aruba-clearpass",
+  "description": "A page of endpoints in the shapes the ClearPass schema permits but the documentation does not describe: a row that is a bare string, a null mac_address, a mac_address that is not hex, a profile returned as a string rather than an object, attributes returned as a list, device_insight_tags as a number, and added_at/updated_at as free text and as the 0001-01-01 never-sentinel. Proves each unusable row is skipped with a logged reason while the rest of the page still imports, and that no timestamp reaches parse_time without being shape-checked first -- an unscreened value aborts the whole script, taking every other endpoint with it. The 2099 timestamps prove the future-time clamp: runZero rejects an ImportAsset dated ahead of now and would drop the record entirely.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "include_sessions": "false",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 300}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 6001,
+                  "mac_address": "00:11:22:33:55:01",
+                  "status": "Known",
+                  "added_at": "not a timestamp",
+                  "updated_at": "0001-01-01T00:00:00",
+                  "device_insight_tags": 42,
+                  "attributes": [],
+                  "profile": "unprofiled"
+                },
+                {"id": 6002, "mac_address": null, "profile": {"host_name": "orphan-a"}},
+                {"id": 6003, "mac_address": "ZZ:ZZ:ZZ:ZZ:ZZ:ZZ", "profile": {"host_name": "orphan-b"}},
+                {"id": 6004, "mac_address": "00:11:22:33", "profile": {"host_name": "orphan-c"}},
+                "not-an-endpoint-object",
+                {
+                  "id": 6005,
+                  "mac_address": "00:11:22:33:55:05",
+                  "status": "Known",
+                  "added_at": "2099-01-01 00:00:00",
+                  "updated_at": "2099-01-01 00:00:00",
+                  "profile": {"host_name": "clock-skewed", "ipv4_address": "10.33.0.5", "last_profiled_at": "2099-01-01 00:00:00"}
+                }
+              ]
+            },
+            "_links": {"self": {"href": "/api/endpoint?offset=0"}}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "aruba-clearpass:127.0.0.1:00:11:22:33:55:01",
+      "aruba-clearpass:127.0.0.1:00:11:22:33:55:05"
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "aruba-clearpass: skipping endpoint with no usable mac_address: id=6002",
+      "aruba-clearpass: skipping endpoint with no usable mac_address: id=6003",
+      "aruba-clearpass: skipping endpoint with no usable mac_address: id=6004",
+      "aruba-clearpass: skipped 4 records with no usable mac_address",
+      "aruba-clearpass: access token expires in 300s"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

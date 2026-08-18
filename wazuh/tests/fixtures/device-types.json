@@ -1,0 +1,206 @@
+{
+  "name": "device-types",
+  "integration": "wazuh",
+  "description": "The device-type hint, across every branch that can set it and the ones that must not.\n\nA Wazuh agent record is id, name, ip, status, version, node_name, group and an os block. There is no chassis, no model and no manufacturer anywhere in it, and syscollector's netiface/netaddr calls add only addressing -- so the os block is the only genuine statement of role this integration has, and for an agent-only host that runZero has never scanned it is the only type the asset will carry.\n\nTwo things can say 'server' and both are covered here. Agent 101 says it in os.name (Wazuh renders Windows server editions as 'Microsoft Windows Server 2019 Datacenter'), and its os.platform is the useless 'windows', so the name is the only signal. Agent 102 says it in os.platform: 'Red Hat Enterprise Linux' contains no 'server' token, so the hint can only come from rhel being a server-only distribution.\n\nThe other three must carry NO deviceType. Windows 11, macOS and Ubuntu each cover a desktop and a laptop without distinguishing them, and the record cannot say which -- so the ambiguity is left for runZero to resolve from a scan or from hardware, and a coin flip is not offered in its place.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "token": "fixture-wazuh-jwt"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=0"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 5,
+              "affected_items": [
+                {
+                  "id": "101",
+                  "name": "win-srv-01",
+                  "status": "active",
+                  "ip": "10.40.0.101",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-04-01T10:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Microsoft Windows Server 2019 Datacenter",
+                    "platform": "windows",
+                    "version": "10.0.17763.5576"
+                  }
+                },
+                {
+                  "id": "102",
+                  "name": "rhel-db-01",
+                  "status": "active",
+                  "ip": "10.40.0.102",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-04-01T10:05:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Red Hat Enterprise Linux",
+                    "platform": "rhel",
+                    "version": "9.4"
+                  }
+                },
+                {
+                  "id": "103",
+                  "name": "win-ws-01",
+                  "status": "active",
+                  "ip": "10.40.0.103",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-04-01T10:10:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Microsoft Windows 11 Pro",
+                    "platform": "windows",
+                    "version": "10.0.22631.3155"
+                  }
+                },
+                {
+                  "id": "104",
+                  "name": "mac-01",
+                  "status": "active",
+                  "ip": "10.40.0.104",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-04-01T10:15:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "macOS",
+                    "platform": "darwin",
+                    "version": "14.4.1"
+                  }
+                },
+                {
+                  "id": "105",
+                  "name": "ubuntu-01",
+                  "status": "active",
+                  "ip": "10.40.0.105",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-04-01T10:20:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "agents-page-2-empty",
+      "match": {
+        "method": "GET",
+        "path": "/agents"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "syscollector",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/syscollector/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "assets": [
+      {
+        "id": "wazuh:$HOST:agent:101:20260401100000",
+        "fields": {
+          "hostnames": "win-srv-01",
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "wazuh:$HOST:agent:102:20260401100500",
+        "fields": {
+          "hostnames": "rhel-db-01",
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "wazuh:$HOST:agent:103:20260401101000",
+        "fields": {
+          "hostnames": "win-ws-01"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "wazuh:$HOST:agent:104:20260401101500",
+        "fields": {
+          "hostnames": "mac-01"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "wazuh:$HOST:agent:105:20260401102000",
+        "fields": {
+          "hostnames": "ubuntu-01"
+        },
+        "fields_absent": ["deviceType"]
+      }
+    ]
+  }
+}

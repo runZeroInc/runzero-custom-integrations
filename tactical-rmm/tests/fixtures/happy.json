@@ -1,0 +1,182 @@
+{
+  "name": "happy",
+  "integration": "tactical-rmm",
+  "description": "One unpaginated GET /agents/ carrying a Windows server, a Linux server, and a macOS workstation. Proves the streamed array is parsed, that both operating_system formats split into os/osVersion, that the posix CIDR suffixes and the fe80 link-local address are handled, and that the agent's sentinel strings ('unknown make/model', 'unknown disk', 'No graphics cards', 'error') never become facts. Row shapes follow the AgentTableSerializer field list and the capture in amidaware/tacticalrmm issue #1978.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-tactical-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/agents/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "agent_id": "kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+              "alert_template": null,
+              "hostname": "VNVMHOSTSRV4",
+              "site_name": "Main Office",
+              "client_name": "Acme Corp",
+              "monitoring_type": "server",
+              "description": "Hyper-V host",
+              "needs_reboot": false,
+              "pending_actions_count": 0,
+              "status": "online",
+              "overdue_text_alert": false,
+              "overdue_email_alert": false,
+              "overdue_dashboard_alert": true,
+              "last_seen": "2026-06-15T12:55:15.110723Z",
+              "boot_time": 1750000000.0,
+              "checks": {"total": 4, "passing": 4, "failing": 0, "warning": 0, "info": 0, "has_failing_checks": false},
+              "maintenance_mode": false,
+              "logged_username": "Administrator",
+              "italic": false,
+              "policy": null,
+              "block_policy_inheritance": false,
+              "plat": "windows",
+              "goarch": "amd64",
+              "has_patches_pending": false,
+              "version": "2.9.0",
+              "operating_system": "Microsoft Windows Server 2019 Standard, 64 bit v1809 (build 17763.4974)",
+              "public_ip": "203.0.113.10",
+              "cpu_model": ["Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz, 8C/16T"],
+              "graphics": "NVIDIA Quadro P520",
+              "local_ips": "192.0.2.121, 192.0.2.6",
+              "make_model": "HP ProLiant DL380 Gen9",
+              "physical_disks": ["Microsoft Storage Space Device 3,690GB SCSI"],
+              "custom_fields": [],
+              "serial_number": "ABCD123456"
+            },
+            {
+              "agent_id": "aBcDeFgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmN",
+              "alert_template": null,
+              "hostname": "web01.example.com",
+              "site_name": "DC1",
+              "client_name": "Acme Corp",
+              "monitoring_type": "server",
+              "description": "",
+              "needs_reboot": true,
+              "pending_actions_count": 2,
+              "status": "online",
+              "last_seen": "2026-06-15T12:50:00.000000Z",
+              "boot_time": 1749000000.0,
+              "checks": {"total": 0, "passing": 0, "failing": 0, "warning": 0, "info": 0, "has_failing_checks": false},
+              "maintenance_mode": false,
+              "logged_username": "-",
+              "plat": "linux",
+              "goarch": "amd64",
+              "has_patches_pending": false,
+              "version": "2.9.0",
+              "operating_system": "Debian 11.5 x86_64 5.10.0-19-amd64",
+              "public_ip": "203.0.113.10",
+              "cpu_model": ["unknown cpu model"],
+              "graphics": "No graphics cards",
+              "local_ips": "198.51.100.54/24, fe80::476:c390:c8dc:11af/64, 2001:db8:beef::5/64",
+              "make_model": "unknown make/model",
+              "physical_disks": ["unknown disk"],
+              "custom_fields": [],
+              "serial_number": "n/a"
+            },
+            {
+              "agent_id": "mNoPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVwXyZ",
+              "alert_template": null,
+              "hostname": "designer-mbp",
+              "site_name": "Remote",
+              "client_name": "Beta Ltd",
+              "monitoring_type": "workstation",
+              "description": "Design team laptop",
+              "needs_reboot": false,
+              "pending_actions_count": 0,
+              "status": "overdue",
+              "last_seen": "2026-05-01T08:00:00.000000Z",
+              "boot_time": 1746000000.0,
+              "checks": {"total": 2, "passing": 1, "failing": 1, "warning": 0, "info": 0, "has_failing_checks": true},
+              "maintenance_mode": false,
+              "logged_username": "designer",
+              "plat": "darwin",
+              "goarch": "arm64",
+              "has_patches_pending": false,
+              "version": "2.8.0",
+              "operating_system": "darwin 14.5 arm64 23.5.0",
+              "public_ip": "error",
+              "cpu_model": ["Apple M1 Pro"],
+              "graphics": "Apple M1 Pro",
+              "local_ips": "192.0.2.113/24, fe80::476:c390:c8dc:11af/64",
+              "make_model": "Apple MacBookPro18,3",
+              "physical_disks": ["APPLE SSD AP0512R 460GB"],
+              "custom_fields": [],
+              "serial_number": "C02XY1Z2ABCD"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "request_count": 1,
+    "ids": [
+      "tacticalrmm:$HOST:kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+      "tacticalrmm:$HOST:aBcDeFgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmN",
+      "tacticalrmm:$HOST:mNoPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVwXyZ"
+    ],
+    "assets": [
+      {
+        "id": "tacticalrmm:$HOST:kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+        "fields": {
+          "hostnames": "VNVMHOSTSRV4",
+          "os": "Microsoft Windows Server 2019 Standard",
+          "osVersion": "1809 (build 17763.4974)",
+          "deviceType": "Server",
+          "model": "HP ProLiant DL380 Gen9",
+          "manufacturer": "HP",
+          "tacticalrmm_client": "Acme Corp",
+          "tacticalrmm_site": "Main Office",
+          "tacticalrmm_serial_number": "ABCD123456"
+        }
+      },
+      {
+        "id": "tacticalrmm:$HOST:aBcDeFgHiJkLmNoPqRsTuVwXyZaBcDeFgHiJkLmN",
+        "fields": {
+          "hostnames": "web01.example.com",
+          "os": "Debian",
+          "osVersion": "11.5",
+          "deviceType": "Server"
+        },
+        "fields_absent": [
+          "model",
+          "manufacturer",
+          "tacticalrmm_make_model",
+          "tacticalrmm_cpu_model",
+          "tacticalrmm_graphics",
+          "tacticalrmm_physical_disks",
+          "tacticalrmm_serial_number"
+        ]
+      },
+      {
+        "id": "tacticalrmm:$HOST:mNoPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVwXyZ",
+        "fields": {
+          "hostnames": "designer-mbp",
+          "os": "darwin",
+          "osVersion": "14.5",
+          "deviceType": "Desktop",
+          "model": "Apple MacBookPro18,3"
+        },
+        "fields_absent": ["tacticalrmm_public_ip"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/agents/", "header_contains": "fixture-tactical-key"}
+    ],
+    "requests_absent": [{"path_contains": "/software/"}]
+  },
+
+  "check_determinism": true
+}

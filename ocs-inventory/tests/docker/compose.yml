@@ -1,0 +1,52 @@
+# A real OCS Inventory NG server -- communication server, web console and REST
+# API in one Apache -- backed by a real MariaDB.
+#
+# Both tags are pinned. The REST API is a separate mod_perl application whose
+# routes and response envelopes have changed between OCS minors, which is
+# exactly the drift this test exists to catch.
+services:
+  dbsrv:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: ocs
+      MARIADB_DATABASE: ocsweb
+      MARIADB_USER: ocs
+      MARIADB_PASSWORD: ocs
+      # Deliberately east of UTC, and deliberately the same zone the OCS image
+      # defaults to. OCS stamps hardware.LASTCOME with its server's local time
+      # and publishes no offset, so a Paris server hands back times that read as
+      # being in the future -- which is precisely the case _clamp_ts() exists
+      # for, and the reason a clamped record must still be imported rather than
+      # dropped.
+      TZ: Europe/Paris
+    # The OCS schema is a hundred tables loaded in one go, and the load fails
+    # outright if the server is still warming up.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  ocs:
+    image: ocsinventory/ocsinventory-docker-image:2.12.2
+    # OCS publishes an amd64-only image, so an arm64 host emulates it. See the
+    # manifest's heavy_reason.
+    platform: linux/amd64
+    depends_on:
+      dbsrv:
+        condition: service_healthy
+    environment:
+      OCS_DB_SERVER: dbsrv
+      OCS_DB_PORT: "3306"
+      OCS_DB_NAME: ocsweb
+      OCS_DB_USER: ocs
+      OCS_DB_PASS: ocs
+      # NOT optional. The image's 10-com-server.sh substitutes this variable
+      # into `PerlSetEnv OCS_OPT_DBI_PRINT_ERROR <value>`, and the image defines
+      # no default -- so an unset variable emits a PerlSetEnv with a single
+      # argument and Apache refuses to start with "PerlSetEnv takes two
+      # arguments". A stock `docker run` of this image never serves a request.
+      OCS_DBI_PRINT_ERROR: "0"
+      TZ: Europe/Paris
+    ports:
+      - "${RZ_HOST_PORT}:80"

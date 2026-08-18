@@ -1,0 +1,36 @@
+{
+  "name": "empty",
+  "integration": "sumo-logic",
+  "script": "sumo-logic/sumo-logic.star",
+  "description": "An organization where the `alive:t` search matches nothing. exportAssetsJSON streams a literal `[` before the first row and `]` after the last, so zero rows is the two-byte body `[]` -- not an empty body and not an error. The run must complete quietly and, critically, must NOT post: an empty upload to a Sumo HTTP source is an ingested empty document, and a receiver cannot tell that apart from a run that legitimately found nothing. `requests_absent` on every POST is the assertion.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+  },
+
+  "routes": [
+    {
+      "name": "runzero asset export, no rows",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [{"status": 200, "json": []}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/export/org/assets.json"}
+    ],
+    "requests_absent": [
+      {"method": "POST"}
+    ],
+    "log_contains": [
+      "runZero did not return any assets"
+    ]
+  }
+}

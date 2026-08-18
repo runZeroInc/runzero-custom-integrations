@@ -1,0 +1,73 @@
+{
+  "name": "null-risk-score",
+  "integration": "carbon-black",
+  "description": "REGRESSION LOCK. A vulnerability whose risk_meter_score is present but null used to abort the run. vuln_info.get('risk_meter_score', 0) only substitutes the default when the KEY IS ABSENT, so an explicit null flowed straight into float() and died with 'float got NoneType, want number or string'. Carbon Black leaves the field null for a vulnerability it has not scored yet, so one unscored CVE on one endpoint took down the entire import. The null must now fold to a zero score and both findings must land on the device.\n\nSkips namespaced_ids: the foreign id is the bare Carbon Black device number with no organization_key scope, a separate defect recorded with the malformed scenario.",
+  "kwargs": {
+    "url": "$BASE",
+    "organization_key": "SYNORG01",
+    "api_id": "SYNAPIID01",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "scroll-page-1",
+      "match": {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": [
+              {"id": 7101, "name": "syn-unscored-vuln", "os": "LINUX", "last_internal_ip_address": "192.0.2.21", "mac_address": "00:50:56:00:71:01"}
+            ]
+          }
+        },
+        {"status": 200, "json": {"num_found": 1, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns",
+      "match": {"method": "POST", "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 2,
+            "results": [
+              {
+                "vuln_info": {
+                  "cve_id": "CVE-2024-11111",
+                  "cve_description": "A scored finding.",
+                  "severity": "HIGH",
+                  "risk_meter_score": 7.4,
+                  "solution": "Apply the vendor update."
+                }
+              },
+              {
+                "vuln_info": {
+                  "cve_id": "CVE-2024-22222",
+                  "cve_description": "A finding Carbon Black has not scored yet.",
+                  "severity": "MODERATE",
+                  "risk_meter_score": null,
+                  "solution": "Apply the vendor update."
+                }
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"num_found": 2, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["7101"],
+    "assets": [
+      {"id": "7101", "fields": {"hostnames": "syn-unscored-vuln", "ipAddresses": "192.0.2.21", "macAddresses": "00:50:56:00:71:01"}}
+    ],
+    "min_vulnerabilities_total": 2
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

@@ -1,0 +1,102 @@
+{
+  "name": "rpc-error",
+  "integration": "bitdefender-gravityzone",
+  "description": "GravityZone reports failures as HTTP 200 with an `error` object in the JSON-RPC body, so post_json reports success and the failure has to be read out of the payload. Proves both halves: an error on the getCompanyDetails bootstrap is non-fatal and the walk continues WITHOUT a parentId, and an error on inventory page 2 stops the walk while keeping the assets already reported from page 1.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "company-details-denied",
+      "match": {"method": "POST", "path": "/api/v1.0/jsonrpc/companies", "body_contains": "getCompanyDetails"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32001,
+              "message": "Operation not allowed",
+              "data": {"details": "the API key is not licensed for the Companies API"}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-inventory",
+      "match": {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "getNetworkInventoryItems"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "result": {
+              "total": 4,
+              "pagesCount": 2,
+              "hasMoreRecords": true,
+              "items": [
+                {
+                  "id": "e0000000000000000000201",
+                  "name": "lab-node-01",
+                  "type": 5,
+                  "companyId": "c0000000000000000000b2",
+                  "details": {"fqdn": "lab-node-01.lab.example.net", "ip": "192.168.30.11", "macs": ["00:1a:2b:00:0a:01"], "managedWithBest": true, "operatingSystemVersion": "Windows 11 Pro"}
+                },
+                {
+                  "id": "e0000000000000000000202",
+                  "name": "lab-node-02",
+                  "type": 5,
+                  "companyId": "c0000000000000000000b2",
+                  "details": {"fqdn": "lab-node-02.lab.example.net", "ip": "192.168.30.12", "macs": ["00:1a:2b:00:0a:02"], "managedWithBest": true, "operatingSystemVersion": "Windows 11 Pro"}
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "error": {
+              "code": -32000,
+              "message": "Internal server error",
+              "data": {"parentId": "c0000000000000000000b2"}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000b2:e0000000000000000000201",
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000b2:e0000000000000000000202"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1.0/jsonrpc/companies"},
+      {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "\"page\":2"}
+    ],
+    "requests_absent": [
+      {"body_contains": "parentId"},
+      {"body_contains": "\"page\":3"}
+    ],
+    "log_contains": [
+      "could not resolve the parent company (json-rpc error -32001 (authorization error): Operation not allowed)",
+      "failed to fetch inventory page 2: json-rpc error -32000 (server error): Internal server error",
+      "reported 2 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "name": "no-results-array",
+  "integration": "icinga2",
+  "description": "A 200 response whose body is not the documented results array: an Icinga error envelope, and then on a retry an HTML page from a reverse proxy. jsonstream.iter_array aborts the entire script - unrecoverably - when the path is missing, when the value is not an array, or when the body is not JSON, so the shape has to be checked before the parser sees it. This scenario is the regression test for that guard.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero",
+    "password": "fixture-secret",
+    "include_checks": "true"
+  },
+  "routes": [
+    {
+      "name": "status",
+      "match": {
+        "method": "GET",
+        "path": "/v1/status/IcingaApplication"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "results": [
+              {
+                "perfdata": [],
+                "status": {
+                  "icingaapplication": {
+                    "app": {
+                      "enable_event_handlers": true,
+                      "enable_flapping": true,
+                      "enable_host_checks": true,
+                      "enable_notifications": true,
+                      "enable_perfdata": true,
+                      "enable_service_checks": true,
+                      "node_name": "icinga.example.com",
+                      "pid": 59819.0,
+                      "program_start": 1755000000.093372,
+                      "version": "r2.14.2-1"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "services",
+      "match": {
+        "method": "POST",
+        "path": "/v1/objects/services"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "<html><head><title>Sign in</title></head><body>login</body></html>",
+          "headers": {
+            "Content-Type": "text/html"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {
+        "method": "POST",
+        "path": "/v1/objects/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 404.0,
+            "status": "No objects found."
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "error": 404.0,
+      "status": "The requested path was not found."
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "the host query returned no results array; nothing was imported",
+      "the service query returned no results array; skipping check summaries"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

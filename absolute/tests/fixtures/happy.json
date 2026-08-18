@@ -1,0 +1,171 @@
+{
+  "name": "happy",
+  "integration": "absolute",
+  "description": "One page of the v3 device report, delivered through the signed JWS envelope that carries the real method, path, and query string in its JOSE header. Covers the adapter-to-interface mapping, the 0.0.0.0 placeholder address being dropped, publicIp being deliberately excluded from the interfaces because a whole NAT gateway shares it, localIp being added only when no adapter already reported it, an unreadable timestamp being ignored rather than aborting the run, and a record with no deviceUid being skipped. The ipAddresses assertion is exact so that the excluded publicIp and the 0.0.0.0 placeholder cannot creep back in unnoticed, while the same publicIp is still asserted present as a custom attribute. Device 2's firstSeenTS must be absent because its firstCall timestamp is unreadable.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "jws-validate",
+      "match": {
+        "method": "POST",
+        "path": "/jws/validate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "pagination": {
+                "nextPage": null
+              }
+            },
+            "data": [
+              {
+                "deviceUid": "fixture-device-0001",
+                "accountUid": "fixture-account",
+                "deviceName": "FIXTURE-LT-0001",
+                "fullSystemName": "fixture-lt-0001.corp.example",
+                "domain": "corp.example",
+                "esn": "FIXTUREESN0001",
+                "serialNumber": "FIXTURESN0001",
+                "agentStatus": "A",
+                "agentVersion": "7.20.1",
+                "chassisType": "Laptop",
+                "systemType": "Laptop",
+                "systemManufacturer": "Fixture Computers",
+                "systemModel": "FixtureBook 14",
+                "isStolen": false,
+                "localIp": "10.140.0.11",
+                "publicIp": "203.0.113.20",
+                "networkSSID": "fixture-corp-wifi",
+                "firstCallDateTimeUtc": "2026-01-15T08:30:00.000Z",
+                "lastConnectedDateTimeUtc": "2026-08-10T12:00:00.000Z",
+                "lastUpdatedDateTimeUtc": "2026-08-10T12:05:00.000Z",
+                "operatingSystem": {
+                  "name": "Windows 11 Pro",
+                  "version": "10.0.22631",
+                  "architecture": "64-bit",
+                  "currentBuild": "22631"
+                },
+                "bios": {
+                  "serialNumber": "FIXTUREBIOS0001",
+                  "version": "1.9.0",
+                  "assetTag": "ASSET-0001"
+                },
+                "espInfo": {
+                  "encryptionStatus": "Encrypted"
+                },
+                "deviceStatus": {
+                  "type": "Active",
+                  "reported": "2026-08-10T12:00:00.000Z"
+                },
+                "geoData": {
+                  "location": {
+                    "geoAddress": {
+                      "city": "Fixtureville",
+                      "country": "Fixtureland",
+                      "countryCode": "FX"
+                    },
+                    "accuracy": 40
+                  }
+                },
+                "networkAdapters": [
+                  {
+                    "name": "Wi-Fi",
+                    "adapterType": "Wireless",
+                    "macAddress": "00:11:22:88:00:11",
+                    "ipV4Address": "10.140.0.11",
+                    "ipV6Address": "2001:db8:2::11"
+                  },
+                  {
+                    "name": "Ethernet",
+                    "adapterType": "Ethernet",
+                    "macAddress": "00:11:22:88:00:12",
+                    "ipV4Address": "0.0.0.0",
+                    "ipV6Address": ""
+                  }
+                ]
+              },
+              {
+                "deviceUid": "fixture-device-0002",
+                "deviceName": "FIXTURE-SRV-0002",
+                "fullSystemName": "",
+                "esn": "FIXTUREESN0002",
+                "serialNumber": "FIXTURESN0002",
+                "agentStatus": "A",
+                "systemType": "Desktop",
+                "isStolen": true,
+                "localIp": "10.140.0.12",
+                "publicIp": "203.0.113.20",
+                "firstCallDateTimeUtc": "not a timestamp at all",
+                "lastConnectedDateTimeUtc": "2026-08-09T23:59:59Z",
+                "operatingSystem": {
+                  "name": "Ubuntu",
+                  "version": "24.04"
+                },
+                "networkAdapters": []
+              },
+              {
+                "deviceName": "FIXTURE-NO-UID",
+                "esn": "FIXTUREESN0003",
+                "localIp": "10.140.0.13"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "absolute:$HOST:fixture-device-0001",
+      "absolute:$HOST:fixture-device-0002"
+    ],
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/jws/validate",
+        "body_contains": "eyJhbGciOiJIUzI1NiIs"
+      }
+    ],
+    "log_contains": [
+      "absolute: skipping device with no deviceUid: esn=FIXTUREESN0003",
+      "absolute: reported 2 devices"
+    ],
+    "assets": [
+      {
+        "id": "absolute:$HOST:fixture-device-0001",
+        "fields": {
+          "hostnames": "FIXTURE-LT-0001\tfixture-lt-0001.corp.example",
+          "ipAddresses": "10.140.0.11\t2001:db8:2::11",
+          "macAddresses": "00:11:22:88:00:11\t00:11:22:88:00:12",
+          "deviceType": "Laptop",
+          "domain": "corp.example",
+          "absolute_public_ip": "203.0.113.20"
+        }
+      },
+      {
+        "id": "absolute:$HOST:fixture-device-0002",
+        "fields": {
+          "hostnames": "FIXTURE-SRV-0002",
+          "ipAddresses": "10.140.0.12"
+        },
+        "fields_absent": [
+          "macAddresses",
+          "firstSeenTS"
+        ]
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

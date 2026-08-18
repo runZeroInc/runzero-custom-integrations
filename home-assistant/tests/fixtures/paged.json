@@ -1,0 +1,69 @@
+{
+  "name": "paged",
+  "integration": "home-assistant",
+  "description": "The device registry read in pages of two. Home Assistant caps a rendered template at 256 KiB and answers 400 when the render exceeds it, so a registry of any size has to be sliced rather than dumped whole - and because no template function lists devices, the slice is taken over the de-duplicated device_id list the template derives from states. Each request must therefore carry the offset the previous one implied, which is asserted here on the rendered template body itself: dids[0:2], then dids[2:4], then dids[4:6]. The third page returns one row, which is short, and the walk must stop rather than asking for dids[6:8].",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-long-lived-token",
+    "device_page_size": "2",
+    "collect_device_trackers": "false"
+  },
+  "routes": [
+    {
+      "name": "states",
+      "match": {"method": "GET", "path": "/api/states"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "config-entries",
+      "match": {"method": "GET", "path": "/api/config/config_entries/entry"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "POST", "path": "/api/template", "body_contains": "dids[0:2]"},
+      "responses": [
+        {"status": 200, "text": "[{\"id\": \"aa000000000000000000000000000001\", \"name\": \"dev-one\", \"connections\": [[\"mac\", \"00:11:22:aa:00:01\"]], \"entities\": [], \"identifiers\": []}, {\"id\": \"aa000000000000000000000000000002\", \"name\": \"dev-two\", \"connections\": [[\"mac\", \"00:11:22:aa:00:02\"]], \"entities\": [], \"identifiers\": []}]"}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {"method": "POST", "path": "/api/template", "body_contains": "dids[2:4]"},
+      "responses": [
+        {"status": 200, "text": "[{\"id\": \"aa000000000000000000000000000003\", \"name\": \"dev-three\", \"connections\": [[\"mac\", \"00:11:22:aa:00:03\"]], \"entities\": [], \"identifiers\": []}, {\"id\": \"aa000000000000000000000000000004\", \"name\": \"dev-four\", \"connections\": [[\"mac\", \"00:11:22:aa:00:04\"]], \"entities\": [], \"identifiers\": []}]"}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-3",
+      "match": {"method": "POST", "path": "/api/template", "body_contains": "dids[4:6]"},
+      "responses": [
+        {"status": 200, "text": "[{\"id\": \"aa000000000000000000000000000005\", \"name\": \"dev-five\", \"connections\": [[\"mac\", \"00:11:22:aa:00:05\"]], \"entities\": [], \"identifiers\": []}]"}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "home-assistant:$HOST:device:aa000000000000000000000000000001",
+      "home-assistant:$HOST:device:aa000000000000000000000000000003",
+      "home-assistant:$HOST:device:aa000000000000000000000000000005"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/api/template", "body_contains": "dids[0:2]"},
+      {"method": "POST", "path": "/api/template", "body_contains": "dids[2:4]"},
+      {"method": "POST", "path": "/api/template", "body_contains": "dids[4:6]"}
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/api/template", "body_contains": "dids[6:8]"}
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

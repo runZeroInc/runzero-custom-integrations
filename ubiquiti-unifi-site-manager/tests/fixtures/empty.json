@@ -1,0 +1,34 @@
+{
+  "name": "empty",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "A UI account with no consoles registered. All three collections answer with an empty data array and no nextToken. Must report zero assets, make exactly one request per collection, and not fail.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path_prefix": "/v1/"},
+      "responses": [
+        {"status": 200, "json": {"data": [], "httpStatusCode": 200, "traceId": "a7dc15e0eb4527142d7823515b15f87d"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"code": "not_found", "httpStatusCode": 404, "message": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/v1/hosts"},
+      {"method": "GET", "path": "/v1/sites"},
+      {"method": "GET", "path": "/v1/devices"}
+    ]
+  },
+
+  "check_determinism": true
+}

@@ -1,0 +1,37 @@
+{
+  "name": "api-offline",
+  "integration": "unraid",
+  "description": "The unraid-api service is stopped. This is the single most important negative case for Unraid, because the failure is invisible to every ordinary check: stock Unraid's rc.nginx intercepts the upstream 502 from the API's unix socket and answers /graphql with HTTP 200 and a hand-written body. The body is NOT standard GraphQL - the message lives at errors[0].error.message rather than errors[0].message - so an integration that reads only .message finds no error, sees no data, and reports a clean run that collected nothing. There is no 404 and no connection refusal to notice, because the nginx location block exists whether or not the backend is up. This scenario proves the nested envelope is decoded, no assets are emitted, and the operator is told to run 'unraid-api start'.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "nginx-offline-shim",
+      "match": {"method": "POST", "path": "/graphql"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errors": [
+              {"error": {"name": "InternalError", "message": "Graphql is offline."}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "the Unraid API service is not running",
+      "unraid-api start",
+      "no system info, nothing collected"
+    ]
+  },
+  "check_determinism": true
+}

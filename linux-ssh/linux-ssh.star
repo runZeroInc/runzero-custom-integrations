@@ -3,8 +3,9 @@ CONFIG = {
     "name": "Linux via SSH",
     "type": "inbound",
     "description": "Collects host facts from Linux/Unix targets over SSH and reports them as assets.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "validationMode": "compile",
     "params": [
         {"key": "host", "label": "Target host", "type": "string", "required": True},
@@ -22,6 +23,56 @@ load("runzero.types", "ImportAsset", "NetworkInterface")
 load("runzero.ssh", ssh_dial="dial")
 load("net", "ip_address")
 load("kwargs", "require", "get_string", "get_int")
+
+
+# SMBIOS System Enclosure type (DMTF SMBIOS 3.x, Type 3 field 05h). The kernel
+# publishes the raw number at /sys/class/dmi/id/chassis_type and dmidecode
+# prints the DMTF name for the same byte, so both spellings are keyed here.
+# Only the values that name a form factor outright are mapped: "Other" (1) and
+# "Unknown" (2) are what a hypervisor and most ARM boards report, and the
+# expansion and peripheral chassis (18-22, 25-27) describe an enclosure rather
+# than the machine, so all of them leave the type unset and let runZero's own
+# fingerprinting decide.
+CHASSIS_DEVICE_TYPES = {
+    "3": "Desktop",
+    "4": "Desktop",
+    "6": "Desktop",
+    "7": "Desktop",
+    "13": "Desktop",
+    "15": "Desktop",
+    "24": "Desktop",
+    "35": "Desktop",
+    "desktop": "Desktop",
+    "low profile desktop": "Desktop",
+    "mini tower": "Desktop",
+    "tower": "Desktop",
+    "all in one": "Desktop",
+    "space-saving": "Desktop",
+    "sealed-case pc": "Desktop",
+    "mini pc": "Desktop",
+    "8": "Laptop",
+    "9": "Laptop",
+    "10": "Laptop",
+    "14": "Laptop",
+    "31": "Laptop",
+    "32": "Laptop",
+    "portable": "Laptop",
+    "laptop": "Laptop",
+    "notebook": "Laptop",
+    "sub notebook": "Laptop",
+    "convertible": "Laptop",
+    "detachable": "Laptop",
+    "30": "Tablet",
+    "tablet": "Tablet",
+    "17": "Server",
+    "23": "Server",
+    "28": "Server",
+    "29": "Server",
+    "main server chassis": "Server",
+    "rack mount chassis": "Server",
+    "blade": "Server",
+    "blade enclosing": "Server",
+}
 
 
 def _run(session, cmd):
@@ -45,6 +96,29 @@ def _os_release(session):
         if line.startswith("VERSION_ID="):
             version = line.split("=", 1)[1].strip('"')
     return name, version
+
+
+def _chassis_type(session):
+    """Return the host's SMBIOS chassis type as reported, or "" if it has none.
+
+    The sysfs file is preferred over dmidecode because it is world-readable and
+    needs no root, and because it carries the raw DMTF number rather than a
+    name that has changed spelling between dmidecode releases. Both are absent
+    on a machine with no DMI table at all -- most ARM boards, and many
+    containers -- and an absent chassis type must leave the device type unset
+    rather than fall back to a guess.
+    """
+    raw = _run(session, "cat /sys/class/dmi/id/chassis_type 2>/dev/null")
+    if not raw:
+        raw = _run(session, "dmidecode -s chassis-type 2>/dev/null")
+    return raw.split("\n")[0].strip()
+
+
+def _device_type(chassis):
+    """Map an SMBIOS chassis type onto a runZero device type, or None."""
+    if not chassis:
+        return None
+    return CHASSIS_DEVICE_TYPES.get(chassis.lower(), None)
 
 
 def _macs_and_ips(session):
@@ -131,6 +205,7 @@ def main(*args, **kwargs):
     os_name, os_version = _os_release(session)
     kernel = _run(session, "uname -r")
     machine_id = _run(session, "cat /etc/machine-id 2>/dev/null || cat /var/lib/dbus/machine-id 2>/dev/null")
+    chassis = _chassis_type(session)
     interfaces = _macs_and_ips(session)
     session.close()
 
@@ -140,11 +215,15 @@ def main(*args, **kwargs):
         hostnames=[hostname] if hostname else [],
         os=os_name,
         osVersion=os_version,
+        deviceType=_device_type(chassis),
         networkInterfaces=interfaces,
         customAttributes={
             "ssh.target": "{}:{}".format(host, port),
             "kernel": kernel,
             "machine_id": machine_id,
+            # The raw SMBIOS value behind deviceType, kept so an operator can
+            # see why a host was or was not typed.
+            "chassis_type": chassis,
         },
     )
     # Stream the asset to runZero via report_assets instead of returning a list.

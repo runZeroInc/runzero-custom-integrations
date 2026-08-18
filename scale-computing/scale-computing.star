@@ -4,9 +4,10 @@ CONFIG = {
     "id": "runzero-scale-computing",
     "name": "Scale Computing",
     "type": "inbound",
-    "description": "Imports VMs and nodes from Scale Computing HC3 clusters.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "description": "Imports virtual machines from a Scale Computing HC3 cluster.",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "base_url",
@@ -40,15 +41,10 @@ load('base64', base64_encode='encode')
 load('kwargs', 'get_bool')
 
 INSECURE_ALLOWED = False
-DEBUG = True  # set to False to disable debug prints
-
-def debug_print(msg):
-    if DEBUG:
-        print(msg)
+# See the comment at the ImportAsset call below for why this is knowable here.
+VM_DEVICE_TYPE = "Virtual Machine"
 
 def main(*args, **kwargs):
-    debug_print(">>> main() start")
-
     # Prefer structured top-level kwargs (params[] schema). Fall back
     # to the legacy JSON-stuffed password for back-compat.
     base_url = kwargs.get('base_url', '').rstrip('/')
@@ -60,9 +56,8 @@ def main(*args, **kwargs):
             base_url = base_url or secret.get('base_url', '').rstrip('/')
             username = username or secret.get('username', '')
             password = secret.get('password', password)
-    debug_print("Base URL: {}".format(base_url))
     if not base_url or not username or not password:
-        debug_print("Failed to parse configuration")
+        print("scale-computing: base_url, username, and password are all required")
         return []
 
     # Session & Auth header
@@ -74,44 +69,52 @@ def main(*args, **kwargs):
     session.headers.set("Authorization", auth_hdr)
     if kwargs.get('http_user_agent'):
         session.headers.set('User-Agent', kwargs.get('http_user_agent'))
-    debug_print("Session headers: {}".format(session.headers))
 
-    # 1) Fetch clusters
-    clusters = {}
+    # 1) Fetch the cluster this endpoint belongs to.
+    #
+    # The previous code built a map keyed by the CLUSTER uuid and then looked it
+    # up with the VM's nodeUUID, which is a NODE uuid, so the lookup never
+    # matched: clusterName was never set and this whole call was wasted. The
+    # /rest/v1/Cluster endpoint is scoped to the appliance being queried and
+    # describes that cluster, so its uuid and name apply to every VM the same
+    # endpoint returns and the first record is the one to use.
+    cluster_uuid = ""
+    cluster_name = ""
     clu_url = "{}{}/rest/v1/Cluster".format("", base_url)  # avoid f-strings
-    debug_print("GET Clusters => {}".format(clu_url))
     resp = session.get(clu_url)
-    debug_print("Clusters status: {}".format(getattr(resp, 'status_code', None)))
     if resp and resp.status_code == 200:
         cl_data = json_decode(resp.body)
-        debug_print("Got {} clusters".format(len(cl_data)))
+        print("scale-computing: read {} clusters".format(len(cl_data)))
         for c in cl_data:
-            clusters[c["uuid"]] = c["clusterName"]
+            if type(c) != "dict":
+                continue
+            cluster_uuid = str(c.get("uuid", "") or "")
+            cluster_name = str(c.get("clusterName", "") or "")
+            break
     else:
-        debug_print("Skipping cluster mapping")
+        print("scale-computing: could not read the cluster record (status {}); VMs will carry no cluster name".format(
+            getattr(resp, 'status_code', None)))
 
     # 2) Fetch VMs
     vm_url = "{}{}/rest/v1/VirDomain".format("", base_url)
-    debug_print("GET VMs => {}".format(vm_url))
     resp = session.get(vm_url)
-    debug_print("VMs status: {}".format(getattr(resp, 'status_code', None)))
     if not (resp and resp.status_code == 200):
-        debug_print("No VMs fetched; exiting")
+        print("scale-computing: could not list VMs (status {})".format(
+            getattr(resp, 'status_code', None)))
         return []
     vm_list = json_decode(resp.body)
-    debug_print("Got {} VMs".format(len(vm_list)))
+    print("scale-computing: read {} VMs".format(len(vm_list)))
 
     # 3) Fetch VM network-devices (for MACs & IPs)
     netdev_url = "{}{}/rest/v1/VirDomainNetDevice".format("", base_url)
-    debug_print("GET NetDevices => {}".format(netdev_url))
     resp = session.get(netdev_url)
-    debug_print("NetDevices status: {}".format(getattr(resp, 'status_code', None)))
     netdevs = []
     if resp and resp.status_code == 200:
         netdevs = json_decode(resp.body)
-        debug_print("Got {} network-devices".format(len(netdevs)))
+        print("scale-computing: read {} network devices".format(len(netdevs)))
     else:
-        debug_print("No network-devices fetched")
+        print("scale-computing: could not list network devices (status {}); VMs will carry no addresses".format(
+            getattr(resp, 'status_code', None)))
     # Group by VM UUID
     netdevs_by_vm = {}
     for d in netdevs:
@@ -120,14 +123,32 @@ def main(*args, **kwargs):
 
     # 4) Build ImportAsset objects
     assets = []
+    skipped = 0
+    skipped_name = ""
     for vm in vm_list:
         vid = vm.get("uuid")
-        debug_print("Processing VM: {}".format(vid))
+        # HC3 assigns the uuid, so a VirDomain row without one is a record the
+        # cluster is still writing or has partly deleted. There was no guard
+        # here: vid went straight to ImportAsset(id=None), which the runtime
+        # rejects with "id must be a string", and with no exceptions in Starlark
+        # that killed the whole run -- every VM already built was lost and none
+        # were reported.
+        if not vid:
+            # Tallied rather than logged per record: a cluster mid-rebuild can
+            # return many of these at once, and a count plus one example says
+            # everything a line per VM would.
+            skipped += 1
+            if skipped == 1:
+                skipped_name = str(vm.get("name", ""))
+            continue
 
         # VM properties
         hostname    = vm.get("name")
         os_name     = vm.get("operatingSystem")
-        os_version  = vm.get("description", "")
+        # description is a free-text note an operator types about the VM ("IIS
+        # front end"), not a version of anything. HC3 publishes no OS version
+        # field, so osVersion is left unset and the note becomes an attribute.
+        description = vm.get("description", "")
         state       = vm.get("state")
         disposition = vm.get("desiredDisposition")
         console     = vm.get("console")
@@ -146,8 +167,6 @@ def main(*args, **kwargs):
         for nd in netdevs_by_vm.get(vid, []):
             mac = nd.get("macAddress")
             ips = nd.get("ipv4Addresses", [])
-            debug_print("  NetDev: MAC={}, IPs={}, VLAN={}, connected={}".format(
-                mac, ips, nd.get("vlan"), nd.get("connected")))
             iface = NetworkInterface(
                 macAddress=mac,
                 ipv4Addresses=ips
@@ -158,11 +177,20 @@ def main(*args, **kwargs):
             id                = vid,
             hostnames         = [hostname],
             os                = os_name,
-            osVersion         = os_version,
+            # Every record this integration imports comes from /rest/v1/VirDomain,
+            # and an HC3 VirDomain is a guest virtual machine -- the collection
+            # holds nothing else, so the type is carried by the resource itself
+            # rather than guessed from a name or an OS. This is the same value
+            # the other hypervisor sources in this repository emit for a guest
+            # (nutanix-prism, truenas, synology-dsm), so a search for VMs across
+            # them returns one consistent type.
+            deviceType        = VM_DEVICE_TYPE,
             networkInterfaces = interfaces,
             customAttributes  = {
-                "clusterId":         vm.get("nodeUUID"),
-                "clusterName":       clusters.get(vm.get("nodeUUID"), ""),
+                "clusterId":         cluster_uuid,
+                "clusterName":       cluster_name,
+                "nodeUUID":          vm.get("nodeUUID"),
+                "description":       description,
                 "state":             state,
                 "desiredDisposition": disposition,
                 "console":           console,
@@ -179,10 +207,13 @@ def main(*args, **kwargs):
                 "modifiedAt":        vm.get("modified"),
             },
         )
-        debug_print("Built asset: {}".format(asset))
         assets.append(asset)
+
+    if skipped > 0:
+        print("scale-computing: skipped {} VMs with no uuid (first name: {})".format(
+            skipped, skipped_name))
 
     # Stream assets to runZero via report_assets instead of returning a list.
     reported = report_assets(assets)
-    debug_print(">>> main() complete: reported {} assets".format(reported))
+    print("scale-computing: reported {} assets".format(reported))
     return None

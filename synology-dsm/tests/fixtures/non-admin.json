@@ -1,0 +1,100 @@
+{
+  "name": "non-admin",
+  "integration": "synology-dsm",
+  "description": "A plain, non-administrator DSM account on a NAS with no optional packages. This scenario exists to pin the honest answer to 'does a least-privileged account work', and the answer is NO. SYNO.DSM.Info is readable by a normal user and returns the model, serial, and DSM version - but SYNO.DSM.Network and SYNO.Core.System are administrator-gated and refuse with error 105, and SYNO.DSM.Network is the ONLY API that exposes the NAS's own MAC addresses. What survives is a record with a serial and no MAC, no address, and (against a URL given as a bare IP, as here) no hostname either, so it cannot correlate with anything runZero scans and is not emitted at all. The run says exactly which API needs administrator rights rather than reporting an empty success. Discovery also correctly suppresses every optional collection: with no Virtualization, Surveillance Station, Active Backup, or DHCP API in the catalog, none of them is ever requested.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-normaluser",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "api-info",
+      "match": {"method": "GET", "path": "/webapi/query.cgi"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "SYNO.API.Info": {"path": "query.cgi", "minVersion": 1, "maxVersion": 1},
+              "SYNO.API.Auth": {"path": "auth.cgi", "minVersion": 1, "maxVersion": 6},
+              "SYNO.DSM.Info": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2},
+              "SYNO.DSM.Network": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2},
+              "SYNO.Core.System": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 3}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "login-on-auth-cgi",
+      "match": {"method": "POST", "path": "/webapi/auth.cgi"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"success": true, "data": {"sid": "fixture-sid-normal"}}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "dsm-info",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "model": "DS220+",
+              "ram": 6144,
+              "serial": "1980PDN654321",
+              "temperature": 38,
+              "uptime": 91234,
+              "version": "64570",
+              "version_string": "DSM 7.2.1-69057"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "admin-only-refused",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi"},
+      "responses": [
+        {"status": 200, "json": {"success": false, "error": {"code": 105}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"success": false, "error": {"code": 102}}
+  },
+  "expect": {
+    "asset_count": 0,
+    "requests_absent": [
+      {"query_contains": "SYNO.Virtualization"},
+      {"query_contains": "SYNO.SurveillanceStation"},
+      {"query_contains": "SYNO.ActiveBackup"},
+      {"query_contains": "DHCPServer"}
+    ],
+    "requests_include": [
+      {"method": "POST", "path_contains": "/webapi/auth.cgi"},
+      {"method": "GET", "query_contains": "api=SYNO.DSM.Info"}
+    ],
+    "log_contains": [
+      "system detail refused (error 105: the logged in session does not have permission). This API requires an administrator account on DSM.",
+      "network interfaces refused (error 105",
+      "the NAS has no usable hostname, address, or MAC; not importing it",
+      "SYNO.DSM.Network requires an administrator account",
+      "skipping virtual machines: this DSM does not publish SYNO.Virtualization.API.Guest",
+      "skipping DHCP leases: this DSM publishes no DHCP server API",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,114 @@
+{
+  "name": "auth-refresh",
+  "integration": "forescout-counteract",
+  "description": "The Enterprise Manager rejects the JWT part way through the walk: the host index answers 401 once and a per-host document answers 401 once. Proves api_get logs back in and retries each rejected call rather than ending the run, and that the second login's token is used for the rest of the walk.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXJzdCJ9.Zmlyc3Qtc2lnbmF0dXJl"},
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzZWNvbmQifQ.c2Vjb25kLXNpZ25hdHVyZQ"},
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0aGlyZCJ9.dGhpcmQtc2lnbmF0dXJl"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hostFields": [
+              {"name": "hostname"},
+              {"name": "os_classification"},
+              {"name": "prim_classification"},
+              {"name": "online"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-2001",
+      "match": {"method": "GET", "path": "/api/hosts/2001"},
+      "responses": [
+        {"status": 401, "json": {"status": 401, "message": "token expired"}},
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 2001,
+              "fields": {
+                "hostname": {"value": "lab-host-a"},
+                "os_classification": {"value": "Computer/Linux Machine/Ubuntu"},
+                "prim_classification": {"value": "Computer/Server"},
+                "online": {"value": "true"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-2002",
+      "match": {"method": "GET", "path": "/api/hosts/2002"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 2002,
+              "fields": {
+                "hostname": {"value": "lab-host-b"},
+                "prim_classification": {"value": "Computer/Laptop"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-index",
+      "match": {"method": "GET", "path": "/api/hosts"},
+      "responses": [
+        {"status": 401, "json": {"status": 401, "message": "token expired"}},
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"hostId": 2001, "ip": "10.40.0.11", "mac": "00:11:22:aa:00:11"},
+              {"hostId": 2002, "ip": "10.40.0.12", "mac": "00:11:22:aa:00:12"}
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:2001",
+      "forescout-counteract:$HOST:2002"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/login"},
+      {"method": "GET", "path": "/api/hosts/2001"},
+      {"method": "GET", "path": "/api/hosts/2002"},
+      {"header_contains": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzZWNvbmQifQ.c2Vjb25kLXNpZ25hdHVyZQ"},
+      {"header_contains": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0aGlyZCJ9.dGhpcmQtc2lnbmF0dXJl"}
+    ],
+    "log_contains": [
+      "forescout-counteract: re-authenticating after a rejected token while fetching the host index",
+      "forescout-counteract: re-authenticating after a rejected token while fetching host 2001",
+      "forescout-counteract: reported 2 assets"
+    ]
+  },
+  "invariants": {"skip": []}
+}

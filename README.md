@@ -19,51 +19,112 @@ If you need help setting up a custom integration, you can create an [issue](http
 # Existing Integrations 
 
 ## Import to runZero 
+- [Absolute Secure Endpoint](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/absolute/)
+- [AdGuard Home](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/adguard-home/)
 - [Akamai Guardicore Centra](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/)
+- [Asimily](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/asimily/)
 - [Automox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/automox/)
+- [Bitdefender GravityZone](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitdefender-gravityzone/)
 - [Bitsight](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bitsight/)
+- [BMC Helix Discovery](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bmc-discovery/)
 - [Carbon Black](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/carbon-black/)
+- [Checkmk Raw Edition](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/checkmk-raw/)
 - [Cisco ISE](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-ise/)
+- [Cisco Secure Endpoint](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-secure-endpoint/)
 - [Cortex XDR](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/)
+- [Cybereason](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cybereason/)
 - [Cyberint](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberint/)
+- [Cyberwatch](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberwatch/)
 - [Device42](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/device42/)
 - [Digital Ocean](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/digital-ocean/)
 - [Drata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/)
 - [exe.dev](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/exe-dev/)
+- [ExtraHop Reveal(x)](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extrahop/)
 - [Extreme Networks CloudIQ](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/extreme-cloud-iq/)
+- [Fleet (osquery)](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/fleet-osquery/)
+- [Foreman](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/foreman/)
+- [Forescout CounterACT](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/forescout-counteract/)
+- [Forescout eyeInspect](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/forescout-eyeinspect/)
+- [Frontline VM](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/frontline-vm/)
 - [Ghost Security](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ghost/)
-- [Halcyon](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halycon/)
+- [GLPI](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/glpi/)
+- [Greenbone (GMP) Import](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone/)
+- [Halcyon](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/halcyon/)
+- [HCL BigFix](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/bigfix/)
+- [Home Assistant](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/home-assistant/)
+- [HPE Aruba ClearPass](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/aruba-clearpass/)
+- [Icinga 2](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/icinga2/)
+- [Illumio Core](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/illumio-core/)
+- [Infoblox NIOS](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/infoblox/)
+- [iTop](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/itop/)
 - [Ivanti Neurons](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ivanti_neurons/)
 - [JAMF](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jamf/)
+- [JumpCloud](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/jumpcloud/)
 - [Kandji](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kandji/)
+- [Kenna Security](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kenna/)
 - [Kubernetes](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/kubernetes/)
+- [Lansweeper](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lansweeper/)
+- [LibreNMS](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/librenms/)
 - [LimaCharlie](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/lima-charlie/)
 - [Linux via SSH](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/linux-ssh/)
 - [ManageEngine Endpoint Central](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/manage-engine-endpoint-central/)
 - [Maze](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/)
 - [Microsoft SQL Server databases](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mssql-databases/)
-- [Mosyle](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/moysle/)
+- [MikroTik RouterOS](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mikrotik-routeros/)
+- [Mosyle](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mosyle/)
+- [Nautobot](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/nautobot/)
+- [Netdata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netdata/)
+- [Netdisco](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netdisco/)
 - [Netskope](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netskope/)
 - [Nexthink](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/nexthink/)
 - [NinjaOne](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ninjaone/)
+- [Nozomi Networks](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/nozomi-networks/)
+- [ntopng](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ntopng/)
+- [Nutanix Prism](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/nutanix-prism/)
+- [OCS Inventory NG](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ocs-inventory/)
+- [Open-AudIT Community](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/open-audit/)
+- [OpenNMS Horizon](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/opennms-horizon/)
+- [OpenWrt](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/openwrt/)
+- [OPNsense](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/opnsense/)
+- [Palo Alto Networks Device Security](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/palo-alto-device-security/)
 - [pfSense](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pfsense/)
+- [phpIPAM](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/phpipam/)
+- [Pi-hole](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/pihole/)
+- [Portainer / Docker Engine](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/portainer/)
 - [Proxmox](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/proxmox/)
-- [runZero Task Sync](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-task-sync/)
+- [PuppetDB](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/puppetdb/)
+- [Quest KACE SMA](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/quest-kace/)
+- [Red Hat Insights](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/redhat-insights/)
 - [Scale Computing](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/scale-computing/)
+- [Slurp'it](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/slurpit/)
 - [Snipe-IT](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snipe-it/)
 - [Snow License Manager](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/snow-license-manager/)
 - [SolarWinds Information Service](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/solarwinds-information-service/)
+- [Sophos Central](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sophos-central/)
 - [Stairwell](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/stairwell/)
+- [Synology DSM](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/synology-dsm/)
+- [Tactical RMM](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tactical-rmm/)
 - [Tailscale](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/)
-- [Tanium](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tanium/)
+- [TP-Link Omada](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tp-link-omada/)
+- [Trellix ePolicy Orchestrator](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/trellix-epo/)
+- [Trend Micro Vision One](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/trend-vision-one/)
+- [TrueNAS](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/truenas/)
 - [Ubiquiti UniFi Network](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-network/)
+- [Ubiquiti UniFi Protect](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-protect/)
+- [Ubiquiti UniFi Site Manager](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/ubiquiti-unifi-site-manager/)
+- [Unraid](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/unraid/)
+- [Uptycs](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/uptycs/)
 - [Wazuh](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/wazuh/)
 - [Windows SMB shares](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/windows-smb-shares/)
 - [Windows WMI](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/windows-wmi/)
+- [Workspace ONE UEM](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/workspace-one-uem/)
+- [Zabbix](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/zabbix/)
 ## Export from runZero 
 - [Audit Log to Webhook](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/audit-events-to-webhook/)
 - [Sumo Logic](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/sumo-logic/)
 ## Internal Integrations
+- [Greenbone (GMP) Scan Launch](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/greenbone-scan/)
+- [runZero Task Sync](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-task-sync/)
 - [Scan Passive Assets](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-scan-passive-assets/)
 - [Vulnerability Workflow](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-vulnerability-workflow/)
 ## The boilerplate folder has examples to follow
@@ -88,7 +149,7 @@ duplicate assets on later polls.
 
 ## Asset IDs and match behavior
 
-Asset reconciliation is configurable per imported record. runZero does not
+Asset reconciliation is configurable per integration. runZero does not
 automatically choose or rewrite a custom integration's identity policy; the
 script author selects `matchBehavior` when the default is not appropriate.
 
@@ -119,8 +180,27 @@ same device will appear as a new asset on every poll.
 
 ### Tuning matching with `matchBehavior`
 
-`ImportAsset` accepts an optional `matchBehavior` string. The default
-behavior matches and breaks on all four dimensions (id, MAC, IP, name)
+`CONFIG` accepts an optional top-level `matchBehavior` string, declared
+once for the whole integration and placed after `minVersion`:
+
+```python
+CONFIG = {
+    "id": "runzero-example",
+    ...
+    "minVersion": "5.1.0",
+    # Say WHY the default is wrong for this source. The reasoning is the
+    # part a future reader cannot reconstruct from the flags.
+    "matchBehavior": "no-id-match no-id-break",
+    "params": [...],
+}
+```
+
+It is **not** a field on `ImportAsset` — the merge path needs the behavior
+before it has an asset, so the value is read from `CONFIG` and applies to
+every record the script emits. Passing `matchBehavior=` to `ImportAsset`
+fails validation. An absent or empty value means the default.
+
+That default matches and breaks on all four dimensions (id, MAC, IP, name)
 which is correct when the integration owns a strong id. When the id
 is weak or absent, use one of the knobs below to tell the cruncher
 which dimensions are unreliable for **matching** (finding the right
@@ -149,7 +229,7 @@ Combine flags with spaces. Recommended presets:
 - **Strong id, but the source also reports churny MAC/IP/hostnames
   (e.g. ephemeral cloud workloads, VPN clients):**
   ```python
-  matchBehavior="no-mac-break no-ip-break no-name-break"
+  "matchBehavior": "no-mac-break no-ip-break no-name-break",
   ```
   Keeps id-based merging authoritative, but stops drift in the other
   dimensions from blocking a legitimate merge.
@@ -157,12 +237,16 @@ Combine flags with spaces. Recommended presets:
 - **No stable id at all (the source only emits per-run / ephemeral
   ids):**
   ```python
-  matchBehavior="no-id-match no-id-break"
+  "matchBehavior": "no-id-match no-id-break",
   ```
-  Falls back to MAC / IP / name matching. Pair this with
-  `id=new_uuid()` or `id="vendor-" + hashlib.sha256(stable_attrs)` so
-  the row still has a unique key but the cruncher ignores it for
-  correlation.
+  Falls back to MAC / IP / name matching. Pair this with a
+  *deterministic* key derived from the record's own stable attributes,
+  such as `id="vendor:" + scope + ":" + mac`, so the same device yields
+  the same id on every run. Never use `new_uuid()` or any other random
+  value as an id: a fresh id each run defeats reconciliation, and the
+  `create-custom-integration` skill forbids it. If a record has no
+  attribute stable enough to derive a key from, skip the record and log
+  the field that was missing.
 
 - **Two-stage enrichment where one integration owns "identity" and
   another only contributes attributes:** use `no-id-match no-id-break`

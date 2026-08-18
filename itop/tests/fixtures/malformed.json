@@ -1,0 +1,177 @@
+{
+  "name": "malformed",
+  "integration": "itop",
+  "description": "A response whose objects map holds entries with a string where the fields object is documented, a null key, a per-object error code, dates that are not dates, and an interface whose owner key is missing. Every one must be skipped or read defensively; none may abort the run.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "classes": "Server"
+  },
+  "routes": [
+    {
+      "name": "physical-interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22PhysicalInterface%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "PhysicalInterface::701": {
+                "code": 0,
+                "class": "PhysicalInterface",
+                "key": 701,
+                "fields": "not-an-object"
+              },
+              "PhysicalInterface::702": {
+                "code": 0,
+                "class": "PhysicalInterface",
+                "key": 702,
+                "fields": {
+                  "id": "702",
+                  "name": "eth0",
+                  "ipaddress": "192.0.2.71",
+                  "macaddress": null,
+                  "connectableci_id": "71"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 2"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "logical-interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22LogicalInterface%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "code": 100,
+            "message": "Internal error"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "servers",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22Server%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::71": {
+                "code": 0,
+                "class": "Server",
+                "key": 71,
+                "fields": {
+                  "id": "71",
+                  "name": "srv-ok.example.com",
+                  "status": "production",
+                  "move2production": "not-a-date",
+                  "purchase_date": "2024-13-45",
+                  "serialnumber": "SN-71",
+                  "nb_u": "x",
+                  "osfamily_name": "Linux"
+                }
+              },
+              "Server::72": {
+                "code": 0,
+                "class": "Server",
+                "key": 72,
+                "fields": "boom"
+              },
+              "Server::73": {
+                "code": 0,
+                "class": "Server",
+                "key": null,
+                "fields": {
+                  "id": null,
+                  "name": "keyless"
+                }
+              },
+              "Server::74": {
+                "code": 100,
+                "message": "Object not found",
+                "class": "Server",
+                "key": 74
+              }
+            },
+            "code": 0,
+            "message": "Found: 4"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "itop:$HOST:Server:71"
+    ],
+    "assets": [
+      {
+        "id": "itop:$HOST:Server:71",
+        "fields": {
+          "ipAddresses": "192.0.2.71",
+          "os": "Linux"
+        },
+        "fields_absent": [
+          "macAddresses"
+        ]
+      }
+    ],
+    "log_contains": [
+      "fetching LogicalInterface: INTERNAL_ERROR",
+      "skipping Server 72: no address, MAC, or usable name",
+      "skipping Server with no key: name=keyless",
+      "skipping Server::74: Object not found"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

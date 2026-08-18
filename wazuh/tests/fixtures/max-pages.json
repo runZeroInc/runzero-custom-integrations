@@ -1,0 +1,173 @@
+{
+  "name": "max-pages",
+  "integration": "wazuh",
+  "description": "Proves the max_pages parameter actually drives the paging bound rather than being decorative. The scenario passes max_pages=2 and serves three pages of genuinely different agents, so the no-progress check cannot fire and no page is empty, meaning the only thing that can end this walk is the ceiling -- which is what makes the stop attributable to the parameter.\n\nThe message is the safety-limit form and ends in the remediation clause, because unlike a page size Wazuh caps at 500 this ceiling is a value the operator can raise; log_contains pins it verbatim, remediation included.\n\nwhen_exhausted is `error` ONLY as a terminator for a regression, for the reason recorded in stuck-page: the harness's empty response is a bare array and this script would abort on it rather than fail an assertion, whereas a 500 takes the existing status check and costs exactly one extra request on raw http.get, so a walk that stopped reading the parameter fails on request_count and the missing log line.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "max_pages": 2
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "token": "fixture-wazuh-jwt"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents",
+      "match": {
+        "method": "GET",
+        "path": "/agents"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 12400000,
+              "affected_items": [
+                {
+                  "id": "011",
+                  "name": "host-011",
+                  "status": "active",
+                  "ip": "10.20.1.11",
+                  "registerIP": "10.20.1.11",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 12400000,
+              "affected_items": [
+                {
+                  "id": "012",
+                  "name": "host-012",
+                  "status": "active",
+                  "ip": "10.20.1.12",
+                  "registerIP": "10.20.1.12",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 12400000,
+              "affected_items": [
+                {
+                  "id": "013",
+                  "name": "host-013",
+                  "status": "active",
+                  "ip": "10.20.1.13",
+                  "registerIP": "10.20.1.13",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "syscollector",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/syscollector/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 7,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=0"
+      },
+      {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=500"
+      }
+    ],
+    "requests_absent": [
+      {
+        "query_contains": "offset=1000"
+      }
+    ],
+    "log_contains": [
+      "wazuh: page limit of 2 hit (integration safety limit, retrieved 2/12400000 available assets) - raise the max_pages parameter to import the rest",
+      "Retrieved 2 agents from Wazuh"
+    ]
+  }
+}

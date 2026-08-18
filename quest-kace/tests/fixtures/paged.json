@@ -1,0 +1,85 @@
+{
+  "name": "paged",
+  "integration": "quest-kace",
+  "description": "Three-page offset walk over the machines collection with page_size=2, asserting each successive call carries the next 'paging=offset N limit 2' clause and that the short third page ends the walk. Also proves the organization fallback: this login response sets no KACE_LAST_ORG_SECURE cookie and no organization is configured, so the namespace must fall back to 'default' rather than producing an id with an empty segment.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "import_software": "false",
+    "import_assets": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ams/shared/api/security/login"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Set-Cookie": "kboxid=paged-session; Path=/; HttpOnly"},
+          "json": {"Result": "Success"}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "machines",
+      "match": {"method": "GET", "path": "/api/inventory/machines"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Machines": [
+              {"Id": "3001", "Name": "kace-3001", "Ip": "10.202.0.1", "Mac": "00:1b:44:30:00:01", "Cs_Manufacturer": "Dell Inc.", "Chassis_Type": "Tower", "Os_name": "Microsoft Windows 11 Pro", "Created": "2025-05-01 09:00:00", "Last_sync": "2026-08-14 05:00:00"},
+              {"Id": "3002", "Name": "kace-3002", "Ip": "10.202.0.2", "Mac": "00:1b:44:30:00:02", "Cs_Manufacturer": "Dell Inc.", "Chassis_Type": "Tower", "Os_name": "Microsoft Windows 11 Pro", "Created": "2025-05-01 09:00:00", "Last_sync": "2026-08-14 05:00:00"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "Machines": [
+              {"Id": "3003", "Name": "kace-3003", "Ip": "10.202.0.3", "Mac": "00:1b:44:30:00:03", "Cs_Manufacturer": "Dell Inc.", "Chassis_Type": "Laptop", "Os_name": "Microsoft Windows 11 Pro", "Created": "2025-05-01 09:00:00", "Last_sync": "2026-08-14 05:00:00"},
+              {"Id": "3004", "Name": "kace-3004", "Ip": "10.202.0.4", "Mac": "00:1b:44:30:00:04", "Cs_Manufacturer": "Dell Inc.", "Chassis_Type": "Laptop", "Os_name": "Microsoft Windows 11 Pro", "Created": "2025-05-01 09:00:00", "Last_sync": "2026-08-14 05:00:00"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "Machines": [
+              {"Id": "3005", "Name": "kace-3005", "Ip": "10.202.0.5", "Mac": "00:1b:44:30:00:05", "Cs_Manufacturer": "Dell Inc.", "Chassis_Type": "Blade", "Os_name": "Microsoft Windows Server 2022 Standard", "Created": "2025-05-01 09:00:00", "Last_sync": "2026-08-14 05:00:00"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "quest-kace:127.0.0.1:default:3001",
+      "quest-kace:127.0.0.1:default:3003",
+      "quest-kace:127.0.0.1:default:3005"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/inventory/machines", "query_contains": "paging=offset%200%20limit%202"},
+      {"method": "GET", "path": "/api/inventory/machines", "query_contains": "paging=offset%202%20limit%202"},
+      {"method": "GET", "path": "/api/inventory/machines", "query_contains": "paging=offset%204%20limit%202"},
+      {"method": "GET", "path": "/api/inventory/machines", "query_contains": "shaping=machine%20all"}
+    ],
+    "requests_absent": [
+      {"query_contains": "paging=offset%206"},
+      {"query_contains": "software%20all"}
+    ],
+    "log_contains": [
+      "quest-kace: reported 5 assets from organization default"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

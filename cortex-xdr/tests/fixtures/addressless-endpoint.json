@@ -1,0 +1,79 @@
+{
+  "name": "addressless-endpoint",
+  "integration": "cortex-xdr",
+  "description": "REGRESSION LOCK on the networkInterfaces=[None] class. build_assets inlined network_interface(...) directly into the ImportAsset call, so an endpoint reporting no ip, no ipv6 and no mac_address -- routine for an agent that has registered but not yet reported its adapters -- made the helper return None and handed ImportAsset networkInterfaces=[None]. The runtime rejects that with 'network_interfaces must be an iterable of NetworkInterface objects' and the whole run aborted, losing the healthy endpoint on the same page. Such an endpoint still has a hostname to correlate on, so it is now imported with no interface rather than taking the import down.\n\nnamespaced_ids is skipped for the same reason as the happy scenario: the foreign id is the bare Cortex agent_id with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key_id": "42",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "get-endpoint",
+      "match": {"method": "POST", "path": "/public_api/v1/endpoints/get_endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "reply": {
+              "total_count": 2,
+              "result_count": 2,
+              "endpoints": [
+                {
+                  "agent_id": "cx-agent-9001",
+                  "endpoint_id": "cx-agent-9001",
+                  "endpoint_name": "cx-no-adapters",
+                  "host_name": "cx-no-adapters.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "operational_status": "PROTECTED",
+                  "operating_system": "Windows",
+                  "os_version": "10.0.19045",
+                  "ip": [],
+                  "ipv6": [],
+                  "users": []
+                },
+                {
+                  "agent_id": "cx-agent-9002",
+                  "endpoint_id": "cx-agent-9002",
+                  "endpoint_name": "cx-healthy",
+                  "host_name": "cx-healthy.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_SERVER",
+                  "endpoint_status": "CONNECTED",
+                  "operational_status": "PROTECTED",
+                  "operating_system": "Linux",
+                  "os_version": "6.1.0",
+                  "ip": ["198.51.100.41"],
+                  "ipv6": [],
+                  "mac_address": ["00:50:56:00:90:02"],
+                  "users": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {"reply": {"total_count": 2, "result_count": 0, "endpoints": []}}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["cx-agent-9001", "cx-agent-9002"],
+    "assets": [
+      {
+        "id": "cx-agent-9001",
+        "fields": {"hostnames": "cx-no-adapters.corp.example.com", "os": "Windows"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "cx-agent-9002",
+        "fields": {"hostnames": "cx-healthy.corp.example.com", "ipAddresses": "198.51.100.41", "macAddresses": "00:50:56:00:90:02"}
+      }
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

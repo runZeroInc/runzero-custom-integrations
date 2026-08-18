@@ -1,0 +1,161 @@
+{
+  "name": "paged",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "Two consoles returned over two pages of /v1/hosts and two pages of /v1/devices at pageSize 2, using a real-shaped nextToken that contains a colon. Proves the cursor from one page is sent on the next request, that pageSize survives alongside it -- get_json's params= REPLACES a URL's query string rather than merging, so a cursor built that way is silently wiped and pagination restarts forever -- and that the walk stops when nextToken comes back empty rather than looping on the last page.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key",
+    "extract_sites": "false",
+    "page_size": "2"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/hosts", "query_contains": "nextToken"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "HOSTB:222222222",
+                "hardwareId": "b1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "203.0.113.20",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "2026-01-05T10:00:00Z",
+                "lastConnectionStateChange": "2026-06-20T10:00:00Z",
+                "reportedState": {
+                  "hardware": {"mac": "AABBCC000002", "name": "UniFi Dream Router", "serialno": "aabbcc000002", "shortname": "UDR", "firmwareVersion": "3.2.12"},
+                  "hostname": "branch-b.example.com",
+                  "ip": "198.51.100.1",
+                  "ipAddrs": ["198.51.100.1"],
+                  "state": "connected",
+                  "timezone": "Europe/Lisbon",
+                  "version": "3.2.12"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-hosts-2"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "HOSTA:111111111",
+                "hardwareId": "a1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "203.0.113.10",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "",
+                "lastConnectionStateChange": "2026-06-21T10:00:00Z",
+                "reportedState": {
+                  "hardware": {"mac": "AABBCC000001", "name": "UniFi Dream Machine SE", "serialno": "aabbcc000001", "shortname": "UDMPROSE", "firmwareVersion": "4.0.6"},
+                  "hostname": "branch-a.example.com",
+                  "ip": "192.0.2.1",
+                  "ipAddrs": ["192.0.2.1", "fe80::1"],
+                  "state": "connected",
+                  "timezone": "Europe/Riga",
+                  "version": "4.0.180"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-hosts-1",
+            "nextToken": "602232A870250000000006C514FF00000000073DD8DB000000006369FDA2:1467082514"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/devices", "query_contains": "nextToken"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hostId": "HOSTB:222222222",
+                "hostName": "branch-b.example.com",
+                "devices": [
+                  {"id": "AABBCC000002", "mac": "AABBCC000002", "name": "branch-b.example.com", "model": "UDR", "shortname": "UDR", "ip": "198.51.100.1", "productLine": "network", "status": "online", "version": "3.2.12", "firmwareStatus": "upToDate", "isConsole": true, "isManaged": true},
+                  {"id": "AABBCC000012", "mac": "AABBCC000012", "name": "Lisbon-AP", "model": "U6 Lite", "shortname": "U6LITE", "ip": "198.51.100.20", "productLine": "network", "status": "online", "version": "6.6.55", "firmwareStatus": "upToDate", "isConsole": false, "isManaged": true}
+                ],
+                "updatedAt": "2026-06-23T07:21:27Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-devices-2"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hostId": "HOSTA:111111111",
+                "hostName": "branch-a.example.com",
+                "devices": [
+                  {"id": "AABBCC000001", "mac": "AABBCC000001", "name": "branch-a.example.com", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "192.0.2.1", "productLine": "network", "status": "online", "version": "4.1.13", "firmwareStatus": "upToDate", "isConsole": true, "isManaged": true},
+                  {"id": "AABBCC000011", "mac": "AABBCC000011", "name": "Riga-Switch", "model": "USW Lite 8 PoE", "shortname": "USWLITE8POE", "ip": "192.0.2.20", "productLine": "network", "status": "online", "version": "7.0.50", "firmwareStatus": "upToDate", "isConsole": false, "isManaged": true}
+                ],
+                "updatedAt": "2026-06-23T07:21:27Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-devices-1",
+            "nextToken": "602232A870250000000006C514FF00000000073DD8DB000000006369FDA2:1467082514"
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"code": "not_found", "httpStatusCode": 404, "message": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 4,
+    "request_count": 4,
+    "ids": [
+      "unifi-site-manager:$HOST:device:AABBCC000001",
+      "unifi-site-manager:$HOST:device:AABBCC000011",
+      "unifi-site-manager:$HOST:device:AABBCC000002",
+      "unifi-site-manager:$HOST:device:AABBCC000012"
+    ],
+    "assets": [
+      {
+        "id": "unifi-site-manager:$HOST:device:AABBCC000002",
+        "fields": {
+          "hostnames": "branch-b.example.com",
+          "unifi_host_id": "HOSTB:222222222",
+          "unifi_console_serial": "aabbcc000002"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/v1/hosts", "query_contains": "pageSize=2"},
+      {"method": "GET", "path": "/v1/hosts", "query_contains": "nextToken=602232A87025"},
+      {"method": "GET", "path": "/v1/devices", "query_contains": "pageSize=2"},
+      {"method": "GET", "path": "/v1/devices", "query_contains": "nextToken=602232A87025"}
+    ],
+    "requests_absent": [{"path": "/v1/sites"}]
+  },
+
+  "check_determinism": true
+}

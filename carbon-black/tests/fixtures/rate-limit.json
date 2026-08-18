@@ -1,0 +1,75 @@
+{
+  "name": "rate-limit",
+  "integration": "carbon-black",
+  "description": "Carbon Black answers the first scroll call with 429 and the first vulnerability search with 429, then relents. post_json retries transient statuses three times by default, so the default must absorb both without the integration hand-rolling a retry loop: the devices still arrive and the CVE still lands on its asset. The 429 also proves the retry re-sends the same POST body, which is what a scroll cursor depends on.\n\nnamespaced_ids is skipped for the same reason as happy: the ids are bare device numbers with no tenant scope, reported as a bug rather than fixed here.",
+  "kwargs": {
+    "url": "$BASE",
+    "organization_key": "SYNORG01",
+    "api_id": "SYNAPIID01",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "scroll-throttled-then-ok",
+      "match": {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll", "body_contains": "\"criteria\""},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error_code": "TOO_MANY_REQUESTS", "message": "rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": [
+              {
+                "id": 6001,
+                "name": "syn-throttled-01",
+                "os": "WINDOWS",
+                "os_version": "Windows Server 2022 x64",
+                "last_internal_ip_address": "10.30.6.1",
+                "mac_address": "00:50:56:00:06:01",
+                "status": "REGISTERED"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"num_found": 1, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns-throttled-then-ok",
+      "match": {"method": "POST", "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/6001/vulnerabilities/_search"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error_code": "TOO_MANY_REQUESTS", "message": "rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": [
+              {
+                "vuln_info": {
+                  "cve_id": "CVE-2023-0001",
+                  "cve_description": "Synthetic fixture finding used to prove the retry delivered a body.",
+                  "severity": "HIGH",
+                  "risk_meter_score": 8.1,
+                  "solution": "Apply the synthetic vendor patch."
+                }
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"num_found": 1, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["6001"],
+    "min_requests": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll", "body_contains": "\"rows\":1000"},
+      {"method": "POST", "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/6001/vulnerabilities/_search", "body_contains": "\"start\":0"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

@@ -1,0 +1,120 @@
+{
+  "name": "future-timestamp",
+  "integration": "cyberwatch",
+  "description": "REGRESSION LOCK for the unclamped Cyberwatch timestamps. _parse_ts handed created_at straight to firstSeenTS, last_communication to lastSeenTS, and analyzed_at to lastDetectedTS on every finding, with no ceiling. runZero fails an ImportAsset whose first- or last-seen time is ahead of now, and that failure ends the RUN rather than the record -- so one scanned host whose clock is ahead of the master took every later page of servers down with it.\n\nServer 401 carries permanently future values (year 2999) in created_at, last_communication and analyzed_at, all of which must now be capped at the current time. Server 402 is a control with sane dates on the same page. Page 2 is where the proof is: server 403 only arrives if page 1 did not abort the run, and the short second page is also what stops the walk.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_access_key": "fixture-access",
+    "api_secret_key": "fixture-secret",
+    "include_details": "true"
+  },
+  "routes": [
+    {
+      "name": "server-list",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 401,
+              "hostname": "clock-ahead-401",
+              "category": "server",
+              "status": "active",
+              "created_at": "2999-01-15T08:00:00.000Z",
+              "analyzed_at": "2999-02-14T09:30:00.000Z",
+              "last_communication": "2999-02-14T10:00:00.000Z",
+              "addresses": ["192.0.2.41"],
+              "os": {"name": "Debian 12", "short_name": "debian12", "type": "Os::Debian"},
+              "cve_announcements_count": 1
+            },
+            {
+              "id": 402,
+              "hostname": "control-402",
+              "category": "server",
+              "status": "active",
+              "created_at": "2025-01-15T08:00:00.000Z",
+              "analyzed_at": "2026-08-14T09:30:00.000Z",
+              "last_communication": "2026-08-14T10:00:00.000Z",
+              "addresses": ["192.0.2.42"],
+              "os": {"name": "Debian 12", "short_name": "debian12", "type": "Os::Debian"},
+              "cve_announcements_count": 0
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 403,
+              "hostname": "later-page-403",
+              "category": "server",
+              "status": "active",
+              "created_at": "2025-02-15T08:00:00.000Z",
+              "analyzed_at": "2026-08-14T09:30:00.000Z",
+              "last_communication": "2026-08-14T10:00:00.000Z",
+              "addresses": ["192.0.2.43"],
+              "os": {"name": "Debian 12", "short_name": "debian12", "type": "Os::Debian"},
+              "cve_announcements_count": 0
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vuln-detail-401",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers/401"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 401,
+            "addresses": ["192.0.2.41"],
+            "analyzed_at": "2999-02-14T09:30:00.000Z",
+            "cve_announcements": [
+              {"cve_code": "CVE-2026-40001", "score": 7.5, "active": true,
+               "published": "2026-02-01T00:00:00.000Z"}
+            ],
+            "updates": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-detail",
+      "match": {"method": "GET", "path_prefix": "/api/v3/assets/servers/"},
+      "responses": [
+        {"status": 200, "json": {"packages": [], "ports": [], "services": [], "metadata": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vuln-detail-rest",
+      "match": {"method": "GET", "path_prefix": "/api/v3/vulnerabilities/servers/"},
+      "responses": [
+        {"status": 200, "json": {"cve_announcements": [], "updates": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "cyberwatch:127.0.0.1:401",
+      "cyberwatch:127.0.0.1:402",
+      "cyberwatch:127.0.0.1:403"
+    ],
+    "min_vulnerabilities_total": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v3/vulnerabilities/servers", "query_contains": "page=2"}
+    ],
+    "log_contains": [
+      "reported 3 assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

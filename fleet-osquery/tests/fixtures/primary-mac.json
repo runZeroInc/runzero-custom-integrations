@@ -1,0 +1,124 @@
+{
+  "name": "primary-mac",
+  "integration": "fleet-osquery",
+  "description": "Fleet reports every osquery interface under host.network_interfaces, most of them virtual, container, or loopback devices whose addresses are shared across unrelated hosts. The integration deliberately imports only primary_ip/primary_mac. Host 21 carries four extra interfaces holding 127.0.0.1, 169.254.x, and a docker bridge address: if any of them reached an interface the no_loopback_interfaces invariant would fail, and the asset would carry addresses that merge unrelated hosts. Also proves a null id and a non-object element are skipped without ending the run. The field assertions pin this exactly: host 21 must come out with one MAC and one address, so importing any of the four extra interfaces changes the value and fails.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_software": "false",
+    "include_labels": "false",
+    "include_policies": "false",
+    "page_size": "10"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/fleet/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {
+                "id": 21,
+                "hostname": "multi-nic.corp.example.com",
+                "computer_name": "multi-nic",
+                "platform": "ubuntu",
+                "os_version": "Ubuntu 24.04.1 LTS",
+                "primary_ip": "10.42.0.21",
+                "primary_mac": "3c:22:fb:42:00:21",
+                "public_ip": "203.0.113.7",
+                "seen_time": "2026-02-03T07:45:00Z",
+                "network_interfaces": [
+                  {
+                    "interface": "lo",
+                    "address": "127.0.0.1",
+                    "mac": "00:00:00:00:00:00"
+                  },
+                  {
+                    "interface": "eth0",
+                    "address": "10.42.0.21",
+                    "mac": "3c:22:fb:42:00:21"
+                  },
+                  {
+                    "interface": "docker0",
+                    "address": "172.17.0.1",
+                    "mac": "02:42:9a:11:22:33"
+                  },
+                  {
+                    "interface": "wlan0",
+                    "address": "169.254.19.4",
+                    "mac": "3c:22:fb:42:00:99"
+                  },
+                  {
+                    "interface": "tun0",
+                    "address": "10.99.99.9",
+                    "mac": "3c:22:fb:42:00:aa"
+                  }
+                ]
+              },
+              "this element is a string, not an object",
+              {
+                "id": null,
+                "hostname": "ghost",
+                "primary_ip": "10.42.0.99",
+                "primary_mac": "3c:22:fb:42:00:ff"
+              },
+              {
+                "id": 22,
+                "hostname": "single-nic.corp.example.com",
+                "platform": "ubuntu",
+                "os_version": "Ubuntu 24.04.1 LTS",
+                "primary_ip": "10.42.0.22",
+                "primary_mac": "3c:22:fb:42:00:22",
+                "seen_time": "2026-02-03T07:45:00Z",
+                "network_interfaces": []
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "hosts": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "fleet-osquery:$HOST:21",
+      "fleet-osquery:$HOST:22"
+    ],
+    "log_contains": [
+      "skipping host with no id: hostname=ghost"
+    ],
+    "min_requests": 1,
+    "assets": [
+      {
+        "id": "fleet-osquery:$HOST:21",
+        "fields": {
+          "macAddresses": "3c:22:fb:42:00:21",
+          "ipAddresses": "10.42.0.21",
+          "fleet_public_ip": "203.0.113.7"
+        }
+      },
+      {
+        "id": "fleet-osquery:$HOST:22",
+        "fields": {
+          "macAddresses": "3c:22:fb:42:00:22",
+          "ipAddresses": "10.42.0.22"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

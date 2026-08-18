@@ -1,0 +1,164 @@
+{
+  "name": "happy",
+  "integration": "ghost",
+  "description": "REGRESSION LOCK on the networkInterfaces=[None] class, and the worst instance of it in the repo: ghost NEVER populates addresses. Both places that build a mapping hard-code \"ips\": [], so network_interface(ips=mapping[\"ips\"]) returned None on every asset and ImportAsset was always handed networkInterfaces=[None]. The runtime rejects that with 'network_interfaces must be an iterable of NetworkInterface objects', so this integration aborted on any non-empty finding set -- it can never have imported anything. Ghost tracks code repositories and their deployment hostnames, not addressed hosts, so the correct result is an asset with hostnames and no interface at all.\n\nThis is also the integration's first scenario, so it covers the rest of the path too: the repo_id lookup, the project.deployments fallback for a finding whose repo is not in /v1/repos, and two findings landing on one asset.\n\nBoth collections are requested with the cursor contract Ghost's own OpenAPI document declares -- `size` in the query and no `page` at all -- and requests_absent proves the page-number parameter is gone.\n\nnamespaced_ids is skipped because the foreign id is the bare repository name with no tenant scope -- a known defect outside the scope of this change.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-ghost-token"
+  },
+  "routes": [
+    {
+      "name": "repos",
+      "match": {
+        "method": "GET",
+        "path": "/v1/repos"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              {
+                "id": "repo-0001",
+                "name": "example-storefront",
+                "projects": [
+                  {
+                    "deployments": {
+                      "production": [
+                        "https://shop.example.com/"
+                      ],
+                      "staging": [
+                        "https://shop-staging.example.com"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings",
+      "match": {
+        "method": "GET",
+        "path": "/v1/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "finding-0001",
+                "name": "Unauthenticated administrative route",
+                "repo_id": "repo-0001",
+                "repo_url": "https://git.example.com/example/storefront",
+                "severity": "critical",
+                "description": "An administrative route is reachable without authentication.",
+                "remediation": "Require authentication on the route.",
+                "confidence": "high",
+                "project_id": "proj-0001",
+                "created_at": "2026-01-04T10:00:00Z",
+                "updated_at": "2026-01-05T10:00:00Z"
+              },
+              {
+                "id": "finding-0002",
+                "name": "Secret committed to source control",
+                "repo_id": "repo-0001",
+                "repo_url": "https://git.example.com/example/storefront",
+                "severity": "high",
+                "description": "An API token was committed to the repository.",
+                "remediation": "Rotate the token and purge it from history.",
+                "confidence": "medium",
+                "project_id": "proj-0001",
+                "created_at": "2026-01-06T10:00:00Z",
+                "updated_at": "2026-01-06T10:00:00Z"
+              },
+              {
+                "id": "finding-0003",
+                "name": "Verbose error page in production",
+                "repo_id": "repo-unknown",
+                "repo_url": "https://git.example.com/example/reporting",
+                "severity": "medium",
+                "description": "Stack traces are returned to unauthenticated callers.",
+                "remediation": "Disable debug output in production.",
+                "confidence": "low",
+                "project": {
+                  "deployments": {
+                    "production": [
+                      "https://reports.example.com/status"
+                    ]
+                  }
+                },
+                "project_id": "proj-0002",
+                "created_at": "2026-01-07T10:00:00Z",
+                "updated_at": "2026-01-07T10:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "example-storefront",
+      "https://git.example.com/example/reporting"
+    ],
+    "assets": [
+      {
+        "id": "example-storefront",
+        "fields": {
+          "hostnames": "shop-staging.example.com\tshop.example.com"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "https://git.example.com/example/reporting",
+        "fields": {
+          "hostnames": "reports.example.com"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/v1/repos",
+        "query_contains": "size=100"
+      },
+      {
+        "method": "GET",
+        "path": "/v1/findings",
+        "query_contains": "size=100"
+      },
+      {
+        "header_contains": "fixture-ghost-token"
+      }
+    ],
+    "request_count": 2,
+    "requests_absent": [
+      {
+        "query_contains": "page="
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

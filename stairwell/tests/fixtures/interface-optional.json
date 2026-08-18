@@ -1,0 +1,112 @@
+{
+  "name": "interface-optional",
+  "description": "Every combination of address and MAC a Stairwell asset can report, because both are optional and the script used to treat either one as a reason to drop the host. `2001` has both. `2002` reports the `-` placeholder and `2003` an empty string -- Stairwell writes both for 'none reported' -- and each must arrive with its address and no MAC. `2004` has a MAC and no address. `2005` has neither, so it arrives as a hostname-only asset with no interface at all: an asset with no interface is a normal asset, and network_interface() answers None rather than an empty object precisely so the caller can leave the list empty. `2007` is the loopback case stated at the record level, which is the only level it can be stated at: the platform's NormalizeAddress drops 127.0.0.1 before it ever reaches an asset, so the `no_loopback_interfaces` invariant would pass whether or not the script filtered it. The script previously substituted 127.0.0.1 for every address-less record, and that is what `2006` catches -- no address, no MAC, no label, and therefore nothing to correlate on. With the synthetic in place it built a real interface, defeated the correlator check, and emitted an orphan asset that the `has_correlator` invariant fails on; with it gone the record is skipped and says so.",
+  "kwargs": {
+    "url": "$BASE",
+    "environment_id": "env-1",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/environments/env-1/assets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "assets": [
+              {
+                "name": "environments/env-1/assets/2001",
+                "label": "syn-both",
+                "ipAddress": "10.70.0.10",
+                "macAddress": "00:11:22:33:44:aa",
+                "os": "Ubuntu",
+                "osVersion": "22.04"
+              },
+              {
+                "name": "environments/env-1/assets/2002",
+                "label": "syn-mac-placeholder",
+                "ipAddress": "10.70.0.11",
+                "macAddress": "-",
+                "os": "Linux"
+              },
+              {
+                "name": "environments/env-1/assets/2003",
+                "label": "syn-mac-empty",
+                "ipAddress": "10.70.0.12",
+                "macAddress": "",
+                "os": "Linux"
+              },
+              {
+                "name": "environments/env-1/assets/2004",
+                "label": "syn-no-address",
+                "macAddress": "00:11:22:33:44:cc",
+                "os": "Ubuntu",
+                "osVersion": "24.04"
+              },
+              {
+                "name": "environments/env-1/assets/2005",
+                "label": "syn-name-only",
+                "ipAddress": "",
+                "macAddress": "-",
+                "os": "Linux"
+              },
+              {
+                "name": "environments/env-1/assets/2006",
+                "label": "",
+                "ipAddress": "",
+                "macAddress": "-",
+                "os": "Linux"
+              },
+              {
+                "name": "environments/env-1/assets/2007",
+                "label": "syn-loopback",
+                "ipAddress": "127.0.0.1",
+                "macAddress": "-",
+                "os": "Linux"
+              }
+            ],
+            "nextPageToken": ""
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 6,
+    "ids": ["2001", "2002", "2003", "2004", "2005", "2007"],
+    "ids_absent": ["2006"],
+    "assets": [
+      {
+        "id": "2002",
+        "fields": {"ipAddresses": "10.70.0.11", "hostnames": "syn-mac-placeholder"},
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "2003",
+        "fields": {"ipAddresses": "10.70.0.12", "hostnames": "syn-mac-empty"},
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "2004",
+        "fields": {"macAddresses": "00:11:22:33:44:cc", "hostnames": "syn-no-address"},
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "2005",
+        "fields": {"hostnames": "syn-name-only"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "2007",
+        "fields": {"hostnames": "syn-loopback"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "log_contains": [
+      "stairwell: skipping asset 2006 with no address, MAC, or label"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

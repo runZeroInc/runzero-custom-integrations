@@ -1,0 +1,151 @@
+{
+  "name": "icinga2",
+  "integration": "icinga2",
+  "description": "Imports five hosts from a real Icinga 2.16 over its TLS-only API, including the one Host object the product configures for itself, and proves the four decisions no hand-written fixture would think to test: loopback and APIPA addresses leave an asset with no address at all, a DNS name in the `address` attribute becomes a hostname rather than an address, a display_name with spaces in it never becomes a hostname, and 18 real service checks produce zero runZero Services.",
+  "compose": "compose.yml",
+  "service": "icinga2",
+  "scheme": "https",
+
+  "ready": [
+    {
+      "name": "api listener demanding credentials",
+      "http": {"path": "/v1/status", "status": [401], "insecure": true},
+      "timeout": 300,
+      "interval": 3
+    }
+  ],
+  "_ready_note": "A 401 is the readiness signal, not a failure: the API is up and refusing an unauthenticated request, which is exactly what it should do and the earliest honest evidence that the ApiListener is bound. Gating on a 200 is impossible without putting a credential in the gate. The seed then does the real waiting -- it polls /v1/status/IcingaApplication as the configured ApiUser, which additionally proves conf.d was parsed.",
+
+  "seed": "seed.py",
+  "seed_timeout": 600,
+
+  "kwargs": {
+    "url": "$BASE",
+    "username": "${seed.username}",
+    "password": "${seed.password}",
+    "include_checks": "true",
+    "include_check_output": "true",
+    "tls_disable_validation": "true"
+  },
+  "_kwargs_note": "The credential is the READ-ONLY ApiUser: status/query plus objects/query on Host and Service, and nothing else. Running under least privilege is the assertion -- a permission the integration quietly needed but nobody granted fails here rather than at a customer. tls_disable_validation is set because the certificate is minted by the CA `icinga2 node setup --master` generates for itself and is trusted by nothing; that is a property of a throwaway container, not a recommendation. The transport is still real TLS, and it has to be: the Icinga API has no plaintext port to fall back to.",
+
+  "expect": {
+    "asset_count": 5,
+
+    "ids": [
+      "icinga2:$HOST:rz-web01.lab.example.com",
+      "icinga2:$HOST:rz-core-switch",
+      "icinga2:$HOST:rz-apipa-only",
+      "icinga2:$HOST:rz-dns-addressed",
+      "icinga2:$HOST:${seed.builtin_host}"
+    ],
+
+    "assets": [
+      {
+        "id": "icinga2:$HOST:rz-web01.lab.example.com",
+        "fields": {
+          "_match.behavior": "id-match id-break mac-match no-mac-break ip-match no-ip-break name-match no-name-break",
+          "hostnames": "rz-web01.lab.example.com",
+          "ipAddresses": "10.223.4.21",
+          "macAddresses": "a8:bb:cc:11:22:33",
+          "macPairs": "10.223.4.21=a8:bb:cc:11:22:33",
+          "icinga_mac": "AA:BB:CC:11:22:33",
+          "icinga_mac_source_var": "mac",
+          "os": "Linux",
+          "icinga_var_location": "DC1 rack 14",
+          "icinga_var_environment": "lab",
+          "icinga_check_count": "${seed.web_check_count}",
+          "icinga_last_check_epoch": "-1",
+          "icinga_server": "$HOST",
+          "tags": "hostgroup:linux-servers\ticinga2\tstate:down"
+        },
+        "fields_absent": ["_services", "_software", "_vulnerabilities"]
+      },
+
+      {
+        "id": "icinga2:$HOST:rz-core-switch",
+        "fields": {
+          "hostnames": "rz-core-switch",
+          "ipAddresses": "10.223.4.22",
+          "macAddresses": "0c:c4:7a:1b:2c:3d",
+          "icinga_mac": "0c:c4:7a:1b:2c:3d",
+          "icinga_mac_source_var": "hwaddr",
+          "icinga_display_name": "Core switch 01",
+          "icinga_check_names": "ping4",
+          "os": "Cisco IOS",
+          "tags": "icinga2\tstate:down"
+        },
+        "fields_absent": ["_services"]
+      },
+
+      {
+        "id": "icinga2:$HOST:rz-apipa-only",
+        "fields": {
+          "hostnames": "rz-apipa-only",
+          "icinga_address": "169.254.10.5",
+          "icinga_state": "DOWN"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "macPairs", "_services"]
+      },
+
+      {
+        "id": "icinga2:$HOST:rz-dns-addressed",
+        "fields": {
+          "hostnames": "ns1.lab.example.com\trz-dns-addressed",
+          "icinga_address": "ns1.lab.example.com"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "_services"]
+      },
+
+      {
+        "id": "icinga2:$HOST:${seed.builtin_host}",
+        "fields": {
+          "hostnames": "${seed.builtin_host}",
+          "icinga_address": "127.0.0.1",
+          "icinga_address6": "::1",
+          "icinga_state": "${seed.builtin_state}",
+          "icinga_state_code": "${seed.builtin_state_code}",
+          "icinga_last_check_exit_status": "0",
+          "icinga_check_count": "${seed.builtin_check_count}",
+          "icinga_groups": "linux-servers",
+          "icinga_var_os": "Linux",
+          "icinga_var_notification_mail_groups": "icingaadmins",
+          "icinga_var_http_vhosts_http_http_uri": "/",
+          "icinga_var_disks_disk /_disk_partitions": "/",
+          "os": "Linux"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "macPairs", "_services"]
+      }
+    ],
+
+    "min_services_total": 0,
+
+    "log_contains": [
+      "icinga2: connected to Icinga ${seed.api_version}",
+      "icinga2: summarized ${seed.service_count} service checks across ${seed.host_count} hosts",
+      "icinga2: reported 5 assets"
+    ]
+  },
+
+  "_expect_notes": {
+    "checks_are_not_services": "The point of this case, and deliberate behaviour rather than an omission. Icinga applies 18 real service checks across these five hosts -- ping4, ssh, http, disk, load, procs, swap, users, icinga -- and NONE of them becomes a runZero Service. An Icinga service is a check, not a listening port: `disk /` is not a port, and `http` on a host means somebody monitors HTTP there, not that the host answers on 80. They are recorded as counts and names on the host instead, which is what icinga_check_count and icinga_check_names assert. _services is asserted absent on every asset so a future change that starts synthesising ports fails here.",
+    "builtin": "Not seeded -- discovered. Icinga configures one Host object for the node itself in conf.d/hosts.conf, named after NodeName, with address 127.0.0.1 and address6 ::1 and the shipped example vars. Both its addresses are filtered, so it emits with a hostname and no address at all, which makes it the case proving an asset can survive on a hostname alone. Its vars are the product's own: notification.mail.groups = icingaadmins, http_vhosts.http.http_uri = /, and disks['disk /'].disk_partitions = / -- the last of which flattens to an attribute name containing BOTH a space and a slash, `icinga_var_disks_disk /_disk_partitions`. No fixture author invents that. It is also the only host here whose state comes from Icinga really executing a monitoring plugin: the seed lets one check complete, then disables active checks so the result stops moving.",
+    "apipa": "169.254.10.5 is what a host reports when DHCP failed. The platform's IsUnicast deliberately KEEPS link-local, so this address would reach the asset if the integration did not filter it, and two unrelated APIPA hosts would then correlate to each other. The raw value survives as icinga_address while ipAddresses is empty, which is the assertion.",
+    "dns_addressed": "`address` is a plain string attribute Icinga validates in no way at all, and pointing it at a DNS name is the norm on installs that let DNS resolve. The value has to be classified by what it IS rather than by which attribute it arrived in, so ns1.lab.example.com becomes a hostname and the asset carries no address. Around a third of a real Icinga estate is addressed this way.",
+    "display_name": "rz-core-switch's display_name is `Core switch 01`. It is a caption, not a name -- it has spaces and does not resolve -- so it survives as an attribute and never reaches hostnames. This is the single most common way an integration invents unresolvable hostnames.",
+    "mac_vars": "Icinga models no hardware, so a MAC only ever appears where an operator put one. rz-web01 carries it in vars.mac and rz-core-switch in vars.hwaddr, and both spellings are found. AA:BB:CC:11:22:33 has the locally-administered bit set, so the platform emits a8:bb:cc:11:22:33 while icinga_mac keeps the raw value -- asserting both sides makes the transformation visible. 0c:c4:7a:1b:2c:3d already has the bit clear and passes through unchanged.",
+    "state": "Seeded hosts are created with enable_active_checks false and are never checked, so they hold Icinga's initial DOWN state permanently and `tags` is stable. Without that, the unreachable seeded addresses would start UP and flip to DOWN a check interval later, and every state-derived assertion would pass or fail on timing. icinga_check_problem_count is deliberately NOT asserted for the same reason: the applied SERVICE checks do keep running, and their states move.",
+    "least_privilege": "Everything above is read by the ApiUser holding only status/query and objects/query on Host and Service. That the run succeeds at all is the assertion."
+  },
+
+  "_findings": {
+    "never_checked_is_minus_one_not_zero": "The script's _epoch() comments say Icinga writes 0 for `never checked` rather than omitting the attribute. This build writes -1: every seeded host reports last_check = -1 and emits icinga_last_check_epoch = -1. No bug follows from it -- _epoch rejects anything <= 0, so both spellings are handled and no firstSeen/lastSeen is set -- but the comment names the wrong sentinel, and a future change that tests `== 0` would regress. Asserted directly on rz-web01 so the real sentinel is recorded.",
+    "runtime_objects_get_a_zone": "Hosts created through the API come back with zone = `master`, while the Host object that ships in conf.d has no zone attribute at all. Harmless, and worth knowing when reading icinga_zone across a mixed estate."
+  },
+
+  "invariants": {"skip": []},
+
+  "check_determinism": true,
+  "startup_timeout": 600,
+  "timeout": 600
+}

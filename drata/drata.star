@@ -5,9 +5,19 @@ CONFIG = {
     "name": "Drata",
     "type": "inbound",
     "description": "Imports assets from Drata.",
-    "version": "26061000",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
+        {
+            "key": "url",
+            "label": "Drata API URL",
+            "type": "url",
+            "required": False,
+            "default": "https://public-api.drata.com",
+            "placeholder": "https://public-api.drata.com",
+            "description": "Drata's API endpoint. Override only for a regional or non-production deployment.",
+        },
         {
             "key": "api_token",
             "label": "API token",
@@ -26,7 +36,58 @@ load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
 load('flatten_json', 'flatten')
 
-DRATA_URL = 'https://public-api.drata.com'
+# Used when the url parameter is unset. The endpoint stays configurable rather
+# than compiled in, so a regional or non-production deployment can be reached
+# without editing the script.
+DEFAULT_DRATA_URL = 'https://public-api.drata.com'
+
+PAGE_SIZE = 50
+
+# A BACKSTOP, not the primary guard. The walk's real runaway protection is the
+# repeated-page check in the loop below, which notices a Drata that ignores
+# `page` after two requests. A page ceiling is a poor first line of defence: it
+# lets a stuck tenant be hammered for the whole ceiling before anything stops
+# it.
+#
+# The number is derived from a record target rather than hand-picked, so it
+# scales with the page size instead of encoding a guess about tenant size:
+# 200,000 pages x 50 rows = 10,000,000 assets, past any real Drata deployment.
+# With the repeated-page check in front of it this should never be reached;
+# reaching it anyway is logged, because a truncated import that says nothing
+# looks exactly like a complete one.
+MAX_PAGES = 200000
+
+
+def retrieved_of(retrieved, total):
+    """The "Retrieved X/Y available assets" half of a truncation message.
+
+    A truncated run has to say how much of the estate it actually got: a bare
+    count tells the reader nothing about whether the import is nearly complete
+    or stopped at the first percent. Where the API reports no total, say so
+    plainly rather than printing a bare slash or inventing a denominator.
+    """
+    if type(total) == 'int' and total > 0:
+        return 'Retrieved {}/{} available assets'.format(retrieved, total)
+    return 'Retrieved {} assets; the API does not report a total'.format(retrieved)
+
+
+def page_signature(rows):
+    """A cheap fingerprint of one page: its length and the ids at either end.
+
+    Two consecutive pages sharing a fingerprint means the server re-served one
+    page rather than advancing through the collection. Comparing ends rather
+    than every row keeps this O(1) per page, and it is enough for the failure it
+    guards against -- a tenant that ignores `page` returns byte-identical
+    responses, not a rearrangement of one.
+    """
+    if not rows:
+        return 'empty'
+    first = rows[0]
+    last = rows[-1]
+    first_id = first.get('id', '') if type(first) == 'dict' else ''
+    last_id = last.get('id', '') if type(last) == 'dict' else ''
+    return '{}|{}|{}'.format(len(rows), first_id, last_id)
+
 
 def build_assets(assets_json):
     assets_import = []
@@ -44,14 +105,82 @@ def build_assets(assets_json):
         updated_at = item.get('updatedAt', '')
         removed_at = item.get('removedAt', '')
 
-        ips = ['127.0.0.1']
-        macs = []
-        if macs:
-            #for m in macs:
-            network = network_interface(ips=ips, mac=macs)
-        else:
-            network = network_interface(ips=ips, mac=None)
+        # The interface is built further down, once the device block has been
+        # read. Drata publishes no IP address, and a synthetic 127.0.0.1 used to
+        # be placed here instead: because loopback is identical on every host,
+        # IP matching pulled every Drata asset onto the same existing asset and
+        # merged unrelated machines. Never put a placeholder address on a
+        # network interface.
 
+        # Every field below is assigned only inside a conditional -- the device
+        # block, or one branch of the compliance-check loop -- and Starlark has no
+        # concept of an unset local. An asset missing its device block, or missing
+        # any one of the six check types, therefore aborted the entire run with
+        # 'referenced before assignment'. Defaulting them here keeps a partial
+        # record importable as a partial record.
+        macs = []
+        agent_version = ''
+        apps_count = ''
+        deleted_at = ''
+        encryption_enabled = ''
+        firewall_enabled = ''
+        gatekeeper_enabled = ''
+        is_device_compliant = ''
+        last_checked_at = ''
+        model = ''
+        os_version = ''
+        serial_number = ''
+        source_type = ''
+        deviceComplianceCheckAgentInstalledCreatedAt = ''
+        deviceComplianceCheckAgentInstalledExpiresAt = ''
+        deviceComplianceCheckAgentInstalledId = ''
+        deviceComplianceCheckAgentInstalledLastCheckedAt = ''
+        deviceComplianceCheckAgentInstalledStatus = ''
+        deviceComplianceCheckAgentInstalledType = ''
+        deviceComplianceCheckAgentInstalledUpdatedAt = ''
+        deviceComplianceCheckAntivirusCreatedAt = ''
+        deviceComplianceCheckAntivirusExpiresAt = ''
+        deviceComplianceCheckAntivirusId = ''
+        deviceComplianceCheckAntivirusLastCheckedAt = ''
+        deviceComplianceCheckAntivirusStatus = ''
+        deviceComplianceCheckAntivirusType = ''
+        deviceComplianceCheckAntivirusUpdatedAt = ''
+        deviceComplianceCheckAutoUpdatesCreatedAt = ''
+        deviceComplianceCheckAutoUpdatesExpiresAt = ''
+        deviceComplianceCheckAutoUpdatesId = ''
+        deviceComplianceCheckAutoUpdatesLastCheckedAt = ''
+        deviceComplianceCheckAutoUpdatesStatus = ''
+        deviceComplianceCheckAutoUpdatesType = ''
+        deviceComplianceCheckAutoUpdatesUpdatedAt = ''
+        deviceComplianceCheckDiskEncryptionCreatedAt = ''
+        deviceComplianceCheckDiskEncryptionExpiresAt = ''
+        deviceComplianceCheckDiskEncryptionId = ''
+        deviceComplianceCheckDiskEncryptionLastCheckedAt = ''
+        deviceComplianceCheckDiskEncryptionStatus = ''
+        deviceComplianceCheckDiskEncryptionType = ''
+        deviceComplianceCheckDiskEncryptionUpdatedAt = ''
+        deviceComplianceCheckLockScreenCreatedAt = ''
+        deviceComplianceCheckLockScreenExpiresAt = ''
+        deviceComplianceCheckLockScreenId = ''
+        deviceComplianceCheckLockScreenLastCheckedAt = ''
+        deviceComplianceCheckLockScreenStatus = ''
+        deviceComplianceCheckLockScreenType = ''
+        deviceComplianceCheckLockScreenUpdatedAt = ''
+        deviceComplianceCheckPasswordManagerCreatedAt = ''
+        deviceComplianceCheckPasswordManagerExpiresAt = ''
+        deviceComplianceCheckPasswordManagerId = ''
+        deviceComplianceCheckPasswordManagerLastCheckedAt = ''
+        deviceComplianceCheckPasswordManagerStatus = ''
+        deviceComplianceCheckPasswordManagerType = ''
+        deviceComplianceCheckPasswordManagerUpdatedAt = ''
+        owner_created_at = ''
+        owner_email = ''
+        owner_first_name = ''
+        owner_id = ''
+        owner_last_name = ''
+        owner_roles = ''
+        owner_terms_agreed = ''
+        owner_updated_at = ''
         device = []
         device = item.get('device', {})
         if device:
@@ -126,7 +255,13 @@ def build_assets(assets_json):
                         deviceComplianceCheckLockScreenType = check.get('type', '')
                         deviceComplianceCheckLockScreenUpdatedAt = check.get('updatedAt', '')  
                     else:
-                        print('unrecognized compliance check: ' + type)              
+                        # `type` here was the Starlark builtin, not the check's
+                        # type, and concatenating a builtin to a string aborts
+                        # the script -- so the first device carrying a
+                        # compliance check Drata added after this code was
+                        # written took the whole import down, including every
+                        # device still unprocessed.
+                        print('drata: unrecognized compliance check: ' + str(check_type))
 
         owner = []
         owner = item.get('owner', {})
@@ -140,11 +275,23 @@ def build_assets(assets_json):
             owner_updated_at = owner.get('updatedAt', '')
             owner_roles = owner.get('roles', [])
 
+        # Build the interface now that the device block above has populated the
+        # MAC list. An asset with no MAC gets no interface at all rather than a
+        # placeholder one. The field is named macAddress in the singular, so it
+        # is coerced to a list rather than iterated directly: iterating a string
+        # would walk its characters.
+        mac_list = macs if type(macs) == "list" else ([macs] if macs else [])
+        networks = []
+        for m in mac_list:
+            nic = network_interface(mac=str(m))
+            if nic:
+                networks.append(nic)
+
         assets_import.append(
             ImportAsset(
                 id=str(id),
                 hostnames=[hostname],
-                networkInterfaces=[network],
+                networkInterfaces=networks,
                 os=os_version,    
                 customAttributes=to_custom_attributes({
                     "description":description,
@@ -227,36 +374,81 @@ def build_assets(assets_json):
 # Build runZero network interfaces; shouldn't need to touch this
 def main(**kwargs):
     token = kwargs['api_token']
+    # The platform applies the CONFIG default, but fall back explicitly so the
+    # script still works if it is invoked without one.
+    base_url = (kwargs.get('url') or DEFAULT_DRATA_URL).rstrip('/')
     http_options = get_http_options(kwargs, headers={"Authorization": bearer(token)})
-        
+
+
     # Get assets
     filter = 'assetClassType=HARDWARE&employmentStatus=CURRENT_EMPLOYEE'
 
     page = 1
-    page_size = 50
-    hasNextPage = True
+    page_size = PAGE_SIZE
     reported = 0
+    last_signature = ""
+    # Drata reports the size of the whole collection alongside every page. It is
+    # captured so a truncated run can say what fraction of the estate it got,
+    # rather than a bare count the reader cannot judge.
+    total_count = None
+    # The walk used to be driven by a hasNextPage flag tested at the top of the
+    # loop, which cost an extra iteration to notice the end. The two end
+    # conditions break directly instead, so the page budget below is spent only
+    # on pages actually requested.
+    capped = True
 
-    while hasNextPage:
-        url = '{}/{}?{}&page={}&limit={}'.format(DRATA_URL, 'public/assets', filter, page, page_size)
+    for _page in range(0, MAX_PAGES):
+        url = '{}/{}?{}&page={}&limit={}'.format(base_url, 'public/assets', filter, page, page_size)
         data, err = get_json(url, **http_options)
         if err:
             print('failed to retrieve assets:', err)
             return None
 
-        total = (data or {}).get('total', 0)
+        # The documented response is an object carrying "data" and "total";
+        # reading .get off a list would abort the script.
+        if type(data) != 'dict':
+            print('drata: unexpected response shape, wanted an object')
+            return None
 
-        if total == 9999999:
-            results_json = (data or {}).get('data', [])
-            # Build and stream each page via report_assets so the full asset set
-            # is never held in memory.
-            reported += report_assets(build_assets(results_json))
-            page += 1
-        elif total == 0:
-            hasNextPage = False
-        else:
-            print('unexpected value returned for total')
-            hasNextPage = False
+        reported_total = data.get('total')
+        if type(reported_total) == 'int' and reported_total >= 0:
+            total_count = reported_total
+
+        results_json = data.get('data', [])
+        if not results_json:
+            capped = False
+            break
+
+        # THE PRIMARY RUNAWAY GUARD. A page identical to the one before it means
+        # Drata is ignoring `page` and re-serving the same rows, so the walk is
+        # not advancing and continuing can only re-report assets already
+        # reported. Checked BEFORE the page is reported, so the repeated rows
+        # never reach runZero, and it can never truncate genuine data: it only
+        # fires on a page that adds nothing. It catches the stuck tenant in two
+        # requests where the page ceiling would take 200,000.
+        signature = page_signature(results_json)
+        if signature == last_signature:
+            capped = False
+            print('drata: paging stopped after {} pages: the API returned the same page twice. {}'.format(
+                page, retrieved_of(reported, total_count)))
+            break
+        last_signature = signature
+
+        # Page on the data itself. This previously advanced only when total was
+        # exactly 9999999 -- a sentinel from a mock -- so every realistic
+        # response fell through to "unexpected value returned for total" and the
+        # integration imported nothing at all.
+        # Build and stream each page via report_assets so the full asset set is
+        # never held in memory.
+        reported += report_assets(build_assets(results_json))
+        if len(results_json) < page_size:
+            capped = False
+            break
+        page += 1
+
+    if capped:
+        print('drata: page limit of {} hit (integration safety limit). {}'.format(
+            MAX_PAGES, retrieved_of(reported, total_count)))
 
     if not reported:
         print('no assets')

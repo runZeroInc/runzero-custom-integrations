@@ -1,0 +1,142 @@
+{
+  "name": "malformed",
+  "integration": "open-audit",
+  "description": "Every shape the devices collection can hand back that would otherwise take the run down, in one page. A data element that is a bare string rather than an object; a row whose attributes is a string; a row with attributes but no id; a row whose id is null; and a row whose id is the integer 0, which PHP's intval() produces for any unparseable value and which therefore means 'no id' rather than 'device zero'. All five are skipped and counted, and the two real devices still import. Device 210 additionally carries a last_seen in the year 2099 and a first_seen of 2026-02-30, a date that does not exist: parse_time aborts the whole script on an impossible calendar date, and a future timestamp makes the platform reject the entire record rather than the field, so the first is range-checked away and the second is clamped to now. Device 211's included block is a string where an object is documented, which must not be subscripted.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_interfaces": "true",
+    "collect_software": "false"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-malformed-session; Path=/"}, "json": {"id": "3", "name": "runzero"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-210-detail",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices/210"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "read", "format": "json", "id": 210, "header": 200},
+            "included": {
+              "ip": [
+                {"id": 950, "device_id": 210, "current": "y", "mac": "not-a-mac", "net_index": "1", "ip": "not-an-address", "version": 4},
+                {"id": 951, "device_id": 210, "current": "y", "mac": "00:1c:42:aa:bb:cc", "net_index": "1", "ip": "198.51.100.60", "version": 4},
+                "a bare string where a row is documented",
+                {"id": 952, "device_id": 210, "current": "y", "mac": "00:1c:42:aa:bb:cc", "net_index": "1", "ip": null, "version": 4}
+              ],
+              "network": "a string where the adapter list is documented"
+            },
+            "logs": [],
+            "data": [{"id": 210, "type": "devices", "attributes": {"id": 210, "name": "survivor-a"}}]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-211-detail",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices/211"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "read", "format": "json", "id": 211, "header": 200},
+            "included": "expected an object keyed by table name",
+            "logs": [],
+            "data": [{"id": 211, "type": "devices", "attributes": {"id": 211, "name": "survivor-b"}}]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 500, "offset": 0, "total": 7, "filtered": 7},
+            "included": [],
+            "logs": [],
+            "data": [
+              "a bare string where a data item is documented",
+              {"id": 205, "type": "devices", "attributes": "a string where the attributes object is documented"},
+              {"type": "devices", "attributes": {"name": "no-id-anywhere", "ip": "198.51.100.5"}},
+              {"id": null, "type": "devices", "attributes": {"id": null, "name": "null-id", "ip": "198.51.100.6"}},
+              {"id": 0, "type": "devices", "attributes": {"id": 0, "name": "zero-id", "ip": "198.51.100.7"}},
+              {
+                "id": 210,
+                "type": "devices",
+                "attributes": {
+                  "id": 210,
+                  "name": "survivor-a",
+                  "ip": "198.51.100.60",
+                  "type": "computer",
+                  "class": "laptop",
+                  "os_name": "macOS 15.5",
+                  "os_version": "15.5",
+                  "manufacturer": "Apple Inc.",
+                  "model": "MacBookPro18,3",
+                  "serial": "C02XX1234567",
+                  "first_seen": "2026-02-30 09:00:00",
+                  "last_seen": "2099-01-01 00:00:00"
+                }
+              },
+              {
+                "id": 211,
+                "type": "devices",
+                "attributes": {
+                  "id": 211,
+                  "name": "survivor-b",
+                  "ip": "198.51.100.61",
+                  "type": "unknown",
+                  "class": "",
+                  "os_name": "",
+                  "first_seen": "2000-01-01 00:00:00",
+                  "last_seen": "0000-00-00 00:00:00"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": ["open-audit:$HOST:210", "open-audit:$HOST:211"],
+    "ids_absent": [
+      "open-audit:$HOST:0",
+      "open-audit:$HOST:205",
+      "open-audit:$HOST:"
+    ],
+    "assets": [
+      {
+        "id": "open-audit:$HOST:210",
+        "fields": {
+          "deviceType": "Laptop",
+          "open_audit_serial": "C02XX1234567"
+        }
+      }
+    ],
+    "log_contains": [
+      "open-audit: skipping a devices row with no id at offset 0",
+      "open-audit: skipped 5 rows with no usable device id",
+      "open-audit: imported 2 devices, 2 with detail"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

@@ -1,0 +1,27 @@
+{
+  "name": "empty",
+  "integration": "cyberint",
+  "description": "A tenant with no open alerts. The run must make its one authenticated call, emit zero assets, and say so, rather than failing or emitting a placeholder. total is present and zero, and the alerts array is empty, which is what the API returns for a clean tenant.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-cyberint-cookie"
+  },
+  "routes": [
+    {
+      "name": "alerts-empty",
+      "match": {"method": "POST", "path": "/alert/api/v1/alerts"},
+      "responses": [{"status": 200, "json": {"total": 0, "alerts": []}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["cyberint: reported 0 assets"],
+    "requests_include": [
+      {"method": "POST", "path": "/alert/api/v1/alerts"},
+      {"header": {"Cookie": "access_token=fixture-cyberint-cookie"}}
+    ]
+  },
+  "invariants": {"skip": []}
+}

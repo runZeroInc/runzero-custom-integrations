@@ -1,0 +1,73 @@
+{
+  "name": "paged",
+  "integration": "kenna",
+  "description": "Two-page walk over /assets/search driven by meta.pages rather than by a short page: page 1 is full-length by the paginator's own reckoning (meta.pages=2), so the walk must continue to page=2 and then stop, without a third call. A 429 is served first to prove get_json's default three retries carry the run through a rate limit rather than the script hand-rolling one.\n\ncheck_determinism is off because the Kenna asset id is scoped by the API host AND port and the fixture server binds a fresh random port on each run.",
+  "check_determinism": false,
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-risk-token",
+    "include_vulnerabilities": "false",
+    "asset_status": "all",
+    "min_risk_meter_score": "100"
+  },
+  "routes": [
+    {
+      "name": "assets-search",
+      "match": {"method": "GET", "path": "/assets/search"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "rate limited"}},
+        {
+          "status": 200,
+          "json": {
+            "meta": {"page": 1, "pages": 2, "total_count": 2},
+            "assets": [
+              {
+                "id": 3001,
+                "primary_locator": "ip_address",
+                "locator": "10.92.0.1",
+                "ip_address": "10.92.0.1",
+                "hostname": "page1-host",
+                "status": "active",
+                "risk_meter_score": 300,
+                "last_seen_time": "2026-08-05T00:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "meta": {"page": 2, "pages": 2, "total_count": 2},
+            "assets": [
+              {
+                "id": 3002,
+                "primary_locator": "ip_address",
+                "locator": "10.92.0.2",
+                "ip_address": "10.92.0.2",
+                "hostname": "page2-host",
+                "status": "inactive",
+                "risk_meter_score": 150,
+                "last_seen_time": "2026-08-06T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/assets/search", "query_contains": "page=1"},
+      {"method": "GET", "path": "/assets/search", "query_contains": "page=2"},
+      {"method": "GET", "path": "/assets/search", "query_contains": "min_risk_meter_score=100"}
+    ],
+    "requests_absent": [
+      {"query_contains": "page=3"},
+      {"query_contains": "status"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

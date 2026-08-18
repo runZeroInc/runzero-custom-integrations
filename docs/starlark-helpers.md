@@ -39,8 +39,11 @@ The full list of registered modules is loaded automatically; you only need a
 load("runzero.types", "ImportAsset", "NetworkInterface", "Service",
                        "ServiceProtocolData", "Software", "Vulnerability",
                        "to_custom_attributes")
-load("net",  "ip_address", "network_interface", "normalize_mac",
-             "ip_network", "ip_in_network", "resolve")
+load("net",  "ip_address", "network_interface", "normalize_mac", "mac_key",
+             "ip_network", "ip_in_network", "resolve",
+             "routable_ip", "routable_ips", "hostname", "hostnames")
+load("coerce", "text", "as_dict", "as_list", "dicts",
+               "as_int", "as_float", "as_bool", "dedupe")
 load("http", http_get="get", http_post="post",
               "head", "put", "patch", "delete",
               "get_json", "post_json",
@@ -55,7 +58,7 @@ load("csv", csv_read="read_all", csv_write="write_dicts")
 load("xml", xml_parse="parse")
 load("re", re_match="match", re_find_all="find_all", re_sub="sub")
 load("uuid", "new_uuid")
-load("time", "now", "parse_time", "parse_duration", "sleep")
+load("time", "now", "parse_ts", "parse_time", "parse_duration", "sleep")
 load("requests", "Session", "Cookie")
 load("base64", base64_encode="encode", base64_decode="decode")
 load("hex", hex_encode="encode", hex_decode="decode")
@@ -86,7 +89,8 @@ CONFIG = {
   "id": "runzero-example",
   "name": "Example",
   "type": "inbound",
-  "version": "26052700",
+  "version": "1",
+  "maturity": "alpha",
   "minVersion": "5.0.260723.0",
   "params": [
     {"key": "url", "type": "url", "required": True},
@@ -136,10 +140,33 @@ Behaviour:
   short string on failure (`"status 401: <body snippet>"`,
   `"transport: ..."`).
 - 2xx responses with empty bodies decode to `None`.
-- Retries transient failures with exponential backoff (default
-  statuses: `408, 425, 429, 500, 502, 503, 504`). Pass
-  `retry_on=[418]` (or `None` to disable) to override.
-- Honors `Retry-After` headers in seconds or HTTP-date form.
+- **Retries transient failures by default.** `retries` defaults to `3`,
+  so a call makes up to four attempts. Transient statuses (default
+  `408, 425, 429, 500, 502, 503, 504`) and transport errors are retried
+  with exponential backoff, and `Retry-After` response headers (seconds
+  or HTTP-date form) are honored. You do not need to opt in.
+- Tuning knobs, all optional: `retry_on=[418]` (or `None`) overrides the
+  status list, and `retry_backoff` / `retry_max_backoff` (defaults `1.0`
+  / `30.0` seconds) control the sleep, which doubles each attempt up to
+  the maximum.
+- **Pass `retries=0` for a request that is not safe to repeat.** A
+  retried `post_json` that creates or mutates something can apply twice:
+  a 5xx may mean the server processed the request and only the response
+  was lost. For non-idempotent writes either disable retries or narrow
+  the list to statuses that mean the request was rejected unprocessed:
+
+  ```python
+  post_json(url, json=payload, retry_on=[429, 503], **http_options)
+  ```
+- **A target the scanner refuses to dial ends the run.** On hosted
+  scans, a URL that resolves to an internal address is refused by the
+  scanner itself, and that failure aborts the script instead of coming
+  back as an `err` string -- no retries, one log line. A script does not
+  need to guard for it: without the abort, a tolerant fetch helper walks
+  the whole endpoint list and reports one dial failure per endpoint plus
+  a run's worth of misleading "0 records read" lines. Every other
+  transport failure (DNS, refused, TLS, timeout) still arrives as `err`,
+  because those can be endpoint-specific.
 - All `http.get`/`http.post` kwargs are accepted
   (`headers`, `params`, `timeout`, `insecure_skip_verify`, ...).
 - `post_json` accepts either `json=<dict>` (auto-encodes and sets
@@ -228,15 +255,143 @@ nic = network_interface(
 - Returns `None` when no usable address is present AND no MAC was
   supplied, so callers can do `if nic: nics.append(nic)`.
 
-## `net.normalize_mac(s)`
+## `net.normalize_mac(mac, preserve_bits=True)`
 
 Returns the canonical lowercase colon form, or `None` for
-unparseable input.
+unparseable input. Accepts colon, dash, dotted-quad Cisco
+(`AABB.CCDD.EEFF`), and bare 12-hex forms.
+
+`preserve_bits=True` (the default) keeps the first octet exactly as the
+source reported it. Pass `preserve_bits=False` for the platform's
+cross-source matching form, which clears the locally administered bit —
+that maps `aa:bb:cc:dd:ee:ff` and `a8:bb:cc:dd:ee:ff` onto the same
+value.
+
+> **These helpers are for keys your script builds for itself** — joining
+> a DHCP lease table to a device table, de-duplicating records, indexing
+> by MAC — where the source's own value is what should match, and where
+> collapsing two locally administered addresses would join the wrong
+> records. Locally administered addresses are the norm on virtual and
+> containerized NICs, so that collapse is not rare.
+>
+> They are **not** a way to change the MAC that lands on an asset.
+> `network_interface(mac=...)` stores the platform's LAA-cleared
+> canonical form regardless of what you pass, because that is what
+> `Asset.addMAC` stores and what the platform's bogus/common/virtual MAC
+> tables are keyed on. A custom integration must not introduce a second
+> spelling into that matching path.
+
+## `net.mac_key(value)`
+
+`normalize_mac` plus the rejections a usable key needs. Returns `None`
+for the all-zero and broadcast placeholders, and for the synthetic
+`ip-<address>` hardware address that dnsmasq-derived sources (Pi-hole /
+FTL among them) invent for a client they never saw at layer 2. Use it as
+the "is this a real MAC" gate; use `normalize_mac` when you only need
+canonical formatting.
+
+```python
+# Index the lease table, then join devices onto it.
+leases_by_mac = {}
+for lease in dicts(data.get("leases")):
+    key = mac_key(lease.get("hwaddr"))   # None for 00:00:00:00:00:00, ip-10.0.0.1
+    if key:
+        leases_by_mac[key] = lease
+
+lease = leases_by_mac.get(mac_key(device.get("hwaddr")), {})
+```
+
+## `net.routable_ip(value, exclude=None)` / `net.routable_ips(values, exclude=None)`
+
+Returns the canonical form of an address usable as an asset identity, or
+`None`. Input is normalized first, so a bracketed address, a
+`host:port`, an IPv6 zone id (`fe80::1%igb0`), and a CIDR-suffixed
+address (`10.0.0.1/24`) are all accepted — real inventory APIs emit all
+four, and hand-rolled filters routinely miss one and silently drop those
+addresses.
+
+Rejected by default: loopback, unspecified/`0.0.0.0`, link-local,
+multicast, and broadcast. These are not "bogons" — they are the values
+that are actively harmful as an identity, because many devices carry
+them at once and importing them merges every such device onto a single
+asset. RFC1918, CGNAT, and ULA addresses are deliberately **kept**.
+
+`routable_ips` maps over an iterable, dropping rejects and
+de-duplicating while preserving order:
+
+```python
+addresses = routable_ips([e.get("ip") for e in device.get("ips", [])])
+```
+
+Pass `exclude=[...]` to replace the default CIDR set, or `exclude=[]` to
+disable exclusion entirely. A malformed CIDR raises, rather than
+silently excluding nothing.
+
+## `net.hostname(value, extra=None)` / `net.hostnames(values, extra=None)`
+
+Returns a value fit to import as a hostname, or `None`. Rejects
+placeholder names (`localhost`, `unknown`, `none`, `-`, `n/a`, ...),
+values that are really IP addresses, all-numeric names, empty or
+over-long labels, names past the 253-character DNS limit, and anything
+containing a character that cannot appear in a DNS name.
+
+Each of those is a merge hazard rather than merely useless: every device
+whose reverse lookup failed carries the same one.
+
+`extra=[...]` adds source-specific placeholders — the appliance's own
+alias for itself, a vendor's "New Device" default — matched
+case-insensitively. `hostnames` maps over an iterable and de-duplicates
+case-insensitively, keeping the first spelling seen.
+
+```python
+names = hostnames(raw_names, extra=["pi.hole"])
+```
 
 ## `net.ip_address(s)`
 
 Validates and classifies a single address. The result exposes
 `.version` (4 or 6) and stringifies to the canonical form.
+
+## `net.mac_vendor(mac)`
+
+> **Not yet available.** This function exists in the platform source but is not
+> in any released Explorer build. `load("net", "mac_vendor")` currently fails
+> with `name mac_vendor not found in module net`, and a failed load aborts the
+> whole script before `main` runs — so do not reference it yet. The description
+> below is here so the capability is documented when it ships.
+
+Looks the MAC up in the OUI registry and returns the registered vendor
+name, or `None` when the address is unparseable or its prefix is not
+assigned. Accepts the same forms as `normalize_mac`.
+
+Locally administered addresses — randomized client MACs, and the space
+AWS assigns to EC2 interfaces — have no registered vendor by
+construction, so `None` means "no assigned prefix", not "bad input".
+Treat a `None` as unknown rather than as a reason to discard the
+address.
+
+```python
+vendor = mac_vendor(mac)          # "VMware, Inc." / None
+if vendor:
+    attrs["mac_vendor"] = vendor
+```
+
+The most useful application is validating a MAC recovered from an
+opaque or undocumented field: a registered prefix is strong evidence
+that the value really is a MAC rather than a coincidentally
+hex-shaped identifier.
+
+## `net.enterprise_vendor(id)`
+
+> **Not yet available** — same caveat as `net.mac_vendor` above.
+
+Resolves an IANA enterprise (SNMP private enterprise) number to its
+registered organization name, or `None` when the id is negative or
+absent from the table. Takes an integer, not a string.
+
+```python
+name = enterprise_vendor(9)       # "ciscoSystems"
+```
 
 ## `net.ip_network(cidr)` / `net.ip_in_network(ip, cidr)`
 
@@ -301,8 +456,34 @@ Supported kwargs:
   empty / `None` entries, so you can write
   `hostnames=[device.get("hostname")]` without the
   `[x] if x else []` wrapper. Pass `[]` to keep them empty.
-- `matchBehavior` accepts a space-separated flag string. The two
-  presets to remember:
+- **The constructor ignores empty arguments** — `None`, a blank or
+  whitespace-only string, an empty list or dict. Pass every optional
+  field unconditionally instead of building the arguments up through an
+  `if x: params["x"] = x` ladder:
+
+  ```python
+  asset = ImportAsset(
+      id=asset_id,
+      os=text(record.get("os")),               # skipped when ""
+      osVersion=text(record.get("os_version")),
+      manufacturer=text(record.get("vendor")),
+      hostnames=names,                          # skipped when []
+      firstSeenTS=parse_ts(record.get("created")),   # skipped when None
+      lastSeenTS=parse_ts(record.get("last_seen")),
+  )
+  ```
+
+  A `False` boolean is a real value and is **not** skipped, so
+  `trustOS=False` still sets the flag. `id` is always forwarded.
+- `lastSeenTS` (and `last_seen_ts`) are accepted by the constructor,
+  alongside `firstSeenTS`. Older scripts assign `asset.lastSeenTS` after
+  construction because the constructor used to reject it; that still
+  works, but is no longer necessary.
+- `matchBehavior` is **not** an `ImportAsset` field. It is declared once
+  per integration as a top-level `CONFIG` key, placed after `minVersion`,
+  and applies to every record the script emits; passing it to
+  `ImportAsset` fails validation. It accepts a space-separated flag
+  string, and the two presets to remember are:
   - `"no-mac-break no-ip-break no-name-break"` — recommended when
     your source supplies a **stable foreign id** (vendor-assigned
     UUID, serial number). The id still drives merges, but
@@ -311,6 +492,9 @@ Supported kwargs:
   - `"no-id-match no-id-break"` — recommended when your source
     only emits **ephemeral / per-run ids**. The id is ignored,
     and merging falls back to MAC/IP/hostname.
+
+  Carry a comment alongside the value saying why the default is wrong
+  for this source. See the root README for the full flag table.
 
 ## `runzero.types.Service` / `ServiceProtocolData`
 
@@ -373,9 +557,42 @@ def main(*args, **kwargs):
   a kwargs dict you can splat into any `http` helper (see
   [Shared HTTP/TLS Options](#shared-httptls-options)).
 
+## `coerce` (defensive type conversion)
+
+A JSON API's schema is a suggestion. A field documented as a string
+arrives as a number, an object arrives as `null`, an array arrives as a
+bare object when it holds one element. Indexing into those directly
+raises, and a raise aborts the import — which is why nearly every script
+grew its own `_text` / `_dict` / `_list` / `_to_int` guards.
+
+Nothing in `coerce` raises. Each function returns the requested type or
+the supplied default, so calls chain without guarding.
+
+```python
+load("coerce", "text", "as_dict", "as_list", "dicts", "as_int", "as_float",
+     "as_bool", "dedupe")
+
+result = as_dict(data.get("result"))          # {} when the API sent null
+for record in dicts(result.get("devices")):   # skips nulls and stray strings
+    name  = text(record.get("hostname"))      # "" when absent
+    count = as_int(record.get("num_queries")) # 0 when absent or unparseable
+```
+
+| Function | Returns |
+| --- | --- |
+| `text(value, default="")` | Trimmed string. `None` → default; `True` → `"true"` (not Starlark's `"True"`); a whole float `42.0` → `"42"`; a dict or list → default, rather than a Go-syntax dump. |
+| `as_dict(value)` | The dict, or `{}`. |
+| `as_list(value, wrap=True)` | The list. `None` → `[]`; a tuple converts; any other value is wrapped in a one-element list (a string is never split into characters). `wrap=False` yields `[]` instead. |
+| `dicts(value)` | Only the dict members of an iterable. A bare dict yields a one-element list. |
+| `as_int(value, default=0)` | Int. Parses numeric strings; truncates floats toward zero. |
+| `as_float(value, default=0.0)` | Float. |
+| `as_bool(value, default=False)` | Bool. Matches `true/t/yes/y/on/1/enabled/active` and their negatives, case-insensitively. **An unrecognized string yields `default`, not Starlark truthiness** — under which the string `"false"` is `True`. |
+| `dedupe(values, fold_case=False)` | Trimmed strings, in order, blanks and repeats removed. |
+
 ## `time`
 
-Re-exports the standard Starlark `time` module plus `time.sleep`.
+Re-exports the standard Starlark `time` module plus `time.sleep` and
+`time.parse_ts`.
 
 ```python
 load("time", "now", "parse_time", "parse_duration", "from_timestamp", "sleep")
@@ -388,6 +605,41 @@ print(d.minutes)                          # 90.0
 later = now() + d                          # time + duration -> time
 sleep("250ms")                            # honors the sandbox deadline
 ```
+
+### `time.parse_ts(value, default=None, assume_utc=True, clamp_to_now=True, unit="s")`
+
+**Use this instead of `parse_time` for anything that came from an API.**
+`parse_time` raises on input it does not recognize, and a raise from a
+builtin aborts the entire script — so one malformed or zero timestamp on
+one record loses the whole import. `parse_ts` returns `default` instead.
+
+```python
+load("time", "parse_ts")
+
+first_seen = parse_ts(record.get("created"))     # None if absent or malformed
+last_seen  = parse_ts(record.get("last_seen_ms"), unit="ms")
+```
+
+Accepts a `time` (returned as-is, still clamped), an int/float epoch, a
+numeric string, and datetime strings in the usual layouts — including
+the offset-less shapes that on-premise sources actually emit
+(`2026-08-15 08:44:01` from SQL `DATETIME`, `2026-08-15T08:44:01`
+without the trailing `Z`). Those are read as UTC unless
+`assume_utc=False`.
+
+A non-positive epoch yields `default`: sources write `0` for "never" far
+more often than they mean 1970.
+
+`clamp_to_now=True` (the default) caps a future value at the current
+time. This is not cosmetic — the platform rejects an `ImportAsset` whose
+first- or last-seen time is ahead of now and drops **the entire record**,
+so an appliance whose clock runs fast would otherwise import nothing at
+all. Pass `clamp_to_now=False` if you want to detect skew yourself.
+
+`unit` selects the scale of a numeric value (`"s"`, `"ms"`, `"us"`,
+`"ns"`). It is explicit rather than magnitude-guessed, because guessing
+silently reinterprets dates far from the present. An unrecognized `unit`
+raises — that is a bug in the script, not bad data.
 
 - `time.time` fields: `year`, `month`, `day`, `hour`, `minute`, `second`,
   `nanosecond`, `unix`, `unix_nano`; methods `format(layout)`,
@@ -497,10 +749,30 @@ load("runzero.sql", sql_connect="connect")
 - `socket.tcp(host, port, timeout=30, tls=False, ...)` / `socket.udp(...)`
   / `socket.tls(...)` return a socket with `send`, `recv`, `recv_exact`,
   `recv_line`, `recv_until`, `starttls`, `set_timeout`, `close` and
-  attributes `local_addr`, `remote_addr`, `is_tls`, `closed`.
+  attributes `local_addr`, `remote_addr`, `is_tls`, `closed`. The `tls`
+  argument on `socket.tcp` (and the `tls=` kwarg on `socket.tls` /
+  `.starttls`) accepts either a bool or a dict of TLS overrides in the same
+  shape as the `http` module (`insecure`, `server_name`, `ca_pem`,
+  `client_cert_pem`, `client_key_pem`, `thumbprints`), so you can splat
+  `get_http_tls(kwargs, "tls_")` straight into a raw TLS socket:
+  ```python
+  conn = tls(host, 9390, timeout=60, tls=get_http_tls(kwargs, "tls_"))
+  ```
 - `runzero.ssh.dial(host, username, password=None, private_key=None,
   port=22, timeout=30)` → session with `run(command) -> (stdout, stderr,
-  exit_code)`.
+  exit_code)`. The session also offers:
+  - `open_unix(path)` — forward to a UNIX-domain socket on the remote host
+    (the SSH `direct-streamlocal` extension, i.e. `ssh -L
+    localport:/remote.sock`) and return a `socket` value. Speak a raw
+    protocol (e.g. GMP to `/run/gvmd/gvmd.sock`) with no remote helper such
+    as `socat`/`netcat`.
+  - `open_tcp(host, port)` — forward to a TCP address reachable from the
+    remote host (`direct-tcpip`, i.e. `ssh -L localport:host:port`) and
+    return a `socket` value; call `.starttls(...)` to speak TLS over it.
+  - `stream(command, stdin=None, timeout=0)` — start a long-lived remote
+    command and return a stream object with `send`, `recv(max, timeout)`
+    (`b""` at EOF), `close_stdin`, `close`, and `exit_code` / `stderr`
+    attributes, for incrementally consuming large command output.
 - `runzero.smb.dial(host, username, password="", nt_hash=None, port=445)`
   → session with `mount(share)`, `list_shares()`; a mounted share offers
   `read`, `list`, `stat`, `exists`.
@@ -530,28 +802,55 @@ progress_info("retrying after 429")
   truncated to 256 bytes.
 - `info(msg)` / `warn(msg)` — emit log lines through the per-task logger.
 
-## `report_assets` (streaming inbound assets)
+## `report_asset` / `report_assets` (streaming inbound assets)
 
-`report_assets` is a predeclared builtin (no `load` required) that streams
-`ImportAsset` values to runZero as your script runs, instead of accumulating
-them all and returning a single `list` from `main`. Use it for inbound
-integrations that page through large inventories so memory stays bounded by a
-single page rather than the entire dataset.
+Both are predeclared builtins (no `load` required) that stream
+`ImportAsset` values to runZero as your script runs, instead of
+accumulating them and returning a single `list` from `main`.
+
+**Prefer `report_asset`, and do not batch.** Report each asset as it is
+built:
 
 ```python
 def main(**kwargs):
+    p = pager("devices")
     cursor = None
-    while True:
+    reported = 0
+    while p.next():
         page, cursor = fetch_page(kwargs, cursor)
-        if not page:
-            break
-        report_assets(build_assets(page))   # stream this page
+        for record in page:
+            reported += report_asset(build_asset(record))
         if not cursor:
             break
+    print("reported {} assets".format(reported))
     return None                             # nothing buffered in main
 ```
 
-Accepted argument shapes:
+The accumulate-and-flush pattern some older scripts use —
+
+```python
+batch.append(asset)
+if len(batch) >= BATCH_SIZE:
+    reported += report_assets(batch)
+    batch = []
+...
+if batch:                       # the trailing flush that is easy to forget
+    reported += report_assets(batch)
+```
+
+— buys nothing. The host already writes incrementally, so the batch is
+just a second buffer in front of it. Reporting per asset bounds memory
+regardless of estate size and cannot lose a partial final batch when a
+script returns early.
+
+`report_asset(asset)` takes exactly one `ImportAsset` and returns `1`, so
+`reported += report_asset(asset)` accumulates a count directly. Passing
+`None` is a no-op returning `0`, so
+`report_asset(build_asset(record))` stays safe when your builder declines
+a record.
+
+`report_assets` remains available for the cases where you genuinely have
+a list in hand:
 
 ```python
 report_assets(asset)            # a single ImportAsset
@@ -564,8 +863,80 @@ n = report_assets(batch)        # returns the int count reported
 - Reported assets are merged with any `list` returned from `main`, so partial
   adoption is safe.
 
+## Pagination: `CONFIG["maxPages"]` and `pager()`
+
+Every pagination loop needs a backstop, because a source whose cursor
+never terminates otherwise spins until the task's wall-clock deadline
+kills it with no indication of why. Do **not** declare your own
+`MAX_PAGES` constant for this; the limit belongs in `CONFIG`, where an
+operator can see and change it.
+
+```python
+CONFIG = {
+    "id": "runzero-example",
+    "name": "Example",
+    "type": "inbound",
+    "version": "1",
+    "minVersion": "5.0.260723.0",
+    "maxPages": 5000,          # optional; defaults to 1,000,000
+    "params": [...],
+}
+```
+
+`pager(label="pages", limit=0)` returns a loop guard enforcing that
+value:
+
+```python
+p = pager("devices")
+while p.next():
+    data, err = get_json(url, params={"cursor": cursor})
+    if err:
+        break
+    for record in dicts(data.get("results")):
+        report_asset(build_asset(record))
+    cursor = data.get("next")
+    if not cursor:
+        break
+```
+
+- `p.next()` returns `True` while the loop may continue. **It never
+  returns `False`** — reaching the limit raises, naming the label, the
+  limit, and the `maxPages` key. A pagination loop is supposed to end
+  because the source said there is no next page; running out of allowed
+  pages instead means the import is incomplete, and silently returning
+  `False` would hand back a truncated asset set that looks complete.
+- `p.page` is `0` before the first `next()`, then the 1-based number of
+  the page the body is handling — use it directly in a `page=` query
+  parameter or a log line.
+- `p.limit` and `p.label` expose what the guard was built with.
+- Give each loop its own label. A script that pages through parents and
+  then through each parent's children has two very different bounds, and
+  the label is what tells you which one failed to terminate.
+- `limit=` lets an inner loop tighten its own bound. It cannot raise the
+  bound past `CONFIG["maxPages"]`.
+- `max_pages()` returns the effective limit if you need the number
+  itself.
+
+`maxPages` must be positive when set; omit it to take the default of
+1,000,000.
+
 ## See also
 
 - `boilerplate/boilerplate.star` — a runnable
   example that exercises the common helpers above.
 - `AGENTS.md` — guidance for authoring new integrations.
+
+## Asset types and merge policy
+
+Neither `matchBehavior` nor `assetTypeBehavior` is a helper you `load` — both
+are CONFIG keys, because the merge path needs the policy before it has an
+asset. Passing `matchBehavior=` to `ImportAsset` fails validation.
+
+`ImportAsset(assetType="lease")` labels one asset's population, and
+`CONFIG["assetTypeBehavior"]` gives that population its own merge policy on top
+of the integration-wide `CONFIG["matchBehavior"]`. A type named in
+`assetTypeBehavior` that no asset actually carries is dead configuration: those
+records silently inherit the integration-wide policy instead.
+
+See the "Asset types and per-type merge policy" section of `AGENTS.md` for the
+full rules and the flag table.

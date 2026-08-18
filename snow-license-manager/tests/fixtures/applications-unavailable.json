@@ -1,0 +1,170 @@
+{
+  "name": "applications-unavailable",
+  "integration": "snow-license-manager",
+  "script": "snow-license-manager/snow-license-manager.star",
+  "description": "The per-computer applications call fails, and the run must finish anyway. This is a regression test for an unbounded loop in get_apps(): its `if err:` branch printed the failure and fell through to the next iteration of `while True:`, re-issuing the identical request forever, and a 2xx with an empty body (which get_json decodes to None) matched neither `if err:` nor `elif data:` and spun the same way. Neither path could ever reach the `break`, so a single computer whose applications endpoint was unhappy hung the whole task -- no assets imported, not even the computers already fetched. The sibling get_computers() always had the `break`; get_apps() is now the same shape.\n\nBoth spinning paths are covered here, one per computer, because they are separate branches and the fix has to close both:\n\n  9101 -> 403 with a body, the `if err:` path. 403 is deliberate: get_json retries 408/425/429/500/502/503/504 by default, so a 500 would be answered four times per iteration with exponential backoff and the loop would present as a hung task rather than a fast spin. A status outside that list makes each iteration cheap, which is what turns an infinite loop into an assertion the harness can actually make -- see `request_count` below.\n  9102 -> 200 with a zero-length body, the falsy-data path. get_json returns (None, None) for it, so this is the case where nothing was wrong and nothing was returned.\n  9103 -> a normal application row, so the scenario also proves the fix did not turn the working path into an early exit.\n\n`request_count: 4` is the assertion that actually pins termination: one computers call plus exactly ONE applications call per computer. Before the fix this run did not merely emit fewer assets, it never returned -- the harness failed with a subprocess timeout after issuing hundreds of thousands of requests. asset_count and the per-asset fields then pin the intended degradation: all three computers still import, with their identity, addressing and device type intact, and the two whose applications could not be read simply carry no software.\n\ncheck_determinism is left on: a re-run answers identically, so both the ids and the partial software set are stable rather than dependent on which call happened to fail.\n\nnamespaced_ids is skipped for the same reason as the happy scenario: the asset id is the bare SLM computer Id with no customer scope, so two Snow customers imported into one runZero account would collide. Pre-existing, not introduced here.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixture-customer",
+    "username": "svc-runzero",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 3}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 9101,
+                  "Name": "syn-snow-apps-denied",
+                  "Manufacturer": "Dell Inc.",
+                  "Model": "Latitude 7440",
+                  "OperatingSystem": "Windows 11 Enterprise",
+                  "BiosSerialNumber": "SNOWSER9101",
+                  "IsPortable": true,
+                  "IsServer": false,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:91:01", "IpAddress": "10.70.2.11"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": {
+                  "Id": 9102,
+                  "Name": "syn-snow-apps-empty",
+                  "Manufacturer": "Dell Inc.",
+                  "Model": "PowerEdge R650",
+                  "OperatingSystem": "Windows Server 2022",
+                  "BiosSerialNumber": "SNOWSER9102",
+                  "IsPortable": false,
+                  "IsServer": true,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:91:02", "IpAddress": "10.70.2.12"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": {
+                  "Id": 9103,
+                  "Name": "syn-snow-apps-ok",
+                  "Manufacturer": "Dell Inc.",
+                  "Model": "OptiPlex 7010",
+                  "OperatingSystem": "Windows 11 Enterprise",
+                  "BiosSerialNumber": "SNOWSER9103",
+                  "IsPortable": false,
+                  "IsServer": false,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:91:03", "IpAddress": "10.70.2.13"}
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications-denied",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers/9101/applications"},
+      "responses": [
+        {"status": 403, "json": {"Message": "The user does not have access to application data."}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications-empty-body",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers/9102/applications"},
+      "responses": [
+        {"status": 200, "text": ""}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications",
+      "match": {"method": "GET", "path_regex": "/api/customers/fixture-customer/computers/[0-9]+/applications$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 1}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 77002,
+                  "Name": "Acme Ledger 2026",
+                  "ManufacturerId": 4100,
+                  "ManufacturerName": "Acme Software",
+                  "FamilyId": 8801,
+                  "FamilyName": "Acme Ledger",
+                  "InstallDate": "2026-03-04T08:00:00",
+                  "IsInstalled": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["9101", "9102", "9103"],
+    "assets": [
+      {
+        "id": "9101",
+        "fields": {
+          "hostnames": "syn-snow-apps-denied",
+          "macAddresses": "00:11:22:44:91:01",
+          "ipAddresses": "10.70.2.11",
+          "deviceType": "Laptop"
+        }
+      },
+      {
+        "id": "9102",
+        "fields": {
+          "hostnames": "syn-snow-apps-empty",
+          "macAddresses": "00:11:22:44:91:02",
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "9103",
+        "fields": {
+          "hostnames": "syn-snow-apps-ok",
+          "macAddresses": "00:11:22:44:91:03"
+        }
+      }
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9101/applications", "query_contains": "%24skip=0"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9102/applications"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9103/applications"}
+    ],
+    "min_software_total": 1,
+    "log_contains": [
+      "failed to retrieve application for 9101 at $skip=0: status 403"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]},
+  "timeout": 120
+}

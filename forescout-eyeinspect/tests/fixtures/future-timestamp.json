@@ -1,0 +1,74 @@
+{
+  "name": "future-timestamp",
+  "integration": "forescout-eyeinspect",
+  "description": "An OT sensor with a skewed clock reports first_seen and last_seen in 2099. runZero rejects an ImportAsset whose first- or last-seen time is ahead of now by failing the whole record, and the rejection aborts main, so an unclamped value costs not just the skewed host but every healthy host on the page and every page still to come. _parse_ts caps the value at now, so both hosts import and the value as reported survives in the forescout_eyeinspect_first_seen / _last_seen attributes. Alerts are off so the scenario isolates the timestamp path; the walk is one page because the hardcoded limit of 100 makes reaching page two a matter of 100 synthetic rows, which paged.json already covers.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "last_seen_days": "0",
+    "include_alerts": "false",
+    "include_cve_details": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 2,
+            "results": [
+              {
+                "id": 9101,
+                "ip": "10.81.1.11",
+                "mac_addresses": ["00:1b:1b:00:91:01"],
+                "main_name": "syn-plc-skewed",
+                "role": "PLC",
+                "os_version": "VxWorks 6.9",
+                "first_seen": "2099-01-01T00:00:00Z",
+                "last_seen": "2099-01-02T00:00:00Z",
+                "alert_count": 0,
+                "open_ports": [102]
+              },
+              {
+                "id": 9102,
+                "ip": "10.81.1.12",
+                "mac_addresses": ["00:1b:1b:00:91:02"],
+                "main_name": "syn-hmi-clean",
+                "role": "HMI",
+                "os_version": "Windows 7 Embedded",
+                "first_seen": "2026-02-11T11:00:00Z",
+                "last_seen": "2026-08-02T14:30:00Z",
+                "alert_count": 0,
+                "open_ports": ["3389/tcp"]
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"total_count": 2, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-eyeinspect:127.0.0.1:9101",
+      "forescout-eyeinspect:127.0.0.1:9102"
+    ],
+    "assets": [
+      {
+        "id": "forescout-eyeinspect:127.0.0.1:9101",
+        "fields": {
+          "forescout_eyeinspect_first_seen": "2099-01-01T00:00:00Z",
+          "forescout_eyeinspect_last_seen": "2099-01-02T00:00:00Z"
+        }
+      }
+    ],
+    "log_contains": ["reported 2 assets"]
+  },
+  "invariants": {"skip": []}
+}

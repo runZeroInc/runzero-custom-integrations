@@ -1,0 +1,42 @@
+{
+  "name": "download-unreachable",
+  "integration": "nexthink",
+  "description": "The export completes and publishes a resultsFileUrl the scanner cannot fetch -- here a scheme-less path, which is what a misconfigured object-store front end or an egress proxy rewrite produces. The raw http_get returns no response for a transport-level failure, so reading download_response.status_code off it ended the whole run instead of reporting a failed download. The download is guarded, so the run finishes cleanly with zero assets and a log line naming the URL.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/oauth2/default/v1/token"},
+      "responses": [{"status": 200, "json": {"access_token": "nexthink-token-4"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export",
+      "match": {"method": "GET", "path": "/api/v1/nql/export"},
+      "responses": [{"status": 200, "json": {"exportId": "exp-0004"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status",
+      "match": {"method": "GET", "path": "/api/v1/nql/status/exp-0004"},
+      "responses": [
+        {"status": 200, "json": {"status": "COMPLETED", "resultsFileUrl": "exports/exp-0004.csv"}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "log_contains": [
+      "Failed to download export results from exports/exp-0004.csv",
+      "No rows returned from Nexthink export workflow"
+    ]
+  },
+  "invariants": {"skip": []}
+}

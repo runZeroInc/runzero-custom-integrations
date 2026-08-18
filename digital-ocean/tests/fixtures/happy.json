@@ -1,0 +1,75 @@
+{
+  "name": "happy",
+  "description": "Proves the new url parameter reaches /v2/droplets and that a droplet parses: v4 and v6 addresses land on one interface, key:value tags become key=value, and the image distribution becomes the OS. The second droplet has no networks block at all, which must yield an asset with no interface rather than aborting. namespaced_ids is skipped: the id is the bare DigitalOcean droplet number with no account scope, so two accounts collide (reported defect). Every record in /v2/droplets is a cloud compute instance and the collection holds nothing else, so both assets must carry deviceType Server -- including the droplet with no networks block, which proves the type does not ride on the address parse.",
+  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "routes": [
+    {
+      "name": "droplets",
+      "match": {"method": "GET", "path": "/v2/droplets"},
+      "responses": [
+        {"status": 200, "json": {
+          "droplets": [
+            {
+              "id": 3164444,
+              "name": "fixture-web-01",
+              "memory": 2048,
+              "vcpus": 2,
+              "disk": 50,
+              "locked": false,
+              "status": "active",
+              "created_at": "2026-01-05T12:00:00Z",
+              "size_slug": "s-2vcpu-2gb",
+              "vpc_uuid": "0d3176ad-fixture-4a3e-9e3f-000000000001",
+              "image": {"id": 900001, "name": "22.04 (LTS) x64", "distribution": "Ubuntu",
+                        "type": "base", "public": true, "status": "available"},
+              "region": {"name": "New York 3", "slug": "nyc3", "available": true},
+              "networks": {
+                "v4": [{"ip_address": "192.0.2.10", "netmask": "255.255.240.0", "type": "public"},
+                       {"ip_address": "198.51.100.10", "netmask": "255.255.0.0", "type": "private"}],
+                "v6": [{"ip_address": "2001:db8:1::10", "netmask": 64, "type": "public"}]
+              },
+              "tags": ["env:prod", "web"]
+            },
+            {
+              "id": 3164555,
+              "name": "fixture-no-network",
+              "status": "off",
+              "size_slug": "s-1vcpu-1gb",
+              "image": {"distribution": "Debian", "name": "12 x64"},
+              "region": {"name": "Frankfurt 1", "available": true},
+              "tags": []
+            }
+          ],
+          "meta": {"total": 2}
+        }}
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["3164444", "3164555"],
+    "assets": [
+      {
+        "id": "3164444",
+        "fields": {
+          "hostnames": "fixture-web-01",
+          "ipAddresses": "192.0.2.10\t198.51.100.10\t2001:db8:1::10",
+          "os": "Ubuntu",
+          "deviceType": "Server",
+          "size_slug": "s-2vcpu-2gb"
+        },
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "3164555",
+        "fields": {"hostnames": "fixture-no-network", "os": "Debian", "deviceType": "Server"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/v2/droplets", "header_contains": "fixture-token"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

@@ -5,15 +5,62 @@ CONFIG = {
     "name": "Wazuh",
     "type": "inbound",
     "description": "Imports agents from a Wazuh manager.",
-    "version": "26061000",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
+    # This integration reports ONE population - Wazuh agents - but two grades of
+    # identifier, so the policy is declared per asset type here and the script
+    # picks a type per agent from whether the record carries a registration
+    # timestamp. See build_asset_id and registration_key for the id halves.
+    #
+    # no-type-break, because the split is about identifier quality inside one
+    # population and not about two different kinds of thing. An agent that
+    # reports no dateAdd today can report one tomorrow - a Wazuh upgrade, a
+    # re-enrollment, an API that starts populating the field - and it is the same
+    # agent on the same host throughout, so nothing about a type change should be
+    # allowed to veto a merge on its own.
+    #
+    # Be aware of what that does NOT buy, because it is easy to over-read:
+    # gaining dateAdd also changes the foreign id, from wazuh:<ns>:agent:<n> to
+    # wazuh:<ns>:agent:<n>:<reg>. Two foreign ids from one custom integration
+    # cannot sit on one asset whatever the break flags say, so that particular
+    # transition still forks and is reconciled in runZero. no-type-break is
+    # necessary but not sufficient here; it is declared so the type boundary is
+    # not a SECOND, independent reason for the same fork.
+    "matchBehavior": "no-type-break",
+    "assetTypeBehavior": {
+        # Registration time pins the ordinal, so the id can no longer be
+        # inherited by a later agent and is safe to merge on. An agent's own
+        # addressing must not then veto that merge: a laptop that moves
+        # between networks, a VM that is renamed, or a host that gains an
+        # interface is the same agent under the same id.
+        "agent": "no-mac-break no-ip-break no-name-break",
+        # Deliberately absent: "agent-unpinned", the type used when the record
+        # carries no dateAdd. Its id CAN be inherited by a later agent reusing
+        # the ordinal -- Wazuh allocates ids from a counter seeded off the
+        # highest id in client.keys, and <auth><purge> defaults to yes -- and a
+        # disagreeing MAC is then the only thing that can stop an unrelated new
+        # host being merged onto the old agent's asset. Wazuh's syscollector
+        # data is read off the host itself, so it is good enough evidence to
+        # break on. With no entry here that type keeps the platform default,
+        # every flag on, which is exactly what it needs.
+    },
     "params": [
+        {
+            "key": "url",
+            "label": "Wazuh API URL",
+            "type": "url",
+            "required": False,
+            "placeholder": "https://wazuh-manager:55000",
+            "description": "Full base URL of the Wazuh manager API. Set this for a deployment that is not plain https on the API port -- behind a reverse proxy, on a path prefix, or on http. When empty, the URL is composed from the hostname and port below.",
+        },
         {
             "key": "hostname",
             "label": "Wazuh manager hostname or IP",
             "type": "string",
-            "required": True,
+            "required": False,
             "placeholder": "wazuh-manager or 10.1.2.3",
+            "description": "Used to compose https://<hostname>:<port> when the URL above is empty.",
         },
         {
             "key": "port",
@@ -34,6 +81,15 @@ CONFIG = {
             "type": "secret",
             "required": True,
         },
+        {
+            "key": "max_pages",
+            "label": "Maximum pages to retrieve",
+            "type": "int",
+            "required": False,
+            "default": 20000,
+            "min": 1,
+            "description": "Safety ceiling on the paging walk. Raise it if a run reports hitting the limit.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -44,10 +100,98 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software')
 load('json', json_decode='decode')
 load('net', 'ip_address')
-load('http', http_post='post', http_get='get')
+load('http', http_post='post', http_get='get', 'url_parse')
 load('base64', base64_encode='encode')
 load('time', 'parse_time')
+load('re', re_sub='sub')
 load('kwargs', 'require', 'get_string', 'get_int', 'get_http_options')
+
+# Wazuh caps `limit` at 500 on the /agents endpoint and answers a larger value
+# with error 1405, so this is the vendor's maximum page, not a choice.
+PAGE_SIZE = 500
+
+# The repo-wide record target for a bounded walk: no integration should import
+# more than ten million records in one run, so the page ceiling is that target
+# divided by the page size. At 500 agents a page that is 20,000 pages. The page
+# size is fixed by the vendor; the page COUNT is not, which is why the ceiling
+# is exposed as max_pages and the message that reports hitting it says so.
+#
+# The ceiling is a backstop, not the working guard. The walk's only exit is a
+# page with no affected_items, so a manager that ignores `offset` -- or a proxy
+# replaying a cached response -- never reaches it and re-reads the same 500
+# agents forever. The no-progress check catches that on the first repeat. Either
+# stop is logged, because a truncated import that says nothing looks exactly
+# like a complete one.
+MAX_RECORDS = 10000000
+MAX_PAGES = (MAX_RECORDS + PAGE_SIZE - 1) // PAGE_SIZE
+
+# os.platform values that name a distribution shipping only as a server
+# platform. Wazuh sets platform from the agent's own os-release ID, so these are
+# the ID values, not display names. Deliberately absent are ubuntu, debian,
+# fedora, arch, opensuse, alpine and darwin, each of which is as often a
+# workstation as a server, and sled (SUSE Linux Enterprise *Desktop*), the
+# desktop half of sles.
+SERVER_OS_PLATFORMS = [
+    'rhel', 'redhat', 'centos', 'rocky', 'almalinux', 'alma',
+    'amzn', 'ol', 'oracle', 'sles',
+]
+
+def device_type_for_os(os_data):
+    """Return a runZero device type for one agent's os block, or "".
+
+    The agent record is id, name, ip, status, version, node_name, group and the
+    os block -- there is no chassis, model or asset class anywhere in it, and
+    syscollector's netiface data adds only addressing -- so the os block is the
+    only genuine statement of role. An os.name carrying "server" ("Windows
+    Server 2019") and the server-only platforms above are unambiguous.
+
+    A bare "Ubuntu", "Debian", "Alpine Linux" or a macOS agent stays unset: it
+    is a desktop or a laptop and the record cannot say which, and a wrong hint
+    is worse than none.
+
+    This is only a hint. runZero prefers what it derives from the hardware or
+    from its own scan, and falls back to this exactly where an agent-only host
+    has never been reached by one.
+    """
+    if type(os_data) != 'dict':
+        return ""
+    name = str(os_data.get('name', '') or '').lower()
+    platform = str(os_data.get('platform', '') or '').strip().lower()
+    if 'server' in name:
+        return "Server"
+    for candidate in SERVER_OS_PLATFORMS:
+        if platform == candidate:
+            return "Server"
+    return ""
+
+def page_signature(agents):
+    """A fingerprint of one page's rows, used to notice a manager that answers
+    every offset with the same page."""
+    ids = []
+    for a in agents:
+        if type(a) == 'dict':
+            ids.append(str(a.get('id', '')))
+        else:
+            ids.append('')
+    return ','.join(ids)
+
+def reported_total(data):
+    """Wazuh returns total_affected_items alongside affected_items. Read it when
+    it is there and answer None when it is not -- a total this script invented
+    would be worse than saying the API did not report one."""
+    if type(data) != 'dict':
+        return None
+    total = data.get('total_affected_items')
+    if type(total) == 'int' and total >= 0:
+        return total
+    return None
+
+def retrieved_of(reported, total):
+    """The 'retrieved x' clause of a truncation message, in the with-total form
+    when the API reported one and the no-total form when it did not."""
+    if total == None:
+        return 'retrieved {} assets, total not reported'.format(reported)
+    return 'retrieved {}/{} available assets'.format(reported, total)
 
 # --- Wazuh API helpers ---
 def authenticate_wazuh(host, username, password, config):
@@ -93,7 +237,7 @@ def authenticate_wazuh(host, username, password, config):
     print("Successfully authenticated with Wazuh API")
     return token
 
-def get_wazuh_agents(host, token, config):
+def get_wazuh_agents(host, token, config, max_pages):
     """
     Retrieve agents from Wazuh using pagination.
 
@@ -112,35 +256,63 @@ def get_wazuh_agents(host, token, config):
 
     all_agents = []
     offset = 0
-    hasNextPage = True
-    limit = 500  # Maximum items per request
+    pages = 0
+    total = None
+    capped = True
+    last_signature = None
 
-    while hasNextPage:
+    for _page in range(0, max_pages):
 
         params = {
             'offset': offset,
-            'limit': limit
+            'limit': PAGE_SIZE
         }
 
         response = http_get(agents_url, params=params, timeout=600, **get_http_options(config, headers=headers))
 
         if response.status_code != 200:
             print("Failed to fetch agents from Wazuh. Status:", response.status_code)
+            capped = False
             break
 
         response_data = json_decode(response.body)
 
         if response_data.get('error', 1) != 0:
             print("Wazuh API error:", response_data.get('message', 'Unknown error'))
+            capped = False
             break
-        agents_batch = response_data.get('data', {}).get('affected_items', [])
+        data = response_data.get('data', {})
+        if total == None:
+            total = reported_total(data)
+        agents_batch = data.get('affected_items', [])
 
         if not agents_batch:
-            hasNextPage = False  # No more agents to fetch
+            capped = False  # No more agents to fetch
+            break
+
+        pages += 1
+
+        # A page whose agent ids are identical to the previous page's means the
+        # manager ignored `offset` or replayed a cached response. The walk's
+        # only exit is an empty page, so a repeat produces no exit at all and
+        # the same 500 agents would be re-read to the ceiling. Stop on the
+        # first repeat, and stop BEFORE extending, so the replayed page is not
+        # collected twice.
+        signature = page_signature(agents_batch)
+        if signature == last_signature:
+            print('wazuh: paging stopped after {} pages (API returned the same page twice, {})'.format(
+                pages, retrieved_of(len(all_agents), total)))
+            capped = False
+            break
+        last_signature = signature
 
         all_agents.extend(agents_batch)
 
-        offset += limit
+        offset += PAGE_SIZE
+
+    if capped:
+        print('wazuh: page limit of {} hit (integration safety limit, {}) - raise the max_pages parameter to import the rest'.format(
+            max_pages, retrieved_of(len(all_agents), total)))
 
     print("Retrieved {} agents from Wazuh".format(len(all_agents)))
     return all_agents
@@ -377,32 +549,57 @@ def build_network_interface(network_interfaces_data, network_addresses_data, pri
 
     return interfaces
 
-def extract_environment_from_node_name(node_name):
+def manager_namespace(host):
+    """Scope asset ids on the manager the agents are enrolled with.
+
+    Wazuh agent ids are small per-manager ordinals, so nothing about `001` is
+    unique outside one manager. Two Wazuh deployments imported into one runZero
+    account would otherwise collide on every agent.
     """
-    Extract environment from node name.
-    Takes the 3rd element from the end when split by '-'.
-   
-    Examples:
-        'wazuh3-worker-prod-sc2-03' -> 'prod'
-        'wazuh3-worker-pp-rs-01' -> 'pp'
-        'wazuh3-manager-pp-rs-01' -> 'pp'
-   
-    Args:
-        node_name: The Wazuh node name string
-       
-    Returns:
-        Environment string or empty string if not found
+    parsed = url_parse(host)
+    if parsed and parsed.hostname:
+        return parsed.hostname
+    # url_parse returns None on a value it cannot parse; fall back to stripping
+    # the scheme, any path, and the port by hand.
+    bare = host.replace("https://", "").replace("http://", "")
+    return bare.split("/")[0].split(":")[0]
+
+
+def registration_key(date_add):
+    """Reduce a registration timestamp to its digits, or "" when there is none.
+
+    `dateAdd` is the agent's registration time and is what separates a recycled
+    agent id from the agent that previously held it. Only the digits are kept so
+    the id does not move if the API's rendering does -- Wazuh has shipped both
+    `2026-01-15T09:00:00Z` and `2026-01-15 09:00:00` for this field, and both
+    reduce to the same key here.
     """
-    if not node_name:
-        return ""
-   
-    parts = node_name.split('-')
-   
-    # Environment is the 3rd element from the end
-    if len(parts) >= 3:
-        return parts[-3]
-   
-    return ""
+    return re_sub(r"[^0-9]", "", str(date_add or ""))
+
+
+def build_asset_id(namespace, agent_id, date_add):
+    """Compose the foreign id for one agent.
+
+    `agent.id` is the stable half: it is assigned once at registration, lives in
+    the manager's `client.keys`, and is what every agent-scoped route is
+    addressed by -- `/syscollector/{agent_id}/netiface` in this very script. It
+    does NOT change when an agent rebalances onto a different cluster worker.
+    `node_name` and `manager`, which the previous id was derived from, are the
+    fields that DO change on a rebalance: Wazuh documents both as the node the
+    agent is currently reporting to.
+
+    `dateAdd` is the disambiguating half. Wazuh allocates agent ids from a
+    counter seeded off the highest id in `client.keys`, so once the top-numbered
+    agent is purged -- and `<auth><purge>` defaults to `yes` -- the next
+    enrollment receives that same id. Registration time separates the new agent
+    from the old one.
+    """
+    reg = registration_key(date_add)
+    if reg:
+        return "wazuh:{}:agent:{}:{}".format(namespace, agent_id, reg)
+    # No registration data to pin the ordinal with. Still namespaced and still
+    # deterministic, but this agent's id can be inherited by a later one.
+    return "wazuh:{}:agent:{}".format(namespace, agent_id)
 
 def parse_os_info(os_data):
     """
@@ -424,7 +621,7 @@ def parse_os_info(os_data):
     return full_os_name, os_version
 
 # REVISED FUNCTION: build_assets to use the new network interface data
-def build_assets(agents, agent_net_interfaces, agent_net_addresses):
+def build_assets(agents, agent_net_interfaces, agent_net_addresses, namespace):
     """
     Convert Wazuh agent data into RunZero ImportAsset objects.
 
@@ -432,6 +629,7 @@ def build_assets(agents, agent_net_interfaces, agent_net_addresses):
         agents: List of agent dictionaries from Wazuh API
         agent_net_interfaces: A dictionary mapping agent ID to a list of its network interfaces.
         agent_net_addresses: A dictionary mapping agent ID to a list of its network addresses.
+        namespace: The manager hostname, used to scope every foreign id.
 
     Returns:
         List of ImportAsset objects
@@ -441,6 +639,9 @@ def build_assets(agents, agent_net_interfaces, agent_net_addresses):
     for agent in agents:
         # print(agent)  # Uncomment for debugging
         agent_id = agent.get('id', "")
+        if not agent_id:
+            print("wazuh: skipping agent with no id: name=" + str(agent.get('name', '')))
+            continue
         agent_name = agent.get('name', "")
         node_name = agent.get('node_name', '')
        
@@ -498,21 +699,32 @@ def build_assets(agents, agent_net_interfaces, agent_net_addresses):
                 'os_uname': os_data.get('uname', ''),
             })
        
-        # Create composite ID from environment and agent ID
-        environment = extract_environment_from_node_name(node_name)
-        if environment:
-            composite_id = "{}-{}".format(environment, agent_id)
-        else:
-            composite_id = str(agent_id)
-       
+        date_add = agent.get('dateAdd', '')
+
         asset_params = {
-            'id': composite_id,
+            'id': build_asset_id(namespace, agent_id, date_add),
             'networkInterfaces': network_interfaces,
             'hostnames': hostnames,
             'os': os_name,
             'osVersion': os_version,
-            'customAttributes': custom_attrs
+            'customAttributes': custom_attrs,
         }
+
+        # Omitted rather than set to '' when the os block names no role: an
+        # empty deviceType is still a value and displaces the type runZero would
+        # otherwise derive for itself.
+        device_type = device_type_for_os(os_data)
+        if device_type:
+            asset_params['deviceType'] = device_type
+
+        # The runtime condition selects the asset type, which is what selects
+        # the merge policy; CONFIG["assetTypeBehavior"] holds the reasoning for
+        # both grades.
+        if registration_key(date_add):
+            asset_params['assetType'] = 'agent'
+        else:
+            asset_params['assetType'] = 'agent-unpinned'
+            print("wazuh: agent {} reports no dateAdd; keeping default match behavior, since its ordinal could be reused".format(agent_id))
        
         asset = ImportAsset(**asset_params)
         if agent_status == "active":
@@ -533,14 +745,31 @@ def main(**kwargs):
     Returns:
         List of ImportAsset objects
     """
-    require(kwargs, "hostname", "username", "password")
-    wazuh_hostname = get_string(kwargs, "hostname")
+    require(kwargs, "username", "password")
+    wazuh_hostname = get_string(kwargs, "hostname", default="")
     port = get_int(kwargs, "port", default=55000)
     username = get_string(kwargs, "username")
     password = get_string(kwargs, "password")
+    # CONFIG defaults are applied by the Console, not by the plain script
+    # --kwargs path, so the default is repeated here.
+    max_pages = get_int(kwargs, "max_pages", default=MAX_PAGES)
+    if max_pages < 1:
+        max_pages = MAX_PAGES
 
-    wazuh_host = "https://{}:{}".format(wazuh_hostname, port)
-   
+    # The API base was compiled in as https://<hostname>:<port>, which cannot
+    # reach a manager behind a reverse proxy, on a path prefix, or on plain
+    # http. An explicit url replaces the composed base entirely; hostname/port
+    # stay as the fallback so existing configurations keep working unchanged.
+    wazuh_url = (kwargs.get("url") or "").rstrip("/")
+    if wazuh_url:
+        wazuh_host = wazuh_url
+    elif wazuh_hostname:
+        wazuh_host = "https://{}:{}".format(wazuh_hostname, port)
+    else:
+        print("set either the Wazuh API URL or the manager hostname")
+        return None
+
+    namespace = manager_namespace(wazuh_host)
     print("Connecting to Wazuh at:", wazuh_host)
    
     # Authenticate with Wazuh
@@ -550,7 +779,7 @@ def main(**kwargs):
         return []
 
     # Retrieve agents
-    agents = get_wazuh_agents(wazuh_host, token, kwargs)
+    agents = get_wazuh_agents(wazuh_host, token, kwargs, max_pages)
     if not agents:
         print("No agents retrieved from Wazuh")
         return []
@@ -605,13 +834,13 @@ def main(**kwargs):
 
         batch.append(agent)
         if len(batch) >= batch_size:
-            reported += report_assets(build_assets(batch, agent_net_interfaces, agent_net_addresses))
+            reported += report_assets(build_assets(batch, agent_net_interfaces, agent_net_addresses, namespace))
             batch = []
             agent_net_interfaces = {}
             agent_net_addresses = {}
 
     if batch:
-        reported += report_assets(build_assets(batch, agent_net_interfaces, agent_net_addresses))
+        reported += report_assets(build_assets(batch, agent_net_interfaces, agent_net_addresses, namespace))
 
     print("Successfully processed {} Wazuh agents into RunZero assets".format(reported))
     return None

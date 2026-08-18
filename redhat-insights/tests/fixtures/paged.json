@@ -1,0 +1,106 @@
+{
+  "name": "paged",
+  "integration": "redhat-insights",
+  "description": "Three pages of the inventory host list at per_page=3. Each page is served by its own route keyed on the page number in the query string, so a paginator that never advanced past page 1 would re-serve the same systems and fail the unique_ids invariant instead of quietly passing. The walk must stop on the short final page and never ask for page 4.",
+  "kwargs": {
+    "url": "$BASE",
+    "sso_url": "$BASE",
+    "client_id": "fixture-service-account",
+    "client_secret": "fixture-secret",
+    "page_size": "3"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 900}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-1",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 7,
+            "count": 3,
+            "page": 1,
+            "per_page": 3,
+            "results": [
+              {"id": "10000000-0000-4000-8000-000000000001", "org_id": "10009999", "fqdn": "page1-a.fixture.example", "ip_addresses": ["10.90.1.1"]},
+              {"id": "10000000-0000-4000-8000-000000000002", "org_id": "10009999", "fqdn": "page1-b.fixture.example", "ip_addresses": ["10.90.1.2"]},
+              {"id": "10000000-0000-4000-8000-000000000003", "org_id": "10009999", "fqdn": "page1-c.fixture.example", "ip_addresses": ["10.90.1.3"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-2",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 7,
+            "count": 3,
+            "page": 2,
+            "per_page": 3,
+            "results": [
+              {"id": "10000000-0000-4000-8000-000000000004", "org_id": "10009999", "fqdn": "page2-a.fixture.example", "ip_addresses": ["10.90.2.1"]},
+              {"id": "10000000-0000-4000-8000-000000000005", "org_id": "10009999", "fqdn": "page2-b.fixture.example", "ip_addresses": ["10.90.2.2"]},
+              {"id": "10000000-0000-4000-8000-000000000006", "org_id": "10009999", "fqdn": "page2-c.fixture.example", "ip_addresses": ["10.90.2.3"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-3",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=3"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 7,
+            "count": 1,
+            "page": 3,
+            "per_page": 3,
+            "results": [
+              {"id": "10000000-0000-4000-8000-000000000007", "org_id": "10009999", "fqdn": "page3-a.fixture.example", "ip_addresses": ["10.90.3.1"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route: the walk asked for a page that should never have been requested"},
+  "expect": {
+    "asset_count": 7,
+    "ids": [
+      "redhat-insights:10009999:10000000-0000-4000-8000-000000000001",
+      "redhat-insights:10009999:10000000-0000-4000-8000-000000000004",
+      "redhat-insights:10009999:10000000-0000-4000-8000-000000000007"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"},
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=3"},
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "per_page=3"}
+    ],
+    "requests_absent": [
+      {"query_contains": "&page=4"}
+    ],
+    "log_contains": [
+      "redhat-insights: reported 3 of 7 systems",
+      "redhat-insights: reported 7 of 7 systems"
+    ]
+  },
+  "invariants": {"skip": []}
+}

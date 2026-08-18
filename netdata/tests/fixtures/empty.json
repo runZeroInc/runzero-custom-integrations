@@ -1,0 +1,40 @@
+{
+  "name": "empty",
+  "integration": "netdata",
+  "description": "A Parent with no children registered yet. The nodes array is present but empty, which must produce zero assets and a clean exit rather than an error.",
+
+  "kwargs": {
+    "url": "$BASE"
+  },
+
+  "routes": [
+    {
+      "name": "nodes-v3-empty",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api": 3,
+            "agents": [],
+            "versions": {"nodes_hard_hash": 0},
+            "nodes": []
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "listed 0 node(s) from /api/v3/nodes",
+      "netdata: import complete"
+    ]
+  },
+
+  "check_determinism": true
+}

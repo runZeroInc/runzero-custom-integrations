@@ -1,0 +1,213 @@
+{
+  "name": "happy",
+  "integration": "foreman",
+  "description": "One bulk fact_values walk plus one host page, with the per-host interface fetch enabled. Proves the facts are indexed by host NAME and joined back onto the host record; that networking::interfaces::<device>::<mac|ip> facts are unflattened into per-NIC interfaces; that the lo device and the all-zero MAC are dropped; that a bond and its slave sharing one MAC are folded into a single interface rather than emitted twice; that the BMC interface is NOT folded into the host (it is given a 169.254.100.1 address, so a leak would trip the no_loopback_interfaces invariant); that a host with no interface facts still gets an interface from the host record's own ip/mac; that a host whose only address is 127.0.0.1 yields an asset with NO interface; and that a host record with no id is skipped with a log line.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-token",
+    "include_facts": "true",
+    "include_interfaces": "true",
+    "include_packages": "false"
+  },
+  "routes": [
+    {
+      "name": "fact-values",
+      "match": {"method": "GET", "path": "/api/v2/fact_values"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "subtotal": 3,
+            "page": 1,
+            "per_page": 1000,
+            "results": {
+              "web01.corp.example.net": {
+                "dmi::manufacturer": "Dell Inc.",
+                "dmi::product::name": "PowerEdge R650",
+                "dmi::product::serial_number": "FRM-SN-0001",
+                "dmi::product::uuid": "4c4c4544-0001-0001-0001-000000000001",
+                "dmi::chassis::type": "Rack Mount Chassis",
+                "dmi::bios::vendor": "Dell Inc.",
+                "dmi::bios::version": "2.11.2",
+                "processors::count": "32",
+                "processors::physicalcount": "2",
+                "memory::system::total": "251.35 GiB",
+                "os::name": "RedHat",
+                "os::family": "RedHat",
+                "os::release::full": "9.4",
+                "os::architecture": "x86_64",
+                "networking::fqdn": "web01.corp.example.net",
+                "networking::primary": "eth0",
+                "virtual": "physical",
+                "kernel": "Linux",
+                "networking::interfaces::lo::mac": "00:00:00:00:00:00",
+                "networking::interfaces::lo::ip": "127.0.0.1",
+                "networking::interfaces::eth0::mac": "AA:BB:CC:00:00:01",
+                "networking::interfaces::eth0::ip": "10.210.0.11",
+                "networking::interfaces::bond0::mac": "AA:BB:CC:00:00:01",
+                "networking::interfaces::bond0::ip": "10.210.0.11",
+                "networking::interfaces::eth1::mac": "00:1a:2b:00:00:02",
+                "networking::interfaces::eth1::ip": "10.211.0.11",
+                "networking::interfaces::eth1::ip6": "fe80::1",
+                "networking::interfaces::broken": "not a leaf fact"
+              },
+              "lb-only.corp.example.net": {
+                "os::name": "Debian",
+                "os::release::full": "12",
+                "virtual": "physical",
+                "networking::interfaces::lo::mac": "00:00:00:00:00:00",
+                "networking::interfaces::lo::ip": "127.0.0.1"
+              },
+              "host-that-has-no-record.corp.example.net": {
+                "os::name": "Ubuntu"
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v2/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 4,
+            "subtotal": 4,
+            "page": 1,
+            "per_page": 100,
+            "results": [
+              {
+                "id": 11,
+                "name": "web01.corp.example.net",
+                "certname": "web01.corp.example.net",
+                "ip": "10.210.0.11",
+                "ip6": null,
+                "mac": "aa:bb:cc:00:00:01",
+                "domain_name": "corp.example.net",
+                "operatingsystem_name": "RedHat 9.4",
+                "architecture_name": "x86_64",
+                "hostgroup_title": "Base/Web",
+                "location_name": "HQ",
+                "organization_name": "Acme",
+                "global_status_label": "OK",
+                "build": false,
+                "managed": true,
+                "enabled": true,
+                "sp_name": "web01-bmc",
+                "sp_ip": "169.254.100.1",
+                "sp_mac": "00:1a:2b:99:99:99",
+                "bmc_available": true,
+                "created_at": "2025-02-01T10:00:00.000Z",
+                "last_report": "2026-08-14T06:00:00.000Z",
+                "updated_at": "2026-08-14T06:00:05.000Z"
+              },
+              {
+                "id": 12,
+                "name": "vm02.corp.example.net",
+                "certname": "vm02.corp.example.net",
+                "ip": "10.210.0.12",
+                "mac": "00:1a:2b:00:00:12",
+                "domain_name": "corp.example.net",
+                "operatingsystem_name": "CentOS Stream 9",
+                "compute_resource_name": "ovirt-prod",
+                "hostgroup_title": "Base/App",
+                "global_status_label": "OK",
+                "managed": true,
+                "enabled": true,
+                "created_at": "2025-03-01T10:00:00.000Z",
+                "last_report": "2026-08-14T06:10:00.000Z"
+              },
+              {
+                "id": 13,
+                "name": "lb-only.corp.example.net",
+                "certname": "lb-only.corp.example.net",
+                "ip": "127.0.0.1",
+                "mac": "00:00:00:00:00:00",
+                "domain_name": "corp.example.net",
+                "operatingsystem_name": "Debian 12",
+                "managed": false,
+                "enabled": true,
+                "created_at": "2025-04-01T10:00:00.000Z",
+                "last_report": "2026-08-01T06:10:00.000Z"
+              },
+              {
+                "id": null,
+                "name": "orphan.corp.example.net",
+                "ip": "10.210.0.99"
+              },
+              "a bare string where a host object is documented"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "host-detail-11",
+      "match": {"method": "GET", "path": "/api/v2/hosts/11"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 11,
+            "name": "web01.corp.example.net",
+            "interfaces": [
+              {"id": 101, "identifier": "eth0", "mac": "aa:bb:cc:00:00:01", "ip": "10.210.0.11", "type": "Nic::Managed", "primary": true, "subnet_name": "prod-10.210"},
+              {"id": 102, "identifier": "eth1.100", "mac": "00:1a:2b:00:00:02", "ip": "10.213.0.11", "type": "Nic::Managed", "virtual": true},
+              {"id": 103, "identifier": "bmc0", "mac": "00:1a:2b:99:99:99", "ip": "169.254.100.1", "type": "bmc"},
+              {"id": 104, "identifier": "", "mac": "00:1a:2b:00:00:99", "ip": "169.254.200.1", "type": "Nic::Managed"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host-detail-12",
+      "match": {"method": "GET", "path": "/api/v2/hosts/12"},
+      "responses": [
+        {"status": 200, "json": {"id": 12, "name": "vm02.corp.example.net", "interfaces": []}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host-detail-13",
+      "match": {"method": "GET", "path": "/api/v2/hosts/13"},
+      "responses": [
+        {"status": 200, "json": {"id": 13, "name": "lb-only.corp.example.net", "interfaces": [{"id": 131, "identifier": "lo", "mac": "00:00:00:00:00:00", "ip": "127.0.0.1", "type": "Nic::Managed"}]}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "foreman:127.0.0.1:11",
+      "foreman:127.0.0.1:12",
+      "foreman:127.0.0.1:13"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/fact_values", "query_contains": "networking%3A%3Ainterfaces%3A%3A"},
+      {"method": "GET", "path": "/api/v2/fact_values", "query_contains": "per_page=1000"},
+      {"method": "GET", "path": "/api/v2/hosts", "query_contains": "per_page=100"},
+      {"method": "GET", "path": "/api/v2/hosts/11"},
+      {"header_contains": "Basic "}
+    ],
+    "requests_absent": [
+      {"path_contains": "/packages"}
+    ],
+    "log_contains": [
+      "foreman: skipping host with no id: name=orphan.corp.example.net",
+      "foreman: reported 3 assets so far"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

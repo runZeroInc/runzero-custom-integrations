@@ -1,0 +1,35 @@
+# A real Icinga 2 master, with its API listener on TLS as the product ships it.
+#
+# Single container and no database: the Icinga 2 API reads from the daemon's own
+# object store, so IDO/Icinga DB and a web frontend are exactly the parts this
+# integration never touches. That keeps the stack light enough to belong in the
+# default run rather than behind --heavy.
+#
+# The version tag is pinned, as the harness requires. `icinga/icinga2` publishes
+# proper version tags, so unlike the ntopng stack there is nothing to waive here.
+services:
+  icinga2:
+    image: icinga/icinga2:2.16.4
+    hostname: rz-icinga-master
+    environment:
+      # The entrypoint turns ICINGA_* into `icinga2 node setup` arguments the
+      # first time it runs, i.e. while /var/lib/icinga2/certs/ca.crt is absent.
+      # --master is what mints the CA and the node certificate and enables the
+      # `api` feature; without it nothing listens on 5665 at all.
+      ICINGA_MASTER: "1"
+      # Becomes the certificate CN, the Endpoint name, and NodeName -- and
+      # NodeName is what the shipped conf.d/hosts.conf names its one Host
+      # object after. Setting it deliberately is what stops the built-in host
+      # from being called "localhost", which the integration would (correctly)
+      # skip as a placeholder, leaving nothing to observe about it.
+      ICINGA_CN: "rz-icinga-master"
+    volumes:
+      # Icinga 2 has no runtime creation for the ApiUser type, so the API
+      # credential cannot be created over the API. It has to be on disk before
+      # the daemon starts. See the file's own comments for why there are two.
+      - ./api-users.conf:/etc/icinga2/conf.d/zz-runzero-api-users.conf:ro
+    ports:
+      # The API is TLS-only and has no plaintext port to fall back to, so the
+      # manifest sets scheme https and the integration runs with certificate
+      # validation disabled against this throwaway self-signed CA.
+      - "${RZ_HOST_PORT}:5665"

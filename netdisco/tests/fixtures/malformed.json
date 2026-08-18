@@ -1,0 +1,96 @@
+{
+  "name": "malformed",
+  "integration": "netdisco",
+  "description": "Junk in every payload must be skipped without losing the run. The device array holds a string element, a device with a null ip, a device whose layers string is truncated, a device whose creation timestamp is the '0001-01-01' never-sentinel and whose last_discover is a date that does not exist (2026-02-30), and a device whose last_discover is in the FUTURE. That last one is the important case: Netdisco writes zone-less LOCALTIMESTAMP values, so a database server east of Greenwich produces timestamps that read as future when parsed as UTC, and the platform rejects the ENTIRE asset record on a future timestamp rather than just the field. The script clamps to now, so the asset must still import. The node array holds a string, a null mac, a non-hex mac, and a node whose time_last is unparseable - which must be treated as unknown age and kept rather than aborting parse_time. The device_ips endpoint returns an object where an array is documented.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "max_age_days": "0"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/login"},
+      "responses": [{"status": 200, "json": {"api_key": "deadbeefdeadbeefdeadbeefdeadbeef"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/v1/search/device"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "this row is a string",
+            {"ip": null, "dns": "ghost.example.com", "name": "ghost"},
+            {"ip": "198.51.100.31", "dns": "odd-sw.example.com", "name": "odd-sw", "layers": "011", "vendor": "unknown-vendor", "mac": "not-a-mac", "creation": "0001-01-01 00:00:00", "last_discover": "2026-02-30 12:00:00", "module_serials": "not-a-list"},
+            {"ip": "198.51.100.32", "dns": "future-sw.example.com", "name": "future-sw", "layers": "00000110", "vendor": "cisco", "os": "ios", "os_ver": "17.9.4", "mac": "00:11:22:33:44:99", "serial": "FDO9999ZZZZ", "creation": "2025-01-01 00:00:00", "last_discover": "2099-12-31 23:59:59", "module_serials": ["FDO9999ZZZZ"]}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-ips",
+      "match": {"method": "GET", "path_prefix": "/api/v1/object/device/", "path_regex": "/device_ips$"},
+      "responses": [{"status": 200, "json": {"unexpected": "object"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "nodes-odd",
+      "match": {"method": "GET", "path": "/api/v1/object/device/198.51.100.31/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "a string where an object belongs",
+            {"mac": null, "switch": "198.51.100.31", "port": "ge-0/0/1", "active": true},
+            {"mac": "zz:zz:zz:zz:zz:zz", "switch": "198.51.100.31", "port": "ge-0/0/2", "active": true},
+            {"mac": "00:1b:21:aa:bb:01", "switch": "198.51.100.31", "port": "ge-0/0/3", "active": true, "time_first": "not a timestamp", "time_last": "not a timestamp", "vlan": "1"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "nodes-future",
+      "match": {"method": "GET", "path": "/api/v1/object/device/198.51.100.32/nodes"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": "no fixture route"}},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "netdisco:$HOST:device:198.51.100.31",
+      "netdisco:$HOST:device:198.51.100.32",
+      "netdisco:$HOST:node:00:1b:21:aa:bb:01"
+    ],
+    "assets": [
+      {
+        "id": "netdisco:$HOST:device:198.51.100.31",
+        "fields": {"netdisco_last_discover_raw": "2026-02-30 12:00:00"},
+        "fields_absent": ["deviceType", "macAddresses"]
+      },
+      {
+        "id": "netdisco:$HOST:device:198.51.100.32",
+        "fields": {
+          "deviceType": "Switch",
+          "netdisco_last_discover_raw": "2099-12-31 23:59:59"
+        }
+      }
+    ],
+    "log_contains": [
+      "skipping device with no ip",
+      "reported 2 devices",
+      "reported 1 located nodes"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

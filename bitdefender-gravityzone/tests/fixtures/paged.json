@@ -1,0 +1,125 @@
+{
+  "name": "paged",
+  "integration": "bitdefender-gravityzone",
+  "description": "Three-page inventory walk. hasMoreRecords is present on EVERY page and is what stops the walk; pagesCount and total appear on the FIRST page only, so the script must capture them there and not re-read them. Asserts the second and third calls carry page 2 and page 3 in the JSON-RPC body, and that the walk stops after the page whose hasMoreRecords is false rather than asking for a fourth.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "parent_id": "c0000000000000000000a1",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "network-inventory",
+      "match": {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "getNetworkInventoryItems"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "result": {
+              "total": 5,
+              "page": 1,
+              "perPage": 2,
+              "pagesCount": 3,
+              "hasMoreRecords": true,
+              "items": [
+                {
+                  "id": "e0000000000000000000101",
+                  "name": "srv-page1-a",
+                  "type": 5,
+                  "companyId": "c0000000000000000000a1",
+                  "details": {"fqdn": "srv-page1-a.corp.example.net", "ip": "10.60.1.11", "macs": ["00:1a:2b:00:01:01"], "managedWithBest": true, "operatingSystemVersion": "Windows Server 2022"}
+                },
+                {
+                  "id": "e0000000000000000000102",
+                  "name": "srv-page1-b",
+                  "type": 5,
+                  "companyId": "c0000000000000000000a1",
+                  "details": {"fqdn": "srv-page1-b.corp.example.net", "ip": "10.60.1.12", "macs": ["00:1a:2b:00:01:02"], "managedWithBest": true, "operatingSystemVersion": "Windows Server 2022"}
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "result": {
+              "page": 2,
+              "perPage": 2,
+              "hasMoreRecords": true,
+              "items": [
+                {
+                  "id": "e0000000000000000000103",
+                  "name": "srv-page2-a",
+                  "type": 5,
+                  "companyId": "c0000000000000000000a1",
+                  "details": {"fqdn": "srv-page2-a.corp.example.net", "ip": "10.60.2.11", "macs": ["00:1a:2b:00:02:01"], "managedWithBest": true, "operatingSystemVersion": "Ubuntu 22.04 LTS"}
+                },
+                {
+                  "id": "e0000000000000000000104",
+                  "name": "srv-page2-b",
+                  "type": 5,
+                  "companyId": "c0000000000000000000a1",
+                  "details": {"fqdn": "srv-page2-b.corp.example.net", "ip": "10.60.2.12", "macs": ["00:1a:2b:00:02:02"], "managedWithBest": true, "operatingSystemVersion": "Ubuntu 22.04 LTS"}
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "result": {
+              "page": 3,
+              "perPage": 2,
+              "hasMoreRecords": false,
+              "items": [
+                {
+                  "id": "e0000000000000000000105",
+                  "name": "srv-page3-a",
+                  "type": 5,
+                  "companyId": "c0000000000000000000a1",
+                  "details": {"fqdn": "srv-page3-a.corp.example.net", "ip": "10.60.3.11", "macs": ["00:1a:2b:00:03:01"], "managedWithBest": true, "operatingSystemVersion": "Ubuntu 22.04 LTS"}
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000a1:e0000000000000000000101",
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000a1:e0000000000000000000103",
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000a1:e0000000000000000000105"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "\"page\":2"},
+      {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "\"page\":3"},
+      {"body_contains": "\"parentId\":\"c0000000000000000000a1\""},
+      {"body_contains": "\"perPage\":2"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1.0/jsonrpc/companies"},
+      {"body_contains": "\"page\":4"}
+    ],
+    "log_contains": [
+      "5 inventory items reported by the API",
+      "reported 5 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "name": "acl-denied",
+  "integration": "openwrt",
+  "description": "A restricted account. rpcd decides per session which ubus objects may be called, and the granted set is returned inside the session.login reply - so the ACL list is readable before any data call is attempted. Here the account may read system.board and luci-rpc getNetworkDevices but has no grant for getHostHints, getDHCPLeases, getWirelessDevices, or iwinfo. Proves the integration reads the acls block from the login reply and skips those calls with a message naming the missing grant, rather than issuing them and surfacing a bare -32002. It also proves the one call that IS attempted but still refused server-side (getNetworkDevices, answered with the real {\"error\":{\"code\":-32002,\"message\":\"Access denied\"}} shape) is logged and the run continues to emit the router from system.board alone. This is the difference between an integration that tells an operator to add an ACL group and one that reports an empty collection.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-readonly",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"session\",\"login\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [0, {
+              "ubus_rpc_session": "99887766554433221100aabbccddeeff",
+              "timeout": 900,
+              "expires": 900,
+              "acls": {
+                "access-group": {"unauthenticated": ["read"]},
+                "ubus": {
+                  "luci-rpc": ["getBoardJSON", "getNetworkDevices"],
+                  "session": ["access", "login"],
+                  "system": ["board", "info"]
+                }
+              },
+              "data": {"username": "fixture-readonly"}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "system-board",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"board\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": [0, {
+              "kernel": "6.6.93",
+              "hostname": "edge-rtr",
+              "system": "ARMv8 Processor rev 4",
+              "model": "GL.iNet GL-MT6000",
+              "board_name": "glinet,gl-mt6000",
+              "release": {
+                "distribution": "OpenWrt",
+                "version": "24.10.8",
+                "revision": "r29233-443ec4032a",
+                "target": "mediatek/filogic",
+                "description": "OpenWrt 24.10.8 r29233-443ec4032a",
+                "builddate": "1784877710"
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-info",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"info\""},
+      "responses": [
+        {"status": 200, "json": {"jsonrpc": "2.0", "id": 3, "result": [0, {"uptime": 4242, "localtime": 1786856432, "memory": {"total": 1073741824, "free": 805306368}}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-devices-denied",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getNetworkDevices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {"code": -32002, "message": "Access denied"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"jsonrpc": "2.0", "id": 99, "error": {"code": -32000, "message": "Object not found"}}
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": ["openwrt:$HOST:router"],
+    "assets": [
+      {
+        "id": "openwrt:$HOST:router",
+        "fields": {
+          "deviceType": "Router",
+          "hostnames": "edge-rtr",
+          "model": "GL.iNet GL-MT6000"
+        },
+        "fields_absent": ["macAddresses", "ipAddresses"]
+      }
+    ],
+    "requests_absent": [
+      {"body_contains": "getHostHints"},
+      {"body_contains": "getDHCPLeases"},
+      {"body_contains": "getWirelessDevices"},
+      {"body_contains": "assoclist"}
+    ],
+    "log_contains": [
+      "does not grant luci-rpc.getHostHints",
+      "does not grant luci-rpc.getDHCPLeases",
+      "does not grant luci-rpc.getWirelessDevices",
+      "access denied (-32002)",
+      "reported 1 router and 0 observed hosts"
+    ]
+  },
+  "check_determinism": true
+}

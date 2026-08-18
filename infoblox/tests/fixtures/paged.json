@@ -1,0 +1,77 @@
+{
+  "name": "paged",
+  "integration": "infoblox",
+  "description": "WAPI's _return_as_object paging over the ipv4address read. Page one comes back with a next_page_id, and the follow-up call must resume from that id alone -- WAPI holds the original search server-side, so re-sending the filters is not required and re-sending _paging would start a new read and loop forever. Asserts the second call carries _page_id=fixture-page-2, that the walk stops on the page with no next_page_id, and that both pages are parsed.\n\ncheck_determinism is disabled and expect.ids is unused because this integration namespaces ids by the Grid host AND PORT and the fixture server binds a fresh ephemeral port per run; see the happy scenario for the full reasoning.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_leases": "false",
+    "include_host_records": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "network-views",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/networkview"},
+      "responses": [
+        {"status": 200, "json": {"result": [{"_ref": "networkview/x:default/true", "name": "default"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/network"},
+      "responses": [
+        {"status": 200, "json": {"result": [{"_ref": "network/x:10.60.0.0/24/default", "network": "10.60.0.0/24", "network_view": "default", "comment": "paged fixture subnet"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/ipv4address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "next_page_id": "fixture-page-2",
+            "result": [
+              {"_ref": "ipv4address/a1:10.60.0.11", "ip_address": "10.60.0.11", "network": "10.60.0.0/24", "network_view": "default", "status": "USED", "names": ["p1-a.corp.example.net"], "mac_address": "00:1a:2b:60:00:11"},
+              {"_ref": "ipv4address/a2:10.60.0.12", "ip_address": "10.60.0.12", "network": "10.60.0.0/24", "network_view": "default", "status": "USED", "names": ["p1-b.corp.example.net"], "mac_address": "00:1a:2b:60:00:12"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "ipv4address/a3:10.60.0.13", "ip_address": "10.60.0.13", "network": "10.60.0.0/24", "network_view": "default", "status": "USED", "names": ["p2-a.corp.example.net"], "mac_address": "00:1a:2b:60:00:13"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/wapi/v2.13.1/ipv4address", "query_contains": "_max_results=2"},
+      {"method": "GET", "path": "/wapi/v2.13.1/ipv4address", "query_contains": "_page_id=fixture-page-2"}
+    ],
+    "requests_absent": [
+      {"path": "/wapi/v2.13.1/lease"},
+      {"path": "/wapi/v2.13.1/record:host"},
+      {"query_contains": "_page_id=fixture-page-3"}
+    ],
+    "log_contains": [
+      "infoblox: view default: 1 networks, 0 leases, 0 host addresses",
+      "infoblox: view default: reported 3 addresses"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

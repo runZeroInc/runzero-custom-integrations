@@ -1,0 +1,270 @@
+{
+  "name": "happy",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "One console with its site and four adopted devices. Payload shapes are Ubiquiti's own published examples: the reportedState block is the console shape from the vendor's List Hosts example, the site row is the List Sites example, and the device group is the List Devices example. Proves the three collections are joined on hostId, that the console's device row is enriched from the host record rather than emitted a second time as a host asset, that the console's public cloud address never reaches an interface, and that the fe80:: addresses in reportedState.ipAddrs are filtered out. The asserted _match.behavior is `no-id-match no-id-break`, because the foreign id is derived from the device's MAC and must not drive or block a merge; the mac-derived-id scenario is the regression lock for that decision.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hardwareId": "eae0f123-0000-5111-b111-f833f56eade5",
+                "id": "900A6F00301100000000074A6BA90000000007A3387E0000000063EC9853:123456789",
+                "ipAddress": "203.0.113.169",
+                "isBlocked": false,
+                "lastConnectionStateChange": "2026-06-23T03:59:52Z",
+                "latestBackupTime": "2026-06-22T11:55:10Z",
+                "owner": true,
+                "registrationTime": "2026-04-17T07:27:14Z",
+                "type": "console",
+                "userData": {"email": "unifi@example.com", "role": "owner", "status": "ACTIVE"},
+                "reportedState": {
+                  "controller_uuid": "900A6F00301100000000074A6BA90000000007A3387E0000000063EC9853:123456789",
+                  "deviceState": "setup",
+                  "directConnectDomain": "f4e2c6c23f1307bc5608082112aa0651cbf10.id.ui.direct",
+                  "hardware": {
+                    "bom": "113-00917-42",
+                    "debianCodename": "bullseye",
+                    "firmwareVersion": "4.0.6",
+                    "hwrev": 234794,
+                    "mac": "F4E2C6C23F13",
+                    "name": "UniFi Dream Machine SE",
+                    "qrid": "QwWvUy",
+                    "serialno": "f4e2c6c23f13",
+                    "shortname": "UDMPROSE",
+                    "sysid": 59948,
+                    "uuid": "eae0f123-0000-5111-b111-f833f56eade5"
+                  },
+                  "host_type": 59948,
+                  "hostname": "unifi.example.com",
+                  "ip": "192.0.2.226",
+                  "ipAddrs": [
+                    "fe80::f6e2:c6ff:fec2:3f15",
+                    "fe80::f6e2:c6ff:fec2:3f17",
+                    "192.0.2.226",
+                    "192.0.2.1"
+                  ],
+                  "isStacked": false,
+                  "mac": "F4E1C6C11F00",
+                  "mgmt_port": 443,
+                  "name": "unifi.example.com",
+                  "releaseChannel": "beta",
+                  "state": "connected",
+                  "timezone": "Europe/Riga",
+                  "version": "4.0.180"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "a7dc15e0eb4527142d7823515b15f87d"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "siteId": "661de833b6b2463f0c20b319",
+                "hostId": "900A6F00301100000000074A6BA90000000007A3387E0000000063EC9853:123456789",
+                "meta": {
+                  "desc": "Head office",
+                  "gatewayMac": "f4:e2:c6:c2:3f:13",
+                  "name": "default",
+                  "timezone": "Europe/Riga"
+                },
+                "statistics": {
+                  "counts": {
+                    "gatewayDevice": 1,
+                    "offlineDevice": 1,
+                    "totalDevice": 4,
+                    "wifiClient": 12,
+                    "wiredClient": 6
+                  },
+                  "internetIssues": [],
+                  "ispInfo": {"name": "Example Telecom", "organization": "Example Telecom Ltd"},
+                  "percentages": {"wanUptime": 100}
+                },
+                "permission": "admin",
+                "isOwner": true
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "a7dc15e0eb4527142d7823515b15f87d"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hostId": "900A6F00301100000000074A6BA90000000007A3387E0000000063EC9853:123456789",
+                "hostName": "unifi.example.com",
+                "devices": [
+                  {
+                    "id": "F4E2C6C23F13",
+                    "mac": "F4E2C6C23F13",
+                    "name": "unifi.example.com",
+                    "model": "UDM SE",
+                    "shortname": "UDMPROSE",
+                    "ip": "192.0.2.226",
+                    "productLine": "network",
+                    "status": "online",
+                    "version": "4.1.13",
+                    "firmwareStatus": "upToDate",
+                    "updateAvailable": null,
+                    "isConsole": true,
+                    "isManaged": true,
+                    "startupTime": "2026-06-19T13:41:43Z",
+                    "adoptionTime": null,
+                    "note": null,
+                    "uidb": {"guid": "0fd8c390-a0e8-4cb2-b93a-7b3051c83c46"}
+                  },
+                  {
+                    "id": "687251A1B2C3",
+                    "mac": "687251A1B2C3",
+                    "name": "Floor2-Switch",
+                    "model": "USW Pro 24 PoE",
+                    "shortname": "USW-Pro-24-PoE",
+                    "ip": "192.0.2.31",
+                    "productLine": "network",
+                    "status": "online",
+                    "version": "US.mt7621_7.0.50+15613.240329.0237",
+                    "firmwareStatus": "updateAvailable",
+                    "updateAvailable": "7.1.26",
+                    "isConsole": false,
+                    "isManaged": true,
+                    "startupTime": "2026-06-01T09:10:00Z",
+                    "adoptionTime": "2025-11-02T14:22:31Z",
+                    "note": null
+                  },
+                  {
+                    "id": "9C05D6D4E5F6",
+                    "mac": "9C05D6D4E5F6",
+                    "name": "Lobby-AP",
+                    "model": "U6 Enterprise",
+                    "shortname": "U6ENT",
+                    "ip": "192.0.2.32",
+                    "productLine": "network",
+                    "status": "offline",
+                    "version": "7.0.50",
+                    "firmwareStatus": "updatePending",
+                    "updateAvailable": null,
+                    "isConsole": false,
+                    "isManaged": true,
+                    "startupTime": null,
+                    "adoptionTime": "2025-11-02T14:30:07Z",
+                    "note": "Replaced 2026-05"
+                  },
+                  {
+                    "id": "F49247A7B8C9",
+                    "mac": "F49247A7B8C9",
+                    "name": "Loading-Dock-Cam",
+                    "model": "G5 Flex",
+                    "shortname": "UVC G5 Flex",
+                    "ip": "192.0.2.60",
+                    "productLine": "protect",
+                    "status": "online",
+                    "version": "UVC.SAV530q.v4.71.149.67.f06ad39.240807.0737",
+                    "firmwareStatus": "upToDate",
+                    "updateAvailable": null,
+                    "isConsole": false,
+                    "isManaged": true,
+                    "startupTime": "2026-06-10T02:00:00Z",
+                    "adoptionTime": "2025-12-14T11:05:00Z",
+                    "note": null
+                  }
+                ],
+                "updatedAt": "2026-06-23T07:21:27Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "a7dc15e0eb4527142d7823515b15f87d"
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"code": "not_found", "httpStatusCode": 404, "message": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 4,
+    "request_count": 3,
+    "ids": [
+      "unifi-site-manager:$HOST:device:F4E2C6C23F13",
+      "unifi-site-manager:$HOST:device:687251A1B2C3",
+      "unifi-site-manager:$HOST:device:9C05D6D4E5F6",
+      "unifi-site-manager:$HOST:device:F49247A7B8C9"
+    ],
+    "assets": [
+      {
+        "id": "unifi-site-manager:$HOST:device:F4E2C6C23F13",
+        "fields": {
+          "hostnames": "unifi.example.com",
+          "manufacturer": "Ubiquiti",
+          "model": "UDM SE",
+          "osVersion": "4.1.13",
+          "deviceType": "Router",
+          "unifi_site_name": "default",
+          "unifi_site_isp": "Example Telecom",
+          "unifi_console_serial": "f4e2c6c23f13",
+          "unifi_console_firmware": "4.0.6",
+          "unifi_console_cloud_address": "203.0.113.169",
+          "unifi_is_console": "true"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:device:687251A1B2C3",
+        "fields": {
+          "hostnames": "Floor2-Switch",
+          "deviceType": "Switch",
+          "unifi_update_available": "7.1.26",
+          "unifi_site_name": "default"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:device:9C05D6D4E5F6",
+        "fields": {
+          "hostnames": "Lobby-AP",
+          "deviceType": "Wireless Access Point",
+          "unifi_status": "offline",
+          "unifi_note": "Replaced 2026-05"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:device:F49247A7B8C9",
+        "fields": {
+          "hostnames": "Loading-Dock-Cam",
+          "deviceType": "IP Camera",
+          "unifi_product_line": "protect"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/v1/hosts", "header_contains": "fixture-site-manager-key"},
+      {"method": "GET", "path": "/v1/sites"},
+      {"method": "GET", "path": "/v1/devices", "query_contains": "pageSize=100"}
+    ]
+  },
+
+  "check_determinism": true
+}

@@ -1,0 +1,558 @@
+{
+  "name": "happy",
+  "integration": "opennms-horizon",
+  "description": "A full four-endpoint OpenNMS collection at the default /opennms context path: the two experimental v2 interface collections indexed once for the whole estate, the v1 monitored-service list, and the v1 node walk. Every payload keeps the shape of a real OpenNMS ReST capture and replaces only the values - the node envelope follows the server's own v1 nodes.json test resource (count/totalCount/offset plus a 'node' array), the ifservices envelope follows v1/ifservices.json with its hyphenated 'monitored-service' key and its node-by-LABEL reference, and the two v2 envelopes follow OnmsIpInterfaceList/OnmsSnmpInterfaceList ('ipInterface', 'snmpInterface'). The type mismatch OpenNMS really emits is preserved: a node's own id is the JSON STRING \"1\" while the nodeId on every interface referring to it is the NUMBER 1, which is the whole reason the script compares join keys as text. Proves: the v2 index keeps the run off the per-node fallback entirely (no /rest/nodes/{id}/ipinterfaces request is ever made); an inlined snmpInterface delivers a MAC with the address it is bound to; a LAG port reporting the same physAddr as one of its members is pooled rather than emitted twice; a softwareLoopback ifType 24 port is dropped; an SNMP port with a MAC and no IP still contributes an interface; a labelSource of \"A\" keeps the address-shaped node label out of hostnames; an interface hostName that is a copy of its own IP is refused as a name; the reverse-DNS name of the loopback interface OpenNMS monitors on its own server is \"localhost\", and that is refused as a name too rather than being handed to runZero as a merge signal every OpenNMS node would share; 127.0.0.1 and 169.254.0.0/16 never reach an interface; a lastCapsdPoll in 2035 is clamped to now instead of making the platform reject the whole asset; and monitored services are recorded as names because an OpenNMS monitored service carries no port anywhere in the data model.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero-ro",
+    "password": "fixture-not-a-real-password"
+  },
+  "routes": [
+    {
+      "name": "v2-ipinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/ipinterfaces"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 5,
+            "totalCount": 5,
+            "offset": 0,
+            "ipInterface": [
+              {
+                "id": "11",
+                "nodeId": 1,
+                "ipAddress": "192.0.2.11",
+                "hostName": "edge-sw-01.example.com",
+                "ifIndex": 1,
+                "isManaged": "M",
+                "isDown": false,
+                "snmpPrimary": "P",
+                "lastCapsdPoll": 1786320000000,
+                "monitoredServiceCount": 2,
+                "snmpInterface": {
+                  "id": 101,
+                  "nodeId": 1,
+                  "ifIndex": 1,
+                  "ifType": 6,
+                  "ifName": "Gi1/0/1",
+                  "ifDescr": "GigabitEthernet1/0/1",
+                  "ifAlias": "uplink to core",
+                  "ifSpeed": 1000000000,
+                  "ifAdminStatus": 1,
+                  "ifOperStatus": 1,
+                  "physAddr": "0050569A1B2C",
+                  "collectFlag": "C",
+                  "pollFlag": "N",
+                  "hasFlows": false
+                }
+              },
+              {
+                "id": "12",
+                "nodeId": 1,
+                "ipAddress": "198.51.100.11",
+                "hostName": "198.51.100.11",
+                "ifIndex": 2,
+                "isManaged": "M",
+                "isDown": false,
+                "snmpPrimary": "S",
+                "lastCapsdPoll": 1786320000000,
+                "monitoredServiceCount": 0,
+                "snmpInterface": {
+                  "id": 102,
+                  "nodeId": 1,
+                  "ifIndex": 2,
+                  "ifType": 6,
+                  "ifName": "Gi1/0/2",
+                  "ifDescr": "GigabitEthernet1/0/2",
+                  "ifSpeed": 1000000000,
+                  "ifAdminStatus": 1,
+                  "ifOperStatus": 1,
+                  "physAddr": "0050569a1b2d",
+                  "collectFlag": "N",
+                  "pollFlag": "N",
+                  "hasFlows": false
+                }
+              },
+              {
+                "id": "21",
+                "nodeId": 2,
+                "ipAddress": "203.0.113.25",
+                "hostName": "203.0.113.25",
+                "ifIndex": null,
+                "isManaged": "M",
+                "isDown": false,
+                "snmpPrimary": "N",
+                "lastCapsdPoll": 1786320000000,
+                "monitoredServiceCount": 1,
+                "snmpInterface": null
+              },
+              {
+                "id": "22",
+                "nodeId": 2,
+                "ipAddress": "127.0.0.1",
+                "hostName": "localhost",
+                "ifIndex": null,
+                "isManaged": "M",
+                "isDown": false,
+                "snmpPrimary": "N",
+                "lastCapsdPoll": 1786320000000,
+                "monitoredServiceCount": 1,
+                "snmpInterface": null
+              },
+              {
+                "id": "23",
+                "nodeId": 2,
+                "ipAddress": "169.254.10.5",
+                "hostName": "169.254.10.5",
+                "ifIndex": null,
+                "isManaged": "U",
+                "isDown": false,
+                "snmpPrimary": "N",
+                "lastCapsdPoll": 1786320000000,
+                "monitoredServiceCount": 0,
+                "snmpInterface": null
+              }
+            ]
+          }
+        },
+        {"status": 204}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v2-snmpinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 6,
+            "totalCount": 6,
+            "offset": 0,
+            "snmpInterface": [
+              {
+                "id": 101,
+                "nodeId": 1,
+                "ifIndex": 1,
+                "ifType": 6,
+                "ifName": "Gi1/0/1",
+                "ifDescr": "GigabitEthernet1/0/1",
+                "physAddr": "0050569A1B2C",
+                "ifAdminStatus": 1,
+                "ifOperStatus": 1,
+                "collectFlag": "C",
+                "pollFlag": "N"
+              },
+              {
+                "id": 102,
+                "nodeId": 1,
+                "ifIndex": 2,
+                "ifType": 6,
+                "ifName": "Gi1/0/2",
+                "ifDescr": "GigabitEthernet1/0/2",
+                "physAddr": "0050569a1b2d",
+                "ifAdminStatus": 1,
+                "ifOperStatus": 1,
+                "collectFlag": "N",
+                "pollFlag": "N"
+              },
+              {
+                "id": 103,
+                "nodeId": 1,
+                "ifIndex": 3,
+                "ifType": 6,
+                "ifName": "Gi1/0/3",
+                "ifDescr": "GigabitEthernet1/0/3",
+                "physAddr": "0050569A1B2E",
+                "ifAdminStatus": 1,
+                "ifOperStatus": 2,
+                "collectFlag": "N",
+                "pollFlag": "N"
+              },
+              {
+                "id": 104,
+                "nodeId": 1,
+                "ifIndex": 10,
+                "ifType": 161,
+                "ifName": "Po1",
+                "ifDescr": "Port-channel1",
+                "physAddr": "0050569A1B2C",
+                "ifAdminStatus": 1,
+                "ifOperStatus": 1,
+                "collectFlag": "N",
+                "pollFlag": "N"
+              },
+              {
+                "id": 105,
+                "nodeId": 1,
+                "ifIndex": 24,
+                "ifType": 24,
+                "ifName": "Lo0",
+                "ifDescr": "Loopback0",
+                "physAddr": "0050569A1B3F",
+                "ifAdminStatus": 1,
+                "ifOperStatus": 1,
+                "collectFlag": "N",
+                "pollFlag": "N"
+              },
+              {
+                "id": 301,
+                "nodeId": 3,
+                "ifIndex": 1,
+                "ifType": 6,
+                "ifName": "eth0",
+                "ifDescr": "HP ETHERNET MULTI-ENVIRONMENT",
+                "physAddr": "001B78AABBCC",
+                "ifAdminStatus": 1,
+                "ifOperStatus": 1,
+                "collectFlag": "N",
+                "pollFlag": "N"
+              }
+            ]
+          }
+        },
+        {"status": 204}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v1-ifservices",
+      "match": {"method": "GET", "path": "/opennms/rest/ifservices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 5,
+            "totalCount": 5,
+            "offset": 0,
+            "monitored-service": [
+              {
+                "id": "2",
+                "ipAddress": "192.0.2.11",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "edge-sw-01.example.com",
+                "serviceName": "ICMP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 11
+              },
+              {
+                "id": "3",
+                "ipAddress": "192.0.2.11",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "edge-sw-01.example.com",
+                "serviceName": "SNMP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 11
+              },
+              {
+                "id": "9",
+                "ipAddress": "198.51.100.40",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "esx-01.example.com",
+                "serviceName": "ICMP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 41
+              },
+              {
+                "id": "10",
+                "ipAddress": "198.51.100.40",
+                "isDown": true,
+                "isMonitored": true,
+                "node": "esx-01.example.com",
+                "serviceName": "HTTPS",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 41
+              },
+              {
+                "id": "14",
+                "ipAddress": "203.0.113.25",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "203.0.113.25",
+                "serviceName": "ICMP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 21
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"count": 0, "totalCount": 5, "offset": 5}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v1-nodes",
+      "match": {"method": "GET", "path": "/opennms/rest/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 4,
+            "totalCount": 4,
+            "offset": 0,
+            "node": [
+              {
+                "id": "1",
+                "label": "edge-sw-01.example.com",
+                "labelSource": "H",
+                "type": "A",
+                "foreignSource": "NetworkDevices",
+                "foreignId": "edge-sw-01",
+                "location": "Default",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 1786320000000,
+                "lastIngressFlow": null,
+                "lastEgressFlow": null,
+                "nodeParentID": null,
+                "sysContact": "netops@example.com",
+                "sysDescription": "Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.09.04a, RELEASE SOFTWARE (fc4)",
+                "sysLocation": "Building A / MDF",
+                "sysName": "edge-sw-01",
+                "sysObjectId": ".1.3.6.1.4.1.9.1.2494",
+                "categories": [
+                  {"id": 5, "name": "Production", "authorizedGroups": []},
+                  {"id": 9, "name": "Network", "authorizedGroups": []}
+                ],
+                "assetRecord": {
+                  "id": 1,
+                  "category": "Unspecified",
+                  "manufacturer": "Cisco Systems",
+                  "vendor": null,
+                  "modelNumber": "C9300-48P",
+                  "serialNumber": "FCW2345X0AB",
+                  "assetNumber": "AST-000112",
+                  "operatingSystem": "IOS-XE 17.09.04a",
+                  "description": "MDF access stack, member 1",
+                  "department": "Network Engineering",
+                  "building": "Building A",
+                  "room": "MDF",
+                  "rack": "R12",
+                  "slot": null,
+                  "region": "us-central",
+                  "division": "Corporate IT",
+                  "circuitId": null,
+                  "admin": null,
+                  "comment": null,
+                  "lastModifiedBy": "admin",
+                  "lastModifiedDate": 1705276800000
+                }
+              },
+              {
+                "id": "2",
+                "label": "203.0.113.25",
+                "labelSource": "A",
+                "type": "A",
+                "foreignSource": null,
+                "foreignId": null,
+                "location": "Default",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 1786320000000,
+                "lastIngressFlow": null,
+                "lastEgressFlow": null,
+                "nodeParentID": null,
+                "sysContact": null,
+                "sysDescription": "Linux buildhost 5.15.0-88-generic #98-Ubuntu SMP Mon Oct 2 15:18:56 UTC 2023 x86_64",
+                "sysLocation": null,
+                "sysName": null,
+                "sysObjectId": ".1.3.6.1.4.1.8072.3.2.10",
+                "categories": [],
+                "assetRecord": {
+                  "id": 2,
+                  "category": "Unspecified",
+                  "manufacturer": null,
+                  "vendor": null,
+                  "modelNumber": null,
+                  "serialNumber": null,
+                  "operatingSystem": null,
+                  "lastModifiedBy": "",
+                  "lastModifiedDate": 1705276800000
+                }
+              },
+              {
+                "id": "3",
+                "label": "printer-01.example.com",
+                "labelSource": "S",
+                "type": "A",
+                "foreignSource": "Printers",
+                "foreignId": "printer-01",
+                "location": "Branch-West",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 2051222400000,
+                "lastIngressFlow": null,
+                "lastEgressFlow": null,
+                "nodeParentID": null,
+                "sysContact": "facilities@example.com",
+                "sysDescription": "HP ETHERNET MULTI-ENVIRONMENT,SN:CNFAKE12345,FN:XYZ,SVCID:00000,PID:HP LaserJet M607,JETDIRECT",
+                "sysLocation": "Building B / Floor 2",
+                "sysName": "printer-01.example.com",
+                "sysObjectId": ".1.3.6.1.4.1.11.2.3.9.1",
+                "categories": [
+                  {"id": 12, "name": "Peripherals", "authorizedGroups": []}
+                ],
+                "assetRecord": {
+                  "id": 3,
+                  "category": "Unspecified",
+                  "manufacturer": null,
+                  "vendor": "HP",
+                  "modelNumber": "LaserJet M607",
+                  "serialNumber": "CNFAKE12345",
+                  "operatingSystem": null,
+                  "building": "Building B",
+                  "room": "Copy room",
+                  "lastModifiedBy": "admin",
+                  "lastModifiedDate": 1705276800000
+                }
+              },
+              {
+                "id": "4",
+                "label": "esx-01.example.com",
+                "labelSource": "U",
+                "type": "A",
+                "foreignSource": "Servers",
+                "foreignId": "esx-01",
+                "location": "Default",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 1786320000000,
+                "lastIngressFlow": null,
+                "lastEgressFlow": null,
+                "nodeParentID": null,
+                "sysContact": "virt@example.com",
+                "sysDescription": "VMware ESXi 8.0.2 build-23305546 VMware, Inc. x86_64",
+                "sysLocation": "Building A / DC1",
+                "sysName": "esx-01",
+                "sysObjectId": ".1.3.6.1.4.1.6876.4.1",
+                "categories": [
+                  {"id": 5, "name": "Production", "authorizedGroups": []}
+                ],
+                "assetRecord": {
+                  "id": 4,
+                  "category": "Unspecified",
+                  "manufacturer": "Dell Inc.",
+                  "vendor": null,
+                  "modelNumber": "PowerEdge R650",
+                  "serialNumber": "SVCTAG7",
+                  "operatingSystem": null,
+                  "building": "Building A",
+                  "room": "DC1",
+                  "rack": "R04",
+                  "lastModifiedBy": "admin",
+                  "lastModifiedDate": 1705276800000
+                }
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"count": 0, "totalCount": 4, "offset": 4}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "opennms:$HOST:1",
+      "opennms:$HOST:2",
+      "opennms:$HOST:3",
+      "opennms:$HOST:4"
+    ],
+    "assets": [
+      {
+        "id": "opennms:$HOST:1",
+        "fields": {
+          "deviceType": "Switch",
+          "os": "IOS-XE 17.09.04a",
+          "manufacturer": "Cisco Systems",
+          "model": "C9300-48P",
+          "hostnames": "edge-sw-01\tedge-sw-01.example.com",
+          "ipAddresses": "192.0.2.11\t198.51.100.11",
+          "macAddresses": "00:50:56:9a:1b:2c\t00:50:56:9a:1b:2d\t00:50:56:9a:1b:2e",
+          "opennms_node_id": "1",
+          "opennms_server": "$HOST",
+          "opennms_label_source": "hostname",
+          "opennms_primary_interface_address": "192.0.2.11",
+          "opennms_interface_count": "3",
+          "opennms_ip_interface_count": "2",
+          "opennms_snmp_interface_count": "5",
+          "opennms_asset_serial_number": "FCW2345X0AB",
+          "opennms_asset_rack": "R12",
+          "opennms_foreign_source": "NetworkDevices",
+          "opennms_monitored_service_count": "2",
+          "opennms_monitored_services": "ICMP,SNMP",
+          "opennms_categories": "Production,Network",
+          "opennms_sys_object_id": ".1.3.6.1.4.1.9.1.2494",
+          "opennms_create_time": "1705276800000",
+          "tags": "category:Network\tcategory:Production\tlocation:Default\topennms\trequisition:NetworkDevices\tserial:FCW2345X0AB\ttype:active"
+        }
+      },
+      {
+        "id": "opennms:$HOST:2",
+        "fields": {
+          "deviceType": "Server",
+          "ipAddresses": "203.0.113.25",
+          "opennms_label": "203.0.113.25",
+          "opennms_label_source": "address",
+          "opennms_interface_count": "1",
+          "opennms_ip_interface_count": "3"
+        },
+        "fields_absent": ["hostnames", "macAddresses", "manufacturer", "model"]
+      },
+      {
+        "id": "opennms:$HOST:3",
+        "fields": {
+          "deviceType": "Printer",
+          "hostnames": "printer-01.example.com",
+          "macAddresses": "00:1b:78:aa:bb:cc",
+          "model": "LaserJet M607",
+          "manufacturer": "HP",
+          "opennms_label_source": "sysname",
+          "opennms_interface_count": "1",
+          "opennms_ip_interface_count": "0",
+          "opennms_snmp_interface_count": "1"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "opennms:$HOST:4",
+        "fields": {
+          "deviceType": "Hypervisor",
+          "hostnames": "esx-01\tesx-01.example.com",
+          "manufacturer": "Dell Inc.",
+          "opennms_label_source": "user-defined",
+          "opennms_interface_count": "0",
+          "opennms_monitored_service_count": "2",
+          "opennms_monitored_services": "ICMP,HTTPS",
+          "opennms_services_down": "HTTPS"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/opennms/api/v2/ipinterfaces", "query_contains": "limit=200&offset=0"},
+      {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces", "query_contains": "limit=200&offset=0"},
+      {"method": "GET", "path": "/opennms/rest/ifservices", "query_contains": "limit=200&offset=0"},
+      {"method": "GET", "path": "/opennms/rest/nodes", "query_contains": "limit=200&offset=0"},
+      {"header": {"Accept": "application/json"}},
+      {"header": {"Authorization": "Basic cnVuemVyby1ybzpmaXh0dXJlLW5vdC1hLXJlYWwtcGFzc3dvcmQ="}}
+    ],
+    "requests_absent": [
+      {"path_contains": "/rest/nodes/1/ipinterfaces"},
+      {"path_contains": "/rest/nodes/2/ipinterfaces"},
+      {"path_contains": "/api/v2/nodes"}
+    ],
+    "log_contains": [
+      "opennms: indexed IP interfaces for 2 nodes",
+      "opennms: reported 4 nodes so far"
+    ]
+  },
+  "check_determinism": true
+}

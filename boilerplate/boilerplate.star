@@ -5,8 +5,21 @@ CONFIG = {
     "name": "Product Name",
     "type": "inbound",
     "description": "Replace with your integration description.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    # Bump by one whenever this script changes. This is the SCRIPT's revision
+    # and is informational only; minVersion below is a different thing --
+    # the minimum runZero platform version required to run it.
+    "maturity": "alpha",
+    # alpha: new or unproven. beta: in use and broadly working.
+    # stable: promoted deliberately after real-world validation.
+    "minVersion": "5.1.260818.0",
+    # How runZero reconciles these records with the assets it already knows,
+    # declared once for the whole integration. Omit it for the default, which
+    # matches and breaks on all four dimensions. The preset below suits a source
+    # with a stable vendor id whose addresses and names drift; a source that only
+    # emits per-run ids wants "no-id-match no-id-break" instead. Say WHY in a
+    # comment here -- the reasoning is what a future reader needs.
+    "matchBehavior": "no-mac-break no-ip-break no-name-break",
     "validationMode": "compile",
     "params": [
         {
@@ -91,13 +104,18 @@ def create_asset_example():
         mac="AA:BB:CC:DD:EE:FF",
         ips=["192.168.1.10", "fe80::1%eth0", "[2001:db8::1]:443"],
     )
+    # Always guard the result like this. network_interface returns None when
+    # nothing usable survives -- a record with no parseable MAC and no routable
+    # address -- and passing [None] to ImportAsset does not skip that one record,
+    # it aborts the ENTIRE run with "network_interfaces must be an iterable of
+    # NetworkInterface objects", losing everything already parsed.
+    interfaces = [netif] if netif else []
     return ImportAsset(
         id="asset-12345",
-        networkInterfaces=[netif],
+        networkInterfaces=interfaces,
         hostnames=["sample-device"],
         os="ExampleOS",
         osVersion="1.0",
-        matchBehavior="no-mac-break no-ip-break no-name-break",
         # match_behavior tells the runZero cruncher how aggressively
         # to merge this asset with existing records. The default is
         # full matching on id+mac+ip+name. When your source provides

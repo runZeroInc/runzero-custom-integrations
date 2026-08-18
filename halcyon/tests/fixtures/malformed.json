@@ -1,0 +1,57 @@
+{
+  "name": "malformed",
+  "integration": "halcyon",
+  "description": "REGRESSION LOCK ON A DEFECT, NOT A PASSING BEHAVIOUR. The asset search answers 200 with a bare JSON array where an object carrying \"items\" is documented -- the shape a gateway or a changed API version returns. `data.get(\"items\", [])` on a list is not recoverable in Starlark: it aborts the whole run with \"list has no .get field or method\", so the integration fails with no diagnosis rather than stopping cleanly. The same hole exists at `_get_access_token` (`data.get(\"accessToken\")`) and inside the item loop (a string element in `items` aborts with \"string has no .get field or method\").\n\nThe fix is the guard stairwell, lima-charlie and extreme-cloud-iq already carry: `if type(data) != \"dict\": print(...); break`. This scenario asserts the current abort so that the day the guard is added it fails and gets updated to expect a clean stop with zero assets.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/identity/auth/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "accessToken": "fixture-access-token"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "search-wrong-shape",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "7f0e3001-0000-4000-8000-000000003001",
+              "name": "syn-halcyon-x.example.com"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "log_contains": [
+      "list has no .get field or method"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

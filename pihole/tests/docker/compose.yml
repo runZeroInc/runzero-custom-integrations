@@ -1,0 +1,69 @@
+# A real Pi-hole v6 plus a container that actually queries it.
+#
+# The second service is the point. Pi-hole's /api/network/devices is not a
+# configuration list -- it is FTL's observed network table, built from the ARP
+# cache of hosts that have really sent DNS queries. Writing rows into FTL's
+# database directly would produce the right shape while skipping the code that
+# fills it, so the client container sends genuine queries and Pi-hole discovers
+# it the same way it discovers a laptop on a home LAN.
+#
+# Both tags are pinned. Pi-hole v6 replaced the whole PHP admin API with FTL's
+# native /api, and the device payload has already moved once inside the v6
+# line, so the version under test has to be deliberate.
+services:
+  pihole:
+    image: pihole/pihole:2025.07.1
+    hostname: rz-pihole
+    networks:
+      lan:
+        ipv4_address: 10.222.8.2
+    # Pinned so the appliance's own row is assertable; Docker otherwise mints a
+    # random address per container. As in the adguard-home stack, the 02 prefix
+    # sets the locally-administered bit and the platform clears it on the way
+    # out, so the emitted MAC is 00:42:0a:de:08:02.
+    mac_address: "02:42:0a:de:08:02"
+    environment:
+      # v6 reads its whole configuration from FTLCONF_* variables. Setting the
+      # API password here is what lets the seed script authenticate without
+      # touching the setup UI.
+      FTLCONF_webserver_api_password: "runzero-test-pw-2026"
+      # Answer queries from the whole compose network rather than only the
+      # container itself, so the client below is served.
+      FTLCONF_dns_listeningMode: "all"
+      # Keep FTL from trying to reach real upstream resolvers; the client only
+      # needs its queries counted, not answered correctly.
+      FTLCONF_dns_upstreams: "127.0.0.1#53"
+      FTLCONF_misc_etc_dnsmasq_d: "false"
+    ports:
+      # Only the web/API port is published; the DNS listener stays internal.
+      - "${RZ_HOST_PORT}:80"
+
+  # A device for Pi-hole to see. busybox is ~4MB and its nslookup is enough to
+  # generate the queries and the ARP entry FTL needs.
+  client:
+    image: busybox:1.36
+    depends_on: [pihole]
+    networks:
+      lan:
+        ipv4_address: 10.222.8.11
+    # A globally-unique-looking MAC, chosen so the locally-administered bit is
+    # already clear: this row is the one the test asserts most closely, and an
+    # address that survives normalisation unchanged keeps the expectation
+    # readable.
+    mac_address: "00:11:22:33:44:55"
+    # Keep querying: FTL rebuilds its network table on a timer, so a single
+    # query at startup can land in a window that is never written out.
+    command: ["sh", "-c", "while true; do nslookup rz-client.example.com 10.222.8.2 >/dev/null 2>&1; sleep 2; done"]
+
+networks:
+  lan:
+    # Fixed for the same reason as the adguard-home stack: the addresses are
+    # asserted directly, so they cannot come from Docker's rotating pool.
+    # 10.222.8.0/24 sits clear of Docker's default pools and of the
+    # adguard-home stack's 10.222.7.0/24 -- the two never run at once, but a
+    # distinct subnet keeps a stale network from either one out of the way.
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.222.8.0/24
+          gateway: 10.222.8.1

@@ -1,0 +1,67 @@
+# A real Zabbix 7.0 -- PostgreSQL, the server daemon, and the PHP frontend that
+# implements the JSON-RPC API this integration talks to.
+#
+# All three containers are needed, and each for a different reason:
+#
+#   db      holds the schema. Everything the API reads and writes lives here.
+#   server  is what CREATES that schema. The frontend image ships no SQL; the
+#           server image carries create.sql.gz and imports it on first boot
+#           against an empty database. Dropping the server would leave the
+#           frontend talking to a database with no tables.
+#   web     is the API. api_jsonrpc.php is PHP served by this container -- the
+#           server daemon on 10051 speaks a different, non-HTTP protocol and
+#           cannot answer a single call this integration makes.
+#
+# Tags are pinned to the 7.0 LTS. The Zabbix API is versioned with the product
+# and reshapes between majors -- selectGroups became selectHostGroups in 6.2 and
+# was removed outright in 7.2, and Bearer token authentication only exists from
+# 6.4 -- so the version under test has to be a deliberate choice rather than
+# whatever :latest resolved to on the day.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+    # The schema import is a few thousand statements; giving Postgres its own
+    # healthcheck is what lets the server wait for a database that will actually
+    # accept the connection rather than one whose port is merely open.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zabbix -d zabbix"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  server:
+    image: zabbix/zabbix-server-pgsql:alpine-7.0.11
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_SERVER_HOST: db
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+    # 10051 is deliberately NOT published. It is the trapper port agents connect
+    # to, the integration never touches it, and publishing it on a shared
+    # machine invites something else to try.
+
+  web:
+    image: zabbix/zabbix-web-nginx-pgsql:alpine-7.0.11
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_SERVER_HOST: db
+      POSTGRES_USER: zabbix
+      POSTGRES_PASSWORD: zabbix
+      POSTGRES_DB: zabbix
+      ZBX_SERVER_HOST: server
+      PHP_TZ: UTC
+    ports:
+      # The frontend image serves at the root, so $BASE + /api_jsonrpc.php is
+      # the endpoint. A package install serves it under /zabbix instead, which
+      # is why the integration appends the RPC file to the configured URL rather
+      # than assuming either layout.
+      - "${RZ_HOST_PORT}:8080"

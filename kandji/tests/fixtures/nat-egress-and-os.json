@@ -1,0 +1,103 @@
+{
+  "name": "nat-egress-and-os",
+  "integration": "kandji",
+  "description": "Two laptops on the same office network report the same network.public_ip, which is the gateway's NAT egress address and identifies the gateway, not the device. Folding it into the same interface as ip_address paired that one address to every device's MAC, so a whole office correlated onto one address; cisco-secure-endpoint excludes external_ip for exactly this reason. public_ip is now kept as an attribute only. The same scenario pins the os field: it was populated from general.model, so the hardware model was imported as the operating system and the real OS was never imported at all. namespaced_ids is skipped for the reason given in happy.json -- the bare device_id is the foreign id, reported separately.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-kandji-token"
+  },
+  "routes": [
+    {
+      "name": "details-1",
+      "match": {"method": "GET", "path": "/devices/k0000000-0000-4000-8000-000000000101/details"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {
+              "model": "MacBook Pro (16-inch, 2023)",
+              "platform": "Mac",
+              "os_version": "14.4.1",
+              "device_name": "eng-mbp-101"
+            },
+            "network": {
+              "local_hostname": "eng-mbp-101",
+              "mac_address": "AC:DE:48:00:12:01",
+              "ip_address": "10.131.1.10",
+              "public_ip": "198.51.100.7"
+            },
+            "hardware_overview": {"serial_number": "C02KANDJI101"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "details-2",
+      "match": {"method": "GET", "path": "/devices/k0000000-0000-4000-8000-000000000102/details"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {
+              "model": "iPad Air (5th generation)",
+              "platform": "iPad",
+              "os_version": "17.4",
+              "device_name": "field-ipad-102"
+            },
+            "network": {
+              "local_hostname": "field-ipad-102",
+              "mac_address": "AC:DE:48:00:12:02",
+              "ip_address": "10.131.1.11",
+              "public_ip": "198.51.100.7"
+            },
+            "hardware_overview": {"serial_number": "DMPKANDJI102"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-list",
+      "match": {"method": "GET", "path": "/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"device_id": "k0000000-0000-4000-8000-000000000101", "device_name": "eng-mbp-101", "platform": "Mac"},
+            {"device_id": "k0000000-0000-4000-8000-000000000102", "device_name": "field-ipad-102", "platform": "iPad"}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "k0000000-0000-4000-8000-000000000101",
+        "fields": {
+          "ipAddresses": "10.131.1.10",
+          "os": "macOS",
+          "osVersion": "14.4.1",
+          "model": "MacBook Pro (16-inch, 2023)",
+          "public_ip": "198.51.100.7"
+        }
+      },
+      {
+        "id": "k0000000-0000-4000-8000-000000000102",
+        "fields": {
+          "ipAddresses": "10.131.1.11",
+          "os": "iPadOS",
+          "osVersion": "17.4",
+          "model": "iPad Air (5th generation)"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

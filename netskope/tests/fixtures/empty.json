@@ -1,0 +1,24 @@
+{
+  "name": "empty",
+  "integration": "netskope",
+  "description": "A tenant with no client records. The datasearch answers 200 with an empty result array, which must end the paging loop after one call, report zero assets and say so, rather than failing or looping. Skips namespaced_ids: no assets are emitted, but the skip keeps the file consistent with netskope/happy.json, whose ids carry no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-netskope-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus"},
+      "responses": [{"status": 200, "json": {"ok": 1, "status": 200, "result": []}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["no assets retrieved"]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "name": "happy",
+  "integration": "nutanix-prism",
+  "description": "One page of hypervisor nodes and one page of guest VMs behind the mandatory /cluster bootstrap. Proves the cluster uuid becomes the id namespace, that node ids and VM ids cannot collide, that the CVM/IPMI addresses are recorded as attributes rather than attached as interfaces, and that a node whose only reported address is loopback yields an asset with no interface at all.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-viewer",
+    "password": "fixture-password",
+    "import_vms": "true",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "uuid": "00000000-0000-4000-8000-c1u57e40000a",
+            "name": "fixture-cluster",
+            "version": "6.5.3.5",
+            "num_nodes": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 3, "count": 3, "page": 1},
+            "entities": [
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "name": "NTNX-SYN01-A",
+                "hypervisor_address": "10.55.0.11",
+                "backplane_ip": "10.66.0.11",
+                "ipmi_address": "10.55.9.11",
+                "service_vmexternal_ip": "10.55.0.111",
+                "service_vmnat_ip": "10.55.0.211",
+                "controller_vm_backplane_ip": "10.66.0.111",
+                "hypervisor_type": "kKvm",
+                "hypervisor_full_name": "Nutanix 20190916.321",
+                "block_model": "NX-3060-G7",
+                "block_serial": "SYNBLOCK01",
+                "serial": "SYNNODE0001",
+                "state": "NORMAL",
+                "num_cpu_cores": 24,
+                "num_vms": 7,
+                "boot_time_in_usecs": 1740000000000000,
+                "memory_capacity_in_bytes": 412316860416
+              },
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "name": "NTNX-SYN01-B",
+                "hypervisor_address": "10.55.0.12",
+                "ipmi_address": "10.55.9.12",
+                "hypervisor_type": "kVMware",
+                "hypervisor_full_name": "VMware ESXi 7.0.3",
+                "block_model": "NX-3060-G7",
+                "state": "NORMAL",
+                "boot_time_in_usecs": 1740000000000000
+              },
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000003",
+                "name": "NTNX-SYN01-C",
+                "hypervisor_address": "127.0.0.1",
+                "backplane_ip": "169.254.3.3",
+                "hypervisor_type": "kKvm",
+                "hypervisor_full_name": "Nutanix 20190916.321",
+                "block_model": "NX-1065-G6",
+                "state": "NORMAL"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {"grand_total_entities": 3}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/vms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 2, "count": 2, "offset": 0},
+            "entities": [
+              {
+                "uuid": "bbbbbbbb-0000-4000-8000-000000000001",
+                "name": "syn-app-01",
+                "power_state": "on",
+                "num_vcpus": 4,
+                "memory_mb": 8192,
+                "host_uuid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "guest_os": "CentOS Linux release 8.5",
+                "vm_nics": [
+                  {
+                    "mac_address": "50:6b:8d:00:00:01",
+                    "ip_addresses": ["10.55.10.21"],
+                    "network_uuid": "cccccccc-0000-4000-8000-000000000001"
+                  }
+                ]
+              },
+              {
+                "uuid": "bbbbbbbb-0000-4000-8000-000000000002",
+                "name": "syn-db-01",
+                "power_state": "off",
+                "num_vcpus": 8,
+                "memory_mb": 32768,
+                "host_uuid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "vm_nics": [
+                  {
+                    "mac_address": "50:6b:8d:00:00:02",
+                    "ip_addresses": ["127.0.0.1", "fe80::1"]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {"grand_total_entities": 2}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000001",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000002",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000003",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-000000000001",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-000000000002"
+    ],
+    "assets": [
+      {
+        "id": "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000001",
+        "comment": "Nodes carry no assetTypeBehavior entry, so they resolve to the platform default with all eight flags on.",
+        "fields": {
+          "_attrType": "host"
+        }
+      },
+      {
+        "id": "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-000000000001",
+        "comment": "Guests select the vm type, which is the only entry in assetTypeBehavior.",
+        "fields": {
+          "_attrType": "vm"
+        }
+      }
+    ],
+    "min_requests": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts", "query_contains": "count=250"},
+      {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/vms", "query_contains": "include_vm_nic_config=true"},
+      {"header_contains": "Basic"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

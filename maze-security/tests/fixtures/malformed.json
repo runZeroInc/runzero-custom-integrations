@@ -1,0 +1,79 @@
+{
+  "name": "malformed",
+  "integration": "maze-security",
+  "description": "Nulls where the API documents objects, plus records missing keys entirely. snapshot, cvss, severity_details, related_scanner_findings and vulnerability_root_cause_analysis all arrive as JSON null on one investigation and are simply absent on another; a related finding carries no asset_name, so it falls back to the scanner_finding_hash asset. This is the null-vs-missing distinction that a bare `.get(k, {})` default does NOT cover -- Maze guards it with `or {}` and survives, and this scenario is the regression test for that guard.\n\nThe last investigation's scanner_finding_hash has no `::` separators at all, so it carries no asset segment. The whole hash used to become the foreign id; since a real hash embeds the CVE that minted one asset per finding, so the record is now skipped and logged.\n\nnamespaced_ids is skipped: Maze ids are bare scanner-supplied names with no tenant scope. Under no-id-match they no longer drive matching.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key"
+  },
+  "routes": [
+    {
+      "name": "investigations-search",
+      "match": {"method": "POST", "path": "/v1/investigations/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "data": [
+              {
+                "id": "inv-null-everything",
+                "cve_id": "CVE-2024-50001",
+                "maze_severity": null,
+                "exploitability": null,
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-50001::null-fields.corp.example.com",
+                "snapshot": null,
+                "severity_details": null,
+                "related_scanner_findings": null,
+                "vulnerability_root_cause_analysis": null,
+                "remediation": null
+              },
+              {
+                "id": "inv-missing-everything",
+                "cve_id": "CVE-2024-50002",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-50002::missing-fields.corp.example.com"
+              },
+              {
+                "id": "inv-finding-no-asset-name",
+                "cve_id": "CVE-2024-50003",
+                "maze_severity": "LOW",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-50003::fallback.corp.example.com",
+                "related_scanner_findings": [
+                  {"asset_name": "", "asset_type": "Server", "region": null}
+                ],
+                "vulnerability_root_cause_analysis": [
+                  {"title": null, "actual_value": "ignored, the title is null"},
+                  {"title": "Operating system", "actual_value": null}
+                ],
+                "snapshot": {"cve": null, "cvss": {"base_score": null, "version": null}}
+              },
+              {
+                "id": "inv-short-hash",
+                "cve_id": "CVE-2024-50004",
+                "maze_severity": "UNRECOGNISED-SEVERITY",
+                "scanner_finding_hash": "no-separators-at-all"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "null-fields.corp.example.com",
+      "missing-fields.corp.example.com",
+      "fallback.corp.example.com"
+    ],
+    "ids_absent": ["no-separators-at-all", "inv-short-hash"],
+    "min_vulnerabilities_total": 3,
+    "request_count": 1,
+    "log_contains": [
+      "Reported 3 assets from 4 investigations",
+      "maze: skipping investigation with no asset name or asset segment: id=inv-short-hash scanner_finding_hash=no-separators-at-all"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

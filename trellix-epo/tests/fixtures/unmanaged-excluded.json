@@ -1,0 +1,55 @@
+{
+  "name": "unmanaged-excluded",
+  "integration": "trellix-epo",
+  "description": "include_unmanaged=false must drop System Tree entries whose EPOLeafNode.ManagedState is not 1 and keep everything else. The unmanaged node id is asserted absent rather than just counting assets, so a filter that dropped the wrong row would still fail.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collection_mode": "search",
+    "include_unmanaged": "false"
+  },
+  "routes": [
+    {
+      "name": "find-groups",
+      "match": {
+        "method": "GET",
+        "path": "/remote/system.findGroups"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "OK:\r\n[\n  {\n    \"groupId\": 2,\n    \"groupPath\": \"My Organization\"\n  },\n  {\n    \"groupId\": 5,\n    \"groupPath\": \"My Organization\\\\Servers\"\n  }\n]"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-find",
+      "match": {
+        "method": "GET",
+        "path": "/remote/system.find"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "OK:\r\n[\n  {\n    \"EPOComputerProperties.ParentID\": 1001,\n    \"EPOComputerProperties.ComputerName\": \"WS-0001\",\n    \"EPOComputerProperties.IPHostName\": \"ws-0001.corp.example.com\",\n    \"EPOComputerProperties.DomainName\": \"CORP\",\n    \"EPOComputerProperties.OSType\": \"Windows 10\",\n    \"EPOComputerProperties.OSVersion\": \"10.0\",\n    \"EPOComputerProperties.OSBuildNum\": 19045,\n    \"EPOComputerProperties.OSServicePackVer\": \"N/A\",\n    \"EPOComputerProperties.OSPlatform\": \"Workstation\",\n    \"EPOComputerProperties.NetAddress\": \"001122334455\",\n    \"EPOComputerProperties.IPV4x\": -1978393048,\n    \"EPOComputerProperties.IPAddress\": \"N/A\",\n    \"EPOComputerProperties.IPV6\": \"(none)\",\n    \"EPOComputerProperties.SubnetAddress\": \"10.20.30.0\",\n    \"EPOComputerProperties.SubnetMask\": \"255.255.255.0\",\n    \"EPOComputerProperties.CPUType\": \"Intel(R) Core(TM) i7-1185G7\",\n    \"EPOComputerProperties.CPUSpeed\": 2800,\n    \"EPOComputerProperties.NumOfCPU\": 4,\n    \"EPOComputerProperties.TotalPhysicalMemory\": 17179869184,\n    \"EPOComputerProperties.UserName\": \"CORP\\\\jdoe\",\n    \"EPOComputerProperties.Description\": \"<null>\",\n    \"EPOLeafNode.ManagedState\": 1,\n    \"EPOLeafNode.AgentGUID\": \"AAAAAAAA-0000-0000-0000-000000001001\",\n    \"EPOLeafNode.AgentVersion\": \"5.7.9.123\",\n    \"EPOLeafNode.Tags\": \"Workstation, Managed Laptops\",\n    \"EPOLeafNode.LastUpdate\": \"2026-08-01T10:00:00Z\",\n    \"EPOBranchNode.AutoID\": 2\n  },\n  {\n    \"EPOComputerProperties.ParentID\": 1002,\n    \"EPOComputerProperties.ComputerName\": \"SRV-0002\",\n    \"EPOComputerProperties.IPHostName\": \"srv-0002.corp.example.com\",\n    \"EPOComputerProperties.DomainName\": \"CORP\",\n    \"EPOComputerProperties.OSType\": \"Windows Server 2022\",\n    \"EPOComputerProperties.OSVersion\": \"10.0\",\n    \"EPOComputerProperties.OSBuildNum\": 20348,\n    \"EPOComputerProperties.OSPlatform\": \"Server\",\n    \"EPOComputerProperties.NetAddress\": \"0011223344AA\",\n    \"EPOComputerProperties.IPV4x\": 1084752138,\n    \"EPOComputerProperties.IPV6\": \"2001:db8:beef::10\",\n    \"EPOComputerProperties.TotalDiskSpace\": 512000,\n    \"EPOComputerProperties.FreeDiskSpace\": 128000,\n    \"EPOLeafNode.ManagedState\": 1,\n    \"EPOLeafNode.AgentGUID\": \"AAAAAAAA-0000-0000-0000-000000001002\",\n    \"EPOLeafNode.AgentVersion\": \"5.7.9.123\",\n    \"EPOLeafNode.Tags\": \"Server\",\n    \"EPOLeafNode.LastUpdate\": \"2026-08-02T04:30:00Z\",\n    \"EPOBranchNode.AutoID\": 5\n  },\n  {\n    \"EPOComputerProperties.ParentID\": 1003,\n    \"EPOComputerProperties.ComputerName\": \"UNMANAGED-01\",\n    \"EPOComputerProperties.IPHostName\": \"N/A\",\n    \"EPOComputerProperties.IPV4x\": 0,\n    \"EPOComputerProperties.IPAddress\": \"N/A\",\n    \"EPOComputerProperties.NetAddress\": \"(none)\",\n    \"EPOComputerProperties.OSPlatform\": \"N/A\",\n    \"EPOLeafNode.ManagedState\": 0,\n    \"EPOLeafNode.AgentGUID\": \"<null>\",\n    \"EPOBranchNode.AutoID\": 2\n  },\n  {\n    \"EPOComputerProperties.ComputerName\": \"NO-NODE-ID\",\n    \"EPOComputerProperties.IPV4x\": 1084752138,\n    \"EPOLeafNode.ManagedState\": 1,\n    \"EPOBranchNode.AutoID\": 2\n  },\n  \"this-row-is-a-string-not-an-object\"\n]"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "trellix-epo:127.0.0.1:1001",
+      "trellix-epo:127.0.0.1:1002"
+    ],
+    "ids_absent": [
+      "trellix-epo:127.0.0.1:1003"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

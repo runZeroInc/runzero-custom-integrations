@@ -1,0 +1,75 @@
+{
+  "name": "rate-limit",
+  "integration": "nautobot",
+  "description": "Nautobot itself ships no rate limiter, but installs routinely sit behind nginx, Traefik, or a WAF that does, and the 429 those emit is indistinguishable to the client. A 503 from a worker restarting during a config-context rebuild is the same class of problem. Both are served once and then relented. get_json retries transient statuses three times by default with exponential backoff and honours Retry-After, so the run must succeed with no retry handling of its own anywhere in the script - a hand-rolled retry loop here would be a defect, not a feature. The fixture server counts every attempt, so the request total proves the retry actually happened rather than the response being skipped.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "0123456789abcdef0123456789abcdef01234567",
+    "collect_interfaces": "false",
+    "import_virtual_machines": "false"
+  },
+  "routes": [
+    {
+      "name": "manufacturers",
+      "match": {"method": "GET", "path": "/api/dcim/manufacturers/"},
+      "responses": [
+        {"status": 503, "json": {"detail": "Service temporarily unavailable"}},
+        {"status": 200, "json": {"count": 1, "next": null, "previous": null, "results": [
+          {"id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979", "object_type": "dcim.manufacturer", "name": "Cisco"}
+        ]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/dcim/devices/"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"detail": "Request was throttled."}},
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "next": null,
+            "previous": null,
+            "results": [
+              {
+                "id": "abababab-abab-4bab-8bab-abababababab",
+                "object_type": "dcim.device",
+                "name": "throttled-dev-01",
+                "serial": "SN-RL-01",
+                "device_type": {"id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1", "model": "ISR 4331", "manufacturer": {"id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979", "object_type": "dcim.manufacturer"}},
+                "status": {"id": "9f38bab4-4b47-4e77-b50c-fda62817b2db", "name": "Active"},
+                "role": {"id": "40567487-6328-4dac-b7b5-b789d1154bf0", "name": "Router"},
+                "platform": null,
+                "location": null,
+                "primary_ip4": {"address": "203.0.113.7/24", "host": "203.0.113.7"},
+                "primary_ip6": null,
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "nautobot:$HOST:device:abababab-abab-4bab-8bab-abababababab",
+        "fields": {
+          "hostnames": "throttled-dev-01",
+          "ipAddresses": "203.0.113.7",
+          "deviceType": "Router",
+          "nautobot_manufacturer": "Cisco"
+        }
+      }
+    ],
+    "request_count": 4
+  },
+  "check_determinism": false,
+  "invariants": {"skip": []}
+}

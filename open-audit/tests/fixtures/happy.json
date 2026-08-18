@@ -1,0 +1,329 @@
+{
+  "name": "happy",
+  "integration": "open-audit",
+  "description": "One page of the devices collection with the per-device include=ip,network read that supplies MACs. Proves the cookie login is exchanged at /index.php/logon and replayed as a Cookie header on the data calls, that the JSON:API envelope's data[].attributes is where the device lives, and that the included block is walked as an object keyed by table name. Device 14 exercises the address/adapter join: the ip and network rows are married on net_index, the docker0 bridge is recognised as a software adapter so neither its MAC nor its address reaches the asset, and an adapter with a MAC but no bound address still becomes an interface because a MAC is the strongest merge signal a switch port ever sees. Device 27 is SNMP-discovered and returns included as an empty PHP array rather than an object, which is the type variance that would abort a run that subscripted it blindly; its only address is the one on the device row. Device 42 proves the placeholder filters: 'To Be Filled By O.E.M.' never becomes a serial, 'localhost' never becomes a hostname, and the 169.254 address the host invented when DHCP failed is dropped even though the platform itself keeps link-local.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_interfaces": "true",
+    "collect_software": "true",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Set-Cookie": "ci_session=fixture-session-a1b2c3d4; Path=/; HttpOnly"},
+          "json": {"id": "3", "name": "runzero", "full_name": "runZero Collector", "lang": "en"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-14-detail",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices/14"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "read", "format": "json", "id": 14, "header": 200, "version": 1, "include": "ip,network,software"},
+            "included": {
+              "ip": [
+                {"id": 901, "device_id": 14, "current": "y", "name": "", "mac": "00:50:56:9a:11:01", "net_index": "2", "ip": "192.0.2.41", "netmask": "255.255.255.0", "cidr": "24", "version": 4, "network": "192.0.2.0/24", "set_by": "static", "interface": "eth0"},
+                {"id": 902, "device_id": 14, "current": "y", "name": "", "mac": "00:50:56:9a:11:01", "net_index": "2", "ip": "2001:db8:60::41", "netmask": "", "cidr": "64", "version": 6, "network": "2001:db8:60::/64", "set_by": "auto", "interface": "eth0"},
+                {"id": 903, "device_id": 14, "current": "y", "name": "", "mac": "02:42:8f:11:22:33", "net_index": "9", "ip": "172.17.0.1", "netmask": "255.255.0.0", "cidr": "16", "version": 4, "network": "172.17.0.0/16", "set_by": "static", "interface": "docker0"}
+              ],
+              "network": [
+                {"id": 701, "device_id": 14, "current": "y", "name": "eth0", "mac": "00:50:56:9a:11:01", "manufacturer": "VMware, Inc.", "model": "VMXNET3 Ethernet Controller", "description": "VMXNET3 Ethernet Controller", "net_index": "2", "type": "ethernet", "connection_status": "connected", "speed": 10000000000, "ip_enabled": "true", "dhcp_enabled": "false", "vlan": "60"},
+                {"id": 702, "device_id": 14, "current": "y", "name": "eth1", "mac": "00:50:56:9a:11:02", "manufacturer": "VMware, Inc.", "model": "VMXNET3 Ethernet Controller", "description": "VMXNET3 Ethernet Controller", "net_index": "3", "type": "ethernet", "connection_status": "disconnected", "speed": 0, "ip_enabled": "false", "dhcp_enabled": "false", "vlan": ""},
+                {"id": 703, "device_id": 14, "current": "y", "name": "docker0", "mac": "02:42:8f:11:22:33", "manufacturer": "", "model": "", "description": "Docker Bridge docker0", "net_index": "9", "type": "bridge", "connection_status": "connected", "speed": 0, "ip_enabled": "true", "dhcp_enabled": "false", "vlan": ""}
+              ],
+              "software": [
+                {"id": 5001, "device_id": 14, "current": "y", "name": "nginx", "version": "1.24.0-2ubuntu7", "publisher": "Ubuntu Developers", "install_date": "2026-02-11"},
+                {"id": 5002, "device_id": 14, "current": "y", "name": "OpenSSH", "version": "9.6p1-3ubuntu13", "publisher": "Ubuntu Developers", "install_date": "2026-02-11"},
+                {"id": 5003, "device_id": 14, "current": "y", "name": "nginx", "version": "1.24.0-2ubuntu7", "publisher": "Ubuntu Developers", "install_date": "2026-02-11"}
+              ]
+            },
+            "logs": [],
+            "data": [
+              {"id": 14, "type": "devices", "attributes": {"id": 14, "name": "srv-web01", "hostname": "srv-web01", "fqdn": "srv-web01.corp.example.com", "ip": "192.0.2.41", "type": "computer", "class": "virtual server", "os_name": "Ubuntu 24.04.1 LTS", "os_version": "24.04", "manufacturer": "VMware, Inc.", "model": "VMware Virtual Platform", "serial": "VMware-42 1a 9c 8d", "first_seen": "2025-04-02 09:14:22", "last_seen": "2026-08-14 03:11:07"}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-27-detail",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices/27"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "read", "format": "json", "id": 27, "header": 200, "version": 1, "include": "ip,network,software"},
+            "included": [],
+            "logs": [],
+            "data": [
+              {"id": 27, "type": "devices", "attributes": {"id": 27, "name": "sw-idf3-01", "ip": "192.0.2.9", "type": "switch"}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-42-detail",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices/42"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "read", "format": "json", "id": 42, "header": 200, "version": 1, "include": "ip,network,software"},
+            "included": {
+              "ip": [
+                {"id": 904, "device_id": 42, "current": "y", "name": "", "mac": "00:1b:21:7c:44:aa", "net_index": "1", "ip": "169.254.11.22", "netmask": "255.255.0.0", "cidr": "16", "version": 4, "network": "169.254.0.0/16", "set_by": "auto", "interface": "Ethernet"},
+                {"id": 905, "device_id": 42, "current": "y", "name": "", "mac": "", "net_index": "1", "ip": "127.0.0.1", "netmask": "255.0.0.0", "cidr": "8", "version": 4, "network": "127.0.0.0/8", "set_by": "local", "interface": "Loopback"}
+              ],
+              "network": [
+                {"id": 704, "device_id": 42, "current": "y", "name": "Ethernet", "mac": "00:1b:21:7c:44:aa", "manufacturer": "Intel Corporate", "model": "Intel(R) 82574L Gigabit Network Connection", "description": "Intel(R) 82574L Gigabit Network Connection", "net_index": "1", "type": "ethernet", "connection_status": "connected", "ip_enabled": "true", "dhcp_enabled": "true", "vlan": ""}
+              ]
+            },
+            "logs": [],
+            "data": [
+              {"id": 42, "type": "devices", "attributes": {"id": 42, "name": "kiosk-03", "type": "point of sale"}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {
+              "collection": "devices",
+              "action": "collection",
+              "format": "json",
+              "header": 200,
+              "version": 1,
+              "limit": 500,
+              "offset": 0,
+              "total": 3,
+              "filtered": 3,
+              "sort": "devices.id",
+              "access_token": "fixture-access-token",
+              "user": "runzero"
+            },
+            "included": [],
+            "logs": [],
+            "data": [
+              {
+                "id": 14,
+                "type": "devices",
+                "attributes": {
+                  "id": 14,
+                  "uuid": "421a9c8d-6b3f-4a21-9f0e-11c2d3e4f5a6",
+                  "name": "srv-web01",
+                  "hostname": "srv-web01",
+                  "dns_hostname": "srv-web01",
+                  "domain": "corp.example.com",
+                  "dns_domain": "corp.example.com",
+                  "fqdn": "srv-web01.corp.example.com",
+                  "dns_fqdn": "srv-web01.corp.example.com",
+                  "ip": "192.0.2.41",
+                  "description": "Front-end web server",
+                  "type": "computer",
+                  "class": "virtual server",
+                  "os_group": "Linux",
+                  "os_family": "Ubuntu",
+                  "os_name": "Ubuntu 24.04.1 LTS",
+                  "os_version": "24.04",
+                  "os_display_version": "",
+                  "os_arch": "x86_64",
+                  "kernel_version": "6.8.0-45-generic",
+                  "manufacturer": "VMware, Inc.",
+                  "model": "VMware Virtual Platform",
+                  "serial": "VMware-42 1a 9c 8d",
+                  "service_tag": "",
+                  "form_factor": "Other",
+                  "status": "production",
+                  "environment": "production",
+                  "function": "web",
+                  "org_id": 1,
+                  "location_id": 2,
+                  "memory_count": 8388608,
+                  "processor_count": 4,
+                  "uptime": "31 days",
+                  "asset_number": "AS-0041",
+                  "vm_vendor": "VMware",
+                  "vm_server_name": "esx-04.corp.example.com",
+                  "cluster_name": "prod-cluster-a",
+                  "snmp_oid": "",
+                  "sysDescr": "",
+                  "sysObjectID": "",
+                  "sysContact": "",
+                  "sysName": "",
+                  "sysLocation": "",
+                  "snmp_enterprise_name": "",
+                  "first_seen": "2025-04-02 09:14:22",
+                  "last_seen": "2026-08-14 03:11:07",
+                  "last_seen_by": "audit_linux",
+                  "instance_provider": "",
+                  "instance_ident": "",
+                  "orgs.name": "Default Organisation",
+                  "orgs.id": 1,
+                  "locations.name": "London DC",
+                  "locations.id": 2
+                }
+              },
+              {
+                "id": 27,
+                "type": "devices",
+                "attributes": {
+                  "id": 27,
+                  "uuid": "",
+                  "name": "sw-idf3-01",
+                  "hostname": "",
+                  "dns_hostname": "",
+                  "domain": "",
+                  "dns_domain": "",
+                  "fqdn": "",
+                  "dns_fqdn": "",
+                  "ip": "192.0.2.9",
+                  "description": "",
+                  "type": "switch",
+                  "class": "",
+                  "os_group": "",
+                  "os_family": "Cisco IOS",
+                  "os_name": "Cisco IOS Software, C2960X Software",
+                  "os_version": "15.2(7)E9",
+                  "manufacturer": "Cisco Systems, Inc.",
+                  "model": "WS-C2960X-48FPD-L",
+                  "serial": "FOC2145X0AB",
+                  "form_factor": "",
+                  "status": "production",
+                  "environment": "production",
+                  "org_id": 1,
+                  "location_id": 2,
+                  "snmp_oid": ".1.3.6.1.4.1.9.1.2494",
+                  "sysDescr": "Cisco IOS Software, C2960X Software (C2960X-UNIVERSALK9-M), Version 15.2(7)E9",
+                  "sysObjectID": ".1.3.6.1.4.1.9.1.2494",
+                  "sysContact": "netops@example.com",
+                  "sysName": "sw-idf3-01.corp.example.com",
+                  "sysLocation": "London DC / IDF 3",
+                  "snmp_enterprise_name": "ciscoSystems",
+                  "first_seen": "2024-11-19 21:02:44",
+                  "last_seen": "2026-08-15 01:45:12",
+                  "last_seen_by": "audit_snmp",
+                  "orgs.name": "Default Organisation",
+                  "orgs.id": 1,
+                  "locations.name": "London DC",
+                  "locations.id": 2
+                }
+              },
+              {
+                "id": 42,
+                "type": "devices",
+                "attributes": {
+                  "id": 42,
+                  "uuid": "",
+                  "name": "kiosk-03",
+                  "hostname": "localhost",
+                  "dns_hostname": "",
+                  "domain": "",
+                  "fqdn": "localhost.localdomain",
+                  "ip": "",
+                  "description": "Lobby self-service kiosk",
+                  "type": "point of sale",
+                  "class": "",
+                  "os_group": "Windows",
+                  "os_family": "Windows 10",
+                  "os_name": "Microsoft Windows 10 IoT Enterprise LTSC",
+                  "os_version": "10.0.19044",
+                  "manufacturer": "To Be Filled By O.E.M.",
+                  "model": "To Be Filled By O.E.M.",
+                  "serial": "To Be Filled By O.E.M.",
+                  "service_tag": "0",
+                  "form_factor": "Desktop",
+                  "status": "production",
+                  "environment": "production",
+                  "org_id": 1,
+                  "location_id": 1,
+                  "first_seen": "2026-01-08 11:31:50",
+                  "last_seen": "2026-08-13 19:22:04",
+                  "last_seen_by": "audit_windows",
+                  "orgs.name": "Default Organisation",
+                  "orgs.id": 1,
+                  "locations.name": "Head Office",
+                  "locations.id": 1
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "open-audit:$HOST:14",
+      "open-audit:$HOST:27",
+      "open-audit:$HOST:42"
+    ],
+    "assets": [
+      {
+        "id": "open-audit:$HOST:14",
+        "fields": {
+          "deviceType": "Virtual Machine",
+          "os": "Ubuntu 24.04.1 LTS",
+          "open_audit_vm_vendor": "VMware",
+          "open_audit_software_count": "2",
+          "open_audit_virtual_adapters": "Docker Bridge docker0"
+        }
+      },
+      {
+        "id": "open-audit:$HOST:27",
+        "fields": {
+          "deviceType": "Switch",
+          "open_audit_snmp_enterprise_name": "ciscoSystems",
+          "open_audit_sys_location": "London DC / IDF 3"
+        }
+      },
+      {
+        "id": "open-audit:$HOST:42",
+        "fields": {
+          "deviceType": "Point of Sale"
+        },
+        "fields_absent": ["open_audit_serial", "open_audit_service_tag"]
+      }
+    ],
+    "min_software_total": 2,
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/open-audit/index.php/logon"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "format=json"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/open-audit/index.php/devices/14", "query_contains": "include=ip%2Cnetwork%2Csoftware"},
+      {"header_contains": "ci_session=fixture-session-a1b2c3d4"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=500"}
+    ],
+    "log_contains": [
+      "open-audit: imported 3 devices, 3 with detail"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

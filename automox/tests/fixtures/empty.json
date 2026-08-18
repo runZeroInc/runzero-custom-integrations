@@ -1,0 +1,35 @@
+{
+  "name": "empty",
+  "description": "An organization with no packages and no devices. The run must finish cleanly with zero assets rather than failing.",
+  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "routes": [
+    {
+      "name": "packages",
+      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "orgs",
+      "match": {"method": "GET", "path": "/api/orgs"},
+      "responses": [
+        {"status": 200, "json": [{"id": 4242, "name": "Fixture Org"}]},
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "servers",
+      "match": {"method": "GET", "path": "/api/servers"},
+      "responses": [{"status": 200, "json": {"data": []}}],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "requests_include": [
+      {"path": "/api/orgs"},
+      {"path": "/api/servers"}
+    ]
+  }
+}

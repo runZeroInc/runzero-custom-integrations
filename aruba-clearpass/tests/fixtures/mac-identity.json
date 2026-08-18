@@ -1,0 +1,68 @@
+{
+  "name": "mac-identity",
+  "integration": "aruba-clearpass",
+  "description": "Two endpoints whose MACs differ only in the locally-administered bit of the first octet: aa:bb:cc:dd:ee:01 and a8:bb:cc:dd:ee:01. ClearPass sees a great many randomized client MACs, every one of which carries that bit, so the two rows are two real devices. The integration canonicalizes the MAC itself instead of calling normalize_mac, which clears that bit; this scenario fails the moment anyone swaps in normalize_mac, because the two ids would collapse to one and unique_ids would fire. Note that the emitted interfaces DO both normalize to a8:bb:cc:dd:ee:01 -- that is correct for matching on the wire and is exactly why the id must not be built the same way. no_mac_in_id is skipped because the MAC-derived id is the deliberate design; the id is paired with no-id-match no-id-break so it never drives a merge on its own.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "include_sessions": "false",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 28800}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 4101,
+                  "mac_address": "AA:BB:CC:DD:EE:01",
+                  "status": "Known",
+                  "randomized_mac": true,
+                  "added_at": "2026-07-01 08:00:00",
+                  "updated_at": "2026-08-10 08:00:00",
+                  "profile": {"ipv4_address": "10.31.0.21", "host_name": "laptop-a", "last_profiled_at": "2026-08-10 07:59:00"}
+                },
+                {
+                  "id": 4102,
+                  "mac_address": "A8:BB:CC:DD:EE:01",
+                  "status": "Known",
+                  "randomized_mac": false,
+                  "added_at": "2026-07-02 08:00:00",
+                  "updated_at": "2026-08-11 08:00:00",
+                  "profile": {"ipv4_address": "10.31.0.22", "host_name": "laptop-b", "last_profiled_at": "2026-08-11 07:59:00"}
+                }
+              ]
+            },
+            "_links": {"self": {"href": "/api/endpoint?offset=0"}}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "aruba-clearpass:127.0.0.1:aa:bb:cc:dd:ee:01",
+      "aruba-clearpass:127.0.0.1:a8:bb:cc:dd:ee:01"
+    ],
+    "request_count": 2
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

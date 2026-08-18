@@ -1,0 +1,104 @@
+# A real Netdisco 2.10 -- its own PostgreSQL, its own backend, and the Dancer2
+# web application that serves the /api/v1 routes this integration calls.
+#
+# All three tags come from the vendor's own release and are pinned together.
+# Netdisco ships the three as a matched set and its schema is versioned with the
+# code: netdisco-deploy refuses to run a web tier against a database deployed by
+# a different release, so mixing tags would fail at boot rather than subtly.
+services:
+  postgresql:
+    image: netdisco/netdisco:2.103000-postgresql
+    environment:
+      # This image wraps the stock postgres entrypoint in one of its own that
+      # exists to migrate data across major versions. It runs under `set -u` and
+      # compares PG_MAJOR against NETDISCO_CURRENT_PG_VERSION, so leaving the
+      # variable unset aborts the container before postgres ever starts. Setting
+      # it equal to the image's own PG_MAJOR takes the "already current" fast
+      # path, which is the only correct answer for a database created fresh.
+      NETDISCO_CURRENT_PG_VERSION: "18"
+      # POSTGRES_USER is deliberately NOT set. The image ships its own
+      # /docker-entrypoint-initdb.d/netdisco-initdb.sh which connects as the
+      # superuser `postgres` and creates the netdisco role and database itself
+      # from the three variables below. Renaming the superuser makes that script
+      # abort with `role "postgres" does not exist` before the database exists at
+      # all -- so the netdisco role's credentials belong here, and the
+      # superuser's stay at the image's defaults.
+      NETDISCO_DB_NAME: netdisco
+      NETDISCO_DB_USER: netdisco
+      NETDISCO_DB_PASS: netdisco
+    healthcheck:
+      # -h forces a TCP check. During initdb the server accepts only unix-socket
+      # connections, so a socket check would report ready while the netdisco role
+      # and database still did not exist.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U netdisco -d netdisco"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # One-shot. Netdisco's supported installer, netdisco-deploy, is a Term::ReadLine
+  # script that asks four questions and defaults every one of them to "no", so it
+  # cannot be driven from a test. These are the two things it does that the stack
+  # cannot start without, run directly:
+  #
+  #   netdisco-db-deploy  creates the schema. Without it the web tier logs "Your
+  #                       DB is currently unversioned" and every query fails.
+  #   the sessions row    is where the web tier reads its Dancer cookie key from
+  #                       (App::Netdisco::Web reads id='dancer_session_cookie_key'
+  #                       out of the database at startup). Without it the web
+  #                       process aborts at compile time with "The setting
+  #                       session_cookie_key must be defined" and restarts
+  #                       forever -- so this has to complete BEFORE web starts,
+  #                       which is what service_completed_successfully buys.
+  #
+  # The SQL is exactly what netdisco-deploy itself issues, md5(random()::text)
+  # included.
+  deploy:
+    image: netdisco/netdisco:2.103000-backend
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        netdisco-db-deploy &&
+        PGPASSWORD=netdisco psql -h postgresql -U netdisco -d netdisco -v ON_ERROR_STOP=1 -c
+        "insert into sessions (id, a_session) values ('dancer_session_cookie_key', md5(random()::text)) on conflict (id) do nothing"
+    environment:
+      NETDISCO_DB_HOST: postgresql
+      NETDISCO_DB_NAME: netdisco
+      NETDISCO_DB_USER: netdisco
+      NETDISCO_DB_PASS: netdisco
+      NETDISCO_DOMAIN: lab.example.com
+    restart: "no"
+
+  backend:
+    image: netdisco/netdisco:2.103000-backend
+    depends_on:
+      deploy:
+        condition: service_completed_successfully
+    environment:
+      NETDISCO_DB_HOST: postgresql
+      NETDISCO_DB_NAME: netdisco
+      NETDISCO_DB_USER: netdisco
+      NETDISCO_DB_PASS: netdisco
+      NETDISCO_DOMAIN: lab.example.com
+      # The backend is here because it is what deploys the schema; nothing in
+      # this test wants it polling. Left to itself it would start discover,
+      # macsuck, arpnip and expiry jobs on a timer against an estate that does
+      # not exist, burning CPU for the whole run and writing rows underneath the
+      # assertions.
+      NETDISCO_NO_SCHEDULER: "1"
+
+  web:
+    image: netdisco/netdisco:2.103000-web
+    depends_on:
+      deploy:
+        condition: service_completed_successfully
+    environment:
+      NETDISCO_DB_HOST: postgresql
+      NETDISCO_DB_NAME: netdisco
+      NETDISCO_DB_USER: netdisco
+      NETDISCO_DB_PASS: netdisco
+      NETDISCO_DOMAIN: lab.example.com
+    ports:
+      - "${RZ_HOST_PORT}:5000"

@@ -1,0 +1,242 @@
+{
+  "name": "happy",
+  "integration": "extreme-cloud-iq",
+  "description": "A full run: username/password login for a bearer token, then one page of the device inventory. The point of this scenario is the device_function -> deviceType mapping, which used to be handed to ImportAsset raw.\n\nEvery value asserted here comes from XiqDeviceFunction in Extreme's published OpenAPI specification. AP becomes WAP, the three switch variants become Switch, and the three router variants become Router -- all of them values runZero accepts, so the console keeps them instead of discarding a near-miss spelling. The last two devices are the contrast that makes the assertion mean something: L3_VPN_GATEWAY names a role without naming a chassis, and a device reporting no device_function at all names nothing, so both must emit NO deviceType. Before this mapping existed the script sent device_function through verbatim and sent a literal empty string for the device with none -- and an empty deviceType is still a value, one that displaces the type runZero fingerprints for itself.\n\nnamespaced_ids is skipped because this integration emits the bare CloudIQ device id with no tenant scope. Two CloudIQ tenants imported into one runZero account collide on any shared id. Reported here rather than fixed, because changing it would move every existing asset's identity.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-xiq-token",
+            "token_type": "Bearer",
+            "expires_in": 86400
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "page=1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "count": 8,
+            "total_count": 8,
+            "total_pages": 1,
+            "data": [
+              {
+                "id": 500000000000001,
+                "hostname": "syn-ap-01",
+                "device_function": "AP",
+                "product_type": "AP305C",
+                "mac_address": "00:11:22:AA:10:01",
+                "ip_address": "10.60.1.11",
+                "serial_number": "SYNXIQAP001",
+                "software_version": "10.6r7",
+                "device_admin_state": "MANAGED",
+                "connected": true
+              },
+              {
+                "id": 500000000000002,
+                "hostname": "syn-sw-01",
+                "device_function": "SWITCH",
+                "product_type": "X440-G2",
+                "mac_address": "00:11:22:AA:10:02",
+                "ip_address": "10.60.1.12",
+                "ipv6_address": "2001:db8:60::12",
+                "serial_number": "SYNXIQSW001",
+                "device_admin_state": "MANAGED",
+                "connected": true
+              },
+              {
+                "id": 500000000000003,
+                "hostname": "syn-sw-hac-01",
+                "device_function": "SWITCH_HAC",
+                "product_type": "5320-48P",
+                "mac_address": "00:11:22:AA:10:03",
+                "ip_address": "10.60.1.13",
+                "serial_number": "SYNXIQSW002",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "id": 500000000000004,
+                "hostname": "syn-sw-dell-01",
+                "device_function": "SWITCH_DELL",
+                "product_type": "N3248",
+                "mac_address": "00:11:22:AA:10:04",
+                "ip_address": "10.60.1.14",
+                "serial_number": "SYNXIQSW003",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "id": 500000000000005,
+                "hostname": "syn-rtr-01",
+                "device_function": "ROUTER",
+                "product_type": "BR200",
+                "mac_address": "00:11:22:AA:10:05",
+                "ip_address": "10.60.1.15",
+                "serial_number": "SYNXIQRT001",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "id": 500000000000006,
+                "hostname": "syn-rtr-vpn-01",
+                "device_function": "ROUTER_AS_L3_VPN_GATEWAY",
+                "product_type": "BR200",
+                "mac_address": "00:11:22:AA:10:06",
+                "ip_address": "10.60.1.16",
+                "serial_number": "SYNXIQRT002",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "id": 500000000000007,
+                "hostname": "syn-vpn-gw-01",
+                "device_function": "L3_VPN_GATEWAY",
+                "product_type": "VG200",
+                "mac_address": "00:11:22:AA:10:07",
+                "ip_address": "10.60.1.17",
+                "serial_number": "SYNXIQGW001",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "id": 500000000000008,
+                "hostname": "syn-unclassified-01",
+                "product_type": "AP305C",
+                "mac_address": "00:11:22:AA:10:08",
+                "ip_address": "10.60.1.18",
+                "serial_number": "SYNXIQAP002",
+                "device_admin_state": "MANAGED"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-drained",
+      "match": {
+        "method": "GET",
+        "path": "/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 2,
+            "count": 0,
+            "total_count": 8,
+            "total_pages": 1,
+            "data": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 8,
+    "ids": [
+      "500000000000001",
+      "500000000000002",
+      "500000000000003",
+      "500000000000004",
+      "500000000000005",
+      "500000000000006",
+      "500000000000007",
+      "500000000000008"
+    ],
+    "assets": [
+      {
+        "id": "500000000000001",
+        "fields": {
+          "hostnames": "syn-ap-01",
+          "deviceType": "WAP"
+        }
+      },
+      {
+        "id": "500000000000002",
+        "fields": {
+          "deviceType": "Switch",
+          "ipAddresses": "10.60.1.12\t2001:db8:60::12"
+        }
+      },
+      {
+        "id": "500000000000003",
+        "fields": {
+          "deviceType": "Switch"
+        }
+      },
+      {
+        "id": "500000000000004",
+        "fields": {
+          "deviceType": "Switch"
+        }
+      },
+      {
+        "id": "500000000000005",
+        "fields": {
+          "deviceType": "Router"
+        }
+      },
+      {
+        "id": "500000000000006",
+        "fields": {
+          "deviceType": "Router"
+        }
+      },
+      {
+        "id": "500000000000007",
+        "fields_absent": [
+          "deviceType"
+        ]
+      },
+      {
+        "id": "500000000000008",
+        "fields_absent": [
+          "deviceType"
+        ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/login",
+        "body_contains": "fixture-user"
+      },
+      {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "view=full",
+        "header_contains": "fixture-xiq-token"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

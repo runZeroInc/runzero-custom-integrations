@@ -1,0 +1,76 @@
+{
+  "name": "malformed",
+  "integration": "zabbix",
+  "description": "Junk in the host.get result must be skipped without losing the run. The array holds a string element, a host with a null hostid, a host whose interfaces field is an object instead of an array, a host whose inventory is a STRING rather than the documented object-or-empty-array, a host whose macaddress_a is a serial number and whose macaddress_b is a bare 12-hex string that IS valid, a host whose only interface address is 127.0.0.1, and a host whose only interface address is an APIPA 169.254 address. The last two matter most: the platform silently discards loopback before it reaches an asset, so a loopback-only host imports with no address at all rather than with a matchable one; and the platform deliberately KEEPS link-local, so an integration that does not filter APIPA itself would correlate every DHCP-failed host onto one asset. Both are dropped here, which is why the surviving host carries no ipAddresses.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-api-token",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "apiinfo",
+      "match": {"method": "POST", "body_contains": "apiinfo.version"},
+      "responses": [{"status": 200, "json": {"jsonrpc": "2.0", "result": "not.a.version", "id": 1}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostgroup-get",
+      "match": {"method": "POST", "body_contains": "hostgroup.get"},
+      "responses": [
+        {"status": 200, "json": {"jsonrpc": "2.0", "result": [{"groupid": "7", "name": "Odd hosts"}, {"groupid": null, "name": "broken"}, "a string"], "id": 2}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-get",
+      "match": {"method": "POST", "body_contains": "host.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "result": [
+              "this row is a string",
+              {"hostid": null, "host": "ghost", "name": "ghost", "status": "0", "inventory": [], "tags": [], "interfaces": []},
+              {"hostid": "401", "host": "odd-shape", "name": "odd-shape", "status": "0", "flags": "0", "interfaces": {"not": "a list"}, "inventory": "not an object", "tags": "not a list", "hostgroups": {"not": "a list"}},
+              {"hostid": "402", "host": "loopback-only", "name": "loopback-only", "status": "0", "flags": "0", "inventory": {"macaddress_a": "CZJ1234ABC", "macaddress_b": "005056aabb01", "os": "Linux"}, "tags": [], "hostgroups": [], "interfaces": [{"interfaceid": "20", "ip": "127.0.0.1", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "1", "error": ""}]},
+              {"hostid": "403", "host": "apipa-only", "name": "apipa-only", "status": "0", "flags": "0", "inventory": [], "tags": [], "hostgroups": [], "interfaces": [{"interfaceid": "21", "ip": "169.254.11.22", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "0", "error": ""}]}
+            ],
+            "id": 3
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": ["zabbix:$HOST:401", "zabbix:$HOST:402", "zabbix:$HOST:403"],
+    "assets": [
+      {
+        "id": "zabbix:$HOST:401",
+        "fields": {"zabbix_inventory_present": "false"},
+        "fields_absent": ["ipAddresses", "macAddresses", "os"]
+      },
+      {
+        "id": "zabbix:$HOST:402",
+        "fields": {
+          "os": "Linux",
+          "macAddresses": "00:50:56:aa:bb:01"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "zabbix:$HOST:403",
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "log_contains": [
+      "zabbix: skipped 1 hosts with no hostid",
+      "reported 3 hosts"
+    ]
+  },
+  "check_determinism": true
+}

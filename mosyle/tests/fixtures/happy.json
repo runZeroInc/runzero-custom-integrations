@@ -1,0 +1,230 @@
+{
+  "name": "happy",
+  "integration": "mosyle",
+  "description": "JWT login followed by a listdevices walk over all four platform families. Proves the bearer token is lifted out of the login response's Authorization header and sent on every later call, that each of ios/mac/tvos/visionos is asked for separately, and -- the regression this file exists for -- that a device's IP and MAC land on the right fields of the interface. The wifi and ethernet network_interface calls had their ips= and mac= arguments transposed, so every Mosyle device imported with an unusable interface; the macAddresses/ipAddresses assertions below fail if that is reintroduced. Also covers the space-to-dash hostname rewrite, the deviceudid-over-serial id preference, and tag parsing from both the tags string and asset_tag.\n\nnamespaced_ids is skipped: the id is the bare Mosyle deviceudid with no tenant scope, so two Mosyle tenants imported into one runZero account collide. Reported, not fixed here.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-access-token",
+    "email": "fixture@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Authorization": "Bearer fixture-jwt-token"
+          },
+          "json": {
+            "status": "OK"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-ios-page-0",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"ios\"",
+        "query_contains": ""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-IOS-0001",
+                  "serial_number": "FIXSER0001",
+                  "device_name": "fixture ipad one",
+                  "os": "iOS",
+                  "osversion": "17.5.1",
+                  "device_model_name": "iPad Air (5th generation)",
+                  "wifi_mac_address": "00:11:22:aa:01:01",
+                  "last_ip_beat": "10.60.0.11",
+                  "tags": "field-ops, kiosk",
+                  "asset_tag": "AT-0001",
+                  "enrollment": {
+                    "type": "dep",
+                    "profile": "fixture-profile"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-mac-page-0",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"mac\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-MAC-0002",
+                  "serial_number": "FIXSER0002",
+                  "device_name": "fixture macbook two",
+                  "LocalHostName": "fixture-macbook-two",
+                  "os": "macOS",
+                  "osversion": "14.6",
+                  "device_model_name": "MacBook Pro (14-inch, M3)",
+                  "wifi_mac_address": "00:11:22:aa:02:01",
+                  "last_ip_beat": "10.60.0.21",
+                  "ethernet_mac_address": "00:11:22:aa:02:02",
+                  "last_lan_ip": "10.60.0.22",
+                  "asset_tag": "AT-0002"
+                },
+                {
+                  "serial_number": "FIXSER0003",
+                  "device_name": "fixture mac mini three",
+                  "os": "macOS",
+                  "osversion": "13.6.7",
+                  "ethernet_mac_address": "00:11:22:aa:03:02",
+                  "last_lan_ip": "10.60.0.32"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-drained",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "FIXTURE-UDID-IOS-0001",
+        "fields": {
+          "hostnames": "fixture-ipad-one",
+          "os": "iOS",
+          "osVersion": "17.5.1",
+          "model": "iPad Air (5th generation)",
+          "macAddresses": "00:11:22:aa:01:01",
+          "ipAddresses": "10.60.0.11",
+          "tags": "AT-0001\tfield-ops\tkiosk",
+          "enrollment_type": "dep",
+          "deviceType": "Tablet"
+        }
+      },
+      {
+        "id": "FIXTURE-UDID-MAC-0002",
+        "fields": {
+          "hostnames": "fixture-macbook-two",
+          "os": "macOS",
+          "macAddresses": "00:11:22:aa:02:01\t00:11:22:aa:02:02",
+          "ipAddresses": "10.60.0.21\t10.60.0.22",
+          "tags": "AT-0002",
+          "model": "MacBook Pro (14-inch, M3)",
+          "deviceType": "Laptop"
+        }
+      },
+      {
+        "id": "FIXSER0003",
+        "fields": {
+          "hostnames": "fixture-mac-mini-three",
+          "macAddresses": "00:11:22:aa:03:02",
+          "ipAddresses": "10.60.0.32"
+        },
+        "fields_absent": [
+          "deviceType"
+        ]
+      }
+    ],
+    "min_requests": 6,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/login",
+        "body_contains": "fixture-access-token"
+      },
+      {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"ios\"",
+        "header_contains": "Bearer fixture-jwt-token"
+      },
+      {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"mac\""
+      },
+      {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"tvos\""
+      },
+      {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"visionos\""
+      }
+    ],
+    "log_contains": [
+      "Login succeeded with bearer token"
+    ],
+    "request_count": 7
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

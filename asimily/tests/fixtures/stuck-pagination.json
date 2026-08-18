@@ -1,0 +1,115 @@
+{
+  "integration": "asimily",
+  "default_response": {
+    "status": 400,
+    "json": {
+      "error": "missing or malformed source header"
+    }
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false,
+  "name": "stuck-pagination",
+  "description": "An Asimily portal that ignores `page` and answers every asset read with the same rows while still reporting a large totalPages. The walk's own exits are an empty page and `page + 1 >= totalPages`, and this shape produces neither: before the repeated-page check it re-imported page one until the 50,000-page ceiling, which at a ten-million-record target is not a guard at all.\n\nThe repeated-page check settles it in two requests. It fingerprints a page by its length and the device ids at either end -- read through _device_key, because the asset payload spells the field deviceID and the CVE payload deviceId, and a fingerprint that read neither would make every full page look identical and truncate a healthy walk on page two.\n\nThe page=2 route is a regression terminator: without it a walk that lost the check would run to the ceiling and fail this scenario by TIMING OUT rather than by failing an assertion.\n\ntotalElements is far larger than what is served, so log_contains pins the retrieved-versus-available half of the message as well as the reason. include_vulnerabilities is off so the asset walk is the only thing under test.\n\nids are unasserted and check_determinism is off for the reason recorded in paged: the id is scoped by the portal host, which under the fixture server is 127.0.0.1:<ephemeral port>.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "include_vulnerabilities": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "assets-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/api/extapi/assets",
+        "header": {
+          "source": "runzero"
+        },
+        "query_contains": "page=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 100,
+            "totalElements": 640000,
+            "content": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/api/extapi/assets",
+        "header": {
+          "source": "runzero"
+        }
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 100,
+            "totalElements": 640000,
+            "content": [
+              {
+                "deviceID": 71001,
+                "hostName": "cap-01",
+                "macAddr": "00:1B:44:71:00:01",
+                "v4IpAddrs": [
+                  "10.71.1.1"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              },
+              {
+                "deviceID": 71002,
+                "hostName": "cap-02",
+                "macAddr": "00:1B:44:71:00:02",
+                "v4IpAddrs": [
+                  "10.71.1.2"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/extapi/assets",
+        "query_contains": "page=0"
+      },
+      {
+        "method": "GET",
+        "path": "/api/extapi/assets",
+        "query_contains": "page=1"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/api/extapi/assets",
+        "query_contains": "page=2"
+      }
+    ],
+    "log_contains": [
+      "asimily: paging stopped after 2 pages (API returned the same page twice walking devices, retrieved 2/640000 available assets)"
+    ]
+  }
+}

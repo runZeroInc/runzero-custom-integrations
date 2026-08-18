@@ -56,7 +56,7 @@ asset_id = "vendor:{}:{}".format(account_id, source_id)
 If network identifiers are expected to change independently of that ID:
 
 ```python
-matchBehavior = "no-mac-break no-ip-break no-name-break"
+"matchBehavior": "no-mac-break no-ip-break no-name-break",
 ```
 
 This keeps the authoritative ID as the matching signal while preventing normal
@@ -70,7 +70,7 @@ Namespace and delimit each component. Do not hash ambiguous concatenated values.
 If uniqueness is not guaranteed, the ID must not drive or block matching:
 
 ```python
-matchBehavior = "no-id-match no-id-break"
+"matchBehavior": "no-id-match no-id-break",
 ```
 
 In that case each record must still contain a usable MAC, IP, or hostname. If it

@@ -1,0 +1,105 @@
+{
+  "name": "stuck-cursor",
+  "integration": "ivanti_neurons",
+  "script": "ivanti_neurons/ivanti_neurons.star",
+  "description": "A landscape that answers a next link with a page carrying that same next link -- the scroll is not advancing. Following it again can only produce the same page a third time, so the walk has to notice the repeat and stop; without that it spends the whole page ceiling re-fetching one page and then reports a truncation that is really a stuck cursor.\n\nrequest_count is exact at 3: the token, page one, and the one re-fetch of the repeated link that reveals the repeat. A walk that does not notice issues more; one that stops too early issues fewer.\n\nThe third scripted response ends the scroll and is never reached while the check holds. It exists ONLY as a terminator, so a regression fails on the request count in one extra request rather than by looping to the page ceiling and timing out.\n\nThe repeated page carries a record with neither DiscoveryId nor DeviceID so the ids stay unique -- the point here is the request sequence, not the second page's contents.\n\nnamespaced_ids is skipped for the reason recorded in paged: the id is the bare Ivanti DiscoveryId with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "tenant_id": "fixture-tenant",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {
+        "method": "GET",
+        "path": "/api/apigatewaydataservices/v1/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-jwt-token"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-scroll",
+      "match": {
+        "method": "GET",
+        "path": "/api/apigatewaydataservices/v1/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "value": [
+              {
+                "DiscoveryId": "22220000-4a11-4c31-9c31-1a2b3c4d5e99",
+                "DeviceID": "device-ceiling-0001",
+                "DeviceName": "neurons-ceiling-01.example.com",
+                "DisplayName": "Neurons Ceiling 01",
+                "OS": {
+                  "Name": "Windows Server 2022",
+                  "Version": "10.0.20348"
+                },
+                "System": {
+                  "Model": "PowerEdge R650"
+                },
+                "Network": {
+                  "TCPIP": {
+                    "IPAddress": "192.0.2.99"
+                  }
+                }
+              }
+            ],
+            "@odata.nextLink": "$BASE/api/apigatewaydataservices/v1/devices?$scrollID=stuck"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "value": [
+              {
+                "DeviceName": "neurons-stuck-page-no-id.example.com"
+              }
+            ],
+            "@odata.nextLink": "$BASE/api/apigatewaydataservices/v1/devices?$scrollID=stuck"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "value": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "22220000-4a11-4c31-9c31-1a2b3c4d5e99"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/apigatewaydataservices/v1/devices",
+        "query_contains": "scrollID=stuck"
+      }
+    ],
+    "log_contains": [
+      "ivanti-neurons: the scroll returned a next link it had already served"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

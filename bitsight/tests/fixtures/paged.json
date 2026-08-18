@@ -1,0 +1,232 @@
+{
+  "name": "paged",
+  "integration": "bitsight",
+  "description": "REGRESSION LOCK on both cursor walks. Bitsight's links.next is an absolute URL carrying its own limit and offset, and the HTTP helper REPLACES a URL's query string with params= rather than merging into it -- so re-sending the filter on the cursor threw the offset away and asked for page one again. get_assets did that with is_ip=true and get_findings with assets.asset=<address>.\n\nThe assets walk is what shows the re-fetch: page one is served by a route with when_exhausted=repeat_last, so a cursor request that has lost its offset lands back on page one and returns the same two assets a second time. Only a request that actually carries offset=2 can produce 198.51.100.12 and 198.51.100.13, which is why they are asserted by id. The findings walk behind 198.51.100.10 is the same shape one level down, and min_vulnerabilities_total=2 is reachable only if its second page arrives too.\n\nrequest_count is exact at 7 -- two asset pages, two finding pages for .10, and one empty finding page for each of the other three assets. That is the assertion that no request repeats: a walk that re-fetches page one issues more than seven, and one that stops early issues fewer.\n\nThe second asset page still carries a next link even though its count is already satisfied -- a paginator that does not know it is on the last page. The walk has to stop on the count there rather than follow the cursor past the end, which is what requests_absent on offset=4 pins. The route behind offset=4 exists only so a regression fails on the request count in one extra request rather than by looping to MAX_PAGES.\n\nnamespaced_ids is skipped: the id is bitsight:<asset_type>:<asset_name> with no company_id scope, the defect the happy scenario records. no_placeholder_hostnames is skipped: a Bitsight asset IS an internet-facing address, so the address is legitimately the name.",
+  "kwargs": {
+    "url": "$BASE",
+    "company_id": "co-fixture",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "assets-past-the-end",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/assets",
+        "query_contains": "offset=4"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 4,
+            "links": {"next": null, "previous": null},
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-page-2",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/assets",
+        "query_contains": "offset=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 4,
+            "links": {
+              "next": "$BASE/ratings/v1/companies/co-fixture/assets?is_ip=true&limit=2&offset=4",
+              "previous": null
+            },
+            "results": [
+              {
+                "asset": "198.51.100.12",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "medium",
+                "country": "Germany",
+                "country_code": "DE"
+              },
+              {
+                "asset": "198.51.100.13",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "low",
+                "country": "Germany",
+                "country_code": "DE"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 4,
+            "links": {
+              "next": "$BASE/ratings/v1/companies/co-fixture/assets?is_ip=true&limit=2&offset=2",
+              "previous": null
+            },
+            "results": [
+              {
+                "asset": "198.51.100.10",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "high",
+                "country": "United States",
+                "country_code": "US"
+              },
+              {
+                "asset": "198.51.100.11",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "low",
+                "country": "United States",
+                "country_code": "US"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "findings-10-page-2",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/findings",
+        "query_contains": "offset=1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "links": {"next": null, "previous": null},
+            "results": [
+              {
+                "risk_vector_label": "Open Ports",
+                "risk_category": "Diligence",
+                "severity": 4.5,
+                "severity_category": "moderate",
+                "first_seen": "2026-02-10",
+                "last_seen": "2026-03-01",
+                "details": {
+                  "dest_port": 22,
+                  "observed_ips": ["198.51.100.10:22"],
+                  "diligence_annotations": {
+                    "message": "SYN-FINDING-OPEN-PORT",
+                    "Title": "Synthetic open port finding on the second page",
+                    "transport": "tcp"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "findings-10-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/findings",
+        "query_contains": "198.51.100.10"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "links": {
+              "next": "$BASE/ratings/v1/companies/co-fixture/findings?assets.asset=198.51.100.10&limit=1&offset=1",
+              "previous": null
+            },
+            "results": [
+              {
+                "risk_vector_label": "Patching Cadence",
+                "risk_category": "Diligence",
+                "severity": 7.0,
+                "severity_category": "material",
+                "first_seen": "2026-01-05",
+                "last_seen": "2026-02-05",
+                "details": {
+                  "dest_port": 443,
+                  "observed_ips": ["198.51.100.10:443"],
+                  "diligence_annotations": {
+                    "message": "SYN-FINDING-PATCHING",
+                    "Title": "Synthetic patching finding on the first page",
+                    "transport": "tcp"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "findings-none",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 0,
+            "links": {"next": null, "previous": null},
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "bitsight:ip:198.51.100.10",
+      "bitsight:ip:198.51.100.11",
+      "bitsight:ip:198.51.100.12",
+      "bitsight:ip:198.51.100.13"
+    ],
+    "assets": [
+      {"id": "bitsight:ip:198.51.100.12", "fields": {"country": "Germany", "countryCode": "DE"}}
+    ],
+    "min_vulnerabilities_total": 2,
+    "request_count": 7,
+    "requests_include": [
+      {"method": "GET", "path": "/ratings/v1/companies/co-fixture/assets", "query_contains": "is_ip=true"},
+      {"method": "GET", "path": "/ratings/v1/companies/co-fixture/assets", "query_contains": "offset=2"},
+      {"method": "GET", "path": "/ratings/v1/companies/co-fixture/findings", "query_contains": "offset=1"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=4"}
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids",
+      "no_placeholder_hostnames"
+    ]
+  }
+}

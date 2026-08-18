@@ -1,0 +1,208 @@
+{
+  "name": "chr-no-serial",
+  "integration": "mikrotik-routeros",
+  "description": "A Cloud Hosted Router. CHR and x86 builds have NO /system/routerboard menu at all - it is not empty, it does not report routerboard=false, the menu simply does not exist and RouterOS answers with 'no such command or directory'. That removes the serial number, which is the only globally unique identifier a MikroTik exposes. This scenario pins the resulting identity fork: with no serial the router id falls back to the configured host and the match behavior flips to no-id-match no-id-break, because a host-derived id is an ADDRESS and addresses are recycled. It also proves the legacy wireless path: this router has /interface/wireless rather than /interface/wifi, whose registration table names its signal field signal-strength and carries NO ssid at all, so the SSID has to be joined from /interface/wireless on the interface name - and that join is only fetched because the legacy table returned rows. no_mac_in_id is skipped for the usual reason.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-runzero",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "system-resource",
+      "match": {"method": "GET", "path": "/rest/system/resource"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "architecture-name": "x86_64",
+              "board-name": "CHR",
+              "build-time": "2025-06-18 11:02:00",
+              "cpu": "QEMU Virtual CPU version 2.5+",
+              "cpu-count": "2",
+              "cpu-frequency": "2394",
+              "cpu-load": "1",
+              "free-memory": "201326592",
+              "platform": "MikroTik",
+              "total-memory": "268435456",
+              "uptime": "3d4h9m",
+              "version": "7.12.1 (stable)"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-identity",
+      "match": {"method": "GET", "path": "/rest/system/identity"},
+      "responses": [{"status": 200, "json": [{"name": "chr-edge01"}]}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "routerboard-absent",
+      "match": {"method": "GET", "path": "/rest/system/routerboard"},
+      "responses": [
+        {"status": 406, "json": {"error": 406, "message": "Not Acceptable", "detail": "no such command or directory (routerboard)"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interfaces",
+      "match": {"method": "GET", "path": "/rest/interface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "name": "ether1", "type": "ether", "mac-address": "DC:2C:6E:00:11:22", "running": "true", "disabled": "false"},
+            {".id": "*2", "name": "wlan1", "type": "wlan", "mac-address": "DC:2C:6E:00:11:23", "running": "true", "disabled": "false"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-address",
+      "match": {"method": "GET", "path": "/rest/ip/address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "address": "10.20.30.1/24", "actual-interface": "ether1", "interface": "ether1", "disabled": "false", "dynamic": "false", "invalid": "false"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-arp",
+      "match": {"method": "GET", "path": "/rest/ip/arp"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases-none-configured",
+      "match": {"method": "GET", "path": "/rest/ip/dhcp-server/lease"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-neighbor",
+      "match": {"method": "GET", "path": "/rest/ip/neighbor"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "wifi-absent",
+      "match": {"method": "GET", "path": "/rest/interface/wifi/registration-table"},
+      "responses": [
+        {"status": 406, "json": {"error": 406, "message": "Not Acceptable", "detail": "no such command or directory (wifi)"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "legacy-wireless-registration-table",
+      "match": {"method": "GET", "path": "/rest/interface/wireless/registration-table"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              ".id": "*1",
+              "ap": "false",
+              "bytes": "44821,10221",
+              "interface": "wlan1",
+              "last-activity": "3s",
+              "mac-address": "A4:83:E7:55:66:77",
+              "radio-name": "8C59C3AABBCC",
+              "routeros-version": "6.49.10",
+              "rx-rate": "65Mbps",
+              "signal-strength": "-62@1Mbps",
+              "signal-to-noise": "33",
+              "tx-rate": "65Mbps",
+              "uptime": "1w2d5h1m9s",
+              "wds": "false"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "legacy-wireless-interfaces",
+      "match": {"method": "GET", "path": "/rest/interface/wireless"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "name": "wlan1", "ssid": "field-link", "band": "2ghz-b/g/n", "mode": "ap-bridge", "disabled": "false"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "capsman-absent",
+      "match": {"method": "GET", "path": "/rest/caps-man/registration-table"},
+      "responses": [
+        {"status": 406, "json": {"error": 406, "message": "Not Acceptable", "detail": "no such command or directory (caps-man)"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {"error": 404, "message": "Not Found"}
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "mikrotik:$HOST:router",
+      "mikrotik:$HOST:host:a4:83:e7:55:66:77"
+    ],
+    "ids_absent": [
+      "mikrotik:routerboard:HGT08ABCDEF"
+    ],
+    "assets": [
+      {
+        "id": "mikrotik:$HOST:router",
+        "fields": {
+          "_attrType": "router-unkeyed",
+          "deviceType": "Router",
+          "manufacturer": "MikroTik",
+          "os": "RouterOS",
+          "osVersion": "7.12.1 (stable)",
+          "model": "CHR",
+          "hostnames": "chr-edge01",
+          "ipAddresses": "10.20.30.1"
+        },
+        "fields_absent": ["mikrotik_serial_number"]
+      },
+      {
+        "id": "mikrotik:$HOST:host:a4:83:e7:55:66:77",
+        "fields": {
+          "_attrType": "host",
+          "mikrotik_wifi_flavor": "wireless",
+          "mikrotik_wifi_ssid": "field-link",
+          "mikrotik_wifi_signal_dbm": "-62@1Mbps",
+          "mikrotik_wifi_interface": "wlan1",
+          "mikrotik_observed_by": "wireless"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/rest/interface/wireless/registration-table"},
+      {"method": "GET", "path_contains": "/rest/interface/wireless"}
+    ],
+    "log_contains": [
+      "no RouterBOARD serial is available",
+      "1 of 3 wireless registration tables were present and contributed 1 stations",
+      "reported 1 router and 1 observed devices"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,36 @@
+{
+  "name": "auth-failure",
+  "integration": "greenbone",
+  "script": "greenbone/greenbone.star",
+  "description": "Rejected GMP credentials must end the run cleanly rather than aborting or importing a partial estate. The response is the byte-for-byte reply a live gvmd 25.2.1 (GMP 22.6) gives to a bad <authenticate>: a self-closing authenticate_response with status 400. gvmd notably does NOT hang up after a failed authenticate -- the connection stays usable -- so the fixture leaves it open too, and the script is expected to stop on its own rather than because the socket died under it. Exactly one GMP command must be sent: the importer must not go on to get_tasks after being refused.",
+  "kwargs": {
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "fixture-user",
+    "gmp_password": "fixture-password",
+    "tls_disable_validation": "true"
+  },
+  "gmp": {
+    "routes": [
+      {
+        "name": "authenticate-rejected",
+        "match": {"command": "authenticate"},
+        "responses": [
+          {"xml": "<authenticate_response status=\"400\" status_text=\"Authentication failed\"/>"}
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GMP", "path": "authenticate"}
+    ],
+    "requests_absent": [
+      {"path": "get_tasks"}
+    ],
+    "log_contains": ["GMP authentication failed (status 400)"]
+  }
+}

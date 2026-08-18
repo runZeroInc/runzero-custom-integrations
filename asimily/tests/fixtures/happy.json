@@ -1,0 +1,150 @@
+{
+  "name": "happy",
+  "integration": "asimily",
+  "description": "Proves the deviceID/deviceId casing join. Asimily spells the key deviceID on /assets and deviceId on /assets/device-cves, so _device_key normalizes both; this scenario feeds each endpoint its own spelling and asserts the CVEs land on the matching asset. Also covers a device whose only address is loopback (no interface survives), and the fixed/not-fixed sentinel filter. check_determinism is off and `ids` is unasserted for a harness reason, not a script one: the asset id is scoped by the portal host (`base_url.split(\"://\")[-1]`), which under the fixture server is 127.0.0.1:<ephemeral port>, so it necessarily differs between two runs. The id is stable in production, where the portal URL does not move.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "include_vulnerabilities": "true",
+    "include_software": "false",
+    "page_size": "200"
+  },
+  "default_response": {"status": 400, "json": {"error": "missing or malformed source header"}},
+  "routes": [
+    {
+      "name": "device-cves",
+      "match": {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceId": 90001,
+                "cves": [
+                  {
+                    "cveName": "CVE-2025-60001",
+                    "cveTitle": "Remote code execution in pump firmware",
+                    "productName": "PumpOS",
+                    "productType": "firmware",
+                    "description": "A synthetic finding used only by the fixture suite.",
+                    "fixedBy": "Upgrade PumpOS to 4.2.1",
+                    "score": 9.4,
+                    "cvssBaseScore": 9.8,
+                    "isFixed": 56,
+                    "exploitableInWild": true,
+                    "nvdPublishDate": "2026-01-14T00:00:00Z",
+                    "openDate": "2026-02-01T00:00:00Z"
+                  },
+                  {
+                    "cveName": "CVE-2025-60002",
+                    "productName": "PumpOS",
+                    "score": 4.1,
+                    "cvssBaseScore": 5.5,
+                    "isFixed": 56,
+                    "exploitableInWild": false
+                  }
+                ]
+              },
+              {
+                "deviceId": 90002,
+                "cves": [
+                  {
+                    "cveName": "CVE-2025-60003",
+                    "productName": "MonitorFW",
+                    "score": 2.0,
+                    "cvssBaseScore": 3.1,
+                    "isFixed": 56
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceID": 90001,
+                "hostName": "pump-ward3-01",
+                "macAddr": "00:1B:44:11:3A:B7",
+                "v4IpAddrs": ["10.90.3.11"],
+                "v6IpAddrs": [],
+                "deviceType": "Infusion Pump",
+                "deviceClass": "Medical",
+                "deviceFamilies": "Infusion",
+                "manufacturer": "Acme Medical",
+                "deviceModel": "PumpMaster 3000",
+                "os": "PumpOS",
+                "osVersion": "4.1.9",
+                "serialNumber": "PM3K-000123",
+                "facility": "North Clinic",
+                "department": "Ward 3",
+                "riskScore": 88,
+                "isConnected": true,
+                "lastDiscoveredAt": "2026-08-14T18:00:00Z"
+              },
+              {
+                "deviceID": 90002,
+                "hostName": "monitor-icu-04",
+                "macAddr": "00:1B:44:11:3A:C8",
+                "v4IpAddrs": ["10.90.4.22"],
+                "v6IpAddrs": ["2001:db8:90::22"],
+                "deviceType": "Patient Monitor",
+                "deviceClass": "Medical",
+                "manufacturer": "Beta Diagnostics",
+                "deviceModel": "VitalWatch 9",
+                "os": "MonitorFW",
+                "facility": "North Clinic",
+                "department": "ICU",
+                "lastDiscoveredAt": 1786550400
+              },
+              {
+                "deviceID": 90003,
+                "hostName": "kiosk-lobby-02",
+                "macAddr": "",
+                "v4IpAddrs": ["127.0.0.1"],
+                "deviceType": "Kiosk",
+                "deviceClass": "IT",
+                "manufacturer": "Gamma Controls",
+                "lastDiscoveredAt": "2026-08-13T09:30:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "min_requests": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/api/extapi/assets/device-cves", "query_contains": "sort=deviceInfoId"},
+      {"method": "POST", "path": "/api/extapi/assets/device-cves", "body_contains": "isFixed"},
+      {"method": "GET", "path": "/api/extapi/assets", "query_contains": "size=200"},
+      {"header_contains": "Basic"},
+      {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "runzero"}},
+      {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "runzero"}}
+    ],
+    "requests_absent": [
+      {"path": "/api/extapi/assets/application"}
+    ],
+    "log_contains": ["asimily: indexed 3 open CVEs across 2 devices"]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

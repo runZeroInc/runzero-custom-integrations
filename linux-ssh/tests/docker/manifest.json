@@ -1,0 +1,88 @@
+{
+  "name": "openssh",
+  "integration": "linux-ssh",
+  "description": "Collects host facts from a real OpenSSH server over a real SSH session -- publickey authentication, verified host key -- and asserts the single asset built from `hostname`, `/etc/os-release`, `uname -r` and `ip -o link show`.",
+  "compose": "compose.yml",
+  "service": "sshd",
+  "scheme": "tcp",
+  "_scheme_reason": "There is no HTTP here. `scheme` only builds the $BASE string, which this manifest never uses; the integration takes a host and a port as separate parameters, so kwargs use $HOST and ${seed.port}. Recorded as `tcp` so nothing reads the manifest and assumes a URL.",
+  "ready": [
+    {
+      "name": "sshd accepting connections",
+      "exec": [
+        "sh",
+        "-c",
+        "nc -z 127.0.0.1 2222 && echo rz-sshd-listening"
+      ],
+      "contains": "rz-sshd-listening",
+      "timeout": 180,
+      "interval": 2
+    },
+    {
+      "name": "account provisioned",
+      "exec": [
+        "sh",
+        "-c",
+        "id runzero >/dev/null && test -f /config/.ssh/authorized_keys && echo rz-account-ready"
+      ],
+      "contains": "rz-account-ready",
+      "timeout": 120,
+      "interval": 2
+    }
+  ],
+  "_ready_reason": "Two gates because readiness is layered here in a way a single check would miss. The image's s6 init creates the `runzero` account and its ~/.ssh in parallel with starting sshd, so the port can be open a moment before the account the seed script writes an authorized_keys for exists. Gating only on the port would make the seed fail intermittently on a loaded host, and the failure would point at the seed rather than at the race.",
+  "seed": "seed.py",
+  "seed_timeout": 180,
+  "kwargs": {
+    "host": "$HOST",
+    "port": "${seed.port}",
+    "username": "${seed.username}",
+    "private_key": "${seed.private_key}",
+    "host_key": "${seed.host_key}",
+    "timeout": "30"
+  },
+  "_kwargs_port_reason": "The harness allocates the published port at run time, and this integration takes host and port as separate parameters rather than a URL, so neither $BASE nor $BASE_HOST fits. The seed echoes RZ_HOST_PORT back as ${seed.port}, which is the documented way to get a run-time value into kwargs.",
+  "_kwargs_private_key_reason": "${seed.private_key} is the PEM with its newlines pre-escaped, not the raw key -- the harness substitutes seed values into the serialised manifest and re-parses it with json.loads, and a raw newline inside a JSON string literal is rejected. The escaping is undone by that same json.loads, so the integration receives a correct PEM. seed.py explains it at the point where it happens.",
+  "_kwargs_host_key_reason": "Passing host_key is what makes this case worth more than a connectivity check: without it the runtime accepts whatever key the server offers, and a man-in-the-middle would be indistinguishable from success. The value is the container's own host key, read out of /config/ssh_host_keys at seed time, so this asserts verification passes against the right key -- something a hard-coded value could never do.",
+  "_host_key_algorithm_finding": "PLATFORM BUG, found by this stack. The key seeded is the server's ECDSA host key, not its ed25519 one, and that is not a preference. `host_key` populates an allowed set but does not constrain which host-key algorithm the client offers, and the runtime's SSH client prefers ecdsa-sha2-nistp256 over ssh-ed25519. Every default OpenSSH install generates rsa, ecdsa and ed25519 host keys, so the server presents ECDSA -- and an operator who pins the ed25519 key their own `ssh-keyscan` showed them gets, verified against this container: `dial: ssh handshake: ssh: handshake failed: ssh: host key mismatch: presented ecdsa-sha2-nistp256 key is not in the allowed set`, with zero assets and no hint that the key was correct but of the wrong type. This belongs to runzero.ssh in the runtime, not to linux-ssh.star, which only forwards the parameter. The fix is for dial() to derive HostKeyAlgorithms from the pinned key. Until then this manifest must seed the negotiated algorithm's key. FIXED 2026-08-16 in the platform (branch feat-custom-integrations-ux, runzero/foreigndata/starlark/module/ssh.go): dial() now derives HostKeyAlgorithms from the pinned keys via hostKeyAlgorithmsForKeys(), as the union across all pins. Confirmed against this same image that pinning ed25519 and RSA now both succeed while a wrong key is still rejected -- and note the original defect broke RSA pinning too; only ECDSA worked, by accident of x/crypto's preference order, which ranks ssh-ed25519 last. This manifest deliberately STILL seeds the ECDSA key, because the scanner build this suite runs against does not yet carry the fix; switching to the ed25519 key before it ships would break the case. Swap the seeded key once the fix is in the shipped Explorer, and this stack becomes the regression test for it.",
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "${seed.machine_id}",
+        "fields": {
+          "hostnames": "rz-linux",
+          "os": "Alpine Linux v3.24",
+          "osVersion": "3.24.1",
+          "macAddresses": "00:42:0a:de:09:02",
+          "ssh.target": "$HOST:${seed.port}",
+          "machine_id": "${seed.machine_id}",
+          "kernel": "${seed.kernel}",
+          "chassis_type": "${seed.chassis_type}"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      }
+    ]
+  },
+  "_expect_reason": {
+    "os": "PRETTY_NAME from the container's real /etc/os-release, not VERSION_ID and not the image tag. The script reports PRETTY_NAME as `os` and VERSION_ID as `osVersion`, so 'Alpine Linux v3.24' and '3.24.1' disagreeing on the minor version is what the software actually says, and asserting both keeps that visible.",
+    "macAddresses": "The LAA-cleared form of the address compose.yml configures (02:42:0a:de:09:02). This stack is now the REGRESSION TEST for the type-constructor normalisation fix. History: linux-ssh.star builds runzero.types.NetworkInterface directly rather than through net.network_interface(), and nothing used to normalise the MAC on that path, so the same NIC reached the asset as 02:... via the type and 00:... via the helper -- and the divergence was not only the LAA bit, since the type path skipped format normalisation too, letting hyphenated, uppercase and Cisco-dotted MACs through as written. Fixed in runzero/foreigndata/starlark/networkinterface.go, where SetField now runs the value through rznet.CleanMACString, the same call the helper uses. Verified 2026-08-16 against the scanner built from the paired branch: both construction paths now emit 00:42:0a:de:07:02 for the same input. If this assertion ever reverts to 02:..., the normalisation has been lost.",
+    "ipAddresses": "KNOWN DEFECT, and this case is the evidence. The container's eth0 really does hold 10.222.9.2, and the integration really does read it -- `ip -o -4 addr show` reports it and the script parses it into v4['eth0'] -- yet the asset has NO address at all. The cause is one line of `_macs_and_ips`: interface names come from `ip -o link show`, where a veth end is reported as `2: eth0@if262:`, and the script does `chunks[1].rstrip(':')`, which yields 'eth0@if262'. The address map is keyed 'eth0', from `ip addr`, so the join never matches and every address is silently dropped. It is not a container artefact: `@` appears in `ip link` for VLAN sub-interfaces (eth0.100@eth0), bridge and bond slaves, and every veth end, so a real host loses its addresses the same way -- and the asset still emits, with a MAC and a hostname, so nothing looks wrong. Stripping at the first '@' is the fix. Asserting the address is ABSENT is deliberate: when the script is fixed this expectation fails, which is exactly when someone should be told.",
+    "kernel": "Read back through ${seed.kernel} rather than hard-coded. `uname -r` inside a container is the *host's* kernel -- here Docker Desktop's Linux VM -- so it differs on every machine this suite runs on and is not a property of the image.",
+    "chassis_type": "The SMBIOS chassis type the integration now reads from /sys/class/dmi/id/chassis_type, and the input its `deviceType` is derived from. Read back through ${seed.chassis_type} for exactly the reason `kernel` is: /sys inside a container is the HOST's, so this is Docker Desktop's Linux VM here (observed: 3, 'Desktop') and would be the bare metal's own chassis on a Linux CI box (often 23, 'Rack Mount Chassis'). Hard-coding either would pass on one machine and fail on the next. deviceType itself is deliberately NOT asserted here for the same reason -- it is a pure function of this value, so pinning it would pin the host's chassis too. The mapping table is proven separately and deterministically by running _device_type over every SMBIOS type in the real Starlark runtime; this case's job is the collection path: that the file is readable over a real SSH session as an unprivileged user with no dmidecode and no root, and that what it says reaches the asset. NOTE: on a machine whose kernel exposes no DMI table at all -- most bare-metal ARM -- the seed emits an empty string and this assertion fails as 'field chassis_type missing'. That failure means the host has no chassis to report, not that the integration is broken; the correct response is to note it, not to hard-code a value.",
+    "machine_id": "Installed by the seed because the image ships none. See seed.py: without it the integration falls back to an id of `<username>@<host>`, and this case would then be testing the fallback rather than the identity a real Linux host has."
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  },
+  "_invariants_skip_reason": {
+    "namespaced_ids": "A systemd machine-id is 128 random bits, generated once per installation and globally unique by construction, so it cannot collide across deployments the way a per-instance row id can. The invariant looks for a ':' scope separator that this id scheme has no need of -- the same argument the kubernetes manifest makes for object UIDs. Worth separating from the fallback id the script uses when /etc/machine-id is absent, `<username>@<host>`, which is genuinely weak: it changes with the polling account and collides for two different hosts both reached on 127.0.0.1 through forwarded ports. That fallback is not what this case exercises."
+  },
+  "check_determinism": true,
+  "startup_timeout": 300,
+  "timeout": 300
+}

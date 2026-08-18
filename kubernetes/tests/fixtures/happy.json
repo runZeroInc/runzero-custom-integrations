@@ -1,0 +1,160 @@
+{
+  "name": "happy",
+  "integration": "kubernetes",
+  "description": "Three nodes and four services from one cluster. Proves the node walk (InternalIP and ExternalIP reach the interface, Hostname/InternalDNS become hostnames, a node with no metadata.uid is skipped), that a loopback-only node still yields an asset with no loopback on its interface, and the Service type filter that admits only LoadBalancer and NodePort. Skips namespaced_ids: kubernetes ids are 'k8s-node-'/'k8s-svc-' plus the object UID, which is unique per cluster but carries no ':' for the invariant to see.",
+  "kwargs": {
+    "url": "$BASE",
+    "bearer_token": "fixture-sa-token",
+    "include_loadbalancer_services": "true"
+  },
+  "routes": [
+    {
+      "name": "nodes",
+      "match": {"method": "GET", "path": "/api/v1/nodes"},
+      "responses": [{"status": 200, "json": {
+        "kind": "NodeList",
+        "items": [
+          {
+            "metadata": {
+              "name": "worker-01",
+              "uid": "6f1c9a10-0000-4000-8000-000000000101",
+              "creationTimestamp": "2026-01-04T09:12:00Z",
+              "labels": {"node.kubernetes.io/instance-type": "m6i.2xlarge", "topology.kubernetes.io/zone": "us-east-1a"}
+            },
+            "spec": {"podCIDR": "10.244.1.0/24", "podCIDRs": ["10.244.1.0/24"], "providerID": "aws:///us-east-1a/i-0fixture001", "unschedulable": false},
+            "status": {
+              "addresses": [
+                {"type": "InternalIP", "address": "10.40.0.11"},
+                {"type": "ExternalIP", "address": "198.51.100.11"},
+                {"type": "Hostname", "address": "worker-01"},
+                {"type": "InternalDNS", "address": "worker-01.cluster.internal"}
+              ],
+              "nodeInfo": {
+                "architecture": "amd64", "bootID": "b0000000-0000-4000-8000-000000000001",
+                "containerRuntimeVersion": "containerd://1.7.18", "kernelVersion": "6.1.0-21-amd64",
+                "kubeProxyVersion": "v1.30.2", "kubeletVersion": "v1.30.2",
+                "machineID": "1111111111114000800000000000aaaa",
+                "systemUUID": "ec200000-0000-4000-8000-0000000000aa",
+                "operatingSystem": "linux", "osImage": "Ubuntu 22.04.4 LTS"
+              },
+              "capacity": {"cpu": "8", "memory": "32756Mi", "pods": "110"},
+              "allocatable": {"cpu": "7900m", "memory": "31220Mi", "pods": "110"}
+            }
+          },
+          {
+            "metadata": {
+              "name": "worker-02",
+              "uid": "6f1c9a10-0000-4000-8000-000000000102",
+              "creationTimestamp": "2026-01-04T09:12:30Z",
+              "labels": {"node.kubernetes.io/instance-type": "m6i.2xlarge"}
+            },
+            "spec": {"podCIDR": "10.244.2.0/24", "unschedulable": true, "taints": [{"key": "node.kubernetes.io/unschedulable", "effect": "NoSchedule"}]},
+            "status": {
+              "addresses": [
+                {"type": "InternalIP", "address": "127.0.0.1"},
+                {"type": "Hostname", "address": "worker-02"}
+              ],
+              "nodeInfo": {"architecture": "amd64", "kubeletVersion": "v1.30.2", "operatingSystem": "linux", "osImage": "Ubuntu 22.04.4 LTS"}
+            }
+          },
+          {
+            "metadata": {"name": "worker-no-uid", "creationTimestamp": "2026-01-04T09:13:00Z"},
+            "spec": {},
+            "status": {"addresses": [{"type": "InternalIP", "address": "10.40.0.13"}], "nodeInfo": {"kubeletVersion": "v1.30.2"}}
+          },
+          {
+            "metadata": {
+              "name": "control-plane-01",
+              "uid": "6f1c9a10-0000-4000-8000-000000000103",
+              "creationTimestamp": "2026-01-04T09:10:00Z",
+              "labels": {"node-role.kubernetes.io/control-plane": ""}
+            },
+            "spec": {"podCIDR": "10.244.0.0/24"},
+            "status": {
+              "addresses": [
+                {"type": "InternalIP", "address": "10.40.0.10"},
+                {"type": "Hostname", "address": "control-plane-01"}
+              ],
+              "nodeInfo": {"architecture": "amd64", "kubeletVersion": "v1.30.2", "operatingSystem": "linux", "osImage": "Ubuntu 22.04.4 LTS"}
+            }
+          }
+        ]
+      }}]
+    },
+    {
+      "name": "services",
+      "match": {"method": "GET", "path": "/api/v1/services"},
+      "responses": [{"status": 200, "json": {
+        "kind": "ServiceList",
+        "items": [
+          {
+            "metadata": {"name": "storefront", "namespace": "shop", "uid": "9a2b0000-0000-4000-8000-0000000000a1", "creationTimestamp": "2026-02-01T00:00:00Z", "labels": {"app": "storefront"}},
+            "spec": {
+              "type": "LoadBalancer",
+              "clusterIP": "10.96.10.10",
+              "clusterIPs": ["10.96.10.10"],
+              "sessionAffinity": "None",
+              "selector": {"app": "storefront"},
+              "ports": [{"name": "https", "port": 443, "protocol": "TCP", "targetPort": 8443, "nodePort": 31443}]
+            },
+            "status": {"loadBalancer": {"ingress": [{"ip": "203.0.113.40", "hostname": "storefront.lb.example.net"}]}}
+          },
+          {
+            "metadata": {"name": "metrics", "namespace": "observability", "uid": "9a2b0000-0000-4000-8000-0000000000a2", "creationTimestamp": "2026-02-01T00:05:00Z"},
+            "spec": {
+              "type": "NodePort",
+              "clusterIP": "10.96.20.20",
+              "clusterIPs": ["10.96.20.20"],
+              "externalIPs": ["198.51.100.60"],
+              "ports": [{"name": "http", "port": 9090, "protocol": "TCP", "nodePort": 30090}]
+            },
+            "status": {}
+          },
+          {
+            "metadata": {"name": "kube-dns", "namespace": "kube-system", "uid": "9a2b0000-0000-4000-8000-0000000000a3", "creationTimestamp": "2026-01-04T09:11:00Z"},
+            "spec": {
+              "type": "ClusterIP",
+              "clusterIP": "10.96.0.10",
+              "clusterIPs": ["10.96.0.10"],
+              "ports": [{"name": "dns", "port": 53, "protocol": "UDP"}]
+            },
+            "status": {}
+          },
+          {
+            "metadata": {"name": "no-uid-service", "namespace": "shop", "creationTimestamp": "2026-02-01T00:06:00Z"},
+            "spec": {"type": "LoadBalancer", "clusterIP": "10.96.30.30"},
+            "status": {"loadBalancer": {"ingress": [{"ip": "203.0.113.41"}]}}
+          }
+        ]
+      }}]
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "k8s-node-6f1c9a10-0000-4000-8000-000000000101",
+      "k8s-node-6f1c9a10-0000-4000-8000-000000000102",
+      "k8s-node-6f1c9a10-0000-4000-8000-000000000103",
+      "k8s-svc-9a2b0000-0000-4000-8000-0000000000a1",
+      "k8s-svc-9a2b0000-0000-4000-8000-0000000000a2"
+    ],
+    "ids_absent": [
+      "k8s-svc-9a2b0000-0000-4000-8000-0000000000a3"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/nodes"},
+      {"method": "GET", "path": "/api/v1/services"},
+      {"header_contains": "fixture-sa-token"}
+    ],
+    "log_contains": [
+      "kubernetes: imported 3 nodes",
+      "kubernetes: imported 2 services",
+      "kubernetes: skipped 1 nodes with no metadata.uid (first name: worker-no-uid)",
+      "kubernetes: skipped 1 services with no metadata.uid (first name: no-uid-service)"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

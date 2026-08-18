@@ -1,0 +1,71 @@
+{
+  "name": "rate-limit",
+  "integration": "adguard-home",
+  "description": "A reverse proxy in front of AdGuard Home answers the first status request with 429 and the first client request with 503, then relents. Proves the run survives both without any hand-rolled retry loop: get_json retries transient statuses three times by default and honors Retry-After, so the integration passes no retries argument anywhere. no_mac_in_id is skipped for every adguard-home scenario: the MAC from the DHCP server is the only durable key the API publishes, and the id is paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_dhcp": "false"
+  },
+  "routes": [
+    {
+      "name": "status",
+      "match": {"method": "GET", "path": "/control/status"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"message": "too many requests"}},
+        {
+          "status": 200,
+          "json": {
+            "version": "v0.107.52",
+            "language": "en",
+            "dns_addresses": ["192.0.2.10"],
+            "dns_port": 53,
+            "http_port": 3000,
+            "protection_enabled": true,
+            "running": true,
+            "dhcp_available": true
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path": "/control/clients"},
+      "responses": [
+        {"status": 503, "text": "upstream unavailable"},
+        {
+          "status": 200,
+          "json": {
+            "clients": [],
+            "auto_clients": [
+              {"ip": "192.0.2.80", "name": "nas.example.com", "source": "rDNS", "whois_info": {}}
+            ],
+            "supported_tags": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "adguard-home:$HOST:appliance",
+      "adguard-home:$HOST:client-ip:192.0.2.80"
+    ],
+    "min_requests": 4,
+    "requests_absent": [
+      {"path_contains": "/control/dhcp/status"}
+    ],
+    "log_contains": [
+      "reported 1 appliance and 1 clients"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

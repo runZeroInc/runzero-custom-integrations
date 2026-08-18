@@ -1,0 +1,117 @@
+{
+  "name": "stuck-pagination",
+  "description": "A Kandji that stops advancing and answers every offset with the same page. The walk's only exit is a page that comes back empty, so this shape produces no exit at all: it used to fetch the same page until the task timed out, with nothing in the log to say why.\n\nThe no-progress check is the working guard -- the MAX_PAGES ceiling behind it is ten million records deep and exists only so an adversarially rotating server still terminates. A page whose row ids are identical to the previous page's means the server ignored `offset` or replayed a cached response, and the walk stops on the first repeat and says so, which is what log_contains pins.\n\nThe first page carries a real device, so the run still proves rows are parsed, detailed, and reported. The second page carries one row with no device_id -- different content, so the walk correctly continues -- and the third repeats it, which is the first genuine repeat and the stop. Rows are single because page fullness is irrelevant to this walk: it continues on ANY non-empty page.\n\nThe route matching offset=900 exists ONLY as a terminator for a regression. Serving the stuck page with when_exhausted=repeat_last alone would make an unguarded walk run to a 33,334-page ceiling and fail this scenario by timing out rather than by failing an assertion; with the terminator, an unguarded walk stops one request later and fails on request_count, requests_absent and the missing log line instead.\n\nnamespaced_ids is skipped for the reason recorded in happy: the id is the bare Kandji device id with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-kandji-token"
+  },
+  "routes": [
+    {
+      "name": "devices-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "offset=900"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "device_id": "k0000000-0000-4000-8000-00000000c001",
+              "device_name": "ceiling-mbp-01",
+              "platform": "Mac"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "device_name": "ceiling-stuck-page-no-id",
+              "platform": "Mac"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "details-ceiling",
+      "match": {
+        "method": "GET",
+        "path": "/devices/k0000000-0000-4000-8000-00000000c001/details"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {
+              "platform": "Mac",
+              "model": "MacBook Pro (16-inch, 2023)",
+              "os_version": "14.4.1"
+            },
+            "network": {
+              "local_hostname": "ceiling-mbp-01",
+              "mac_address": "00:11:22:33:44:c1",
+              "ip_address": "10.140.1.10",
+              "public_ip": "198.51.100.9"
+            },
+            "hardware_overview": {
+              "serial_number": "SVC-CEIL-001"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "k0000000-0000-4000-8000-00000000c001"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "offset=0"
+      },
+      {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "offset=600"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/devices",
+        "query_contains": "offset=900"
+      }
+    ],
+    "log_contains": [
+      "kandji: pagination stopped making progress at offset 600; the server repeated the previous page. Retrieved 1 assets; the API does not report a total"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  },
+  "timeout": 600
+}

@@ -1,0 +1,147 @@
+{
+  "integration": "asimily",
+  "default_response": {
+    "status": 400,
+    "json": {
+      "error": "missing or malformed source header"
+    }
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false,
+  "name": "page-limit",
+  "description": "Proves the max_pages parameter actually drives the loop bound rather than decorating the credential form, and that a run stopped by the ceiling says so. max_pages is 2 and the portal reports totalPages=100, so a walk that ignored the parameter would keep going.\n\nEach page carries DIFFERENT devices, so the repeated-page check cannot fire and the ceiling is the only thing that can stop this walk. The page=2 route is a regression terminator: it ends the walk one request past the ceiling, so an integration that ignored max_pages fails on request_count, requests_absent and the missing log line rather than by TIMING OUT at the 50,000-page default.\n\nThe asserted line carries the ' - raise the max_pages parameter to import the rest' remediation, which is the only thing that tells an operator a truncated run is fixable and how, and the retrieved-versus-available figures that say how much was missed.\n\nids are unasserted and check_determinism is off for the reason recorded in paged: the id is scoped by the portal host, which under the fixture server is 127.0.0.1:<ephemeral port>.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "include_vulnerabilities": "false",
+    "page_size": "2",
+    "max_pages": "2"
+  },
+  "routes": [
+    {
+      "name": "assets-page-3-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/api/extapi/assets",
+        "header": {
+          "source": "runzero"
+        },
+        "query_contains": "page=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 100,
+            "totalElements": 640000,
+            "content": [
+              {
+                "deviceID": 71005,
+                "hostName": "cap-05",
+                "macAddr": "00:1B:44:71:00:05",
+                "v4IpAddrs": [
+                  "10.71.1.5"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/api/extapi/assets",
+        "header": {
+          "source": "runzero"
+        }
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 100,
+            "totalElements": 640000,
+            "content": [
+              {
+                "deviceID": 71001,
+                "hostName": "cap-01",
+                "macAddr": "00:1B:44:71:00:01",
+                "v4IpAddrs": [
+                  "10.71.1.1"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              },
+              {
+                "deviceID": 71002,
+                "hostName": "cap-02",
+                "macAddr": "00:1B:44:71:00:02",
+                "v4IpAddrs": [
+                  "10.71.1.2"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 100,
+            "totalElements": 640000,
+            "content": [
+              {
+                "deviceID": 71003,
+                "hostName": "cap-03",
+                "macAddr": "00:1B:44:71:00:03",
+                "v4IpAddrs": [
+                  "10.71.1.3"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              },
+              {
+                "deviceID": 71004,
+                "hostName": "cap-04",
+                "macAddr": "00:1B:44:71:00:04",
+                "v4IpAddrs": [
+                  "10.71.1.4"
+                ],
+                "deviceType": "Workstation",
+                "deviceClass": "IT",
+                "lastDiscoveredAt": "2026-08-12T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "request_count": 2,
+    "requests_absent": [
+      {
+        "path": "/api/extapi/assets",
+        "query_contains": "page=2"
+      }
+    ],
+    "log_contains": [
+      "asimily: page limit of 2 hit (integration safety limit, walking devices, retrieved 4/640000 available assets) - raise the max_pages parameter to import the rest"
+    ]
+  }
+}

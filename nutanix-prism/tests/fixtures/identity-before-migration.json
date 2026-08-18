@@ -1,0 +1,70 @@
+{
+  "name": "identity-before-migration",
+  "integration": "nutanix-prism",
+  "description": "First half of the migration identity pair. A guest running on node A, with a DHCP address and its original Prism label. Its id must be identical to the one identity-after-migration produces from the same guest running on node B with a different address and a new label -- run both and diff the ids. This is the regression test for an id that embeds host_uuid, the address, or the name, any of which would mint a second asset for the same guest after a live migration.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-viewer",
+    "password": "fixture-password",
+    "import_vms": "true",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      "responses": [
+        {"status": 200, "json": {"uuid": "00000000-0000-4000-8000-c1u57e40000a", "name": "fixture-cluster", "version": "6.5.3.5"}}
+      ]
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 2},
+            "entities": [
+              {"uuid": "aaaaaaaa-0000-4000-8000-000000000001", "name": "NTNX-SYN01-A", "hypervisor_address": "10.55.0.11", "hypervisor_type": "kKvm", "hypervisor_full_name": "Nutanix 20190916.321", "block_model": "NX-3060-G7"},
+              {"uuid": "aaaaaaaa-0000-4000-8000-000000000002", "name": "NTNX-SYN01-B", "hypervisor_address": "10.55.0.12", "hypervisor_type": "kKvm", "hypervisor_full_name": "Nutanix 20190916.321", "block_model": "NX-3060-G7"}
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/vms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 1},
+            "entities": [
+              {
+                "uuid": "bbbbbbbb-0000-4000-8000-00000000beef",
+                "name": "syn-migrating-01",
+                "power_state": "on",
+                "host_uuid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "vm_nics": [{"mac_address": "50:6b:8d:00:0b:ee", "ip_addresses": ["10.55.10.31"]}]
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-00000000beef"],
+    "ids_absent": [
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:aaaaaaaa-0000-4000-8000-000000000001:bbbbbbbb-0000-4000-8000-00000000beef"
+    ]
+  },
+  "invariants": {"skip": []}
+}

@@ -1,0 +1,81 @@
+{
+  "name": "subpath",
+  "integration": "foreman",
+  "description": "REGRESSION LOCK for get_url_base discarding the URL path. main used to build base_url with get_url_base(kwargs), which keeps only the scheme and host -- verified against the scanner, https://proxy.example.com/foreman comes back as https://proxy.example.com. A Foreman published through a reverse proxy under a path prefix therefore had every /api/v2 request sent to the proxy root, and the run reported nothing.\n\nThe configured URL here carries a /foreman prefix and the fixture server answers ONLY under it, so a run that drops the path 404s on every call and emits no assets. requests_absent pins the unprefixed path so the failure is named rather than merely counted. The scope in the foreign id comes from the hostname and is unaffected by the prefix, which is why the ids are still foreman:127.0.0.1:<id>.",
+  "kwargs": {
+    "url": "$BASE/foreman",
+    "username": "fixture-user",
+    "password": "fixture-token",
+    "include_facts": "false",
+    "include_interfaces": "false",
+    "include_packages": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts-under-prefix",
+      "match": {"method": "GET", "path": "/foreman/api/v2/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "subtotal": 2,
+            "page": 1,
+            "per_page": 100,
+            "results": [
+              {
+                "id": 21,
+                "name": "proxied21.corp.example.net",
+                "certname": "proxied21.corp.example.net",
+                "ip": "192.0.2.21",
+                "mac": "aa:bb:cc:00:00:21",
+                "domain_name": "corp.example.net",
+                "operatingsystem_name": "RedHat 9.4",
+                "architecture_name": "x86_64",
+                "managed": true,
+                "enabled": true,
+                "created_at": "2025-02-01T10:00:00.000Z",
+                "last_report": "2026-08-14T06:00:00.000Z"
+              },
+              {
+                "id": 22,
+                "name": "proxied22.corp.example.net",
+                "certname": "proxied22.corp.example.net",
+                "ip": "192.0.2.22",
+                "mac": "aa:bb:cc:00:00:22",
+                "domain_name": "corp.example.net",
+                "operatingsystem_name": "Debian 12",
+                "managed": true,
+                "enabled": true,
+                "created_at": "2025-03-01T10:00:00.000Z",
+                "last_report": "2026-08-14T06:10:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "host-detail-under-prefix",
+      "match": {"method": "GET", "path_prefix": "/foreman/api/v2/hosts/"},
+      "responses": [{"status": 200, "json": {}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route: the proxy root is not Foreman"},
+  "expect": {
+    "asset_count": 2,
+    "ids": ["foreman:127.0.0.1:21", "foreman:127.0.0.1:22"],
+    "requests_include": [
+      {"method": "GET", "path": "/foreman/api/v2/hosts"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2/hosts"},
+      {"path": "/api/v2/fact_values"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

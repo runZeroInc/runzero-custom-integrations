@@ -1,0 +1,29 @@
+# A real Portainer CE server fronting a real Docker Engine API.
+#
+# Portainer is the thinnest possible "real software" for this integration: a
+# single ~90MB Go binary with an embedded database, no external dependencies,
+# and it reaches a usable API in a couple of seconds. That matters because the
+# integration's own value is in how it reads Portainer's envelope around the
+# Docker Engine payload, and that envelope is exactly what a fixture guesses at.
+#
+# The tag is pinned. Portainer renamed several fields on /api/endpoints between
+# 2.19 and 2.21 (ContainerEngine is a 2.21 addition), which is precisely the
+# drift this test exists to catch -- so the version under test has to be a
+# deliberate choice rather than whatever :latest resolved to today.
+services:
+  portainer:
+    image: portainer/portainer-ce:2.21.4
+    # --host makes Portainer adopt the mounted socket as its "primary" local
+    # environment at first boot, so the seed script does not have to create an
+    # environment before it can create a credential.
+    command: ["--host", "unix:///var/run/docker.sock"]
+    volumes:
+      # Read-only: this test only ever issues GETs through the proxy, and a
+      # writable socket would hand the container control of every other
+      # container on the host.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      # 9000 is the plain-HTTP listener. 9443 serves the same API behind a
+      # self-signed certificate; HTTP keeps the test off the TLS-trust path,
+      # which is a transport concern the fixture scenarios already cover.
+      - "${RZ_HOST_PORT}:9000"

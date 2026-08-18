@@ -1,0 +1,126 @@
+{
+  "name": "empty",
+  "integration": "truenas",
+  "description": "A TrueNAS system with nothing on it: no configured interfaces, no pools, no disks, no applications, and no virtual machines. Every collection answers 200 with a bare empty JSON array, which is what the middleware returns rather than an error or a paging envelope. The point of the scenario is that this is NOT a zero-asset run: the appliance itself is always an asset, because it is a real device with a hostname whether or not anything is configured on it, so the walk must still emit exactly one asset and zero VMs. It also proves the empty array is treated as an end-of-collection signal rather than as a failure -- an empty /app must not fall back to the removed Kubernetes-era /chart/release endpoint, because falling back would spend a request proving something that is already known. Response shapes follow the TrueNAS middleware API models; all data is synthetic.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1-fixtureapikeyabcdef0123456789abcdef0123456789abcdef0123456789ab"
+  },
+  "routes": [
+    {
+      "name": "system_info",
+      "match": {"method": "GET", "path": "/api/v2.0/system/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "TrueNAS-SCALE-24.04.2.2",
+            "buildtime": {"$date": 1718900000000},
+            "hostname": "nas02.example.com",
+            "physmem": 8589934592,
+            "model": "Intel(R) Celeron(R) N5105 @ 2.00GHz",
+            "cores": 4,
+            "physical_cores": 4,
+            "loadavg": [0.0, 0.0, 0.0],
+            "uptime": "0:04:22",
+            "uptime_seconds": 262.1,
+            "system_serial": "Default string",
+            "system_product": "Default string",
+            "system_product_version": "Default string",
+            "license": null,
+            "boottime": {"$date": 1755299700000},
+            "datetime": {"$date": 1755300000000},
+            "timezone": "Etc/UTC",
+            "system_manufacturer": "Default string",
+            "ecc_memory": false
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "network_configuration",
+      "match": {"method": "GET", "path": "/api/v2.0/network/configuration"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 1,
+            "hostname": "nas02",
+            "domain": "example.com",
+            "ipv4gateway": "",
+            "ipv6gateway": "",
+            "nameserver1": "",
+            "nameserver2": "",
+            "nameserver3": "",
+            "httpproxy": "",
+            "hosts": [],
+            "domains": [],
+            "service_announcement": {"netbios": false, "mdns": true, "wsd": true},
+            "activity": {"type": "DENY", "activities": []},
+            "hostname_local": "nas02"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "interface",
+      "match": {"method": "GET", "path": "/api/v2.0/interface"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "pool",
+      "match": {"method": "GET", "path": "/api/v2.0/pool"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "disk",
+      "match": {"method": "GET", "path": "/api/v2.0/disk"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "app",
+      "match": {"method": "GET", "path": "/api/v2.0/app"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vm",
+      "match": {"method": "GET", "path": "/api/v2.0/vm"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "request_count": 7,
+    "ids": ["truenas:$HOST:system"],
+    "assets": [
+      {
+        "id": "truenas:$HOST:system",
+        "fields": {
+          "hostnames": "nas02",
+          "os": "TrueNAS",
+          "osVersion": "24.04.2.2",
+          "deviceType": "Storage"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "truenas_system_serial"]
+      }
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/v2.0/chart/release"},
+      {"path_contains": "/api/v2.0/vm/device"}
+    ],
+    "log_contains": [
+      "truenas: reported the system asset for",
+      "truenas: reported 0 virtual machines"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

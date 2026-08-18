@@ -1,0 +1,87 @@
+{
+  "name": "detail-cap",
+  "integration": "netdata",
+  "description": "Per-node system detail is an N+1 call against a Parent, so max_detail_nodes bounds it. With the cap at 1 and three nodes listed, exactly one detail request may be issued, the remaining two nodes must still be imported without OS fields, and the number skipped must be logged.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "collect_node_details": "true",
+    "max_detail_nodes": "1"
+  },
+
+  "routes": [
+    {
+      "name": "nodes-v3",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api": 3,
+            "agents": [{"mg": "aa11bb22-cc33-4d44-9e55-f6677889900a", "nm": "cap-parent", "ai": 0}],
+            "nodes": [
+              {"mg": "aa11bb22-cc33-4d44-9e55-f6677889900a", "nm": "cap-parent", "ni": 0, "st": {"code": 200}, "version": "v2.3.2", "hops": 0, "state": "reachable"},
+              {"mg": "bb22cc33-dd44-4e55-af66-07788990011b", "nm": "cap-child-1", "ni": 1, "st": {"code": 200}, "version": "v2.3.2", "hops": 1, "state": "reachable"},
+              {"mg": "cc33dd44-ee55-4f66-b077-18899001122c", "nm": "cap-child-2", "ni": 2, "st": {"code": 200}, "version": "v2.3.2", "hops": 1, "state": "reachable"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "info-local",
+      "match": {"method": "GET", "path": "/api/v1/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v2.3.2",
+            "uid": "aa11bb22-cc33-4d44-9e55-f6677889900a",
+            "os_name": "Alpine Linux",
+            "os_id": "alpine",
+            "os_version": "3.20.3",
+            "kernel_name": "Linux",
+            "kernel_version": "6.6.52-0-lts",
+            "architecture": "x86_64",
+            "virtualization": "none",
+            "container": "docker",
+            "container_detection": "dockerenv",
+            "labels": {"_os_name": "Alpine Linux"}
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "request_count": 2,
+    "assets": [
+      {
+        "id": "netdata:$HOST:aa11bb22-cc33-4d44-9e55-f6677889900a",
+        "fields": {"os": "Alpine Linux", "osVersion": "3.20.3"}
+      },
+      {
+        "id": "netdata:$HOST:bb22cc33-dd44-4e55-af66-07788990011b",
+        "fields": {"hostnames": "cap-child-1"},
+        "fields_absent": ["os", "osVersion"]
+      },
+      {
+        "id": "netdata:$HOST:cc33dd44-ee55-4f66-b077-18899001122c",
+        "fields": {"hostnames": "cap-child-2"},
+        "fields_absent": ["os", "osVersion"]
+      }
+    ],
+    "requests_absent": [
+      {"path_contains": "/host/cap-child-1/"},
+      {"path_contains": "/host/cap-child-2/"}
+    ],
+    "log_contains": [
+      "system detail capped: 2 node(s) imported without OS detail"
+    ]
+  },
+
+  "check_determinism": true
+}

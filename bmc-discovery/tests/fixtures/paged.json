@@ -1,0 +1,109 @@
+{
+  "name": "paged",
+  "integration": "bmc-discovery",
+  "description": "Two-page cursor walk over Host, proving the offset/results_id pair is echoed back on the second call and that both pages are parsed. Also covers the key-vs-#id identity rule and the loopback-only host.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_details": "false"
+  },
+  "routes": [
+    {
+      "name": "search-host-page-1",
+      "match": {"method": "POST", "path": "/api/v1.3/data/search", "body_contains": "SEARCH Host"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "kind": "Host",
+              "count": 3,
+              "offset": 0,
+              "results_id": "cursor-abc",
+              "next_offset": 2,
+              "results": [
+                {
+                  "#id": "aabbccdd0001",
+                  "key": "HOSTKEY0001",
+                  "name": "web01",
+                  "hostname": "web01",
+                  "local_fqdn": "web01.corp.example.com",
+                  "os": "Ubuntu 22.04",
+                  "os_class": "Linux",
+                  "type": "Linux Host",
+                  "vendor": "Dell Inc.",
+                  "model": "PowerEdge R640",
+                  "serial": "SVC12345",
+                  "__all_ip_addrs": ["10.20.0.10", "127.0.0.1"],
+                  "__all_mac_addrs": ["00:11:22:33:44:55"],
+                  "__all_dns_names": ["web01.corp.example.com"]
+                },
+                {
+                  "#id": "aabbccdd0002",
+                  "key": "HOSTKEY0002",
+                  "name": "db01",
+                  "hostname": "db01",
+                  "local_fqdn": "localhost",
+                  "os": "Red Hat Enterprise Linux 9",
+                  "os_class": "Linux",
+                  "__all_ip_addrs": ["10.20.0.11"],
+                  "__all_mac_addrs": ["00:11:22:33:44:66"],
+                  "__all_dns_names": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "kind": "Host",
+              "count": 3,
+              "offset": 2,
+              "results_id": "cursor-abc",
+              "results": [
+                {
+                  "#id": "aabbccdd0003",
+                  "key": "HOSTKEY0003",
+                  "name": "loopback-only",
+                  "hostname": "loopback-only",
+                  "os": "Windows Server 2019",
+                  "os_class": "Windows",
+                  "__all_ip_addrs": ["127.0.0.1", "::1"],
+                  "__all_mac_addrs": [],
+                  "__all_dns_names": []
+                },
+                {
+                  "#id": "aabbccdd0004",
+                  "key": "",
+                  "name": "no-key-host",
+                  "hostname": "no-key-host",
+                  "__all_ip_addrs": ["10.20.0.13"]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "bmc-discovery:127.0.0.1:HOSTKEY0001",
+      "bmc-discovery:127.0.0.1:HOSTKEY0002",
+      "bmc-discovery:127.0.0.1:HOSTKEY0003"
+    ],
+    "min_requests": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1.3/data/search", "body_contains": "SEARCH Host"},
+      {"method": "POST", "query_contains": "results_id=cursor-abc"},
+      {"header_contains": "fixture-token"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

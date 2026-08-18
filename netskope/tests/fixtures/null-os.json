@@ -1,0 +1,71 @@
+{
+  "name": "null-os",
+  "integration": "netskope",
+  "description": "REGRESSION LOCK on the null-versus-absent trap. A .get default only applies when the KEY IS MISSING, never when it is present with a null value, and Netskope emits explicit nulls for anything it has not classified.\n\nThe confirmed abort was `os`: build_assets read os_name = item.get('os', '') and then evaluated `if 'Mac' in os_name`, which aborts with 'unknown binary op: string in NoneType'. Starlark has no exception handling, so the abort ended the run and every healthy record in the same page was lost with it.\n\nThe same pattern was audited across the file and two siblings are pinned here alongside it: a record whose `_id` is present but null, which used to abort on item.get('_id', {}).get('nsdeviceuid'), and a record whose `hostname` is null, which reached ImportAsset as hostnames=[None]. All four records must import, with the null-_id record falling back to device_id.\n\nSkips namespaced_ids: netskope emits the bare nsdeviceuid with no tenant scope, a separate defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-netskope-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "ok": 1,
+          "result": [
+            {
+              "_id": {"nsdeviceuid": "NSDEV-HEALTHY-0001"},
+              "hostname": "healthy-01",
+              "mac_addresses": ["00:1B:44:11:3A:C1"],
+              "os": "Windows",
+              "os_version": "11"
+            },
+            {
+              "_id": {"nsdeviceuid": "NSDEV-NULL-OS-0002"},
+              "hostname": "no-os-reported-02",
+              "mac_addresses": ["00:1B:44:11:3A:C2"],
+              "os": null,
+              "os_version": null
+            },
+            {
+              "_id": null,
+              "device_id": "NSDEV-NULL-ID-0003",
+              "hostname": "no-nsdeviceuid-03",
+              "mac_addresses": ["00:1B:44:11:3A:C3"],
+              "os": "Mac OS X",
+              "os_version": "14.5"
+            },
+            {
+              "_id": {"nsdeviceuid": "NSDEV-NULL-HOSTNAME-0004"},
+              "hostname": null,
+              "mac_addresses": ["00:1B:44:11:3A:C4"],
+              "os": "Windows",
+              "os_version": "10"
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "NSDEV-HEALTHY-0001",
+      "NSDEV-NULL-OS-0002",
+      "NSDEV-NULL-ID-0003",
+      "NSDEV-NULL-HOSTNAME-0004"
+    ],
+    "assets": [
+      {"id": "NSDEV-HEALTHY-0001", "fields": {"os": "Windows", "hostnames": "healthy-01"}},
+      {"id": "NSDEV-NULL-OS-0002", "fields": {"hostnames": "no-os-reported-02"}, "fields_absent": ["os"]},
+      {"id": "NSDEV-NULL-ID-0003", "fields": {"os": "macOS", "hostnames": "no-nsdeviceuid-03"}},
+      {"id": "NSDEV-NULL-HOSTNAME-0004", "fields": {"os": "Windows"}, "fields_absent": ["hostnames"]}
+    ],
+    "request_count": 1
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

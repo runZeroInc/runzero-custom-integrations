@@ -1,0 +1,84 @@
+{
+  "name": "null-sid",
+  "integration": "lima-charlie",
+  "description": "A sensor row with a null sid -- the shape the API returns for a partially provisioned or deleted sensor -- must be skipped and logged, and the healthy sensor listed after it must still import.\n\nThis was a whole-run abort: build_assets never checked item.get('sid'), so ImportAsset(id=None) reached the runtime, which rejects it with \"id must be a string\". Starlark has no exceptions, so the run died and ZERO assets were exported -- one malformed record cost every sensor in the response. The guard now sits alongside the existing hostname and architecture filters and uses the house skip-log format.\n\nnamespaced_ids is skipped: id=sid is the bare LimaCharlie sensor UUID, globally unique on shape.",
+  "kwargs": {
+    "url": "$BASE",
+    "jwt_url": "$BASE",
+    "organization_id": "8bd1f0e2-0000-4000-8000-000000000001",
+    "api_token": "fixture-lc-secret"
+  },
+  "routes": [
+    {
+      "name": "jwt-exchange",
+      "match": {
+        "method": "POST",
+        "path": "/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jwt": "fixture-lc-jwt"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors",
+      "match": {
+        "method": "GET",
+        "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "sensors": [
+              {
+                "sid": null,
+                "hostname": "syn-lc-provisioning.example.com",
+                "arch": 2,
+                "int_ip": "192.0.2.70"
+              },
+              {
+                "sid": "cccc0002-0000-4000-8000-000000000002",
+                "hostname": "syn-lc-healthy.example.com",
+                "arch": 2,
+                "int_ip": "192.0.2.71",
+                "mac_addr": "00-11-22-33-44-71"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "cccc0002-0000-4000-8000-000000000002"
+    ],
+    "assets": [
+      {
+        "id": "cccc0002-0000-4000-8000-000000000002",
+        "fields": {
+          "hostnames": "syn-lc-healthy.example.com",
+          "ipAddresses": "192.0.2.71",
+          "macAddresses": "00:11:22:33:44:71"
+        }
+      }
+    ],
+    "log_contains": [
+      "lima-charlie: skipping sensor with no sid: hostname=syn-lc-provisioning.example.com",
+      "Reported 1 assets from 2 sensors"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

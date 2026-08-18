@@ -1,0 +1,84 @@
+{
+  "name": "auth-refresh",
+  "integration": "quest-kace",
+  "description": "The KACE session expires mid-run: the first /api/inventory/machines call answers 401, which must trigger exactly one re-login and a retry of the same page, not abandon the import. Proves the second login happens, that the retried request replays the NEW session cookie, and that the retry is bounded to one attempt.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "import_software": "false",
+    "import_assets": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ams/shared/api/security/login"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Set-Cookie": "KACE_LAST_ORG_SECURE=Default; Path=/; Secure",
+            "set-cookie": "kboxid=first-session; Path=/; HttpOnly"
+          },
+          "json": {"Result": "Success"}
+        },
+        {
+          "status": 200,
+          "headers": {
+            "Set-Cookie": "KACE_LAST_ORG_SECURE=Default; Path=/; Secure",
+            "set-cookie": "kboxid=second-session; Path=/; HttpOnly"
+          },
+          "json": {"Result": "Success"}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "machines",
+      "match": {"method": "GET", "path": "/api/inventory/machines"},
+      "responses": [
+        {"status": 401, "json": {"error": "session expired"}},
+        {
+          "status": 200,
+          "json": {
+            "Machines": [
+              {
+                "Id": "2001",
+                "Name": "reauth-2001",
+                "Ip": "10.201.0.1",
+                "Mac": "00:1b:44:11:3a:b7",
+                "Bios_Serial_Number": "KACE-SN-2001",
+                "Cs_Manufacturer": "HP",
+                "Cs_Model": "EliteDesk 800 G6",
+                "Chassis_Type": "Desktop",
+                "Os_name": "Microsoft Windows 11 Pro",
+                "Created": "2025-05-01 09:00:00",
+                "Last_sync": "2026-08-14 05:00:00"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["quest-kace:127.0.0.1:default:2001"],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/inventory/machines", "header_contains": "kboxid=first-session"},
+      {"method": "GET", "path": "/api/inventory/machines", "header_contains": "kboxid=second-session"}
+    ],
+    "requests_absent": [
+      {"path": "/api/asset/assets"}
+    ],
+    "log_contains": [
+      "quest-kace: session expired, logging in again",
+      "quest-kace: reported 1 assets from organization default"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

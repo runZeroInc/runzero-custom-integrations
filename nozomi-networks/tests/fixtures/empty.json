@@ -1,0 +1,51 @@
+{
+  "name": "empty",
+  "integration": "nozomi-networks",
+  "description": "An appliance with nothing to import and a credential that is not permitted to query asset_cves. The CVE probe answers 200 with the refusal in the envelope's error field rather than in the status, which is the shape the Open API actually uses, so the body has to be inspected. Both must be reported and neither may fail the run or emit an asset.",
+  "kwargs": {
+    "url": "$BASE",
+    "key_name": "fixture-key-name",
+    "key_token": "fixture-key-token",
+    "include_cves": "true"
+  },
+  "routes": [
+    {
+      "name": "sign-in",
+      "match": {"method": "POST", "path": "/api/open/sign_in"},
+      "responses": [
+        {"status": 200, "json": {"authenticated": true}, "headers": {"Authorization": "Bearer nozomi-fixture-token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "asset-cves-not-permitted",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=asset_cves"},
+      "responses": [
+        {"status": 200, "json": {"result": [], "error": "the user is not allowed to query this table"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-empty",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=assets%20"},
+      "responses": [
+        {"status": 200, "json": {"result": [], "total": 0, "error": null}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=asset_cves"},
+      {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=assets%20"}
+    ],
+    "log_contains": [
+      "nozomi-networks: CVE findings are unavailable on this appliance: the user is not allowed to query this table",
+      "nozomi-networks: reported 0 assets",
+      "nozomi-networks: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []}
+}

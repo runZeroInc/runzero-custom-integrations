@@ -1,0 +1,223 @@
+{
+  "name": "paged",
+  "integration": "nautobot",
+  "description": "Two pages of devices, proving both halves of how this integration paginates. Request 2 must carry the offset that response 1's 'next' link returned, so the server's own cursor stays authoritative. But the request must still go to the CONFIGURED base URL: Nautobot builds 'next' from the Host header of the incoming request, so behind a reverse proxy it names an address the Explorer may not reach. This fixture returns a 'next' pointing at nautobot.internal.example.com, which does not exist. A client that followed the link verbatim would fail to resolve it and stop after one page; a client that re-issues the query against the configured base gets page 2. The walk must then stop, because page 2 returns next: null. (Route order matters here: the fixture server takes the first matching route, and page 2's query still carries the status filter, so the offset=2 route is declared first.)",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "0123456789abcdef0123456789abcdef01234567",
+    "page_size": "2",
+    "collect_interfaces": "false",
+    "import_virtual_machines": "false",
+    "device_filter": "status=active"
+  },
+  "routes": [
+    {
+      "name": "manufacturers",
+      "match": {
+        "method": "GET",
+        "path": "/api/dcim/manufacturers/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 0,
+            "next": null,
+            "previous": null,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {
+        "method": "GET",
+        "path": "/api/dcim/devices/",
+        "query_contains": "offset=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 3,
+            "next": null,
+            "previous": "http://nautobot.internal.example.com/api/dcim/devices/?depth=1&limit=2&status=active",
+            "results": [
+              {
+                "id": "33333333-3333-4333-8333-333333333333",
+                "object_type": "dcim.device",
+                "name": "page2-dev-c",
+                "serial": "",
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "name": "Active"
+                },
+                "role": null,
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "object_type": "dcim.devicetype",
+                  "model": "ISR 4331"
+                },
+                "platform": null,
+                "location": null,
+                "primary_ip4": {
+                  "id": "aaaa0003-0000-4000-8000-000000000003",
+                  "object_type": "ipam.ipaddress",
+                  "address": "192.0.2.23/24",
+                  "host": "192.0.2.23",
+                  "mask_length": 24,
+                  "ip_version": 4
+                },
+                "primary_ip6": null,
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/api/dcim/devices/",
+        "query_contains": "status=active"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 3,
+            "next": "http://nautobot.internal.example.com/api/dcim/devices/?depth=1&limit=2&offset=2&status=active",
+            "previous": null,
+            "results": [
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "object_type": "dcim.device",
+                "name": "page1-dev-a",
+                "serial": "",
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "name": "Active"
+                },
+                "role": {
+                  "id": "40567487-6328-4dac-b7b5-b789d1154bf0",
+                  "object_type": "extras.role",
+                  "name": "Router"
+                },
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "object_type": "dcim.devicetype",
+                  "model": "ISR 4331"
+                },
+                "platform": null,
+                "location": {
+                  "id": "9e39051b-e968-4016-b0cf-63a5607375de",
+                  "object_type": "dcim.location",
+                  "name": "AMS01"
+                },
+                "primary_ip4": {
+                  "id": "aaaa0001-0000-4000-8000-000000000001",
+                  "object_type": "ipam.ipaddress",
+                  "address": "192.0.2.21/24",
+                  "host": "192.0.2.21",
+                  "mask_length": 24,
+                  "ip_version": 4
+                },
+                "primary_ip6": null,
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "22222222-2222-4222-8222-222222222222",
+                "object_type": "dcim.device",
+                "name": "page1-dev-b",
+                "serial": "",
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "name": "Active"
+                },
+                "role": null,
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "object_type": "dcim.devicetype",
+                  "model": "ISR 4331"
+                },
+                "platform": null,
+                "location": null,
+                "primary_ip4": {
+                  "id": "aaaa0002-0000-4000-8000-000000000002",
+                  "object_type": "ipam.ipaddress",
+                  "address": "192.0.2.22/24",
+                  "host": "192.0.2.22",
+                  "mask_length": 24,
+                  "ip_version": 4
+                },
+                "primary_ip6": null,
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "nautobot:$HOST:device:11111111-1111-4111-8111-111111111111",
+      "nautobot:$HOST:device:22222222-2222-4222-8222-222222222222",
+      "nautobot:$HOST:device:33333333-3333-4333-8333-333333333333"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/dcim/devices/",
+        "query_contains": "depth=1&limit=2&status=active"
+      },
+      {
+        "method": "GET",
+        "path": "/api/dcim/devices/",
+        "query_contains": "offset=2"
+      },
+      {
+        "method": "GET",
+        "path": "/api/dcim/devices/",
+        "query_contains": "limit=2&offset=2&status=active"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/api/dcim/devices/",
+        "query_contains": "offset=4"
+      },
+      {
+        "path": "/api/dcim/interfaces/"
+      },
+      {
+        "path": "/api/virtualization/virtual-machines/"
+      }
+    ],
+    "log_contains": [
+      "nautobot: reported 3 device records so far"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

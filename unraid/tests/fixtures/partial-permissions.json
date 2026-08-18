@@ -1,0 +1,141 @@
+{
+  "name": "partial-permissions",
+  "integration": "unraid",
+  "description": "An API key scoped to INFO:READ_ANY only. Unraid's exception filter sends HTTP 200 for GraphQL errors, and a key that can read one resource but not another gets BOTH in one response: populated data for what it may see, plus an error entry for what it may not. Discarding the whole response on any error - the reflex an all-or-nothing HTTP client encourages - would throw away a perfectly good server asset. This scenario proves partial data is ingested, the refused resources are named in the log rather than swallowed, and the run still produces the server. It also proves the value of splitting the collection into separate documents: the docker, vms, and storage queries fail independently and none of them can take the info query down with it.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-viewer-key"
+  },
+  "routes": [
+    {
+      "name": "info",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidInfo"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "info": {
+                "machineId": "0011aabb2233ccdd4455eeff66778899",
+                "os": {"platform": "linux", "distro": "Unraid", "release": "7.2.0", "kernel": "6.12.24-Unraid", "arch": "x64", "hostname": "backup-nas", "fqdn": "backup-nas", "uptime": "2026-07-20T02:00:00.000Z", "uefi": false},
+                "system": {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "PRIME B550M-A", "serial": "System Serial Number", "uuid": "11111111-2222-3333-4444-555555555555"},
+                "baseboard": {"manufacturer": "ASUSTeK COMPUTER INC.", "model": "PRIME B550M-A", "serial": "220512345600123"},
+                "cpu": {"manufacturer": "AMD", "brand": "Ryzen 5 5600G", "cores": 6, "threads": 12},
+                "versions": {"core": {"unraid": "7.2.0", "api": "4.37.1"}, "packages": {"docker": "27.5.1"}},
+                "networkInterfaces": [
+                  {
+                    "name": "eth0",
+                    "macAddress": "d8:bb:c1:00:11:22",
+                    "internal": false,
+                    "virtual": false,
+                    "operstate": "up",
+                    "ipv4Addresses": [{"address": "10.0.5.20", "netmask": "255.255.255.0"}],
+                    "ipv6Addresses": [],
+                    "ipAddress": "10.0.5.20",
+                    "ipv6Address": ""
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vars-refused",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVars"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": null,
+            "errors": [{"message": "Forbidden resource", "path": ["vars"], "extensions": {"code": "FORBIDDEN"}}]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "storage-partial",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidStorage"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "array": {
+                "state": "STARTED",
+                "capacity": {"kilobytes": {"free": "100", "used": "200", "total": "300"}},
+                "disks": [{"id": "1:disk1", "name": "disk1", "device": "sda", "status": "DISK_OK", "type": "DATA"}],
+                "parities": [],
+                "caches": []
+              },
+              "disks": null
+            },
+            "errors": [{"message": "Forbidden resource", "path": ["disks"], "extensions": {"code": "FORBIDDEN"}}]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "docker-refused",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidDocker"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": null,
+            "errors": [{"message": "Forbidden resource", "path": ["docker"], "extensions": {"code": "FORBIDDEN"}}]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms-refused",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": null,
+            "errors": [{"message": "Forbidden resource", "path": ["vms"], "extensions": {"code": "FORBIDDEN"}}]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"errors": [{"message": "Cannot query field on type Query."}]}
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": ["unraid:machine:0011aabb2233ccdd4455eeff66778899"],
+    "assets": [
+      {
+        "id": "unraid:machine:0011aabb2233ccdd4455eeff66778899",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Unraid",
+          "osVersion": "7.2.0",
+          "hostnames": "backup-nas",
+          "ipAddresses": "10.0.5.20",
+          "macAddresses": "d8:bb:c1:00:11:22",
+          "unraid_storage_array_state": "STARTED"
+        },
+        "fields_absent": ["unraid_vars_flashGuid"]
+      }
+    ],
+    "log_contains": [
+      "vars and metrics returned no data: Forbidden resource",
+      "array and disks returned partial data: Forbidden resource",
+      "docker containers returned no data: Forbidden resource",
+      "reported 1 server and 0 containers"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,92 @@
+{
+  "name": "vuln-cap",
+  "integration": "redhat-insights",
+  "description": "CVE enrichment is one request per system, so vulnerability_limit caps it. With the limit at 1 and three systems, only the first may be queried, the other two must still be imported without findings, and the skip count must be reported. Any call for the capped systems is served a 500 so a broken cap fails loudly.",
+  "kwargs": {
+    "url": "$BASE",
+    "sso_url": "$BASE",
+    "client_id": "fixture-service-account",
+    "client_secret": "fixture-secret",
+    "include_vulnerabilities": "true",
+    "vulnerability_limit": "1"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 900}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cves-first-system",
+      "match": {"method": "GET", "path": "/api/vulnerability/v1/systems/30000000-0000-4000-8000-000000000001/cves"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "CVE-2026-20001",
+                "attributes": {
+                  "impact": "Low",
+                  "cvss3_score": "3.100",
+                  "public_date": "2026-01-15T00:00:00+00:00",
+                  "advisories_list": ["RHSA-2026:1111"]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cves-capped-systems",
+      "match": {"method": "GET", "path_prefix": "/api/vulnerability/v1/systems/"},
+      "responses": [
+        {"status": 500, "text": "the enrichment cap should have prevented this call"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "results": [
+              {"id": "30000000-0000-4000-8000-000000000001", "org_id": "10009999", "fqdn": "cap-a.fixture.example", "ip_addresses": ["10.92.0.1"]},
+              {"id": "30000000-0000-4000-8000-000000000002", "org_id": "10009999", "fqdn": "cap-b.fixture.example", "ip_addresses": ["10.92.0.2"]},
+              {"id": "30000000-0000-4000-8000-000000000003", "org_id": "10009999", "fqdn": "cap-c.fixture.example", "ip_addresses": ["10.92.0.3"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "redhat-insights:10009999:30000000-0000-4000-8000-000000000001",
+      "redhat-insights:10009999:30000000-0000-4000-8000-000000000002",
+      "redhat-insights:10009999:30000000-0000-4000-8000-000000000003"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/vulnerability/v1/systems/30000000-0000-4000-8000-000000000001/cves"}
+    ],
+    "requests_absent": [
+      {"path": "/api/vulnerability/v1/systems/30000000-0000-4000-8000-000000000002/cves"},
+      {"path": "/api/vulnerability/v1/systems/30000000-0000-4000-8000-000000000003/cves"}
+    ],
+    "log_contains": [
+      "redhat-insights: CVE enrichment limit of 1 reached; findings were not imported for 2 of 3 systems"
+    ]
+  },
+  "invariants": {"skip": []}
+}

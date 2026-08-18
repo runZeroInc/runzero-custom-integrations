@@ -1,0 +1,204 @@
+{
+  "name": "happy",
+  "integration": "glpi",
+  "description": "Full bootstrap chain: initSession issues the session token every later call needs, the Item_OperatingSystem and Software side tables are indexed once, the Computer collection is walked with its network ports inline, one computer is enriched with software, and killSession releases the session. Covers the loopback port class and the loopback address (both must be dropped), GLPI's HTML-entity-encoded text, the is_template blueprint, a null id, a non-object row, and a future date_creation/last_inventory_update pair that must be CLAMPED to now rather than rejecting the whole record.",
+  "kwargs": {
+    "url": "$BASE",
+    "user_token": "fixture-user-token",
+    "app_token": "fixture-app-token",
+    "include_software": "true",
+    "include_network_devices": "false"
+  },
+  "routes": [
+    {
+      "name": "init-session",
+      "match": {"method": "GET", "path": "/apirest.php/initSession"},
+      "responses": [{"status": 200, "json": {"session_token": "fixture-session-token"}}]
+    },
+    {
+      "name": "item-operating-system",
+      "match": {"method": "GET", "path": "/apirest.php/Item_OperatingSystem"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1,
+              "itemtype": "Computer",
+              "items_id": 7,
+              "is_deleted": 0,
+              "install_date": "2024-05-02 09:00:00",
+              "_keys_names": {
+                "operatingsystems_id": "Ubuntu",
+                "operatingsystemversions_id": "24.04 LTS",
+                "operatingsystemarchitectures_id": "x86_64",
+                "operatingsystemkernelversions_id": "6.8.0-40-generic"
+              }
+            },
+            {
+              "id": 2,
+              "itemtype": "Computer",
+              "items_id": 99,
+              "is_deleted": 1,
+              "_keys_names": {"operatingsystems_id": "Windows 7"}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "software-catalog",
+      "match": {"method": "GET", "path": "/apirest.php/Software"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"id": 300, "name": "Firefox", "manufacturers_id": "Mozilla"},
+            {"id": 301, "name": "OpenSSH", "manufacturers_id": "OpenBSD Project"}
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computer-collection",
+      "match": {"method": "GET", "path": "/apirest.php/Computer"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 7,
+              "name": "ws-0007",
+              "serial": "SN-0007",
+              "otherserial": "ASSET-0007",
+              "entities_id": "Root entity &#62; Site A",
+              "locations_id": "HQ &#62; Floor 2",
+              "states_id": "In production",
+              "manufacturers_id": "Dell Inc.",
+              "computermodels_id": "OptiPlex 7090",
+              "computertypes_id": "Desktop",
+              "users_id": "jdoe",
+              "comment": "Bench unit &#38; spare",
+              "is_template": 0,
+              "is_dynamic": 1,
+              "date_creation": "2024-05-01 08:00:00",
+              "date_mod": "2026-08-09 12:00:00",
+              "last_inventory_update": "2026-08-10 09:00:00",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {
+                    "id": 31,
+                    "name": "eth0",
+                    "mac": "aa:bb:cc:00:00:07",
+                    "NetworkName": {
+                      "id": 41,
+                      "name": "ws-0007",
+                      "IPAddress": [
+                        {"id": 51, "name": "10.60.0.7"},
+                        {"id": 52, "name": "127.0.0.1"},
+                        {"id": 53, "name": "169.254.10.10"}
+                      ]
+                    }
+                  }
+                ],
+                "NetworkPortLocal": [
+                  {
+                    "id": 32,
+                    "name": "lo",
+                    "mac": "",
+                    "NetworkName": {"IPAddress": [{"id": 54, "name": "127.0.0.1"}]}
+                  }
+                ]
+              }
+            },
+            {
+              "id": 9,
+              "name": "ws-0009",
+              "serial": "SN-0009",
+              "entities_id": "Root entity",
+              "computertypes_id": "Laptop",
+              "is_template": 0,
+              "date_creation": "2027-03-01 12:00:00",
+              "last_inventory_update": "2027-03-02 12:00:00",
+              "_networkports": {
+                "NetworkPortWifi": [
+                  {
+                    "id": 33,
+                    "name": "wlan0",
+                    "mac": "00:11:22:33:44:09",
+                    "NetworkName": {"IPAddress": [{"id": 55, "name": "10.60.0.9"}]}
+                  }
+                ]
+              }
+            },
+            {
+              "id": 10,
+              "name": "blueprint-template",
+              "is_template": 1,
+              "_networkports": {}
+            },
+            {
+              "id": null,
+              "name": "no-id-record",
+              "is_template": 0
+            },
+            "this-row-is-a-string-not-an-object"
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computer-7-software",
+      "match": {"method": "GET", "path": "/apirest.php/Computer/7"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 7,
+            "_softwares": [
+              {"softwares_id": "Firefox", "softwareversions_id": "128.0", "softwarecategories_id": "Browser", "is_dynamic": 1, "is_valid": 1},
+              {"softwares_id": "Firefox", "softwareversions_id": "128.0", "softwarecategories_id": "Browser"},
+              {"softwares_id": "OpenSSH", "softwareversions_id": "9.6p1"},
+              {"softwares_id": 0, "softwareversions_id": "1.0"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "computer-9-software",
+      "match": {"method": "GET", "path": "/apirest.php/Computer/9"},
+      "responses": [{"status": 200, "json": {"id": 9, "_softwares": []}}]
+    },
+    {
+      "name": "kill-session",
+      "match": {"method": "GET", "path": "/apirest.php/killSession"},
+      "responses": [{"status": 200, "json": {}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["glpi:127.0.0.1:Computer:7", "glpi:127.0.0.1:Computer:9"],
+    "min_software_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/apirest.php/initSession", "header_contains": "user_token fixture-user-token"},
+      {"method": "GET", "path": "/apirest.php/Item_OperatingSystem", "query_contains": "range=0-499"},
+      {"method": "GET", "path": "/apirest.php/Computer", "query_contains": "range=0-199"},
+      {"method": "GET", "path": "/apirest.php/Computer", "query_contains": "with_networkports=true"},
+      {"method": "GET", "path": "/apirest.php/Computer/7", "query_contains": "with_softwares=true"},
+      {"method": "GET", "path": "/apirest.php/killSession"}
+    ],
+    "requests_absent": [
+      {"path": "/apirest.php/NetworkEquipment"},
+      {"path": "/apirest.php/Printer"}
+    ],
+    "log_contains": [
+      "glpi: skipping Computer with no id: name=no-id-record",
+      "glpi: reported 2 assets from Computer"
+    ]
+  },
+  "invariants": {"skip": []}
+}

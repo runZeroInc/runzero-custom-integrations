@@ -1,0 +1,149 @@
+{
+  "name": "stuck-pagination",
+  "integration": "mosyle",
+  "description": "A Mosyle tenant that stops advancing and answers every `page` with the same page of ios devices. The walk's only exit is a page that comes back empty, so this shape produces no exit at all: it used to re-import that page until the task timed out, with nothing in the log to say why.\n\nThe no-progress check is the working guard -- the MAX_PAGES ceiling behind it is ten million records deep, and listdevices takes no page-size option at all, so the ceiling is stated in records and divided by the 500-device page Mosyle serves. A page whose row ids match the previous page's means Mosyle ignored `page` or replayed a cached response, and the walk stops on the first repeat and says so, which is what log_contains pins.\n\nPage zero carries a real device so the run still proves rows are parsed and reported; page one carries one row with neither deviceudid nor serial_number -- different content, so the walk correctly continues past it -- and page two repeats that row, which is the first genuine repeat and the stop. The stop is per OS family, so mac, tvos and visionos are still asked for once each and answer empty.\n\nMosyle reports no row total, so the message uses the no-total form rather than printing a denominator the script invented.\n\nThe route matching ios page 3 exists ONLY as a terminator for a regression. Serving the stuck page with when_exhausted=repeat_last alone would make an unguarded walk run to a 20,000-page ceiling and fail this scenario by timing out rather than by failing an assertion; with the terminator, an unguarded walk stops one request later and fails on request_count, requests_absent and the missing log line instead.\n\nnamespaced_ids is skipped: the id is the bare Mosyle deviceudid with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-access-token",
+    "email": "fixture@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Authorization": "Bearer fixture-jwt-token"
+          },
+          "json": {
+            "status": "OK"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-ios-terminator",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"ios\",\"page\":3"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-ios-stuck",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"ios\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-STUCK0",
+                  "device_name": "fixture stuck zero",
+                  "os": "iOS",
+                  "osversion": "17.5",
+                  "wifi_mac_address": "00:11:22:cc:00:01",
+                  "last_ip_beat": "10.62.0.1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "device_name": "fixture stuck page no id",
+                  "os": "iOS",
+                  "osversion": "17.5"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-drained",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "FIXTURE-UDID-STUCK0"
+    ],
+    "request_count": 7,
+    "requests_include": [
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":0"
+      },
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":2"
+      },
+      {
+        "body_contains": "\"os\":\"mac\",\"page\":0"
+      },
+      {
+        "body_contains": "\"os\":\"visionos\",\"page\":0"
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":3"
+      }
+    ],
+    "log_contains": [
+      "mosyle: pagination stopped making progress on ios at page 2; the server repeated the previous page. Retrieved 1 assets; the API does not report a total"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

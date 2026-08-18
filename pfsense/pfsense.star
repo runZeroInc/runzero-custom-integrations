@@ -4,9 +4,10 @@ CONFIG = {
     "id": "runzero-pfsense",
     "name": "pfSense",
     "type": "inbound",
-    "description": "Imports firewall objects and DHCP leases from pfSense.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "description": "Imports the pfSense firewall itself as one asset, with its interfaces, version, and Netgate serial.",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "base_url",
@@ -99,8 +100,15 @@ def _build_settings(kwargs):
     if type(auth_header) != "string":
         auth_header = "authorization"
 
+    # Read from the legacy JSON credential ONLY. There is no
+    # `insecure_skip_verify` parameter in CONFIG, and a CONFIG-based integration
+    # rejects unknown kwargs, so `kwargs.get("insecure_skip_verify", ...)` could
+    # never see a value an operator set -- it was unreachable code that read as
+    # a supported option. TLS validation is controlled by `tls_disable_validation`
+    # from the OPTIONS_TLS include, which get_http_tls collects below; this key
+    # survives only so an existing legacy JSON credential keeps working.
     insecure_skip_verify = _parse_bool(
-        kwargs.get("insecure_skip_verify", parsed_secret.get("insecure_skip_verify", False)),
+        parsed_secret.get("insecure_skip_verify", False),
         False,
     )
 
@@ -150,12 +158,19 @@ def _pick(payload, keys, default_value):
     return default_value
 
 def _extract_interfaces(payload):
+    # The caller hands this straight through from get(), which returns None when
+    # the endpoint could not be read, so guard both the payload and the list it
+    # is expected to carry before reading either.
+    if type(payload) != "dict":
+        return []
     data = payload.get("data")
-    if data == None:
+    if type(data) != "list":
         return []
 
     interfaces = []
     for item in data:
+        if type(item) != "dict":
+            continue
         interface = NetworkInterface()
         mac = item.get("macaddr")
         if mac != None and mac != "":
@@ -184,13 +199,17 @@ def _sanitize_identifier(value):
 
 def get(settings, http_options, path):
     url = settings.get("base_url") + path
-    print("INFO: ", url)
     decoded, status_text, _ = _request_json(url, http_options)
     if decoded != None:
-        system_data = decoded
-        endpoint_used = path
+        return decoded, path
 
-        return system_data, endpoint_used
+    # Always return the pair. Falling off the end here returned a bare None,
+    # and every caller unpacks this into two variables, so any failed request —
+    # an unreachable endpoint, an empty body, an unexpected shape — aborted the
+    # script on the assignment instead of degrading to the defaults that _pick
+    # already provides.
+    print("pfsense: no usable response from {}: {}".format(path, status_text))
+    return None, path
 
 def getVersion(settings, http_options):
     system_data, _ = get(settings, http_options, "/api/v2/system/version")
@@ -216,10 +235,10 @@ def getSystemInfo(settings, http_options):
 def main(*args, **kwargs):
     settings = _build_settings(kwargs)
     if not settings.get("base_url"):
-        print("ERROR: base_url is required, or include base_url in legacy_credentials JSON.")
+        print("pfsense: base_url is required, or include base_url in legacy_credentials JSON")
         return []
     if not settings.get("api_token"):
-        print("ERROR: api_token is required, or include api_token in legacy_credentials JSON.")
+        print("pfsense: api_token is required, or include api_token in legacy_credentials JSON")
         return []
 
     headers = _build_headers(settings.get("api_token"), settings.get("auth_header"))
@@ -260,5 +279,6 @@ def main(*args, **kwargs):
         networkInterfaces=network_interfaces,
         customAttributes=to_custom_attributes(attrs),
     ))
+    print("pfsense: reported 1 asset")
     return None
 

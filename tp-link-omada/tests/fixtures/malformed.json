@@ -1,0 +1,130 @@
+{
+  "name": "malformed",
+  "integration": "tp-link-omada",
+  "description": "Rows in the shapes a real controller and a firmware variation can produce: a bare string where an object belongs, a device with no mac, a device whose mac is all zeroes, a device whose result is a bare list rather than a paginated envelope, a client whose only address is APIPA, a client named after its own MAC, and a client whose lastSeen is years in the future. Every unusable row must be skipped with the run continuing, the future timestamp must be clamped rather than failing the whole record, and the unpaginated device result must end the walk after one page rather than looping on it.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret",
+    "site_ids": "660293f1ae766909a69251d4"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/openapi/authorize/token"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {"accessToken": "AT-malformed", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT-malformed"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": [
+              "not-a-device",
+              {"type": "ap", "name": "No-MAC-AP", "model": "EAP245(EU) v3.0", "ip": "192.0.2.31", "status": 1},
+              {"type": "switch", "mac": "00-00-00-00-00-00", "name": "Zero-MAC-SW", "model": "TL-SG2210P", "ip": "192.0.2.32", "status": 1},
+              {
+                "type": "ap",
+                "mac": "50-D4-F7-66-0D-9C",
+                "name": "Reception-AP",
+                "model": "EAP245(EU) v3.0",
+                "ip": "192.0.2.31",
+                "status": 1,
+                "sn": "22394A7000123",
+                "firmwareVersion": "5.1.0 Build 20230518 Rel. 60119"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 3,
+              "currentPage": 1,
+              "currentSize": 3,
+              "data": [
+                {
+                  "mac": "3C-22-FB-99-88-77",
+                  "name": "3C-22-FB-99-88-77",
+                  "ip": "169.254.11.22",
+                  "ipv6List": ["fe80::1234:5678:9abc:def0"],
+                  "wireless": true,
+                  "ssid": "Corp-WiFi",
+                  "active": true
+                },
+                {
+                  "mac": "3C-22-FB-11-22-33",
+                  "name": "clock-skewed-laptop",
+                  "ip": "192.0.2.101",
+                  "wireless": true,
+                  "ssid": "Corp-WiFi",
+                  "active": true,
+                  "lastSeen": 4102444800000
+                },
+                {
+                  "mac": "not-a-mac-at-all",
+                  "name": "bogus-client",
+                  "ip": "192.0.2.199",
+                  "active": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"errorCode": -1600, "msg": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:50:D4:F7:66:0D:9C",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:99:88:77",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:33"
+    ],
+    "assets": [
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:99:88:77",
+        "fields_absent": ["ipAddresses", "hostnames"]
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:33",
+        "fields": {"hostnames": "clock-skewed-laptop"}
+      }
+    ],
+    "log_contains": [
+      "skipping device row that is not an object",
+      "skipping device with no usable mac in site 660293f1ae766909a69251d4",
+      "skipping client with no usable mac in site 660293f1ae766909a69251d4"
+    ]
+  },
+
+  "invariants": {"skip": ["no_mac_in_id"]},
+  "check_determinism": true
+}

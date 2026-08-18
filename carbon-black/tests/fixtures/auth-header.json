@@ -1,0 +1,111 @@
+{
+  "name": "auth-header",
+  "integration": "carbon-black",
+  "description": "REGRESSION LOCK on the X-Auth-Token header. Carbon Black documents the header as <API Secret Key>/<API ID>, secret first, with the Org Key appearing only in the request path. This script built it as <api_key>/<organization_key> and CONFIG declared no API ID parameter at all, so the API ID was never sent and no request could authenticate against a real tenant.\n\nEvery route here matches on the correct header and anything else falls through to a 401, which is what a real tenant does -- so a wrong header produces zero assets rather than a passing run. The three values are deliberately distinct strings with no shared substring: the secret is 'fixture-api-key', the API ID 'SYNAPIID01', the Org Key 'SYNORG01'. requests_absent then pins the Org Key OUT of the header while requests_include pins it INTO the path, which is the actual distinction the defect got wrong.\n\nBoth header construction sites are covered: the device scroll and the per-device vulnerability search each carry it independently.\n\nSkips namespaced_ids: build_assets sets id=device_id, a bare Carbon Black device number with no organization_key scope, which the happy scenario records as a separate defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "organization_key": "SYNORG01",
+    "api_id": "SYNAPIID01",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "scroll",
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "header": {"x-auth-token": "fixture-api-key/SYNAPIID01"}
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": [
+              {
+                "id": 2001,
+                "name": "syn-auth-01",
+                "os": "LINUX",
+                "os_version": "Ubuntu 22.04.3 LTS",
+                "last_internal_ip_address": "10.30.5.21",
+                "mac_address": "00:50:56:00:00:21",
+                "sensor_version": "2.14.0.1234",
+                "status": "REGISTERED",
+                "deployment_type": "WORKLOAD"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns-2001",
+      "match": {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/2001/vulnerabilities/_search",
+        "header": {"x-auth-token": "fixture-api-key/SYNAPIID01"}
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": [
+              {
+                "vuln_info": {
+                  "cve_id": "CVE-2021-44228",
+                  "cve_description": "Synthetic fixture description for a remote code execution issue in a logging library.",
+                  "severity": "CRITICAL",
+                  "risk_meter_score": 9.8,
+                  "solution": "Upgrade the affected package to a fixed release."
+                }
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 401,
+    "json": {"error_code": "UNAUTHORIZED", "message": "Authentication failed"}
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": ["2001"],
+    "assets": [
+      {"id": "2001", "fields": {"hostnames": "syn-auth-01", "deviceType": "Server"}}
+    ],
+    "min_vulnerabilities_total": 1,
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "header": {"x-auth-token": "fixture-api-key/SYNAPIID01"}
+      },
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/2001/vulnerabilities/_search",
+        "header": {"x-auth-token": "fixture-api-key/SYNAPIID01"}
+      }
+    ],
+    "requests_absent": [
+      {"header": {"x-auth-token": "SYNORG01"}}
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

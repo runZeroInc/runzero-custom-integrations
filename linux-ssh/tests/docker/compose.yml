@@ -1,0 +1,70 @@
+# A real OpenSSH server, reached over a real SSH transport.
+#
+# Together with mssql-databases this is one of the two stacks whose integration
+# is not HTTP at all. linux-ssh.star loads `runzero.ssh` and dials a TCP SSH
+# session, so until this case existed nothing in the repository had ever run it:
+# the fixture harness serves HTTP and has no SSH server to offer, and there are
+# no linux-ssh fixtures at all. Key exchange, publickey authentication, host-key
+# verification, `session.run` and the command output parsing are all exercised
+# here for the first time.
+#
+# The tag is a full LinuxServer build tag rather than a version alias, so both
+# the OpenSSH version and the Alpine base are pinned. That matters more than
+# usual here: every fact the integration collects is scraped from the *text* of
+# `hostname`, `/etc/os-release`, `uname -r` and `ip -o link show`, so a base
+# image that moved from iproute2 to BusyBox's `ip`, or reworded PRETTY_NAME,
+# would change what the script parses without changing the script.
+services:
+  sshd:
+    image: linuxserver/openssh-server:10.3_p1-r0-ls233
+    # The integration reports `hostname -f` as the asset's hostname. Pinning it
+    # makes that assertable; the default is the random container id, which would
+    # differ on every run -- and a bare hex container id is exactly the kind of
+    # non-identity the no_placeholder_hostnames invariant exists to catch.
+    hostname: rz-linux
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      USER_NAME: runzero
+      # Key-only. Leaving password authentication off is what proves the
+      # publickey path is the one actually under test: if the runtime silently
+      # fell back to a password the connection would simply be refused, rather
+      # than passing for the wrong reason.
+      PASSWORD_ACCESS: "false"
+      SUDO_ACCESS: "false"
+    networks:
+      lan:
+        ipv4_address: 10.222.9.2
+    # Pinned so the interface the integration scrapes out of `ip -o link show`
+    # is a constant. Docker otherwise mints a random address per container and
+    # the emitted MAC would differ on every run.
+    #
+    # The 02 prefix sets the locally-administered bit, and unlike the
+    # adguard-home and pihole stacks the asset here carries it UNCHANGED:
+    # 02:42:0a:de:09:02, not 00:42:0a:de:09:02. Those integrations build
+    # interfaces with the platform's network_interface() helper, which clears
+    # that bit; linux-ssh.star constructs runzero.types.NetworkInterface
+    # directly, and no normalisation happens at the ImportAsset boundary. The
+    # manifest asserts the raw value, and the contrast is the point -- the two
+    # code paths do not agree, and only one of them is visible in a fixture.
+    mac_address: "02:42:0a:de:09:02"
+    ports:
+      # The image's sshd listens on 2222, not 22.
+      - "${RZ_HOST_PORT}:2222"
+
+networks:
+  lan:
+    # Fixed rather than left to Docker's address pool: the address the
+    # integration reads off eth0 is asserted directly, so it cannot come from a
+    # pool that assigns a different subnet on a different host.
+    #
+    # 10.222.9.0/24 sits clear of Docker's default pools and of the subnets the
+    # adguard-home (10.222.7.0/24) and pihole (10.222.8.0/24) stacks pin. None
+    # of the three ever runs at the same time, but a distinct subnet keeps a
+    # stale network left by any of them from blocking this one.
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.222.9.0/24
+          gateway: 10.222.9.1

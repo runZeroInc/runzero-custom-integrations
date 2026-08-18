@@ -1,0 +1,94 @@
+{
+  "name": "paged",
+  "integration": "maze-security",
+  "description": "Three-page cursor walk. Proves the next_cursor from each response is echoed back in the body of the following request, that the walk stops on has_more:false even though a cursor is still present, and -- the point of grouping across pages -- that the same asset seen on page 1 and page 3 collapses into ONE asset carrying both vulnerabilities rather than two.\n\nnamespaced_ids is skipped: Maze ids are bare vendor strings with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "days_back": "30"
+  },
+  "routes": [
+    {
+      "name": "page-1",
+      "match": {"method": "POST", "path": "/v1/investigations/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": true,
+            "next_cursor": "fixture-cursor-page-2",
+            "data": [
+              {
+                "id": "inv-p1-a",
+                "cve_id": "CVE-2024-10001",
+                "maze_severity": "HIGH",
+                "exploitability": "exploitable",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-10001::span-01.corp.example.com",
+                "snapshot": {"cvss": {"base_score": 8.1, "version": "3.1"}},
+                "vulnerability_root_cause_analysis": [
+                  {"title": "Operating system", "actual_value": "Debian"}
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "has_more": true,
+            "next_cursor": "fixture-cursor-page-3",
+            "data": [
+              {
+                "id": "inv-p2-a",
+                "cve_id": "CVE-2024-10002",
+                "maze_severity": "MEDIUM",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-10002::page2-only.corp.example.com",
+                "snapshot": {"cvss": {"base_score": 4.3, "version": "3.1"}}
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "next_cursor": "fixture-cursor-never-followed",
+            "data": [
+              {
+                "id": "inv-p3-a",
+                "cve_id": "CVE-2024-10003",
+                "maze_severity": "CRITICAL",
+                "exploitability": "exploitable",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-10003::span-01.corp.example.com",
+                "snapshot": {"cvss": {"base_score": 9.1, "version": "3.1"}}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "span-01.corp.example.com",
+        "fields": {"maze_finding_count": "2", "os": "Debian"}
+      },
+      {
+        "id": "page2-only.corp.example.com",
+        "fields": {"maze_finding_count": "1"}
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "body_contains": "fixture-cursor-page-2"},
+      {"method": "POST", "body_contains": "fixture-cursor-page-3"}
+    ],
+    "requests_absent": [{"body_contains": "fixture-cursor-never-followed"}],
+    "log_contains": ["Reported 2 assets from 3 investigations"]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

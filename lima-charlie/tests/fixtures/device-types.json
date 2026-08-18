@@ -1,0 +1,93 @@
+{
+  "name": "device-types",
+  "integration": "lima-charlie",
+  "description": "The `plat` platform constant is the only form-factor signal a LimaCharlie sensor carries -- the sensor object has no chassis, role, or server/workstation field at all -- and only two of its values imply one. This scenario pins both halves of that.\n\nThe iOS (0x40000000) and Android (0x50000000) sensors must come out as Mobile. The Windows (0x10000000), Linux (0x20000000) and macOS (0x30000000) sensors must come out with NO deviceType: those platforms run on desktops, laptops and servers alike, so claiming a form factor from them would override runZero's own fingerprinting with a guess. The sensor reporting no `plat` at all covers the same path for a field that is absent rather than uninteresting.\n\nnamespaced_ids is skipped: id=sid is the bare LimaCharlie sensor uuid with no organization scope, the same defect happy.json records.",
+  "kwargs": {
+    "url": "$BASE",
+    "jwt_url": "$BASE",
+    "organization_id": "8bd1f0e2-0000-4000-8000-000000000001",
+    "api_token": "fixture-lc-secret"
+  },
+  "routes": [
+    {
+      "name": "jwt-exchange",
+      "match": {"method": "POST", "path": "/", "query_contains": "oid=8bd1f0e2-0000-4000-8000-000000000001"},
+      "responses": [{"status": 200, "json": {"jwt": "fixture-lc-jwt"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors",
+      "match": {"method": "GET", "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "sensors": [
+              {
+                "sid": "bbbb0001-0000-4000-8000-000000000001",
+                "hostname": "syn-lc-iphone",
+                "arch": 4,
+                "plat": 1073741824,
+                "int_ip": "192.0.2.20",
+                "mac_addr": "00-11-22-33-45-01"
+              },
+              {
+                "sid": "bbbb0002-0000-4000-8000-000000000002",
+                "hostname": "syn-lc-android",
+                "arch": 4,
+                "plat": 1342177280,
+                "int_ip": "192.0.2.21",
+                "mac_addr": "00-11-22-33-45-02"
+              },
+              {
+                "sid": "bbbb0003-0000-4000-8000-000000000003",
+                "hostname": "syn-lc-windows",
+                "arch": 2,
+                "plat": 268435456,
+                "int_ip": "192.0.2.22",
+                "mac_addr": "00-11-22-33-45-03"
+              },
+              {
+                "sid": "bbbb0004-0000-4000-8000-000000000004",
+                "hostname": "syn-lc-linux",
+                "arch": 2,
+                "plat": 536870912,
+                "int_ip": "192.0.2.23",
+                "mac_addr": "00-11-22-33-45-04"
+              },
+              {
+                "sid": "bbbb0005-0000-4000-8000-000000000005",
+                "hostname": "syn-lc-macos",
+                "arch": 4,
+                "plat": 805306368,
+                "int_ip": "192.0.2.24",
+                "mac_addr": "00-11-22-33-45-05"
+              },
+              {
+                "sid": "bbbb0006-0000-4000-8000-000000000006",
+                "hostname": "syn-lc-no-plat",
+                "arch": 2,
+                "int_ip": "192.0.2.25",
+                "mac_addr": "00-11-22-33-45-06"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 6,
+    "assets": [
+      {"id": "bbbb0001-0000-4000-8000-000000000001", "fields": {"hostnames": "syn-lc-iphone", "deviceType": "Mobile"}},
+      {"id": "bbbb0002-0000-4000-8000-000000000002", "fields": {"hostnames": "syn-lc-android", "deviceType": "Mobile"}},
+      {"id": "bbbb0003-0000-4000-8000-000000000003", "fields": {"hostnames": "syn-lc-windows"}, "fields_absent": ["deviceType"]},
+      {"id": "bbbb0004-0000-4000-8000-000000000004", "fields": {"hostnames": "syn-lc-linux"}, "fields_absent": ["deviceType"]},
+      {"id": "bbbb0005-0000-4000-8000-000000000005", "fields": {"hostnames": "syn-lc-macos"}, "fields_absent": ["deviceType"]},
+      {"id": "bbbb0006-0000-4000-8000-000000000006", "fields": {"hostnames": "syn-lc-no-plat"}, "fields_absent": ["deviceType"]}
+    ],
+    "request_count": 2
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

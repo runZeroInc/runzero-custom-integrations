@@ -1,0 +1,105 @@
+{
+  "name": "auth-refresh",
+  "integration": "tp-link-omada",
+  "description": "The controller reports an expired access token the way it really does -- HTTP 200 with errorCode -44112 in the envelope, not a 401 -- on the first devices request, and answers normally after the token is re-minted. Proves the envelope error code is inspected rather than only the HTTP status, that exactly one extra token exchange happens, and that the retried request carries the new token. A 429 on the token exchange is also served once, which get_json retries on its own.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret",
+    "extract_clients": "false"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/openapi/authorize/token"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"errorCode": -44100, "msg": "Too many requests."}},
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {"accessToken": "AT-first", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT-first"}
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {"accessToken": "AT-second", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT-second"}
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "match": {"method": "GET", "path": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 1,
+              "currentPage": 1,
+              "currentSize": 1,
+              "data": [{"siteId": "660293f1ae766909a69251d4", "name": "Branch-Hamburg", "region": "Germany", "timeZone": "Europe/Amsterdam", "scenario": "Office", "type": 0}]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/devices"},
+      "responses": [
+        {"status": 200, "json": {"errorCode": -44112, "msg": "Invalid access token.", "result": null}},
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 1,
+              "currentPage": 1,
+              "currentSize": 1,
+              "data": [
+                {
+                  "type": "ap",
+                  "mac": "50-D4-F7-66-0D-9C",
+                  "name": "Reception-AP",
+                  "model": "EAP245(EU) v3.0",
+                  "ip": "192.0.2.31",
+                  "status": 1,
+                  "sn": "22394A7000123",
+                  "firmwareVersion": "5.1.0 Build 20230518 Rel. 60119",
+                  "uptime": "1h 43m"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"errorCode": -1600, "msg": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 1,
+    "ids": ["tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:50:D4:F7:66:0D:9C"],
+    "requests_include": [
+      {"method": "POST", "path_contains": "/openapi/authorize/token"},
+      {"method": "GET", "path_contains": "/devices", "header_contains": "AccessToken=AT-first"},
+      {"method": "POST", "path_contains": "/openapi/authorize/token"},
+      {"method": "GET", "path_contains": "/devices", "header_contains": "AccessToken=AT-second"}
+    ],
+    "log_contains": ["returned token errorCode -44112, refreshing the access token"]
+  },
+
+  "invariants": {"skip": ["no_mac_in_id"]},
+  "check_determinism": true
+}

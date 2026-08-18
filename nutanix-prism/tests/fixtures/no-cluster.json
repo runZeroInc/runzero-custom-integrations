@@ -1,0 +1,33 @@
+{
+  "name": "no-cluster",
+  "integration": "nutanix-prism",
+  "description": "The /cluster bootstrap is the identity namespace and the integration documents that it aborts without it. Prism rejects the credential on that first call; the run must stop there, report the credential problem, and never fetch hosts or VMs -- because any asset it emitted would carry an unscoped id that collides with the same estate imported through another Controller VM.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-viewer",
+    "password": "wrong-password",
+    "import_vms": "true",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "cluster-rejects",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      "responses": [
+        {"status": 401, "json": {"message": "Basic authentication failed", "message_list": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 500, "text": "no request should reach this fixture after the cluster call fails"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/hosts"},
+      {"path_contains": "/vms"}
+    ],
+    "log_contains": ["authentication rejected, check the username and password"]
+  },
+  "invariants": {"skip": []}
+}

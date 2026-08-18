@@ -1,0 +1,106 @@
+{
+  "name": "detail-cap",
+  "integration": "glpi",
+  "description": "Software enrichment is one extra request per computer, so detail_limit caps it. With the limit set to 1 and three computers on the page, only the first may be enriched, the other two must still be imported without software, and the skip count must be logged. requests_absent is what proves the N+1 was actually stopped rather than the software merely being discarded after the call.",
+  "kwargs": {
+    "url": "$BASE",
+    "user_token": "fixture-user-token",
+    "include_software": "true",
+    "detail_limit": "1",
+    "include_network_devices": "false"
+  },
+  "routes": [
+    {
+      "name": "init-session",
+      "match": {"method": "GET", "path": "/apirest.php/initSession"},
+      "responses": [{"status": 200, "json": {"session_token": "fixture-session-token"}}]
+    },
+    {
+      "name": "item-operating-system",
+      "match": {"method": "GET", "path": "/apirest.php/Item_OperatingSystem"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "software-catalog",
+      "match": {"method": "GET", "path": "/apirest.php/Software"},
+      "responses": [{"status": 200, "json": [{"id": 300, "name": "Firefox", "manufacturers_id": "Mozilla"}]}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computer-collection",
+      "match": {"method": "GET", "path": "/apirest.php/Computer"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1,
+              "name": "cap-host-01",
+              "computertypes_id": "Server",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {"id": 11, "name": "eth0", "mac": "00:11:22:80:00:01", "NetworkName": {"IPAddress": [{"name": "10.80.0.1"}]}}
+                ]
+              }
+            },
+            {
+              "id": 2,
+              "name": "cap-host-02",
+              "computertypes_id": "Server",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {"id": 12, "name": "eth0", "mac": "00:11:22:80:00:02", "NetworkName": {"IPAddress": [{"name": "10.80.0.2"}]}}
+                ]
+              }
+            },
+            {
+              "id": 3,
+              "name": "cap-host-03",
+              "computertypes_id": "Server",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {"id": 13, "name": "eth0", "mac": "00:11:22:80:00:03", "NetworkName": {"IPAddress": [{"name": "10.80.0.3"}]}}
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computer-1-software",
+      "match": {"method": "GET", "path": "/apirest.php/Computer/1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"id": 1, "_softwares": [{"softwares_id": "Firefox", "softwareversions_id": "128.0"}]}
+        }
+      ]
+    },
+    {
+      "name": "kill-session",
+      "match": {"method": "GET", "path": "/apirest.php/killSession"},
+      "responses": [{"status": 200, "json": {}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "glpi:127.0.0.1:Computer:1",
+      "glpi:127.0.0.1:Computer:2",
+      "glpi:127.0.0.1:Computer:3"
+    ],
+    "min_software_total": 1,
+    "requests_include": [{"method": "GET", "path": "/apirest.php/Computer/1", "query_contains": "with_softwares=true"}],
+    "requests_absent": [
+      {"path": "/apirest.php/Computer/2"},
+      {"path": "/apirest.php/Computer/3"}
+    ],
+    "log_contains": [
+      "glpi: software enrichment limit of 1 reached; software was not imported for 2 computers"
+    ]
+  },
+  "invariants": {"skip": []}
+}

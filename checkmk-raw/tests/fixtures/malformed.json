@@ -1,0 +1,263 @@
+{
+  "name": "malformed",
+  "integration": "checkmk-raw",
+  "description": "Every degenerate shape the two collections can hand back, in one run, proving each is skipped or absorbed and that the walk keeps going to the good host at the end. In the configuration collection: a null id, a bare string where a domain object belongs, and an entry whose effective_attributes is null so the parser must fall back to the plain attributes -- which is the shipped default, because effective_attributes is only populated when the query parameter asks for it. In the monitoring collection: a row with neither an id nor a name column, which is the only row that may be dropped; a row whose extensions is a string rather than an object; a row whose mk_inventory is still the undecoded on-disk repr string rather than a tree; and a row whose inventory holds an all-zero MAC, a non-dict table row, an unparseable MAC, a loopback address, and an APIPA address, none of which may reach an interface while the address Checkmk actually polls survives. That last host is the one that matters: link-local is deliberately kept by the platform's own address filter, so an integration that fails to screen 169.254/16 would correlate every DHCP-failed host in an estate onto one asset. Structure follows Checkmk 2.3 constructors and structured_data.SDRawTree; all data is synthetic.",
+  "kwargs": {
+    "url": "$BASE",
+    "site": "mysite",
+    "username": "automation",
+    "password": "fixture-automation-secret"
+  },
+  "routes": [
+    {
+      "name": "host_config",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host_config/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host_config",
+            "links": [],
+            "extensions": {},
+            "value": [
+              {
+                "domainType": "host_config",
+                "id": null,
+                "title": "a host whose id never serialized",
+                "links": [],
+                "members": {},
+                "extensions": {"folder": "/", "attributes": {"ipaddress": "192.0.2.200"}, "effective_attributes": null, "is_cluster": false, "is_offline": false, "cluster_nodes": null}
+              },
+              "not-an-object",
+              {
+                "domainType": "host_config",
+                "id": "ok01.example.com",
+                "title": "ok01.example.com",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "folder": "/servers",
+                  "attributes": {"ipaddress": "192.0.2.51", "tag_criticality": "prod"},
+                  "effective_attributes": null,
+                  "is_cluster": false,
+                  "is_offline": false,
+                  "cluster_nodes": null
+                }
+              },
+              {
+                "domainType": "host_config",
+                "id": "weird01",
+                "title": "weird01",
+                "links": [],
+                "members": {},
+                "extensions": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host_status",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host",
+            "links": [],
+            "extensions": {},
+            "value": [
+              {
+                "domainType": "host",
+                "id": "",
+                "title": "",
+                "links": [],
+                "members": {},
+                "extensions": {"name": "", "address": "192.0.2.99", "state": 0}
+              },
+              {
+                "domainType": "host",
+                "id": "broken01",
+                "title": "broken01",
+                "links": [],
+                "members": {},
+                "extensions": "not-an-object"
+              },
+              {
+                "domainType": "host",
+                "id": "weird01",
+                "title": "weird01",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "name": "weird01",
+                  "address": "not-an-ip",
+                  "alias": "",
+                  "state": "purple",
+                  "last_check": "never",
+                  "groups": "linux",
+                  "labels": [],
+                  "tags": "nope",
+                  "num_services": null,
+                  "mk_inventory": "{'Nodes': {}}"
+                }
+              },
+              {
+                "domainType": "host",
+                "id": "badnic01",
+                "title": "badnic01",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "name": "badnic01",
+                  "address": "192.0.2.41",
+                  "state": 1,
+                  "last_check": 1755300000,
+                  "groups": [],
+                  "labels": {},
+                  "tags": {},
+                  "mk_inventory": {
+                    "Attributes": {},
+                    "Table": {},
+                    "Nodes": {
+                      "hardware": {
+                        "Attributes": {},
+                        "Table": {},
+                        "Nodes": {
+                          "nwadapter": {
+                            "Attributes": {},
+                            "Table": {
+                              "KeyColumns": ["name"],
+                              "Rows": [
+                                {"name": "lo", "macaddress": "00:00:00:00:00:00", "ipv4_address": "127.0.0.1"},
+                                "not-a-row",
+                                {"name": "eth1", "macaddress": "not-a-mac", "ipv4_address": "169.254.10.1"}
+                              ]
+                            },
+                            "Nodes": {}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "domainType": "host",
+                "id": "ok01.example.com",
+                "title": "ok01.example.com",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "name": "ok01.example.com",
+                  "address": "192.0.2.51",
+                  "alias": "ok01.example.com",
+                  "state": 0,
+                  "state_type": 1,
+                  "has_been_checked": 1,
+                  "last_check": 1755300000,
+                  "groups": ["linux"],
+                  "labels": {"cmk/os_family": "linux"},
+                  "tags": {"criticality": "prod"},
+                  "num_services": 8,
+                  "mk_inventory": {
+                    "Attributes": {},
+                    "Table": {},
+                    "Nodes": {
+                      "hardware": {
+                        "Attributes": {},
+                        "Table": {},
+                        "Nodes": {
+                          "system": {"Attributes": {"Pairs": {"manufacturer": "Supermicro", "product": "SYS-5019C-MR", "serial": "FIXT9876"}}, "Table": {}, "Nodes": {}},
+                          "nwadapter": {
+                            "Attributes": {},
+                            "Table": {
+                              "KeyColumns": ["name"],
+                              "Rows": [
+                                {"name": "eno1", "macaddress": "00:25:90:AA:BB:CC", "ipv4_address": "192.0.2.51"}
+                              ]
+                            },
+                            "Nodes": {}
+                          }
+                        }
+                      },
+                      "software": {
+                        "Attributes": {},
+                        "Table": {},
+                        "Nodes": {
+                          "os": {"Attributes": {"Pairs": {"name": "Debian GNU/Linux 12 (bookworm)", "version": "12", "type": "linux", "arch": "x86_64"}}, "Table": {}, "Nodes": {}}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "request_count": 2,
+    "ids": [
+      "checkmk:$HOST:mysite:broken01",
+      "checkmk:$HOST:mysite:weird01",
+      "checkmk:$HOST:mysite:badnic01",
+      "checkmk:$HOST:mysite:ok01.example.com"
+    ],
+    "assets": [
+      {
+        "id": "checkmk:$HOST:mysite:ok01.example.com",
+        "fields": {
+          "hostnames": "ok01.example.com",
+          "ipAddresses": "192.0.2.51",
+          "macAddresses": "00:25:90:aa:bb:cc",
+          "os": "Debian GNU/Linux 12 (bookworm)",
+          "manufacturer": "Supermicro",
+          "model": "SYS-5019C-MR",
+          "checkmk_system_serial": "FIXT9876",
+          "checkmk_inventory_present": "true"
+        }
+      },
+      {
+        "id": "checkmk:$HOST:mysite:badnic01",
+        "fields": {
+          "hostnames": "badnic01",
+          "ipAddresses": "192.0.2.41"
+        },
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "checkmk:$HOST:mysite:weird01",
+        "fields": {
+          "hostnames": "weird01",
+          "checkmk_inventory_present": "false"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses", "os"]
+      },
+      {
+        "id": "checkmk:$HOST:mysite:broken01",
+        "fields": {
+          "hostnames": "broken01"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "log_contains": [
+      "checkmk: skipping a monitored host with no name",
+      "checkmk: skipped 1 host records with no host name",
+      "checkmk: 2 hosts have no HW/SW inventory yet",
+      "checkmk: reported 4 hosts"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

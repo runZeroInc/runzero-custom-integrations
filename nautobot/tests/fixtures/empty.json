@@ -1,0 +1,34 @@
+{
+  "name": "empty",
+  "integration": "nautobot",
+  "description": "A Nautobot instance with nothing in it, or a token whose object permissions filter every device away - which looks identical over the API, because Nautobot enforces permissions by filtering the queryset rather than by returning 403. Every collection answers with a well-formed DRF envelope carrying an empty results list. The run must report zero assets and log that, not fail and not retry.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path_prefix": "/api/"},
+      "responses": [
+        {"status": 200, "json": {"count": 0, "next": null, "previous": null, "results": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/dcim/manufacturers/"},
+      {"method": "GET", "path": "/api/dcim/devices/"},
+      {"method": "GET", "path": "/api/virtualization/virtual-machines/"}
+    ],
+    "requests_absent": [
+      {"path": "/api/dcim/interfaces/"},
+      {"path": "/api/virtualization/interfaces/"}
+    ],
+    "log_contains": ["nautobot: no assets retrieved"]
+  },
+  "check_determinism": false,
+  "invariants": {"skip": []}
+}

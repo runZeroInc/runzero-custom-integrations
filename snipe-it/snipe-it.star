@@ -5,8 +5,9 @@ CONFIG = {
     "name": "Snipe-IT",
     "type": "inbound",
     "description": "Imports hardware assets from Snipe-IT.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "url",
@@ -23,6 +24,25 @@ CONFIG = {
             "required": True,
             "description": "API token used to authenticate to Snipe-IT.",
         },
+        {
+            "key": "page_size",
+            "label": "Hardware per page",
+            "type": "int",
+            "required": False,
+            "default": 500,
+            "min": 1,
+            "max": 1000,
+            "description": "Hardware records requested per page. Snipe-IT's own default when no limit is sent is 50, and some installs cap the limit below what is asked for; neither truncates the import, because paging continues until the reported total is reached.",
+        },
+        {
+            "key": "max_assets",
+            "label": "Maximum assets",
+            "type": "int",
+            "required": False,
+            "default": 0,
+            "min": 0,
+            "description": "Cap on the number of assets imported in one run, as a safety valve on a very large register. 0, the default, imports every record; a run stopped by the cap says so in the task log.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -31,10 +51,60 @@ CONFIG = {
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
-load('http', 'get_json', 'bearer')
-load('kwargs', 'get_url_base', 'get_http_options')
+load('http', 'get_json', 'bearer', 'url_parse')
+load('kwargs', 'get_url_base', 'get_http_options', 'get_int')
 
-def build_assets(assets_json):
+VENDOR = "snipe-it"
+
+DEFAULT_PAGE_SIZE = 500
+
+# Snipe-IT custom field formats that hold an address. The custom_fields map is
+# keyed by the operator's own field NAME, so no name can be assumed; the
+# field_format Snipe-IT records alongside the value identifies the content
+# whatever the field was called. The names are a fallback for a field created
+# with the free-form ANY format, which carries no usable field_format.
+IP_FIELD_FORMATS = ['ip', 'ipv4', 'ipv6']
+IP_FIELD_NAMES = ['ip', 'ip address', 'ipv4 address', 'ipv6 address']
+
+
+def custom_field_ips(custom_fields):
+    """Return the IP addresses recorded in an asset's custom fields.
+
+    A v7 hardware row carries NO address data of its own -- verified against a
+    real snipe/snipe-it:v7.0.13 container. This script used to read
+    asset['networks'] and walk networks['v4'] and networks['v6'], a key the API
+    never returns, so every address it claimed to import was dead code and the
+    MAC was the only thing that ever reached an interface.
+
+    Snipe-IT stores an address the same way it stores the MAC this script
+    already reads: in a custom field on the model's fieldset.
+    """
+    if type(custom_fields) != 'dict':
+        return []
+    ips = []
+    for name in custom_fields:
+        entry = custom_fields[name]
+        if type(entry) != 'dict':
+            continue
+        value = entry.get('value')
+        if type(value) != 'string' or not value.strip():
+            continue
+        field_format = str(entry.get('field_format') or '').strip().lower()
+        if field_format not in IP_FIELD_FORMATS and str(name).strip().lower() not in IP_FIELD_NAMES:
+            continue
+        # One field can hold several addresses on a multi-homed host.
+        for part in value.split(','):
+            text = part.strip()
+            if text and text not in ips:
+                ips.append(text)
+    return ips
+
+# Bound on the paging loop. A server that keeps answering with a full page --
+# because it ignores 'offset', or because its 'total' never settles while rows
+# are being added -- must not spin forever.
+MAX_PAGES = 10000
+
+def build_assets(assets_json, scope):
     assets_import = []
     for asset in assets_json:
         id = asset.get('id') or asset.get('asset_tag') or asset.get('serial')
@@ -57,13 +127,17 @@ def build_assets(assets_json):
         else:
             manufacturer = ''
         # Map custom fields from Snipe-IT
+        # mac is reset on every iteration. Starlark locals are function-scoped,
+        # not loop-scoped, so a row that had custom fields but no 'MAC Address'
+        # among them used to keep the PREVIOUS row's value: a monitor was
+        # imported carrying a laptop's MAC. MAC is a matching attribute, so that
+        # merged unrelated hardware onto one asset.
+        mac = None
         custom_fields = asset.get('custom_fields', {})
         if custom_fields:
             mac_info =custom_fields.get('MAC Address', {})
             if mac_info:
                 mac = mac_info.get('value', None)
-        else:
-            mac = None
 
         # Map additional Snipe-IT fields as custom attributes
         age = asset.get('age', '')
@@ -121,33 +195,37 @@ def build_assets(assets_json):
         warranty_exp = asset.get(str('warranty_expires'), '')
 
         # parse IP addresses
-        ipv4s = []
-        ipv6s = []
-        ips = []
-        networks = asset.get('networks', {})
-        if networks:
-            ipv4s = networks.get('v4', [])
-            ipv6s = networks.get('v6', [])
-            
-            if ipv4s:
-                for v4 in ipv4s:
-                    addr = v4.get('ip_address', '')
-                    ips.append(addr)
-        
-            if ipv6s:
-                for v6 in ipv6s:
-                    addr = v6.get('ip_address', '')
-                    ips.append(addr)        
+        #
+        # These come from the custom fields, not from asset['networks']: that
+        # key does not exist in the v7 API, verified against a real
+        # snipe/snipe-it:v7.0.13 container, so the block that read it imported
+        # nothing while looking like it imported addresses.
+        ips = custom_field_ips(custom_fields)
 
-        network = network_interface(ips=[], mac=mac)
-        
+        # The addresses collected above are passed through: network_interface
+        # used to be called with ips=[], which discarded every IP the asset
+        # reported and left the MAC as the only possible interface.
+        #
+        # It returns None when nothing usable survives, and a stock Snipe-IT
+        # install has no 'MAC Address' custom field at all, so a row with no MAC
+        # and no networks is the common case rather than the exception. Passing
+        # [None] to ImportAsset aborts the whole run, losing every row already
+        # parsed, so the interface is only added when one was actually built.
+        network = network_interface(ips=ips, mac=mac)
+        interfaces = [network] if network else []
+
         assets_import.append(
             ImportAsset(
-                id=str(id),
+                # Snipe-IT's hardware id is a per-instance auto-increment
+                # primary key: every install numbers its register from 1, so a
+                # bare '1' collides with the '1' of every other Snipe-IT. The
+                # id is scoped on the hostname of the configured URL so two
+                # instances imported into one runZero account stay apart.
+                id='{}:{}:hardware:{}'.format(VENDOR, scope, id),
                 model=model,
                 deviceType=device_type,
                 manufacturer=manufacturer,
-                networkInterfaces=[network],
+                networkInterfaces=interfaces,
                 customAttributes=to_custom_attributes({
                     "age": age,
                     "asset.tag": asset_tag,
@@ -183,24 +261,114 @@ def build_assets(assets_json):
         )
     return assets_import
 
+def to_count(value):
+    """Return a non-negative int for a value that may arrive as an int, a float
+    or a numeric string, and 0 for anything else.
+
+    Comparing an int against a string aborts the script and Starlark has no way
+    to catch it, so 'total' is never used in the shape it arrives in.
+    """
+    if type(value) == 'int':
+        return value if value > 0 else 0
+    if type(value) == 'float':
+        return int(value) if value > 0 else 0
+    if type(value) == 'string':
+        text = value.strip()
+        if text.isdigit():
+            return int(text)
+    return 0
+
+
+def stream_assets(base_url, scope, http_options, page_size, max_assets):
+    """Page through /api/v1/hardware with limit and offset, building and
+    streaming each page via report_assets so the whole register is never held in
+    memory at once. Returns the number of assets reported.
+
+    The offset advances by the number of ROWS received rather than by the number
+    of assets reported: build_assets drops rows with no id, asset_tag or serial,
+    so advancing by the reported count would request those same rows again.
+    """
+    url = '{}/{}'.format(base_url, 'api/v1/hardware')
+    fetched = 0
+    reported = 0
+    total = 0
+    complete = False
+
+    for page in range(MAX_PAGES):
+        params = {'limit': page_size, 'offset': fetched}
+        data, err = get_json(url, params=params, **http_options)
+        if err:
+            print('snipe-it: failed to retrieve hardware at offset {}: {}'.format(fetched, err))
+            return reported
+        data = data or {}
+        rows = data.get('rows', [])
+        if type(rows) != 'list':
+            print('snipe-it: hardware at offset {} answered with no usable rows; stopping'.format(fetched))
+            return reported
+        # 'total' counts every record matching the request, not the ones on this
+        # page. It is re-read every time because the register can grow between
+        # two requests, and kept from the previous page when a response omits it.
+        total = to_count(data.get('total')) or total
+        if not rows:
+            complete = True
+            break
+
+        fetched += len(rows)
+        reported += report_assets(build_assets(rows, scope))
+        print('snipe-it: reported {} assets from {} of {} hardware records'.format(
+            reported, fetched, total or fetched))
+
+        if max_assets and reported >= max_assets:
+            print('snipe-it: stopped at the {} asset import limit after {} hardware records; raise or clear "Maximum assets" to import the rest'.format(
+                max_assets, fetched))
+            return reported
+
+        # 'total' is the reliable end signal, so it is tested first. A short page
+        # only means the end of the register when there is no total to check
+        # against: an install that caps 'limit' below the requested page size
+        # answers every page short, and ending the run on the first one is the
+        # single-page truncation this pagination replaced.
+        if total:
+            if fetched >= total:
+                complete = True
+                break
+        elif len(rows) < page_size:
+            complete = True
+            break
+
+    if not complete:
+        print('snipe-it: stopped at the {}-page safety limit after {} hardware records; the register may be larger'.format(
+            MAX_PAGES, fetched))
+    return reported
+
+
 # build runZero network interfaces; shouldn't need to touch this
 def main(**kwargs):
     base_url = get_url_base(kwargs)
+    # The instance scope for every foreign id. Snipe-IT's hardware id is a bare
+    # per-instance auto-increment key, so without this two installs collide on
+    # 1, 2, 3.
+    parsed = url_parse(base_url)
+    scope = parsed.hostname if parsed else ''
+    if not scope:
+        print('snipe-it: could not determine the Snipe-IT host from the configured URL')
+        return None
     token = kwargs['api_token']
     http_options = get_http_options(kwargs, headers={'Accept': 'application/json', 'Authorization': bearer(token)})
 
-    # get assets
-    assets = []
-    url = '{}/{}'.format(base_url, 'api/v1/hardware')
-    data, err = get_json(url, **http_options)
-    if err:
-        print('failed to retrieve assets:', err)
-        return None
+    # CONFIG's min and max are console-side hints, so a run from the command
+    # line or an older credential can still arrive with anything. A page_size
+    # below 1 would make every page look short and end the import after one
+    # request, which is exactly the truncation this replaced.
+    page_size = get_int(kwargs, 'page_size', default=DEFAULT_PAGE_SIZE)
+    if page_size < 1:
+        page_size = DEFAULT_PAGE_SIZE
+    max_assets = get_int(kwargs, 'max_assets', default=0)
+    if max_assets < 0:
+        max_assets = 0
 
-    assets_json = (data or {}).get('rows', [])
-
-    # build and stream asset import via report_assets instead of returning a list
-    if not report_assets(build_assets(assets_json)):
+    # Hardware is streamed page by page via report_assets in stream_assets.
+    if not stream_assets(base_url, scope, http_options, page_size, max_assets):
         print('no assets')
 
     return None

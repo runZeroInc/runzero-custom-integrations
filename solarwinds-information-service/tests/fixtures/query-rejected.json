@@ -1,0 +1,31 @@
+{
+  "name": "query-rejected",
+  "integration": "solarwinds-information-service",
+  "description": "The Information Service rejects the SWQL and the run must end cleanly with nothing imported, rather than treating a rejection as an empty estate.\n\nA bad column name is the realistic failure here, not a bad credential: which columns exist depends on the Orion version and the modules installed, so an operator narrowing or extending the default query is the most likely way this call fails. SWIS answers 400 with a message naming the column.\n\nThe assertion is that get_assets returns [] on `err`, the failure reaches the log, and report_assets is still called with an empty list so the run reports 0 rather than aborting. request_count 1 pins that a rejected query is not retried into a loop -- get_json retries 5xx and 429, and a 400 is neither.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "query": "SELECT N.NoSuchColumn FROM Orion.Nodes N"
+  },
+  "routes": [
+    {
+      "name": "query",
+      "match": {"method": "GET", "path": "/SolarWinds/InformationService/v3/Json/Query"},
+      "responses": [
+        {
+          "status": 400,
+          "json": {"Message": "Invalid column name 'NoSuchColumn'."}
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "swis: failed to retrieve assets",
+      "swis: reported 0 assets"
+    ]
+  }
+}

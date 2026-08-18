@@ -5,9 +5,19 @@ CONFIG = {
     "name": "Digital Ocean",
     "type": "inbound",
     "description": "Imports droplets from DigitalOcean.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
+        {
+            "key": "url",
+            "label": "DigitalOcean API URL",
+            "type": "url",
+            "required": False,
+            "default": "https://api.digitalocean.com",
+            "placeholder": "https://api.digitalocean.com",
+            "description": "DigitalOcean's API endpoint. Override only for a regional or non-production deployment.",
+        },
         {
             "key": "api_token",
             "label": "API token",
@@ -25,7 +35,22 @@ load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
 
-DIGITAL_OCEAN_API_URL = 'https://api.digitalocean.com/v2/'
+# Used when the url parameter is unset. The endpoint stays configurable rather
+# than compiled in, so a proxy or non-production deployment can be reached
+# without editing the script. The /v2 API prefix is applied in the code below,
+# so the parameter carries only the scheme and host.
+DEFAULT_DIGITAL_OCEAN_URL = 'https://api.digitalocean.com'
+
+# Upper bound on the droplet page walk, so a server that keeps handing back a
+# next link can never spin forever.
+MAX_PAGES = 1000
+
+# Every record this integration imports comes from /v2/droplets, and a Droplet
+# is DigitalOcean's cloud compute instance -- there is no other kind of record
+# in the collection, so the role is carried by the resource itself rather than
+# guessed from an image name or size slug. runZero types the equivalent AWS and
+# GCP compute instances the same way.
+DROPLET_DEVICE_TYPE = "Server"
 
 def collect_ips(networks):
     """Pull the v4 and v6 addresses out of a DigitalOcean `networks` block."""
@@ -71,6 +96,7 @@ def build_assets(assets_json):
             hostnames=[item.get('name', '')],
             networkInterfaces=nics,
             os=image.get('distribution', ''),
+            deviceType=DROPLET_DEVICE_TYPE,
             tags=format_tags(item.get('tags')),
             customAttributes=to_custom_attributes({
                 "id": item.get('id'),
@@ -96,16 +122,47 @@ def build_assets(assets_json):
 
 def main(**kwargs):
     token = kwargs['api_token']
+    # The platform applies the CONFIG default, but fall back explicitly so the
+    # script still works if it is invoked without one.
+    base_url = (kwargs.get('url') or DEFAULT_DIGITAL_OCEAN_URL).rstrip('/')
     headers = {"Authorization": bearer(token)}
     http_options = get_http_options(kwargs, headers=headers)
 
-    data, err = get_json(DIGITAL_OCEAN_API_URL + 'droplets', **http_options)
-    if err:
-        print('failed to retrieve droplets:', err)
-        return None
+    # DigitalOcean pages at 20 droplets by default and publishes the next page as
+    # an absolute URL in links.pages.next. Fetching only the first page silently
+    # truncated every account with more than one page, so the walk follows that
+    # cursor to the end. per_page is raised to the API maximum to keep the number
+    # of round trips down.
+    url = base_url + '/v2/droplets?per_page=200'
+    reported = 0
+    pages = 0
 
-    droplets = (data or {}).get('droplets', [])
-    # Stream assets to runZero via report_assets instead of returning a list.
-    if not report_assets(build_assets(droplets)):
+    # The cursor comes from the server, so cap the walk rather than trusting it
+    # to terminate.
+    for _ in range(MAX_PAGES):
+        if not url:
+            break
+
+        data, err = get_json(url, **http_options)
+        if err:
+            print('failed to retrieve droplets:', err)
+            break
+
+        body = data or {}
+        if type(body) != "dict":
+            print('digital-ocean: unexpected response shape, wanted an object')
+            break
+
+        # Stream each page via report_assets instead of accumulating the estate.
+        reported += report_assets(build_assets(body.get('droplets', [])))
+        pages += 1
+
+        links = body.get('links') or {}
+        url = (links.get('pages') or {}).get('next', '')
+
+    if url:
+        print('digital-ocean: stopped after ' + str(pages) + ' pages; more remain')
+
+    if not reported:
         print('no assets')
     return None

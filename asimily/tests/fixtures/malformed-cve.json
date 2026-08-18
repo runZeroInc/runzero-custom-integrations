@@ -1,0 +1,105 @@
+{
+  "name": "malformed-cve",
+  "integration": "asimily",
+  "description": "One device carries a cveName the platform's Vulnerability.cve pattern rejects (lower-case 'cve-2025-60001') and one carries a vendor advisory id that is not a CVE at all. Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and a miss fails the whole ImportAsset, which aborts the run and loses every device already parsed. The finding must still be imported -- named by the raw value, with the raw value kept as an attribute -- and only the cve field dropped. check_determinism is off for the same harness reason as happy: the asset id is scoped by the ephemeral fixture port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "include_vulnerabilities": "true",
+    "include_software": "false",
+    "page_size": "200"
+  },
+  "default_response": {"status": 400, "json": {"error": "missing or malformed source header"}},
+  "routes": [
+    {
+      "name": "device-cves",
+      "match": {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceId": 91001,
+                "cves": [
+                  {
+                    "cveName": "cve-2025-60001",
+                    "cveTitle": "Lower-case identifier the platform pattern rejects",
+                    "productName": "PumpOS",
+                    "score": 9.4,
+                    "cvssBaseScore": 9.8,
+                    "isFixed": 56
+                  },
+                  {
+                    "cveName": "ASIMILY-ADV-2026-0007",
+                    "cveTitle": "Vendor advisory that is not a CVE",
+                    "productName": "PumpOS",
+                    "score": 5.0,
+                    "cvssBaseScore": 5.5,
+                    "isFixed": 56
+                  },
+                  {
+                    "cveName": "CVE-2026-60002",
+                    "productName": "PumpOS",
+                    "score": 7.6,
+                    "cvssBaseScore": 7.8,
+                    "isFixed": 56
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              {
+                "deviceID": 91001,
+                "hostName": "pump-ward9-01",
+                "macAddr": "00:1B:44:11:9A:B7",
+                "v4IpAddrs": ["10.91.3.11"],
+                "deviceType": "Infusion Pump",
+                "deviceClass": "Medical",
+                "manufacturer": "Acme Medical",
+                "os": "PumpOS",
+                "osVersion": "4.1.9",
+                "lastDiscoveredAt": "2026-08-14T18:00:00Z"
+              },
+              {
+                "deviceID": 91002,
+                "hostName": "monitor-icu-09",
+                "macAddr": "00:1B:44:11:9A:C8",
+                "v4IpAddrs": ["10.91.4.22"],
+                "deviceType": "Patient Monitor",
+                "deviceClass": "Medical",
+                "manufacturer": "Beta Diagnostics",
+                "lastDiscoveredAt": "2026-08-13T09:30:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "min_vulnerabilities_total": 3,
+    "min_requests": 2
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

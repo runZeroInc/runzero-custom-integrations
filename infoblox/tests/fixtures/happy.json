@@ -1,0 +1,214 @@
+{
+  "name": "happy",
+  "integration": "infoblox",
+  "description": "One network view, one network, and four ipv4address rows joined against the DHCP lease and record:host indexes. Proves the bootstrap chain (networkview -> lease -> record:host -> network -> ipv4address) is walked in order and that each read is scoped to the view; that a lease supplies the MAC when IPAM has none; that when one address carries several lease rows the most current binding wins (ACTIVE over BACKUP) rather than the last one read; that an operator-set device_type on the host record outranks the DHCP fingerprint guess while a fingerprint alone still classifies; and that a row with no ip_address is skipped and counted.\n\ncheck_determinism is disabled and expect.ids is not used because this integration namespaces its ids by the Grid URL's host AND PORT, and the fixture server binds a fresh ephemeral port on every run, so the ids differ between two runs of the harness for reasons that have nothing to do with the script. In production the Grid host:port is fixed and the ids are stable. Asset identity is asserted through asset_count plus the unique_ids invariant instead.\n\nInvariant no_placeholder_hostnames is NOT skipped: this integration is address-derived but must still never import a bare IP as a hostname.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "wapi_version": "v2.13.1",
+    "include_leases": "true",
+    "include_host_records": "true"
+  },
+  "routes": [
+    {
+      "name": "network-views",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/networkview"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {"_ref": "networkview/ZG5zLm5ldHdvcmtfdmlldyQw:default/true", "name": "default", "is_default": true}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "leases",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/lease"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "lease/ZG5zLmxlYXNlJDAvMTAuNTAuMC4xMS8w:10.50.0.11/default",
+                "address": "10.50.0.11",
+                "binding_state": "BACKUP",
+                "hardware": "00:00:00:00:00:00",
+                "client_hostname": "stale-name",
+                "network": "10.50.0.0/24",
+                "protocol": "IPV4",
+                "served_by": "10.50.0.2",
+                "starts": 1750000000,
+                "cltt": 1750100000,
+                "ends": 1750200000
+              },
+              {
+                "_ref": "lease/ZG5zLmxlYXNlJDAvMTAuNTAuMC4xMS8x:10.50.0.11/default",
+                "address": "10.50.0.11",
+                "binding_state": "ACTIVE",
+                "hardware": "00:1a:2b:50:00:11",
+                "client_hostname": "laptop-050011",
+                "network": "10.50.0.0/24",
+                "protocol": "IPV4",
+                "served_by": "10.50.0.2",
+                "fingerprint": "Apple macOS",
+                "starts": 1754000000,
+                "cltt": 1755100000,
+                "ends": 1755500000
+              },
+              {
+                "_ref": "lease/ZG5zLmxlYXNlJDAvMTAuNTAuMC4xMi8w:10.50.0.12/default",
+                "address": "10.50.0.12",
+                "binding_state": "ACTIVE",
+                "hardware": "00:1a:2b:50:00:12",
+                "client_hostname": "phone-050012",
+                "starts": 1754000000,
+                "cltt": 1755100000
+              },
+              {"_ref": "lease/no-address", "binding_state": "ACTIVE", "hardware": "00:1a:2b:99:99:99"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host-records",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/record:host"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "record:host/ZG5zLmhvc3QkLl9kZWZhdWx0:phone-050012.corp.example.net/default",
+                "name": "phone-050012.corp.example.net",
+                "aliases": ["voip-12.corp.example.net"],
+                "device_type": "IP Phone",
+                "device_vendor": "Polycom",
+                "device_location": "HQ Floor 2",
+                "view": "default",
+                "zone": "corp.example.net",
+                "ipv4addrs": [{"ipv4addr": "10.50.0.12", "host": "phone-050012.corp.example.net"}],
+                "extattrs": {"Owner": {"value": "Facilities"}}
+              },
+              {"_ref": "record:host/broken", "name": "no-addresses.corp.example.net", "ipv4addrs": []}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/network"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "network/ZG5zLm5ldHdvcmskMTAuNTAuMC4wLzI0LzA:10.50.0.0/24/default",
+                "network": "10.50.0.0/24",
+                "network_view": "default",
+                "comment": "HQ user subnet",
+                "extattrs": {"Site": {"value": "HQ"}}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/ipv4address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "ipv4address/Li5pcHY0X2FkZHJlc3MkMTAuNTAuMC4xMC8w:10.50.0.10",
+                "ip_address": "10.50.0.10",
+                "network": "10.50.0.0/24",
+                "network_view": "default",
+                "status": "USED",
+                "usage": ["DHCP", "DNS"],
+                "types": ["FA"],
+                "names": ["prn-050010.corp.example.net"],
+                "mac_address": "00:1a:2b:50:00:10",
+                "is_conflict": false,
+                "lease_state": "ACTIVE",
+                "fingerprint": "Xerox WorkCentre Printer",
+                "comment": "Floor 1 printer",
+                "extattrs": {"Site": {"value": "HQ"}}
+              },
+              {
+                "_ref": "ipv4address/Li5pcHY0X2FkZHJlc3MkMTAuNTAuMC4xMS8w:10.50.0.11",
+                "ip_address": "10.50.0.11",
+                "network": "10.50.0.0/24",
+                "network_view": "default",
+                "status": "USED",
+                "usage": ["DHCP"],
+                "names": [],
+                "is_conflict": false
+              },
+              {
+                "_ref": "ipv4address/Li5pcHY0X2FkZHJlc3MkMTAuNTAuMC4xMi8w:10.50.0.12",
+                "ip_address": "10.50.0.12",
+                "network": "10.50.0.0/24",
+                "network_view": "default",
+                "status": "USED",
+                "usage": ["DHCP", "DNS"],
+                "names": ["phone-050012.corp.example.net"],
+                "is_conflict": false,
+                "fingerprint": "Generic Printer"
+              },
+              {
+                "_ref": "ipv4address/broken",
+                "network": "10.50.0.0/24",
+                "network_view": "default",
+                "status": "USED"
+              },
+              "a bare string where an address object is documented"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/wapi/v2.13.1/networkview", "query_contains": "_return_as_object=1"},
+      {"method": "GET", "path": "/wapi/v2.13.1/lease", "query_contains": "network_view=default"},
+      {"method": "GET", "path": "/wapi/v2.13.1/record:host", "query_contains": "network_view=default"},
+      {"method": "GET", "path": "/wapi/v2.13.1/network", "query_contains": "_max_results=1000"},
+      {"method": "GET", "path": "/wapi/v2.13.1/ipv4address", "query_contains": "network=10.50.0.0%2F24"},
+      {"method": "GET", "path": "/wapi/v2.13.1/ipv4address", "query_contains": "status=USED"},
+      {"method": "GET", "path": "/wapi/v2.13.1/ipv4address", "query_contains": "_return_fields%2B=comment"},
+      {"header_contains": "Basic "}
+    ],
+    "requests_absent": [
+      {"query_contains": "_page_id"}
+    ],
+    "log_contains": [
+      "infoblox: view default: 1 networks, 2 leases, 1 host addresses",
+      "infoblox: skipping address with no ip_address in view default network 10.50.0.0/24",
+      "infoblox: view default: reported 3 addresses",
+      "infoblox: view default: skipped 2 records with no usable address"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

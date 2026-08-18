@@ -1,0 +1,43 @@
+{
+  "name": "degraded",
+  "integration": "pfsense",
+  "description": "Three of the four endpoints fail in a different way each - a 500, a 404, and a 200 whose body is a JSON array where an object is documented. Each one used to abort the script on the two-variable unpack in get(); now every caller must fall through to the defaults _pick provides, so the firewall is still imported, still identified by its Netgate ID, and only the fields that could not be read are missing. The asset keeps its hostname, which is the only correlator it has left once the interface list is unreadable.\n\nnamespaced_ids is skipped for the reason recorded in happy.json.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token": "fixture-api-token"
+  },
+  "routes": [
+    {
+      "name": "hostname",
+      "match": {"method": "GET", "path": "/api/v2/system/hostname"},
+      "responses": [{"status": 200, "json": {"data": {"hostname": "fw02", "domain": "corp.example.com"}}}]
+    },
+    {
+      "name": "version",
+      "match": {"method": "GET", "path": "/api/v2/system/version"},
+      "responses": [{"status": 404, "json": {"code": 404, "message": "Not found"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "status-interfaces",
+      "match": {"method": "GET", "path": "/api/v2/status/interfaces"},
+      "responses": [{"status": 500, "text": "internal error"}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "status-system",
+      "match": {"method": "GET", "path": "/api/v2/status/system"},
+      "responses": [{"status": 200, "json": {"netgate_id": "ddeeff445566", "serial": "SN-6100-0002"}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["pfsense-ddeeff445566"],
+    "min_requests": 4,
+    "log_contains": [
+      "pfsense: no usable response from /api/v2/system/version",
+      "pfsense: no usable response from /api/v2/status/interfaces"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

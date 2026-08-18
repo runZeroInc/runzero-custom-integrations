@@ -1,0 +1,83 @@
+{
+  "name": "relevance-fallback",
+  "integration": "bigfix",
+  "description": "A property that does not exist in the deployment makes the root server answer the whole tuple query with a <Query><Error> document, and BESAPI returns that inside a 200. A deployment missing one property must not lose its entire inventory: the range is retried with the six native inspectors only, the configured properties are dropped for the rest of the run, and both computers still import. The census route is asserted to have been called once and the failing property query to have been issued before the core-only retry.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "range-query-with-properties-rejected",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "bes%20property"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Error>The operator &quot;bes property&quot; is not defined for the given operand types.</Error></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "range-query-core-only",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "whose"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Tuple><Answer type=\"string\">301</Answer><Answer type=\"string\">CORE01</Answer><Answer type=\"string\">core01.corp.example.com</Answer><Answer type=\"string\">Win2016 10.0.14393.6796</Answer><Answer type=\"string\">10.72.0.1</Answer><Answer type=\"string\">Mon, 10 Nov 2025 12:00:00 +0000</Answer></Tuple><Tuple><Answer type=\"string\">302</Answer><Answer type=\"string\">CORE02</Answer><Answer type=\"string\">core02.corp.example.com</Answer><Answer type=\"string\">Win2016 10.0.14393.6796</Answer><Answer type=\"string\">10.72.0.2</Answer><Answer type=\"string\">Mon, 10 Nov 2025 12:00:00 +0000</Answer></Tuple></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "computer-id-census",
+      "match": {
+        "method": "GET",
+        "path": "/api/query"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Answer type=\"string\">301</Answer><Answer type=\"string\">302</Answer></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "bigfix:$HOST:301",
+      "bigfix:$HOST:302"
+    ],
+    "request_count": 3,
+    "log_contains": [
+      "relevance error: The operator",
+      "is not defined for the given operand types.",
+      "dropping the configured properties for the rest of the run",
+      "reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

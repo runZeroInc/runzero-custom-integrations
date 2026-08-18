@@ -1,0 +1,231 @@
+{
+  "name": "device-types",
+  "integration": "mosyle",
+  "description": "Device-type mapping across all four platform families. Mosyle manages Apple hardware only, and the model name is the one field that separates the form factors inside a family: 'ios' covers iPhone, iPad and iPod alike, and 'mac' covers both portable and desktop Macs. So the model drives the mapping (iPhone -> Mobile, iMac -> Desktop) and the family is consulted only as a fallback, which is what the tvos device here proves -- it reports no model at all and must still come out as a Smart TV because a tvOS device was what the request asked for.\n\nThe visionOS device is the deliberate negative: Mosyle reports it exactly as clearly as the others, but runZero's device-type vocabulary has no value for a head-mounted display, so it must carry NO deviceType rather than a near-miss label. Asserting its absence is what stops someone inventing one later.\n\nnamespaced_ids is skipped: the id is the bare Mosyle deviceudid with no tenant scope, the same defect happy.json records.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-access-token",
+    "email": "fixture@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Authorization": "Bearer fixture-jwt-token"
+          },
+          "json": {
+            "status": "OK"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-ios",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"ios\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-IPHONE",
+                  "device_name": "fixture iphone",
+                  "os": "iOS",
+                  "osversion": "17.5.1",
+                  "device_model_name": "iPhone 15 Pro",
+                  "wifi_mac_address": "00:11:22:cc:01:01",
+                  "last_ip_beat": "10.62.0.11"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-mac",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"mac\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-IMAC",
+                  "device_name": "fixture imac",
+                  "os": "macOS",
+                  "osversion": "14.6",
+                  "device_model_name": "iMac (24-inch, M3)",
+                  "ethernet_mac_address": "00:11:22:cc:02:01",
+                  "last_lan_ip": "10.62.0.21"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-tvos",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"tvos\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-APPLETV",
+                  "device_name": "fixture lobby display",
+                  "os": "tvOS",
+                  "osversion": "17.5",
+                  "ethernet_mac_address": "00:11:22:cc:03:01",
+                  "last_lan_ip": "10.62.0.31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-visionos",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"visionos\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-VISION",
+                  "device_name": "fixture vision pro",
+                  "os": "visionOS",
+                  "osversion": "1.2",
+                  "device_model_name": "Apple Vision Pro",
+                  "wifi_mac_address": "00:11:22:cc:04:01",
+                  "last_ip_beat": "10.62.0.41"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "assets": [
+      {
+        "id": "FIXTURE-UDID-IPHONE",
+        "fields": {
+          "hostnames": "fixture-iphone",
+          "model": "iPhone 15 Pro",
+          "deviceType": "Mobile"
+        }
+      },
+      {
+        "id": "FIXTURE-UDID-IMAC",
+        "fields": {
+          "hostnames": "fixture-imac",
+          "model": "iMac (24-inch, M3)",
+          "deviceType": "Desktop"
+        }
+      },
+      {
+        "id": "FIXTURE-UDID-APPLETV",
+        "fields": {
+          "hostnames": "fixture-lobby-display",
+          "deviceType": "Smart TV"
+        }
+      },
+      {
+        "id": "FIXTURE-UDID-VISION",
+        "fields": {
+          "hostnames": "fixture-vision-pro",
+          "model": "Apple Vision Pro"
+        },
+        "fields_absent": [
+          "deviceType"
+        ]
+      }
+    ],
+    "request_count": 9
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

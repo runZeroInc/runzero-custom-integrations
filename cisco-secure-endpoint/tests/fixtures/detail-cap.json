@@ -1,0 +1,126 @@
+{
+  "name": "detail-cap",
+  "integration": "cisco-secure-endpoint",
+  "description": "Vulnerability enrichment is one extra request per computer against a 3000/hour budget, so vulnerability_limit caps it. With three computers and vulnerability_limit=2, exactly two /vulnerabilities calls may be made and the third computer must still be imported without findings. The findings payload also carries a lower-case CVE id and a null cvss: Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and a miss rejects the WHOLE record, so this proves the script's upper-casing and screening keeps the run alive. unique_ids and has_correlator are skipped because the enrichment pass deliberately re-reports the same foreign id as a vulnerabilities-only overlay asset, which by design carries no MAC, IP, or hostname of its own.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "client_id": "fixture-client-id",
+    "api_key": "fixture-api-key",
+    "page_size": "500",
+    "import_vulnerabilities": "true",
+    "vulnerability_limit": "2"
+  },
+  "routes": [
+    {
+      "name": "vulns-host-1",
+      "match": {"method": "GET", "path": "/v1/computers/dddddddd-3333-4000-8000-000000000001/vulnerabilities"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "vulnerabilities": [
+                {
+                  "application": "Acrobat Reader",
+                  "version": "21.001.20135",
+                  "latest_date": "2026-08-01T12:00:00Z",
+                  "file": {"filename": "AcroRd32.exe", "identity": {"sha256": "AB12CD34EF56AB12CD34EF56AB12CD34EF56AB12CD34EF56AB12CD34EF56AB12"}},
+                  "cves": [
+                    {"id": "CVE-2025-71001", "cvss": 7.8, "link": "https://example.invalid/CVE-2025-71001"},
+                    {"id": "cve-2025-71002", "cvss": 5.5},
+                    {"id": "CVE-2025-71003", "cvss": null},
+                    {"id": "NOT-A-CVE-AT-ALL", "cvss": 9.9},
+                    {"id": "CVE-2025-71001", "cvss": 7.8}
+                  ]
+                },
+                "this row should have been an object"
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns-host-2",
+      "match": {"method": "GET", "path": "/v1/computers/dddddddd-3333-4000-8000-000000000002/vulnerabilities"},
+      "responses": [
+        {"status": 200, "json": {"data": {"vulnerabilities": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns-over-budget",
+      "match": {"method": "GET", "path_contains": "/vulnerabilities", "path_prefix": "/v1/computers/"},
+      "responses": [
+        {"status": 500, "text": "this computer is past the enrichment budget and must never be queried"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"results": {"total": 3}},
+            "data": [
+              {
+                "connector_guid": "dddddddd-3333-4000-8000-000000000001",
+                "hostname": "vuln-host-1",
+                "active": true,
+                "operating_system": "Windows 10, SP 0.0",
+                "os_version": "10.0.19044.1466",
+                "last_seen": "2026-08-14T00:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:d3:00:01", "ip": "10.50.0.1"}]
+              },
+              {
+                "connector_guid": "dddddddd-3333-4000-8000-000000000002",
+                "hostname": "vuln-host-2",
+                "active": true,
+                "operating_system": "Windows 11",
+                "os_version": "10.0.22621.2861",
+                "last_seen": "2026-08-14T01:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:d3:00:02", "ip": "10.50.0.2"}]
+              },
+              {
+                "connector_guid": "dddddddd-3333-4000-8000-000000000003",
+                "hostname": "vuln-host-3-over-budget",
+                "active": true,
+                "operating_system": "Linux",
+                "os_version": "6.1.0",
+                "last_seen": "2026-08-14T02:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:d3:00:03", "ip": "10.50.0.3"}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "cisco-secure-endpoint:127.0.0.1:dddddddd-3333-4000-8000-000000000001",
+      "cisco-secure-endpoint:127.0.0.1:dddddddd-3333-4000-8000-000000000002",
+      "cisco-secure-endpoint:127.0.0.1:dddddddd-3333-4000-8000-000000000003"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/v1/computers/dddddddd-3333-4000-8000-000000000001/vulnerabilities", "query_contains": "limit=100"},
+      {"method": "GET", "path": "/v1/computers/dddddddd-3333-4000-8000-000000000002/vulnerabilities"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/v1/computers/dddddddd-3333-4000-8000-000000000003/vulnerabilities"}
+    ],
+    "log_contains": [
+      "cisco-secure-endpoint: reported 3 computers",
+      "cisco-secure-endpoint: checked 2 computers for vulnerabilities"
+    ]
+  },
+  "invariants": {
+    "skip": ["unique_ids", "has_correlator"]
+  }
+}

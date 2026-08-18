@@ -1,0 +1,90 @@
+{
+  "name": "clean-repo",
+  "integration": "ghost",
+  "description": "A repository Ghost has scanned and found nothing wrong with is still an asset.\n\nAssets used to be created exclusively inside the findings loop -- get_all_repositories walked and logged every repository, and then repo_map was consulted only when a finding referenced it. A clean codebase was therefore fetched, logged, and discarded, which made this an import of findings grouped by repository rather than an inventory of repositories. Here `spotless-service` has no finding against it at all and must still arrive, carrying its deployment hostnames and no vulnerabilities; `flagged-service` beside it proves the findings path still attaches.\n\n`undeployed-tool` is the deliberate exception. Ghost publishes no addresses -- every mapping hard-codes \"ips\": [] -- so the deployment hostnames are the only thing tying a repository asset to anything else in the inventory. A repository deployed nowhere would be imported as an orphan that can never merge, so it is skipped, logged, and counted. ids_absent pins that.\n\nnamespaced_ids is skipped because the foreign id is the bare repository name with no tenant scope -- a known defect outside the scope of this change.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-ghost-token"
+  },
+  "routes": [
+    {
+      "name": "repos",
+      "match": {"method": "GET", "path": "/v1/repos"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "total": 3,
+            "items": [
+              {
+                "id": "repo-clean",
+                "name": "spotless-service",
+                "projects": [{"deployments": {"production": ["https://spotless.example.com/"], "staging": ["https://spotless-staging.example.com"]}}]
+              },
+              {
+                "id": "repo-flagged",
+                "name": "flagged-service",
+                "projects": [{"deployments": {"production": ["https://flagged.example.com"]}}]
+              },
+              {
+                "id": "repo-undeployed",
+                "name": "undeployed-tool",
+                "projects": [{"deployments": {}}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings",
+      "match": {"method": "GET", "path": "/v1/findings"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              {
+                "id": "finding-only-one",
+                "name": "Hardcoded credential",
+                "repo_id": "repo-flagged",
+                "repo_url": "https://git.example.com/example/flagged",
+                "severity": "high",
+                "description": "A credential is committed in the source.",
+                "remediation": "Rotate it and read it from the environment."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["spotless-service", "flagged-service"],
+    "ids_absent": ["undeployed-tool"],
+    "assets": [
+      {
+        "id": "spotless-service",
+        "fields": {"hostnames": "spotless-staging.example.com\tspotless.example.com"},
+        "fields_absent": ["_vulnerabilities", "ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "flagged-service",
+        "fields": {"hostnames": "flagged.example.com"}
+      }
+    ],
+    "min_vulnerabilities_total": 1,
+    "request_count": 2,
+    "log_contains": [
+      "ghost: skipping repository with no deployment hostname: name=undeployed-tool",
+      "ghost: skipped 1 repositories with no deployment hostname",
+      "Completed. Assets created: 2"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

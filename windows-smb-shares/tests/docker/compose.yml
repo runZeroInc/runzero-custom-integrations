@@ -1,0 +1,134 @@
+# A real SMB file server, reached over real SMB2 on TCP/445.
+#
+# This is the third stack in the suite whose integration is not HTTP at all, and
+# the first to speak SMB. windows-smb-shares.star loads `runzero.smb` and
+# nothing else -- no `http`, no `requests` -- so the fixture harness in
+# tests/harness/server.py, which is a plain HTTP server, can never run a line of
+# it. Until this case existed the integration had no automated coverage of any
+# kind: no fixture scenario, no container stack, no live config. Session setup,
+# NTLM authentication, srvsvc share enumeration, tree connect, and directory
+# listing are all exercised here for the first time.
+#
+# ---------------------------------------------------------------------------
+# Why Samba and not Windows
+# ---------------------------------------------------------------------------
+# There is no licensed Windows container this suite could pull, and the
+# integration's name is about the target it is aimed at rather than the protocol
+# it speaks. What it actually does is SMB2: `list_shares()` is a srvsvc
+# NetShareEnum, `mount()` is a tree connect, `list()` is a directory query. Samba
+# is a complete server implementation of all three, so every line under test runs
+# against a real peer that really enforces authentication and really refuses a
+# tree connect the account is not entitled to -- which a stub could only pretend
+# to do.
+#
+# The trade is worth naming. Samba's share table is whatever smb.conf says, so
+# the administrative shares a Windows box synthesises (C$, ADMIN$) have to be
+# configured here by hand; only IPC$ comes for free. That is why this file
+# defines an `ADMIN$` and a `restricted$` explicitly -- see manifest.json, where
+# what each one proves is set out in full.
+#
+# The `smbd-only` variant is deliberate: the default image also runs avahi and
+# wsdd2, which advertise on the network and are pure noise for a test that
+# connects to a published port by address. Pinning the full build tag pins the
+# Samba version (4.23.8) and the Alpine base (3.24.1) together, which matters
+# because the share list this integration reads is produced by Samba's srvsvc
+# implementation and its visibility rules.
+services:
+  samba:
+    image: servercontainers/samba:smbd-only-a3.24.1-s4.23.8-r0
+    # Cosmetic, unlike the hostname in the linux-ssh and mssql stacks: this
+    # integration puts the `host` *kwarg* into `hostnames` and never asks the
+    # server its name, so nothing here is asserted against it. Pinned anyway so
+    # the container's own log lines are readable when a case fails.
+    hostname: rz-smb
+    environment:
+      # smbd-only runs no nmbd, so this only suppresses the NetBIOS stanza in
+      # the generated smb.conf. Kept for the same reason as the image variant:
+      # this test reaches a published port by address and wants nothing
+      # broadcasting alongside it.
+      NETBIOS_DISABLE: "1"
+      SAMBA_CONF_LOG_LEVEL: "1"
+      SAMBA_CONF_WORKGROUP: "RZTEST"
+      # The image defaults to "Bad User", which maps an unknown account to guest
+      # rather than rejecting it. That would make a failed login look like a
+      # successful one with fewer shares, and this case asserts share counts.
+      # "Never" makes a wrong credential fail as a wrong credential.
+      SAMBA_CONF_MAP_TO_GUEST: "Never"
+
+      # --- accounts ------------------------------------------------------
+      # The polling account. Must match POLL_USER/POLL_PASSWORD in seed.py; the
+      # seed authenticates with it before the integration runs, so a drift
+      # between the two files fails there with a clear message rather than here.
+      #
+      # Deliberately free of ',' and of '\'. A comma would be split into a
+      # fabricated second parameter by the runZero CLI's --kwargs flag (the
+      # container harness rejects that outright). A backslash is worse and
+      # quieter: runzero.smb treats `DOMAIN\user` as shorthand and splits the
+      # username on it, so a backslash anywhere in the credential silently
+      # changes which account is being authenticated.
+      ACCOUNT_runzero: "runZero-Test-Pw-2026!"
+      UID_runzero: "2000"
+      # A second account that exists only to own `restricted$`. Without it the
+      # denied share would be denied to *everyone*, which proves nothing -- a
+      # share no one can read is indistinguishable from a broken path. The seed
+      # reads it successfully as this account and is refused as the polling one,
+      # so the denial is demonstrably about entitlement.
+      ACCOUNT_otheruser: "Other-Pw-2026!"
+      UID_otheruser: "2001"
+
+      # --- shares --------------------------------------------------------
+      # `browseable` is load-bearing here and is the single most surprising thing
+      # this stack found. VERIFIED against this image, both ways: Samba honours
+      # it in srvsvc NetShareEnum and not merely in the browse list, so a share
+      # marked `browseable = no` is absent from `list_shares()` ENTIRELY -- the
+      # script never sees it, and it is not counted in `smb.share_count`.
+      #
+      # Windows is documented to behave the other way: `$` shares are flagged
+      # STYPE_SPECIAL and still enumerate, which is the share table this script's
+      # `$`-skip branch was written against. That half is NOT verified here --
+      # there is no Windows host in this suite to check it against -- but it is
+      # why every share below is browseable, including the `$` ones. A
+      # `browseable = no` share would silently remove the skip branch from the
+      # test rather than exercise it.
+      #
+      # Three readable shares with deliberately different contents, so a script
+      # that listed one share and reported its entries for all of them could not
+      # pass.
+      SAMBA_VOLUME_CONFIG_public: "[public]; path=/shares/public; browseable=yes; read only=yes; valid users=runzero,otheruser"
+      SAMBA_VOLUME_CONFIG_reports: "[reports]; path=/shares/reports; browseable=yes; read only=yes; valid users=runzero"
+      SAMBA_VOLUME_CONFIG_bulk: "[bulk]; path=/shares/bulk; browseable=yes; read only=yes; valid users=runzero"
+      # Readable, and empty. The integration counts a share as accessible only
+      # when it lists at least one entry, so this one is reachable but reported
+      # as inaccessible. See manifest.json.
+      SAMBA_VOLUME_CONFIG_empty: "[empty]; path=/shares/empty; browseable=yes; read only=yes; valid users=runzero"
+      # Named ADMIN$ on purpose. The script skips `$` shares by name with one
+      # hard-coded exception -- `name != "ADMIN$"` -- so this is the only `$`
+      # share it will try to mount, and it is readable here so the case can
+      # assert that it really does. On a real Windows host ADMIN$ requires
+      # membership of the local Administrators group; manifest.json records what
+      # happens when the polling account does not have it.
+      SAMBA_VOLUME_CONFIG_admin: "[ADMIN$]; path=/shares/admin; browseable=yes; read only=yes; valid users=runzero"
+      # Two shares the polling account cannot read, denied the same way -- by
+      # naming only the other account in `valid users`, so smbd refuses the tree
+      # connect with NT_STATUS_ACCESS_DENIED. seed.py proves both refusals from
+      # both sides. They differ only in their names, and that difference is the
+      # point:
+      #
+      #   restricted$  ends in `$`, so the script skips it before ever trying.
+      #   finance      is plain-named, so the script DOES try, is refused, and
+      #                has to carry on and report the rest of the host.
+      #
+      # `finance` is the case that could not be tested at all before the runtime
+      # learned to return None from a refused mount(): the script aborted on it
+      # and the run emitted zero assets, so any stack containing one could
+      # assert nothing else. It is also the ordinary shape of the problem --
+      # a departmental share the polling account is not a member of.
+      SAMBA_VOLUME_CONFIG_restricted: "[restricted$]; path=/shares/restricted; browseable=yes; read only=yes; valid users=otheruser"
+      SAMBA_VOLUME_CONFIG_finance: "[finance]; path=/shares/finance; browseable=yes; read only=yes; valid users=otheruser"
+    ports:
+      # SMB2 over TCP, published on the harness-allocated port. The integration
+      # reaches it from the host exactly as a deployed runZero would reach a real
+      # file server. No subnet is pinned and no MAC is configured, unlike the
+      # linux-ssh stack: this integration emits no network interfaces at all, so
+      # there is nothing address-shaped for a fixed subnet to make assertable.
+      - "${RZ_HOST_PORT}:445"

@@ -1,0 +1,99 @@
+{
+  "name": "upload-rejected",
+  "integration": "sumo-logic",
+  "script": "sumo-logic/sumo-logic.star",
+  "description": "The upload half of a run failing while the export half succeeded, which used to be invisible: `sync_to_sumo` assigned the result of `http_post` to a variable it never read, so a revoked collector code, a wrong source address, or a batch over the source's size limit produced no log line and a task that still finished green. An HTTP source is write-only -- the status code is the only acknowledgement Sumo gives -- so the status is the whole signal. 501 assets make two batches; the first is refused with 429 and the second accepted. Three things are asserted together, and each fails differently. The rejection is LOGGED with its status. The second batch is still POSTed, because batches are independent uploads and abandoning the rest would turn one refused batch into a lost estate -- request_count==3 and the a501 body assertion pin that. And the run does not end green: `Uploaded 1 of 501` is the last line the loop reaches, and `fail()` then carries the count into the task's own outcome, which is the only place an integration that emits no assets can report anything at all. 429 is deliberate rather than a 4xx that could only mean a bad credential: it is the failure a healthy configuration meets under load, and the one most likely to be mistaken for success.",
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+  },
+  "routes": [
+    {
+      "name": "runzero asset export, 501 rows",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"id": "a001"}, {"id": "a002"}, {"id": "a003"}, {"id": "a004"}, {"id": "a005"}, {"id": "a006"}, {"id": "a007"}, {"id": "a008"}, {"id": "a009"}, {"id": "a010"},
+            {"id": "a011"}, {"id": "a012"}, {"id": "a013"}, {"id": "a014"}, {"id": "a015"}, {"id": "a016"}, {"id": "a017"}, {"id": "a018"}, {"id": "a019"}, {"id": "a020"},
+            {"id": "a021"}, {"id": "a022"}, {"id": "a023"}, {"id": "a024"}, {"id": "a025"}, {"id": "a026"}, {"id": "a027"}, {"id": "a028"}, {"id": "a029"}, {"id": "a030"},
+            {"id": "a031"}, {"id": "a032"}, {"id": "a033"}, {"id": "a034"}, {"id": "a035"}, {"id": "a036"}, {"id": "a037"}, {"id": "a038"}, {"id": "a039"}, {"id": "a040"},
+            {"id": "a041"}, {"id": "a042"}, {"id": "a043"}, {"id": "a044"}, {"id": "a045"}, {"id": "a046"}, {"id": "a047"}, {"id": "a048"}, {"id": "a049"}, {"id": "a050"},
+            {"id": "a051"}, {"id": "a052"}, {"id": "a053"}, {"id": "a054"}, {"id": "a055"}, {"id": "a056"}, {"id": "a057"}, {"id": "a058"}, {"id": "a059"}, {"id": "a060"},
+            {"id": "a061"}, {"id": "a062"}, {"id": "a063"}, {"id": "a064"}, {"id": "a065"}, {"id": "a066"}, {"id": "a067"}, {"id": "a068"}, {"id": "a069"}, {"id": "a070"},
+            {"id": "a071"}, {"id": "a072"}, {"id": "a073"}, {"id": "a074"}, {"id": "a075"}, {"id": "a076"}, {"id": "a077"}, {"id": "a078"}, {"id": "a079"}, {"id": "a080"},
+            {"id": "a081"}, {"id": "a082"}, {"id": "a083"}, {"id": "a084"}, {"id": "a085"}, {"id": "a086"}, {"id": "a087"}, {"id": "a088"}, {"id": "a089"}, {"id": "a090"},
+            {"id": "a091"}, {"id": "a092"}, {"id": "a093"}, {"id": "a094"}, {"id": "a095"}, {"id": "a096"}, {"id": "a097"}, {"id": "a098"}, {"id": "a099"}, {"id": "a100"},
+            {"id": "a101"}, {"id": "a102"}, {"id": "a103"}, {"id": "a104"}, {"id": "a105"}, {"id": "a106"}, {"id": "a107"}, {"id": "a108"}, {"id": "a109"}, {"id": "a110"},
+            {"id": "a111"}, {"id": "a112"}, {"id": "a113"}, {"id": "a114"}, {"id": "a115"}, {"id": "a116"}, {"id": "a117"}, {"id": "a118"}, {"id": "a119"}, {"id": "a120"},
+            {"id": "a121"}, {"id": "a122"}, {"id": "a123"}, {"id": "a124"}, {"id": "a125"}, {"id": "a126"}, {"id": "a127"}, {"id": "a128"}, {"id": "a129"}, {"id": "a130"},
+            {"id": "a131"}, {"id": "a132"}, {"id": "a133"}, {"id": "a134"}, {"id": "a135"}, {"id": "a136"}, {"id": "a137"}, {"id": "a138"}, {"id": "a139"}, {"id": "a140"},
+            {"id": "a141"}, {"id": "a142"}, {"id": "a143"}, {"id": "a144"}, {"id": "a145"}, {"id": "a146"}, {"id": "a147"}, {"id": "a148"}, {"id": "a149"}, {"id": "a150"},
+            {"id": "a151"}, {"id": "a152"}, {"id": "a153"}, {"id": "a154"}, {"id": "a155"}, {"id": "a156"}, {"id": "a157"}, {"id": "a158"}, {"id": "a159"}, {"id": "a160"},
+            {"id": "a161"}, {"id": "a162"}, {"id": "a163"}, {"id": "a164"}, {"id": "a165"}, {"id": "a166"}, {"id": "a167"}, {"id": "a168"}, {"id": "a169"}, {"id": "a170"},
+            {"id": "a171"}, {"id": "a172"}, {"id": "a173"}, {"id": "a174"}, {"id": "a175"}, {"id": "a176"}, {"id": "a177"}, {"id": "a178"}, {"id": "a179"}, {"id": "a180"},
+            {"id": "a181"}, {"id": "a182"}, {"id": "a183"}, {"id": "a184"}, {"id": "a185"}, {"id": "a186"}, {"id": "a187"}, {"id": "a188"}, {"id": "a189"}, {"id": "a190"},
+            {"id": "a191"}, {"id": "a192"}, {"id": "a193"}, {"id": "a194"}, {"id": "a195"}, {"id": "a196"}, {"id": "a197"}, {"id": "a198"}, {"id": "a199"}, {"id": "a200"},
+            {"id": "a201"}, {"id": "a202"}, {"id": "a203"}, {"id": "a204"}, {"id": "a205"}, {"id": "a206"}, {"id": "a207"}, {"id": "a208"}, {"id": "a209"}, {"id": "a210"},
+            {"id": "a211"}, {"id": "a212"}, {"id": "a213"}, {"id": "a214"}, {"id": "a215"}, {"id": "a216"}, {"id": "a217"}, {"id": "a218"}, {"id": "a219"}, {"id": "a220"},
+            {"id": "a221"}, {"id": "a222"}, {"id": "a223"}, {"id": "a224"}, {"id": "a225"}, {"id": "a226"}, {"id": "a227"}, {"id": "a228"}, {"id": "a229"}, {"id": "a230"},
+            {"id": "a231"}, {"id": "a232"}, {"id": "a233"}, {"id": "a234"}, {"id": "a235"}, {"id": "a236"}, {"id": "a237"}, {"id": "a238"}, {"id": "a239"}, {"id": "a240"},
+            {"id": "a241"}, {"id": "a242"}, {"id": "a243"}, {"id": "a244"}, {"id": "a245"}, {"id": "a246"}, {"id": "a247"}, {"id": "a248"}, {"id": "a249"}, {"id": "a250"},
+            {"id": "a251"}, {"id": "a252"}, {"id": "a253"}, {"id": "a254"}, {"id": "a255"}, {"id": "a256"}, {"id": "a257"}, {"id": "a258"}, {"id": "a259"}, {"id": "a260"},
+            {"id": "a261"}, {"id": "a262"}, {"id": "a263"}, {"id": "a264"}, {"id": "a265"}, {"id": "a266"}, {"id": "a267"}, {"id": "a268"}, {"id": "a269"}, {"id": "a270"},
+            {"id": "a271"}, {"id": "a272"}, {"id": "a273"}, {"id": "a274"}, {"id": "a275"}, {"id": "a276"}, {"id": "a277"}, {"id": "a278"}, {"id": "a279"}, {"id": "a280"},
+            {"id": "a281"}, {"id": "a282"}, {"id": "a283"}, {"id": "a284"}, {"id": "a285"}, {"id": "a286"}, {"id": "a287"}, {"id": "a288"}, {"id": "a289"}, {"id": "a290"},
+            {"id": "a291"}, {"id": "a292"}, {"id": "a293"}, {"id": "a294"}, {"id": "a295"}, {"id": "a296"}, {"id": "a297"}, {"id": "a298"}, {"id": "a299"}, {"id": "a300"},
+            {"id": "a301"}, {"id": "a302"}, {"id": "a303"}, {"id": "a304"}, {"id": "a305"}, {"id": "a306"}, {"id": "a307"}, {"id": "a308"}, {"id": "a309"}, {"id": "a310"},
+            {"id": "a311"}, {"id": "a312"}, {"id": "a313"}, {"id": "a314"}, {"id": "a315"}, {"id": "a316"}, {"id": "a317"}, {"id": "a318"}, {"id": "a319"}, {"id": "a320"},
+            {"id": "a321"}, {"id": "a322"}, {"id": "a323"}, {"id": "a324"}, {"id": "a325"}, {"id": "a326"}, {"id": "a327"}, {"id": "a328"}, {"id": "a329"}, {"id": "a330"},
+            {"id": "a331"}, {"id": "a332"}, {"id": "a333"}, {"id": "a334"}, {"id": "a335"}, {"id": "a336"}, {"id": "a337"}, {"id": "a338"}, {"id": "a339"}, {"id": "a340"},
+            {"id": "a341"}, {"id": "a342"}, {"id": "a343"}, {"id": "a344"}, {"id": "a345"}, {"id": "a346"}, {"id": "a347"}, {"id": "a348"}, {"id": "a349"}, {"id": "a350"},
+            {"id": "a351"}, {"id": "a352"}, {"id": "a353"}, {"id": "a354"}, {"id": "a355"}, {"id": "a356"}, {"id": "a357"}, {"id": "a358"}, {"id": "a359"}, {"id": "a360"},
+            {"id": "a361"}, {"id": "a362"}, {"id": "a363"}, {"id": "a364"}, {"id": "a365"}, {"id": "a366"}, {"id": "a367"}, {"id": "a368"}, {"id": "a369"}, {"id": "a370"},
+            {"id": "a371"}, {"id": "a372"}, {"id": "a373"}, {"id": "a374"}, {"id": "a375"}, {"id": "a376"}, {"id": "a377"}, {"id": "a378"}, {"id": "a379"}, {"id": "a380"},
+            {"id": "a381"}, {"id": "a382"}, {"id": "a383"}, {"id": "a384"}, {"id": "a385"}, {"id": "a386"}, {"id": "a387"}, {"id": "a388"}, {"id": "a389"}, {"id": "a390"},
+            {"id": "a391"}, {"id": "a392"}, {"id": "a393"}, {"id": "a394"}, {"id": "a395"}, {"id": "a396"}, {"id": "a397"}, {"id": "a398"}, {"id": "a399"}, {"id": "a400"},
+            {"id": "a401"}, {"id": "a402"}, {"id": "a403"}, {"id": "a404"}, {"id": "a405"}, {"id": "a406"}, {"id": "a407"}, {"id": "a408"}, {"id": "a409"}, {"id": "a410"},
+            {"id": "a411"}, {"id": "a412"}, {"id": "a413"}, {"id": "a414"}, {"id": "a415"}, {"id": "a416"}, {"id": "a417"}, {"id": "a418"}, {"id": "a419"}, {"id": "a420"},
+            {"id": "a421"}, {"id": "a422"}, {"id": "a423"}, {"id": "a424"}, {"id": "a425"}, {"id": "a426"}, {"id": "a427"}, {"id": "a428"}, {"id": "a429"}, {"id": "a430"},
+            {"id": "a431"}, {"id": "a432"}, {"id": "a433"}, {"id": "a434"}, {"id": "a435"}, {"id": "a436"}, {"id": "a437"}, {"id": "a438"}, {"id": "a439"}, {"id": "a440"},
+            {"id": "a441"}, {"id": "a442"}, {"id": "a443"}, {"id": "a444"}, {"id": "a445"}, {"id": "a446"}, {"id": "a447"}, {"id": "a448"}, {"id": "a449"}, {"id": "a450"},
+            {"id": "a451"}, {"id": "a452"}, {"id": "a453"}, {"id": "a454"}, {"id": "a455"}, {"id": "a456"}, {"id": "a457"}, {"id": "a458"}, {"id": "a459"}, {"id": "a460"},
+            {"id": "a461"}, {"id": "a462"}, {"id": "a463"}, {"id": "a464"}, {"id": "a465"}, {"id": "a466"}, {"id": "a467"}, {"id": "a468"}, {"id": "a469"}, {"id": "a470"},
+            {"id": "a471"}, {"id": "a472"}, {"id": "a473"}, {"id": "a474"}, {"id": "a475"}, {"id": "a476"}, {"id": "a477"}, {"id": "a478"}, {"id": "a479"}, {"id": "a480"},
+            {"id": "a481"}, {"id": "a482"}, {"id": "a483"}, {"id": "a484"}, {"id": "a485"}, {"id": "a486"}, {"id": "a487"}, {"id": "a488"}, {"id": "a489"}, {"id": "a490"},
+            {"id": "a491"}, {"id": "a492"}, {"id": "a493"}, {"id": "a494"}, {"id": "a495"}, {"id": "a496"}, {"id": "a497"}, {"id": "a498"}, {"id": "a499"}, {"id": "a500"},
+            {"id": "a501"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sumo http source, throttles the first batch and accepts the second",
+      "match": {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE"},
+      "responses": [
+        {"status": 429, "text": "rate limit exceeded for this source"},
+        {"status": 200, "text": ""}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE", "body_contains": "\"id\":\"a001\""},
+      {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE", "body_contains": "\"id\":\"a501\""}
+    ],
+    "log_contains": [
+      "Sumo Logic rejected a batch of 500 assets with status 429",
+      "rate limit exceeded for this source",
+      "Uploaded 1 of 501 assets to Sumo Logic",
+      "Sumo Logic did not accept 500 of 501 assets"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "name": "filters",
+  "integration": "frontline-vm",
+  "description": "min_vuln_severity and max_days_since_scan set together. Frontline silently ignores any filter parameter that is not prefixed with its ordinal position, so a filter built without the _<n>_ rewrite no-ops without returning an error and the operator gets everything they asked to exclude. This asserts both filters arrive in the indexed form: _0_lte_vuln_severity_ddi=high on the vulnerability read and _0_gte_host_date_created on the host read. The date value itself is computed from now() so only its key is asserted. check_determinism is off because the id embeds the fixture server's random port; see happy for the detail.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_vulnerabilities": "true",
+    "min_vuln_severity": "high",
+    "max_days_since_scan": "30"
+  },
+  "routes": [
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "next": null,
+            "results": [
+              {
+                "id": 9101,
+                "title": "Apache httpd remote code execution CVE-2026-3333",
+                "severities": {"ddi": "Critical"},
+                "ip_address": "10.41.0.20",
+                "hostname": "app01",
+                "active_view_date_created": "2026-08-10T09:00:00Z",
+                "data": "Vendor patch available."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/scanresults/active/hosts/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "next": null,
+            "results": [
+              {
+                "id": 601,
+                "ip_address": "10.41.0.20",
+                "hostname": "app01",
+                "dns_name": "app01.corp.example.com",
+                "mac_address": "00:11:22:33:88:01",
+                "os": "Windows Server 2022",
+                "os_type": "Windows",
+                "date_created": "2026-08-09T12:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/", "query_contains": "_0_lte_vuln_severity_ddi=high"},
+      {"method": "GET", "path": "/api/scanresults/active/hosts/", "query_contains": "_0_gte_host_date_created="}
+    ],
+    "requests_absent": [
+      {"path": "/api/scanresults/active/hosts/", "query_contains": "_0_lte_vuln_severity_ddi"},
+      {"path": "/api/scanresults/active/vulnerabilities/", "query_contains": "_0_gte_host_date_created"}
+    ],
+    "log_contains": ["frontline-vm: indexed 1 vulnerabilities across 1 hosts"]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": false
+}

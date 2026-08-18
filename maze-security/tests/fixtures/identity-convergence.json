@@ -1,0 +1,115 @@
+{
+  "name": "identity-convergence",
+  "integration": "maze-security",
+  "description": "The regression test for one-asset-per-finding. Six investigations describe exactly TWO devices.\n\nconv-01 is named four different ways: twice through the asset segment of a three-part scanner_finding_hash, once through related_scanner_findings[].asset_name, and once through a related finding that carries no asset_name and therefore falls back to the hash's asset segment. All four must land on ONE asset carrying four vulnerabilities.\n\nThe other two investigations name no asset at all -- a two-segment hash (scanner::CVE, the CVE embedded and no asset field) and an investigation with no scanner_finding_hash whatsoever. Both used to mint an asset apiece keyed on the whole hash and on investigation.id respectively, so a host with N such findings became N assets. Both are now skipped and logged, and the scenario asserts by id that neither reaches the import.\n\nmatchBehavior is asserted directly: Maze publishes no asset identifier, only scanner-supplied names, so the id must not drive matching and must not veto a hostname merge.\n\nnamespaced_ids is skipped: Maze ids are bare scanner-supplied names with no tenant scope. Under no-id-match they no longer drive matching, so the collision hazard the invariant guards is not reachable through this integration.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "days_back": "7"
+  },
+  "routes": [
+    {
+      "name": "investigations-search",
+      "match": {"method": "POST", "path": "/v1/investigations/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "next_cursor": null,
+            "data": [
+              {
+                "id": "inv-conv-1",
+                "cve_id": "CVE-2024-70001",
+                "maze_severity": "HIGH",
+                "exploitability": "exploitable",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-70001::conv-01.corp.example.com",
+                "snapshot": {"cvss": {"base_score": 7.5, "version": "3.1"}},
+                "vulnerability_root_cause_analysis": [
+                  {"title": "Operating system", "actual_value": "Ubuntu"}
+                ]
+              },
+              {
+                "id": "inv-conv-2",
+                "cve_id": "CVE-2024-70002",
+                "maze_severity": "MEDIUM",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-70002::conv-01.corp.example.com",
+                "snapshot": {"cvss": {"base_score": 5.0, "version": "3.1"}}
+              },
+              {
+                "id": "inv-conv-3",
+                "cve_id": "CVE-2024-70003",
+                "maze_severity": "CRITICAL",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-70003::ignored-when-asset-name-present",
+                "snapshot": {"cvss": {"base_score": 9.8, "version": "3.1"}},
+                "related_scanner_findings": [
+                  {
+                    "asset_name": "conv-01.corp.example.com",
+                    "asset_id": "arn:aws:ec2:us-east-1:000000000000:instance/i-0fixtureconv01",
+                    "asset_type": "Server",
+                    "cloud_platform": "aws",
+                    "region": "us-east-1",
+                    "account_id": "000000000000",
+                    "scanner": "fixture-scanner"
+                  }
+                ]
+              },
+              {
+                "id": "inv-conv-4",
+                "cve_id": "CVE-2024-70004",
+                "maze_severity": "LOW",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-70004::conv-01.corp.example.com",
+                "snapshot": {"cvss": {"base_score": 3.1, "version": "3.1"}},
+                "related_scanner_findings": [
+                  {"asset_name": "", "scanner": "fixture-scanner"}
+                ]
+              },
+              {
+                "id": "inv-two-segment-hash",
+                "cve_id": "CVE-2024-70005",
+                "maze_severity": "HIGH",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-70005",
+                "snapshot": {"cvss": {"base_score": 8.8, "version": "3.1"}}
+              },
+              {
+                "id": "inv-no-hash-at-all",
+                "cve_id": "CVE-2024-70006",
+                "maze_severity": "MEDIUM",
+                "snapshot": {"cvss": {"base_score": 6.1, "version": "3.1"}}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "conv-01.corp.example.com",
+        "fields": {
+          "hostnames": "conv-01.corp.example.com",
+          "os": "Ubuntu",
+          "maze_finding_count": "4",
+          "maze_scanner": "fixture-scanner"
+        }
+      }
+    ],
+    "ids_absent": [
+      "fixture-scanner::CVE-2024-70005",
+      "inv-two-segment-hash",
+      "inv-no-hash-at-all"
+    ],
+    "min_vulnerabilities_total": 4,
+    "request_count": 1,
+    "log_contains": [
+      "maze: skipping investigation with no asset name or asset segment: id=inv-two-segment-hash scanner_finding_hash=fixture-scanner::CVE-2024-70005",
+      "maze: skipping investigation with no asset name or asset segment: id=inv-no-hash-at-all scanner_finding_hash=",
+      "Reported 1 assets from 6 investigations",
+      "Skipped 2 investigations that named no asset"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

@@ -1,0 +1,123 @@
+{
+  "name": "happy",
+  "integration": "scale-computing",
+  "description": "The three-call HC3 sequence: Cluster for the cluster names, VirDomain for the VMs, and VirDomainNetDevice for the MACs and addresses, which are then grouped back onto their VM by virDomainUUID. Covers a multi-NIC VM, a VM whose only NIC has no address yet, and a network device belonging to a VM that is not in the VirDomain list, which must simply be ignored.\n\nnamespaced_ids is skipped because the foreign id is the bare HC3 VirDomain UUID with no cluster or appliance scope. The UUID is generated per cluster so a collision is unlikely in practice, but the id carries no scope at all - reported rather than accepted, see the report.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/rest/v1/Cluster"},
+      "responses": [
+        {"status": 200, "json": [{"uuid": "cluster-uuid-0001", "clusterName": "HC3 Cluster A"}]}
+      ]
+    },
+    {
+      "name": "virdomain",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomain"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "vm-uuid-0001",
+              "name": "vm-web-01",
+              "operatingSystem": "os_windows_server_2019",
+              "description": "IIS front end",
+              "state": "RUNNING",
+              "desiredDisposition": "RUNNING",
+              "uiState": "RUNNING",
+              "console": {"port": 5900},
+              "bootDevices": ["scsi-0"],
+              "snapUUIDs": [],
+              "snapshotSerialNumber": 4,
+              "replicationUUIDs": [],
+              "nodeUUID": "node-uuid-0001",
+              "mem": 8589934592,
+              "numVCPU": 4,
+              "tags": "production,web",
+              "created": 1750000000,
+              "modified": 1786000000
+            },
+            {
+              "uuid": "vm-uuid-0002",
+              "name": "vm-db-01",
+              "operatingSystem": "os_other",
+              "description": "PostgreSQL",
+              "state": "SHUTOFF",
+              "desiredDisposition": "SHUTOFF",
+              "nodeUUID": "node-uuid-0002",
+              "mem": 17179869184,
+              "numVCPU": 8,
+              "tags": "production,db",
+              "created": 1750000000,
+              "modified": 1786000000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "virdomain-netdevice",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "nic-uuid-0001",
+              "virDomainUUID": "vm-uuid-0001",
+              "macAddress": "00:11:26:00:00:01",
+              "ipv4Addresses": ["10.120.0.11"],
+              "vlan": 10,
+              "connected": true
+            },
+            {
+              "uuid": "nic-uuid-0002",
+              "virDomainUUID": "vm-uuid-0001",
+              "macAddress": "00:11:26:00:00:02",
+              "ipv4Addresses": ["10.121.0.11"],
+              "vlan": 20,
+              "connected": true
+            },
+            {
+              "uuid": "nic-uuid-0003",
+              "virDomainUUID": "vm-uuid-0002",
+              "macAddress": "00:11:26:00:00:03",
+              "ipv4Addresses": [],
+              "vlan": 10,
+              "connected": false
+            },
+            {
+              "uuid": "nic-uuid-0004",
+              "virDomainUUID": "vm-uuid-9999",
+              "macAddress": "00:11:26:00:00:04",
+              "ipv4Addresses": ["10.120.0.99"],
+              "vlan": 10,
+              "connected": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["vm-uuid-0001", "vm-uuid-0002"],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/rest/v1/Cluster", "header_contains": "Basic "},
+      {"method": "GET", "path": "/rest/v1/VirDomain"},
+      {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"}
+    ],
+    "log_contains": [
+      "scale-computing: read 2 VMs",
+      "scale-computing: read 4 network devices",
+      "scale-computing: reported 2 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

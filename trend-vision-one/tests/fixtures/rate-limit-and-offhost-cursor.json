@@ -1,0 +1,79 @@
+{
+  "name": "rate-limit-and-offhost-cursor",
+  "integration": "trend-vision-one",
+  "description": "Two behaviours that share one call. Vision One answers 429 with Retry-After once the per-API quota is spent, and get_json's built-in retry (three attempts, widened backoff) must absorb it rather than the script hand-rolling one: the first response is a 429 and the second is the real page, and the endpoints still arrive. That page then returns a nextLink pointing at a different regional API host, which must not be followed, because following a rewritten or redirected cursor would walk the API key onto another host. The run stops there and says so, and no request is ever made off the configured host.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "api_token": "fixture-vision-one-key",
+    "import_software": "true",
+    "fetch_interfaces": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "endpoints-throttled-then-ok",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints"},
+      "responses": [
+        {
+          "status": 429,
+          "headers": {"Retry-After": "1"},
+          "json": {"error": {"code": "TooManyRequests", "message": "API request quota exceeded"}}
+        },
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 4,
+            "items": [
+              {
+                "agentGuid": "bbbbbbbb-2222-4000-8000-000000000001",
+                "endpointName": "EU-WIN-01",
+                "type": "server",
+                "osName": "Windows Server 2022",
+                "osVersion": "10.0.20348",
+                "ipAddresses": ["10.120.1.10"],
+                "eppAgent": {"status": "on", "version": "12.5.1234",
+                             "productNames": ["Trend Vision One Endpoint Security"],
+                             "lastConnectedDateTime": "2026-06-03T09:00:00Z"}
+              },
+              {
+                "agentGuid": "bbbbbbbb-2222-4000-8000-000000000002",
+                "endpointName": "EU-LNX-02",
+                "type": "server",
+                "osName": "Ubuntu",
+                "osVersion": "22.04",
+                "ipAddresses": ["10.120.2.20"],
+                "edrSensor": {"status": "on", "version": "1.2.3",
+                              "productNames": ["Trend Vision One Endpoint Sensor"],
+                              "lastConnectedDateTime": "2026-06-03T09:05:00Z"}
+              }
+            ],
+            "nextLink": "https://api.eu.xdr.trendmicro.example/v3.0/endpointSecurity/endpoints?skipToken=fixture-cursor-2"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "trend-vision-one:127.0.0.1:bbbbbbbb-2222-4000-8000-000000000001",
+      "trend-vision-one:127.0.0.1:bbbbbbbb-2222-4000-8000-000000000002"
+    ],
+    "request_count": 2,
+    "min_software_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "top=2"}
+    ],
+    "requests_absent": [
+      {"query_contains": "skipToken"}
+    ],
+    "log_contains": [
+      "trend-vision-one: stopping: nextLink left the configured API host",
+      "trend-vision-one: reported 2 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

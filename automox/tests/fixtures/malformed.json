@@ -1,0 +1,49 @@
+{
+  "name": "malformed",
+  "description": "A page mixing a device with no id, a device whose detail block is a string instead of an object, and a NIC with a MAC but no IPS. Each must be handled without aborting: the id-less device is skipped and logged, the string detail falls back to ip_addrs, and the IP-less NIC still yields a MAC-only interface. NOTE: a device whose \"status\" key is present but null still aborts the whole run (reported defect), so this page uses an object status. namespaced_ids is skipped: ids are the bare org-local device number (reported defect).",
+  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "routes": [
+    {
+      "name": "packages",
+      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "orgs",
+      "match": {"method": "GET", "path": "/api/orgs"},
+      "responses": [
+        {"status": 200, "json": [{"id": 4242, "name": "Fixture Org"}]},
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "servers",
+      "match": {"method": "GET", "path": "/api/servers"},
+      "responses": [
+        {"status": 200, "json": [
+          {"id": 2001, "name": "fixture-ok", "os_family": "Linux", "os_name": "Debian 12",
+           "status": {"agent_status": "connected"}, "ip_addrs": ["192.0.2.31"]},
+          {"id": 2002, "name": "fixture-string-detail", "detail": "unavailable",
+           "ip_addrs": ["192.0.2.32"]},
+          {"name": "fixture-no-id", "ip_addrs": ["192.0.2.33"]},
+          {"id": 2004, "name": "fixture-nic-without-ips",
+           "detail": {"NICS": [{"MAC": "00:11:22:aa:00:04"}]}}
+        ]},
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["2001", "2002", "2004"],
+    "assets": [
+      {"id": "2002", "fields": {"ipAddresses": "192.0.2.32"}, "fields_absent": ["macAddresses"]},
+      {"id": "2004", "fields": {"macAddresses": "00:11:22:aa:00:04"}, "fields_absent": ["ipAddresses"]}
+    ],
+    "log_contains": ["automox: skipping device with no id: name=fixture-no-id"]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

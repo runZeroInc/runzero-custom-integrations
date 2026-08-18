@@ -1,0 +1,261 @@
+{
+  "name": "happy",
+  "integration": "tp-link-omada",
+  "description": "The full Open API sequence: client_credentials token exchange, site list, then devices and clients for the one site. Proves the non-standard 'Authorization: AccessToken=<token>' header is sent, that the {errorCode, msg, result} envelope is unwrapped, that hyphenated uppercase MACs are canonicalised, and that a device named after its own MAC does not get that MAC as a hostname. Envelope and token shapes follow a real capture of an Omada software controller; the device field set follows a capture from an OC200 on firmware 5.13.30.20.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/openapi/authorize/token", "query_contains": "grant_type=client_credentials"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {
+              "accessToken": "AT-uBtS3HaO3B6sFa7ajMIKnTJLwaecYzQS",
+              "tokenType": "bearer",
+              "expiresIn": 7200,
+              "refreshToken": "RT-VhdGW51kbqLjS5aCd2PZEuCnLWtbdGC8"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 1,
+              "currentPage": 1,
+              "currentSize": 1,
+              "data": [
+                {
+                  "siteId": "660293f1ae766909a69251d4",
+                  "name": "Branch-Hamburg",
+                  "region": "Germany",
+                  "timeZone": "Europe/Amsterdam",
+                  "scenario": "Office",
+                  "type": 0
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 3,
+              "currentPage": 1,
+              "currentSize": 3,
+              "data": [
+                {
+                  "type": "ap",
+                  "mac": "50-D4-F7-66-0D-9C",
+                  "name": "Reception-AP",
+                  "model": "EAP245(EU) v3.0",
+                  "compoundModel": "EAP245 v3.0",
+                  "ip": "192.0.2.31",
+                  "status": 1,
+                  "sn": "22394A7000123",
+                  "firmwareVersion": "5.1.0 Build 20230518 Rel. 60119",
+                  "needUpgrade": false,
+                  "uptime": "1h 43m",
+                  "cpuUtil": 6,
+                  "memUtil": 41,
+                  "lastSeen": 1750000000000
+                },
+                {
+                  "type": "switch",
+                  "mac": "AC-84-C6-11-22-33",
+                  "name": "AC-84-C6-11-22-33",
+                  "model": "TL-SG2210P",
+                  "ip": "192.0.2.32",
+                  "status": 1,
+                  "sn": "22394A7000456",
+                  "firmwareVersion": "1.20.0 Build 20220920 Rel. 50488",
+                  "needUpgrade": true,
+                  "uptime": "6d 2h",
+                  "cpuUtil": 12,
+                  "memUtil": 55,
+                  "lastSeen": 1750000000000
+                },
+                {
+                  "type": "gateway",
+                  "mac": "5C-E9-31-AA-BB-CC",
+                  "name": "Branch-Gateway",
+                  "model": "ER605 v2.0",
+                  "ip": "192.0.2.1",
+                  "status": 0,
+                  "sn": "22394A7000789",
+                  "firmwareVersion": "2.1.2 Build 20230725 Rel. 34829",
+                  "uptime": "0s",
+                  "lastSeen": 1749000000000
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 2,
+              "currentPage": 1,
+              "currentSize": 2,
+              "data": [
+                {
+                  "mac": "3C-22-FB-11-22-33",
+                  "name": "designer-mbp",
+                  "hostName": "designer-mbp",
+                  "ip": "192.0.2.101",
+                  "ipv6List": ["2001:db8:beef::101"],
+                  "vendor": "Apple, Inc.",
+                  "deviceType": "MacBook",
+                  "deviceCategory": "computer",
+                  "osName": "macOS",
+                  "model": "MacBook Pro",
+                  "active": true,
+                  "wireless": true,
+                  "ssid": "Corp-WiFi",
+                  "networkName": "LAN",
+                  "vid": 10,
+                  "apName": "Reception-AP",
+                  "apMac": "50-D4-F7-66-0D-9C",
+                  "radioId": 1,
+                  "channel": 44,
+                  "signalLevel": 84,
+                  "rssi": -52,
+                  "connectDevType": "ap",
+                  "connectType": 0,
+                  "guest": false,
+                  "blocked": false,
+                  "uptime": 8340,
+                  "lastSeen": 1750000000000
+                },
+                {
+                  "mac": "B8-27-EB-44-55-66",
+                  "name": "B8-27-EB-44-55-66",
+                  "hostName": "sensor-pi",
+                  "ip": "192.0.2.102",
+                  "vendor": "Raspberry Pi Foundation",
+                  "deviceType": "Linux Device",
+                  "active": true,
+                  "wireless": false,
+                  "networkName": "IoT",
+                  "vid": 20,
+                  "switchName": "AC-84-C6-11-22-33",
+                  "switchMac": "AC-84-C6-11-22-33",
+                  "port": 7,
+                  "connectDevType": "switch",
+                  "guest": false,
+                  "blocked": false,
+                  "uptime": 998877,
+                  "lastSeen": 1750000000000
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"errorCode": -1600, "msg": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:50:D4:F7:66:0D:9C",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:AC:84:C6:11:22:33",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:5C:E9:31:AA:BB:CC",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:33",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:B8:27:EB:44:55:66"
+    ],
+    "assets": [
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:50:D4:F7:66:0D:9C",
+        "fields": {
+          "_attrType": "device",
+          "hostnames": "Reception-AP",
+          "deviceType": "Wireless Access Point",
+          "manufacturer": "TP-Link",
+          "model": "EAP245(EU) v3.0",
+          "osVersion": "5.1.0 Build 20230518 Rel. 60119",
+          "omada_site_name": "Branch-Hamburg",
+          "omada_serial_number": "22394A7000123",
+          "omada_status": "connected"
+        }
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:AC:84:C6:11:22:33",
+        "fields": {"_attrType": "device",
+          "deviceType": "Switch"},
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:device:5C:E9:31:AA:BB:CC",
+        "fields": {"_attrType": "device",
+          "deviceType": "Router", "omada_status": "disconnected"}
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:33",
+        "fields": {
+          "_attrType": "client",
+          "hostnames": "designer-mbp",
+          "manufacturer": "Apple, Inc.",
+          "os": "macOS",
+          "omada_ssid": "Corp-WiFi",
+          "omada_ap_name": "Reception-AP",
+          "omada_vlan_id": "10"
+        }
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:B8:27:EB:44:55:66",
+        "fields": {
+          "_attrType": "client",
+          "hostnames": "sensor-pi",
+          "omada_switch_name": "AC-84-C6-11-22-33",
+          "omada_port": "7"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "POST", "path_contains": "/openapi/authorize/token", "query_contains": "grant_type=client_credentials"},
+      {"method": "GET", "path_contains": "/sites", "header_contains": "AccessToken=AT-uBtS3HaO3B6sFa7ajMIKnTJLwaecYzQS"},
+      {"method": "GET", "path_contains": "/devices", "query_contains": "page=1"},
+      {"method": "GET", "path_contains": "/clients", "query_contains": "pageSize=100"}
+    ]
+  },
+
+  "invariants": {"skip": ["no_mac_in_id"]},
+  "check_determinism": true
+}

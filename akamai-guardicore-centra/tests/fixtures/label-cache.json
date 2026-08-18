@@ -1,0 +1,118 @@
+{
+  "name": "label-cache",
+  "integration": "akamai-guardicore-centra",
+  "script": "akamai-guardicore-centra/centra-v4-api.star",
+  "description": "REGRESSION LOCK for the missing negative cache on label lookups. build_assets tested `if not name` against the label cache, which cannot tell \"never asked\" from \"asked, and nothing usable came back\". A label the API user cannot read answers 404 forever, so GET /api/v4.0/labels/<guid> was re-issued once per asset carrying it -- four assets here meant four identical 404s, and on a real estate a policy label attached to every host means one wasted round trip per host, every run.\n\nAll four assets carry the same two labels: one that resolves and one that 404s. The run must issue exactly ONE request for each, so request_count pins it: 1 authenticate + 1 assets?status=on + 1 assets?status=off + 1 readable label + 1 forbidden label = 5. Before the fix it was 8, because the forbidden guid was fetched four times. The resolved label must still become a tag on every asset, which is what proves the positive cache was not broken in the process.\n\nSkips namespaced_ids: centra-v4 uses the bare Centra asset guid as the foreign id, with no appliance scope. Not this scenario's defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {"method": "POST", "path": "/api/v3.0/authenticate"},
+      "responses": [{"status": 200, "json": {"access_token": "fixture-centra-token", "2fa_required": false}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-on",
+      "match": {"method": "GET", "path": "/api/v4.0/assets", "query_contains": "status=on"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 4,
+            "objects": [
+              {
+                "id": "asset-guid-0201",
+                "name": "syn-centra-201",
+                "status": "on",
+                "asset_type": "Server",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "os_info": {"type": "Linux"},
+                "nics": [{"mac_address": "00:50:56:00:c2:01", "ip_addresses": ["192.0.2.101"]}],
+                "labels": [{"id": "label-guid-readable"}, {"id": "label-guid-forbidden"}]
+              },
+              {
+                "id": "asset-guid-0202",
+                "name": "syn-centra-202",
+                "status": "on",
+                "asset_type": "Server",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "os_info": {"type": "Linux"},
+                "nics": [{"mac_address": "00:50:56:00:c2:02", "ip_addresses": ["192.0.2.102"]}],
+                "labels": [{"id": "label-guid-readable"}, {"id": "label-guid-forbidden"}]
+              },
+              {
+                "id": "asset-guid-0203",
+                "name": "syn-centra-203",
+                "status": "on",
+                "asset_type": "Server",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "os_info": {"type": "Linux"},
+                "nics": [{"mac_address": "00:50:56:00:c2:03", "ip_addresses": ["192.0.2.103"]}],
+                "labels": [{"id": "label-guid-forbidden"}, {"id": "label-guid-readable"}]
+              },
+              {
+                "id": "asset-guid-0204",
+                "name": "syn-centra-204",
+                "status": "on",
+                "asset_type": "Server",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "os_info": {"type": "Linux"},
+                "nics": [{"mac_address": "00:50:56:00:c2:04", "ip_addresses": ["192.0.2.104"]}],
+                "labels": [{"id": "label-guid-forbidden"}, {"id": "label-guid-readable"}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-off",
+      "match": {"method": "GET", "path": "/api/v4.0/assets", "query_contains": "status=off"},
+      "responses": [{"status": 200, "json": {"total_count": 0, "objects": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "label-readable",
+      "match": {"method": "GET", "path": "/api/v4.0/labels/label-guid-readable"},
+      "responses": [{"status": 200, "json": {"objects": [{"key": "Environment", "value": "Production"}]}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "label-forbidden",
+      "match": {"method": "GET", "path": "/api/v4.0/labels/label-guid-forbidden"},
+      "responses": [{"status": 404, "json": {"error": "label not found"}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "asset-guid-0201",
+      "asset-guid-0202",
+      "asset-guid-0203",
+      "asset-guid-0204"
+    ],
+    "assets": [
+      {"id": "asset-guid-0201", "fields": {"labels": "Environment: Production"}},
+      {"id": "asset-guid-0204", "fields": {"labels": "Environment: Production"}}
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v4.0/labels/label-guid-forbidden"},
+      {"method": "GET", "path": "/api/v4.0/labels/label-guid-readable"}
+    ],
+    "log_contains": ["failed to retrieve label info for label-guid-forbidden"]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "age-filter",
+  "integration": "greenbone",
+  "script": "greenbone/greenbone.star",
+  "description": "Exercises the max_age_days branch, which the main import scenario deliberately disables by passing 0. Any non-zero age limit makes the importer call parse_time(scan_end) on whatever gvmd put in last_report, and parse_time defaults to RFC3339 and RAISES on anything it cannot read -- a Starlark builtin returning an error aborts the entire run, so the script's `if ended != None` guard can never fire. That makes the exact timestamp gvmd emits load-bearing.\n\nBoth forms a live gvmd 25.2.1 was observed to produce are RFC3339 and parse cleanly: '2026-08-16T13:57:09Z' from get_tasks, and '2026-08-16T08:57:09-05:00' from get_reports when a timezone= filter term is supplied (note the colon in the offset -- gvmd does not emit the bare -0500 form here, even though the %FT%T%z format string is present in the binary). get_tasks ignores timezone= entirely and always answers in UTC, and last_report/report/scan_end is the only timestamp this importer reads, so the Z form below is the realistic case. A 10-year window keeps the assertion stable rather than expiring as the recording ages.",
+  "kwargs": {
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "fixture-user",
+    "gmp_password": "fixture-password",
+    "tls_disable_validation": "true",
+    "max_age_days": "3650",
+    "page_size": "8"
+  },
+  "gmp": {
+    "routes": [
+      {"name": "authenticate", "match": {"command": "authenticate"},
+       "responses": [{"xml_file": "authenticate-ok.xml"}]},
+      {"name": "get-tasks", "match": {"command": "get_tasks"},
+       "responses": [{"xml_file": "tasks.xml"}]},
+      {"name": "get-reports-paged", "match": {"command": "get_reports"},
+       "responses": [
+         {"xml_file": "report-page1.xml"},
+         {"xml_file": "report-page2.xml"}
+       ],
+       "when_exhausted": "error"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]},
+  "expect": {
+    "asset_count": 2,
+    "request_count": 4,
+    "log_contains": [
+      "greenbone: importing task 'Lab All' report 00000000 (scan_end 2026-08-16T13:57:09Z)",
+      "greenbone: imported 2 assets from 1 report(s)"
+    ],
+    "requests_absent": [
+      {"path": "get_reports", "body_contains": "first=17"}
+    ]
+  }
+}

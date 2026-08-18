@@ -1,0 +1,235 @@
+{
+  "name": "happy",
+  "integration": "uptycs",
+  "description": "One upt_assets page with every enrichment table enabled. The point of this scenario is the virtual-adapter filter on interface names: interface_details and interface_addresses report eth0, docker0, veth123, vEthernet (Default Switch) and lo, and only eth0 may become a network interface. The four virtual adapters are deliberately given 169.254.0.0/16 addresses, so if the name filter ever regresses the no_loopback_interfaces invariant fires on the leaked link-local address. Asset a2 owns nothing but virtual adapters and must therefore come out with NO interface at all, correlating on hostname alone.\n\nAlso covers: the locally-signed HS256 JWT (there is no token endpoint to route, so the run must reach the query endpoint on its first request); wildcard 0.0.0.0 listening_ports rows resolving to the asset's primary IP while an asset with no primary IP drops its wildcard row instead of inventing an address; and the future-timestamp clamp on a2's last_activity_at of 2099, which runZero would otherwise reject outright, dropping the whole record.\n\nThe two assets also bracket the device-type hint. a2 runs Windows Server 2022 on a 'Microsoft Corporation / Virtual Machine' chassis, which tells runZero's hardware fingerprinter nothing, so the OS product name is the only statement of role there is and must reach deviceType. a1 runs Ubuntu, which is a desktop as often as a server, so it must carry NO deviceType rather than a guess.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixturecust",
+    "api_key": "fixture-key",
+    "api_secret": "fixture-secret",
+    "include_host_details": "true",
+    "include_software": "true",
+    "include_services": "true",
+    "include_vulnerabilities": "true",
+    "vulnerability_table": "upt_vulnerabilities_state"
+  },
+  "routes": [
+    {
+      "name": "upt-assets",
+      "match": {"method": "POST", "path": "/public/api/customers/fixturecust/query", "body_contains": "FROM upt_assets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "a1",
+                "host_name": "web-a1",
+                "os": "Ubuntu",
+                "os_version": "22.04",
+                "os_flavor": "ubuntu",
+                "osquery_version": "5.10.2",
+                "status": "active",
+                "live": true,
+                "hardware_vendor": "Dell Inc.",
+                "hardware_model": "PowerEdge R650",
+                "cores": 16,
+                "memory_mb": 65536,
+                "cpu_brand": "Intel(R) Xeon(R) Silver 4314",
+                "created_at": "2025-02-01 10:00:00.000",
+                "last_activity_at": "2026-08-14 12:00:00.000"
+              },
+              {
+                "id": "a2",
+                "host_name": "iso-a2",
+                "os": "Windows Server 2022",
+                "os_version": "10.0.20348",
+                "os_flavor": "windows",
+                "osquery_version": "5.10.2",
+                "status": "active",
+                "hardware_vendor": "Microsoft Corporation",
+                "hardware_model": "Virtual Machine",
+                "created_at": "2025-06-01 08:00:00.000",
+                "last_activity_at": "2099-01-01 00:00:00.000"
+              },
+              {
+                "id": "",
+                "host_name": "ghost-a3"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "interface-details",
+      "match": {"method": "POST", "body_contains": "FROM interface_details"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "a1", "interface": "eth0", "mac": "00:50:56:a1:00:01"},
+              {"asset_id": "a1", "interface": "lo", "mac": "00:00:00:00:00:00"},
+              {"asset_id": "a1", "interface": "docker0", "mac": "02:42:ac:11:00:02"},
+              {"asset_id": "a1", "interface": "veth123", "mac": "6a:11:22:33:44:55"},
+              {"asset_id": "a2", "interface": "vEthernet (Default Switch)", "mac": "00:15:5d:00:0a:0b"},
+              {"asset_id": "a2", "interface": "veth9", "mac": "6a:aa:bb:cc:dd:ee"},
+              {"asset_id": "a2", "interface": "docker0", "mac": "02:42:ac:11:00:02"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "interface-addresses",
+      "match": {"method": "POST", "body_contains": "FROM interface_addresses"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "a1", "interface": "eth0", "address": "10.150.1.10"},
+              {"asset_id": "a1", "interface": "eth0", "address": "2001:db8:150::10"},
+              {"asset_id": "a1", "interface": "lo", "address": "127.0.0.1"},
+              {"asset_id": "a1", "interface": "docker0", "address": "169.254.5.5"},
+              {"asset_id": "a1", "interface": "veth123", "address": "169.254.6.6"},
+              {"asset_id": "a2", "interface": "vEthernet (Default Switch)", "address": "169.254.7.7"},
+              {"asset_id": "a2", "interface": "veth9", "address": "169.254.8.8"},
+              {"asset_id": "a2", "interface": "docker0", "address": "169.254.9.9"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "system-info",
+      "match": {"method": "POST", "body_contains": "FROM system_info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "a1", "hardware_serial": "SN-A1-0001", "system_uuid": "11111111-1111-1111-1111-111111111111", "computer_name": "web-a1"},
+              {"asset_id": "a2", "hardware_serial": "SN-A2-0002", "system_uuid": "22222222-2222-2222-2222-222222222222", "computer_name": "ISO-A2"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "programs",
+      "match": {"method": "POST", "body_contains": "FROM programs"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "a2", "product": "Microsoft Edge", "version": "127.0.2651.98", "vendor": "Microsoft Corporation", "extra": "C:\\Program Files (x86)\\Microsoft\\Edge"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "apps",
+      "match": {"method": "POST", "body_contains": "FROM apps"},
+      "responses": [{"status": 200, "json": {"items": []}}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "deb-packages",
+      "match": {"method": "POST", "body_contains": "FROM deb_packages"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "a1", "product": "openssl", "version": "3.0.2-0ubuntu1.15", "vendor": "Ubuntu Developers", "extra": "amd64"},
+              {"asset_id": "a1", "product": "nginx", "version": "1.18.0-6ubuntu14", "vendor": "Ubuntu Developers", "extra": "amd64"},
+              {"asset_id": "a1", "product": "", "version": "9", "vendor": "", "extra": ""}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "rpm-packages",
+      "match": {"method": "POST", "body_contains": "FROM rpm_packages"},
+      "responses": [{"status": 200, "json": {"items": []}}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "listening-ports",
+      "match": {"method": "POST", "body_contains": "FROM listening_ports"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "a1", "address": "0.0.0.0", "port": 22, "protocol": 6, "pid": 1234, "path": "/usr/sbin/sshd"},
+              {"asset_id": "a1", "address": "10.150.1.10", "port": 443, "protocol": 6, "pid": 2345, "path": "/usr/sbin/nginx"},
+              {"asset_id": "a1", "address": "127.0.0.1", "port": 5432, "protocol": 6, "pid": 3456, "path": "/usr/lib/postgresql/bin/postgres"},
+              {"asset_id": "a1", "address": "0.0.0.0", "port": 0, "protocol": 6, "pid": 4567, "path": ""},
+              {"asset_id": "a1", "address": "10.150.1.10", "port": 53, "protocol": 17, "pid": 5678, "path": "/usr/sbin/named"},
+              {"asset_id": "a1", "address": "10.150.1.10", "port": 9999, "protocol": 47, "pid": 6789, "path": "/opt/weird"},
+              {"asset_id": "a2", "address": "0.0.0.0", "port": 8080, "protocol": 6, "pid": 7890, "path": "C:\\svc.exe"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "POST", "body_contains": "FROM upt_vulnerabilities_state"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"upt_asset_id": "a1", "cve_list": "CVE-2026-77777", "title": "OpenSSL remote code execution", "description": "A synthetic finding for fixture purposes.", "uptycs_severity": "HIGH", "cvss_score": 8.8, "package_name": "openssl", "package_version": "3.0.2-0ubuntu1.15", "solution": "Upgrade openssl"},
+              {"upt_asset_id": "a1", "cve_list": "CVE-2026-77777", "title": "OpenSSL remote code execution", "uptycs_severity": "HIGH", "cvss_score": 8.8, "package_name": "openssl", "package_version": "3.0.2-0ubuntu1.15"},
+              {"upt_asset_id": "a2", "cve_list": "CVE-2025-88888", "title": "Edge sandbox escape", "uptycs_severity": "MEDIUM", "cvss_score": 5.4, "package_name": "Microsoft Edge"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["uptycs:fixturecust:a1", "uptycs:fixturecust:a2"],
+    "assets": [
+      {"id": "uptycs:fixturecust:a2", "fields": {"deviceType": "Server"}},
+      {"id": "uptycs:fixturecust:a1", "fields_absent": ["deviceType"]}
+    ],
+    "request_count": 10,
+    "requests_include": [
+      {"method": "POST", "path": "/public/api/customers/fixturecust/query", "body_contains": "SELECT * FROM upt_assets ORDER BY id LIMIT 200 OFFSET 0"},
+      {"body_contains": "upt_asset_id IN ('a1','a2')"},
+      {"body_contains": "upt_day >="},
+      {"header_contains": "Bearer "}
+    ],
+    "requests_absent": [
+      {"path_contains": "/token"},
+      {"path_contains": "/oauth"}
+    ],
+    "min_software_total": 3,
+    "min_services_total": 3,
+    "log_contains": [
+      "uptycs: skipping asset with no id: host_name=ghost-a3",
+      "uptycs: reported 2 assets so far"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

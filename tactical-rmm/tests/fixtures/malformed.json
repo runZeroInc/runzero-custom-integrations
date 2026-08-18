@@ -1,0 +1,127 @@
+{
+  "name": "malformed",
+  "integration": "tactical-rmm",
+  "description": "An agent array holding the shapes a real server can produce and the ones a proxy or a partial upgrade can: a bare string where an object belongs, a null element, an agent with no agent_id, an agent whose only address is loopback, an agent whose only address is APIPA, an agent whose local_ips is the 'error getting local ips' sentinel and which has no usable hostname, an agent whose last_seen is years in the future, and one good agent. Everything unusable must be skipped with the run continuing, and the future timestamp must be clamped rather than failing the whole record -- an unclamped future time is rejected by validateTimeForImportAsset and drops the entire asset, not the field.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-tactical-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/agents/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "not-an-agent",
+            null,
+            {
+              "hostname": "no-identity.example.com",
+              "monitoring_type": "server",
+              "local_ips": "192.0.2.200",
+              "plat": "linux"
+            },
+            {
+              "agent_id": "LoopbackOnlyAgentIdentifierPaddedTo40Chr",
+              "hostname": "127.0.0.1",
+              "monitoring_type": "server",
+              "local_ips": "127.0.0.1",
+              "plat": "linux",
+              "operating_system": "Ubuntu 22.04 x86_64 5.15.0-91-generic"
+            },
+            {
+              "agent_id": "ApipaOnlyAgentIdentifierPaddedOutTo40Chr",
+              "hostname": "dhcp-failed",
+              "monitoring_type": "workstation",
+              "local_ips": "169.254.11.22/16, fe80::1234:5678:9abc:def0/64",
+              "plat": "windows",
+              "operating_system": "Windows 11 Pro, 64 bit v23H2 (build 22631.3155)"
+            },
+            {
+              "agent_id": "SentinelAddressAgentIdentifierPaddedTo40C",
+              "hostname": "localhost",
+              "monitoring_type": "server",
+              "local_ips": "error getting local ips",
+              "plat": "linux"
+            },
+            {
+              "agent_id": "FutureTimestampAgentIdentifierPaddedTo40C",
+              "hostname": "clock-skewed.example.com",
+              "site_name": "DC2",
+              "client_name": "Acme Corp",
+              "monitoring_type": "server",
+              "status": "online",
+              "last_seen": "2099-01-01T00:00:00.000000Z",
+              "boot_time": 4102444800.0,
+              "plat": "linux",
+              "goarch": "amd64",
+              "operating_system": "Rocky Linux 9.3 x86_64 5.14.0-362.el9.x86_64",
+              "local_ips": "198.51.100.77/24",
+              "make_model": "error getting make/model",
+              "cpu_model": "not-a-list-but-a-string",
+              "physical_disks": "also-not-a-list",
+              "checks": "checks-should-be-an-object"
+            },
+            {
+              "agent_id": "kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+              "hostname": "VNVMHOSTSRV4",
+              "site_name": "Main Office",
+              "client_name": "Acme Corp",
+              "monitoring_type": "server",
+              "status": "online",
+              "last_seen": "2026-06-15T12:55:15.110723Z",
+              "plat": "windows",
+              "goarch": "amd64",
+              "operating_system": "Microsoft Windows Server 2019 Standard, 64 bit v1809 (build 17763.4974)",
+              "local_ips": "192.0.2.121",
+              "make_model": "HP ProLiant DL380 Gen9",
+              "serial_number": "ABCD123456"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tacticalrmm:$HOST:kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+      "tacticalrmm:$HOST:FutureTimestampAgentIdentifierPaddedTo40C",
+      "tacticalrmm:$HOST:ApipaOnlyAgentIdentifierPaddedOutTo40Chr"
+    ],
+    "ids_absent": [
+      "tacticalrmm:$HOST:SentinelAddressAgentIdentifierPaddedTo40C",
+      "tacticalrmm:$HOST:LoopbackOnlyAgentIdentifierPaddedTo40Chr"
+    ],
+    "assets": [
+      {
+        "id": "tacticalrmm:$HOST:FutureTimestampAgentIdentifierPaddedTo40C",
+        "fields": {
+          "hostnames": "clock-skewed.example.com",
+          "os": "Rocky Linux",
+          "osVersion": "9.3",
+          "deviceType": "Server"
+        },
+        "fields_absent": ["model", "manufacturer", "tacticalrmm_checks_total"]
+      },
+      {
+        "id": "tacticalrmm:$HOST:ApipaOnlyAgentIdentifierPaddedOutTo40Chr",
+        "fields": {"hostnames": "dhcp-failed"},
+        "fields_absent": ["ipAddresses"]
+      }
+    ],
+    "log_contains": [
+      "skipping agent row that is not an object",
+      "skipping agent with no agent_id",
+      "skipping agent SentinelAddressAgentIdentifierPaddedTo40C with no hostname and no routable address",
+      "skipping agent LoopbackOnlyAgentIdentifierPaddedTo40Chr with no hostname and no routable address"
+    ]
+  },
+
+  "check_determinism": true
+}

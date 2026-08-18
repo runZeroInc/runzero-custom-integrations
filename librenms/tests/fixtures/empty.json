@@ -1,0 +1,38 @@
+{
+  "name": "empty",
+  "integration": "librenms",
+  "description": "A LibreNMS install with nothing discovered yet. /devices answers with an empty devices array and count 0, while the ARP table answers 404 'Fdb entry does not exist'-style, because LibreNMS returns 404 rather than an empty collection when a resource table has no rows. Both must be treated as empty rather than as failures, and the run must report zero assets without erroring and without issuing any per-device call.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-auth-token"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v0/devices"},
+      "responses": [{"status": 200, "json": {"status": "ok", "devices": [], "count": 0}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp",
+      "match": {"method": "GET", "path": "/api/v0/resources/ip/arp/all"},
+      "responses": [{"status": 404, "json": {"status": "error", "message": "No valid IP/MAC provided"}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"status": "error", "message": "This API route doesn't exist."}},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_absent": [
+      {"path_contains": "/api/v0/devices/"},
+      {"path_contains": "/resources/fdb"}
+    ],
+    "log_contains": [
+      "reported 0 devices",
+      "treating it as empty",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

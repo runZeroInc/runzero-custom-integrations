@@ -1,0 +1,170 @@
+{
+  "name": "swarm",
+  "integration": "portainer",
+  "description": "A Swarm manager. Swarm is the one place the Docker API reports routable addresses for machines other than the daemon being queried: /info gives the local node's advertise address in Swarm.NodeAddr, and GET /nodes gives every other node's address in Status.Addr. Proves the swarm node listing is only requested when LocalNodeState is active, that each node becomes its own asset keyed on the swarm node ID, and that a worker with no ManagerStatus is handled. Node fields follow the Node schema in moby/moby api/swagger.yaml.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "mode": "portainer",
+    "api_key": "ptr_fixtureAPIKeyValue0000000000000000000000=",
+    "import_containers": "none",
+    "import_published_ports": "false"
+  },
+
+  "routes": [
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoints"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"Id": 7, "Name": "swarm-prod", "Type": 1, "URL": "unix:///var/run/docker.sock", "Status": 1, "Snapshots": []}
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "info",
+      "match": {"method": "GET", "path": "/api/endpoints/7/docker/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ID": "9f8e7d6c-5b4a-4392-8180-7f6e5d4c3b2a",
+            "Containers": 12,
+            "ContainersRunning": 12,
+            "Images": 40,
+            "Driver": "overlay2",
+            "KernelVersion": "5.15.0-113-generic",
+            "OperatingSystem": "Ubuntu 22.04.4 LTS",
+            "OSVersion": "22.04",
+            "OSType": "linux",
+            "Architecture": "x86_64",
+            "NCPU": 16,
+            "MemTotal": 33537572864,
+            "Name": "swarm-mgr-01",
+            "Labels": [],
+            "ServerVersion": "27.0.1",
+            "Swarm": {
+              "NodeID": "k67qz4598weg5unwwffg6z1m1",
+              "NodeAddr": "192.0.2.71",
+              "LocalNodeState": "active",
+              "ControlAvailable": true,
+              "Error": "",
+              "RemoteManagers": [
+                {"NodeID": "k67qz4598weg5unwwffg6z1m1", "Addr": "192.0.2.71:2377"}
+              ],
+              "Nodes": 3,
+              "Managers": 1,
+              "Cluster": {"ID": "abajmipo7b4xz5ip2nrla6b11", "CreatedAt": "2026-02-18T10:44:24.496525531Z", "DataPathPort": 4789}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "nodes",
+      "match": {"method": "GET", "path": "/api/endpoints/7/docker/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "ID": "k67qz4598weg5unwwffg6z1m1",
+              "Version": {"Index": 373531},
+              "CreatedAt": "2026-02-18T10:44:24.496525531Z",
+              "UpdatedAt": "2026-08-09T07:09:37.632105588Z",
+              "Spec": {"Name": "", "Labels": {"rack": "a1"}, "Role": "manager", "Availability": "active"},
+              "Description": {
+                "Hostname": "swarm-mgr-01",
+                "Platform": {"Architecture": "x86_64", "OS": "linux"},
+                "Resources": {"NanoCPUs": 16000000000, "MemoryBytes": 33537572864},
+                "Engine": {"EngineVersion": "27.0.1", "Labels": {"site": "hq"}}
+              },
+              "Status": {"State": "ready", "Message": "", "Addr": "192.0.2.71"},
+              "ManagerStatus": {"Leader": true, "Reachability": "reachable", "Addr": "192.0.2.71:2377"}
+            },
+            {
+              "ID": "24ifsmvkjbyhksix2ldy4o4bx",
+              "Version": {"Index": 373540},
+              "Spec": {"Labels": {}, "Role": "worker", "Availability": "active"},
+              "Description": {
+                "Hostname": "swarm-wkr-01",
+                "Platform": {"Architecture": "x86_64", "OS": "linux"},
+                "Engine": {"EngineVersion": "27.0.1", "Labels": {}}
+              },
+              "Status": {"State": "ready", "Message": "", "Addr": "192.0.2.72"}
+            },
+            {
+              "ID": "38ktdmvkjbyhksix2ldy4o9zq",
+              "Spec": {"Labels": {}, "Role": "worker", "Availability": "drain"},
+              "Description": {
+                "Hostname": "swarm-wkr-02",
+                "Platform": {"Architecture": "aarch64", "OS": "linux"},
+                "Engine": {"EngineVersion": "26.1.4"}
+              },
+              "Status": {"State": "down", "Message": "heartbeat failure", "Addr": "192.0.2.73"}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "docker:$HOST:host:9f8e7d6c-5b4a-4392-8180-7f6e5d4c3b2a",
+      "docker:$HOST:swarm-node:k67qz4598weg5unwwffg6z1m1",
+      "docker:$HOST:swarm-node:24ifsmvkjbyhksix2ldy4o4bx",
+      "docker:$HOST:swarm-node:38ktdmvkjbyhksix2ldy4o9zq"
+    ],
+    "assets": [
+      {
+        "id": "docker:$HOST:host:9f8e7d6c-5b4a-4392-8180-7f6e5d4c3b2a",
+        "fields": {
+          "_attrType": "host",
+          "hostnames": "swarm-mgr-01",
+          "ipAddresses": "192.0.2.71",
+          "docker.swarm_state": "active",
+          "docker.swarm_node_id": "k67qz4598weg5unwwffg6z1m1"
+        }
+      },
+      {
+        "id": "docker:$HOST:swarm-node:24ifsmvkjbyhksix2ldy4o4bx",
+        "fields": {
+          "_attrType": "swarm-node",
+          "hostnames": "swarm-wkr-01",
+          "ipAddresses": "192.0.2.72",
+          "deviceType": "Server",
+          "docker.swarm_role": "worker",
+          "docker.swarm_state": "ready",
+          "docker.server_version": "27.0.1"
+        },
+        "fields_absent": ["docker.swarm_leader"]
+      },
+      {
+        "id": "docker:$HOST:swarm-node:38ktdmvkjbyhksix2ldy4o9zq",
+        "fields": {
+          "_attrType": "swarm-node",
+          "hostnames": "swarm-wkr-02",
+          "ipAddresses": "192.0.2.73",
+          "docker.swarm_availability": "drain",
+          "docker.swarm_state": "down",
+          "docker.swarm_message": "heartbeat failure"
+        }
+      }
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/endpoints/7/docker/nodes"}
+    ],
+    "log_contains": ["portainer: reported 4 assets from 1 environment(s)"]
+  },
+
+  "check_determinism": true
+}

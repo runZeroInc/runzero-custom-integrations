@@ -1,0 +1,95 @@
+{
+  "name": "malformed",
+  "integration": "asimily",
+  "description": "Junk records must be skipped without ending the run: a string where a device object is documented, a device with no deviceID under either spelling, a cves entry that is a string rather than an object, and a CVE row with no cveName. check_determinism is off because the id is scoped by the portal host, which under the fixture server carries an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "api_key": "fixture-key",
+    "include_vulnerabilities": "true",
+    "page_size": "50"
+  },
+  "default_response": {"status": 400, "json": {"error": "missing or malformed source header"}},
+  "routes": [
+    {
+      "name": "device-cves",
+      "match": {"method": "POST", "path": "/api/extapi/assets/device-cves", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              "this row should have been an object",
+              {
+                "deviceId": 60001,
+                "cves": [
+                  "this row should have been an object too",
+                  {"productName": "NoNameFW", "score": 5.0, "isFixed": 56},
+                  {"cveName": "CVE-2025-61001", "productName": "AlphaFW", "score": 7.7,
+                   "cvssBaseScore": 8.1, "isFixed": 56, "nvdPublishDate": "sometime in 2025",
+                   "openDate": 1767225600}
+                ]
+              },
+              {
+                "cves": [{"cveName": "CVE-2025-61999", "productName": "OrphanFW", "isFixed": 56}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/extapi/assets", "header": {"source": "runzero"}},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalPages": 1,
+            "content": [
+              "this row should have been an object",
+              {
+                "deviceID": 60001,
+                "hostName": "alpha-mal-01",
+                "macAddr": "00:1B:44:60:00:01",
+                "v4IpAddrs": ["10.60.1.1"],
+                "deviceType": "Ultrasound",
+                "deviceClass": "Medical",
+                "lastDiscoveredAt": "2026-08-09T00:00:00Z"
+              },
+              {
+                "hostName": "no-device-id-host",
+                "macAddr": "00:1B:44:60:00:02",
+                "v4IpAddrs": ["10.60.1.2"]
+              },
+              {
+                "deviceID": 60003,
+                "hostName": "scalar-addr-03",
+                "macAddr": "00:1B:44:60:00:03",
+                "v4IpAddrs": "10.60.1.3",
+                "v6IpAddrs": null,
+                "deviceType": "Workstation",
+                "lastDiscoveredAt": "not a timestamp at all"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "log_contains": [
+      "asimily: skipping malformed device record",
+      "asimily: skipping device with no deviceID: mac=00:1B:44:60:00:02",
+      "asimily: indexed 1 open CVEs across 1 devices"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

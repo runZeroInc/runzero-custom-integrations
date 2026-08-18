@@ -1,0 +1,115 @@
+{
+  "name": "detail-cap",
+  "integration": "trend-vision-one",
+  "description": "The optional adapter pass, which is the only source of MAC addresses in this API, capped at two lookups across four endpoints. Proves the N+1 budget is honoured and reported, that an endpoint past the cap is still imported using only the inventory addresses, that a single failing detail lookup is logged and skipped rather than ending the run, that an adapter reduced to a loopback address contributes no interface, and that an agentGuid which would not survive being interpolated into the request path ('../../admin-endpoints') skips the detail lookup entirely instead of addressing another resource.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "api_token": "fixture-vision-one-key",
+    "import_software": "false",
+    "fetch_interfaces": "true",
+    "interface_limit": "2",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "detail-0001",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints/aaaaaaaa-1111-4000-8000-000000000001"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "agentGuid": "aaaaaaaa-1111-4000-8000-000000000001",
+          "endpointName": "WIN-APP-01",
+          "description": "primary application server",
+          "os": {"name": "Windows Server 2022", "version": "10.0.20348", "architecture": "x86_64", "platform": "windows"},
+          "interfaces": [
+            {"macAddress": "00:50:56:9A:0B:0C", "ipAddresses": ["10.110.1.10", "fe80::250:56ff:fe9a:b0c"]},
+            {"macAddress": "", "ipAddresses": ["127.0.0.1", "::1"]}
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-0002-missing",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints/aaaaaaaa-1111-4000-8000-000000000002"},
+      "responses": [{
+        "status": 404,
+        "json": {"error": {"code": "NotFound", "message": "endpoint not found"}}
+      }],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints-list",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "totalCount": 4,
+          "items": [
+            {
+              "agentGuid": "../../admin-endpoints",
+              "endpointName": "PATH-TRAVERSAL-PROBE",
+              "type": "desktop",
+              "osName": "Windows 11",
+              "ipAddresses": ["10.110.0.9"]
+            },
+            {
+              "agentGuid": "aaaaaaaa-1111-4000-8000-000000000001",
+              "endpointName": "WIN-APP-01",
+              "type": "server",
+              "osName": "Windows Server 2022",
+              "osVersion": "10.0.20348",
+              "ipAddresses": ["10.110.1.10"],
+              "eppAgent": {"status": "on", "version": "12.5.1234", "lastConnectedDateTime": "2026-06-01T12:00:00Z"}
+            },
+            {
+              "agentGuid": "aaaaaaaa-1111-4000-8000-000000000002",
+              "endpointName": "LNX-DB-02",
+              "type": "server",
+              "osName": "Red Hat Enterprise Linux",
+              "osVersion": "9.4",
+              "ipAddresses": ["10.110.2.20"],
+              "eppAgent": {"status": "on", "version": "12.5.1234", "lastConnectedDateTime": "2026-06-01T13:00:00Z"}
+            },
+            {
+              "agentGuid": "aaaaaaaa-1111-4000-8000-000000000003",
+              "endpointName": "WIN-DESK-03",
+              "type": "desktop",
+              "osName": "Windows 11",
+              "osVersion": "10.0.22631",
+              "ipAddresses": ["10.110.3.30"],
+              "eppAgent": {"status": "on", "version": "12.5.1234", "lastConnectedDateTime": "2026-06-01T14:00:00Z"}
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "trend-vision-one:127.0.0.1:../../admin-endpoints",
+      "trend-vision-one:127.0.0.1:aaaaaaaa-1111-4000-8000-000000000001",
+      "trend-vision-one:127.0.0.1:aaaaaaaa-1111-4000-8000-000000000002",
+      "trend-vision-one:127.0.0.1:aaaaaaaa-1111-4000-8000-000000000003"
+    ],
+    "min_requests": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints/aaaaaaaa-1111-4000-8000-000000000001"},
+      {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints/aaaaaaaa-1111-4000-8000-000000000002"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/v3.0/endpointSecurity/endpoints/aaaaaaaa-1111-4000-8000-000000000003"},
+      {"path_contains": "admin-endpoints"}
+    ],
+    "log_contains": [
+      "trend-vision-one: failed to fetch details for aaaaaaaa-1111-4000-8000-000000000002",
+      "trend-vision-one: reported 4 endpoints",
+      "trend-vision-one: fetched adapter details for 2 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "name": "happy",
+  "integration": "runzero-task-sync",
+  "script": "runzero-task-sync/runzero-task-sync.star",
+  "description": "The full mirror of two tasks from one runZero instance to another, which is a five-hop chain per task and is only observable through the requests it makes -- the script imports nothing itself, it hands scan data to the destination console's own import endpoint. Task listing uses the real GET /api/v1.0/org/tasks shape: a bare array of models.TaskWithJoin (no envelope, no pagination), with the join-only fields site_name/agent_name/template_name that the write endpoints do not return. The download hop is the part worth the fixture: /org/tasks/<id>/data does NOT return the bytes, it answers 303 See Other with a Location pointing at a presigned object-store URL and a {\"url\": ...} body, so the run only works if the HTTP client follows the redirect -- two requests reach the server per download, and asserting on the object path proves the second one happened. What comes back is a real gzip member, served via body_base64 because a `text` body is UTF-8 encoded on the way out and would mangle every byte above 0x7f, the 0x8b of the gzip magic included. The scan data itself is opaque to this integration: it decompresses and recompresses without ever parsing it, so the payload's internal shape is not part of the contract under test. That is also why 'Successfully synced task' is the load-bearing log assertion -- it is printed only after gzip_decompress, gzip_compress, and a 200 from the destination import, so it is transitive proof the whole binary round trip worked. hide_tasks_on_sync is on, so each synced task is then hidden at the SOURCE with the source org id -- pinning that the hide call goes to src_url and not to dst_url, which would hide a task on the wrong console.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "src_org_id": "aaaaaaaa-1111-4222-8333-444444444444",
+    "src_task_search_filter": "type:scan",
+    "dst_url": "$BASE",
+    "dst_org_id": "bbbbbbbb-5555-4666-8777-888888888888",
+    "dst_site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+    "hide_tasks_on_sync": "true",
+    "src_api_token": "OT-source-fixture-token",
+    "dst_api_token": "OT-destination-fixture-token"
+  },
+
+  "routes": [
+    {
+      "name": "source task list",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "d1d1d1d1-1111-4222-8333-444444444444",
+              "client_id": "11111111-2222-3333-4444-555555555555",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "agent_id": "a0a0a0a0-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "error": "",
+              "name": "Weekly subnet sweep",
+              "description": "",
+              "created_by": "jdoe@example.com",
+              "hidden": false,
+              "recur": false,
+              "created_at": 1755100000,
+              "updated_at": 1755103600,
+              "start_time": 1755100000,
+              "size_data": 48213,
+              "size_results": 91002,
+              "source_id": 1,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "explorer_group_name": null,
+              "template_name": null,
+              "params": {"targets": "10.42.0.0/24", "rate": "1000"},
+              "stats": {"hosts": 24}
+            },
+            {
+              "id": "d2d2d2d2-5555-4666-8777-888888888888",
+              "client_id": "11111111-2222-3333-4444-555555555555",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "agent_id": "a0a0a0a0-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "error": "",
+              "name": "Ad-hoc sweep",
+              "description": "",
+              "created_by": "jdoe@example.com",
+              "hidden": false,
+              "recur": false,
+              "created_at": 1755200000,
+              "updated_at": 1755203600,
+              "start_time": 1755200000,
+              "size_data": 12044,
+              "size_results": 20881,
+              "source_id": 1,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "explorer_group_name": null,
+              "template_name": null,
+              "params": {"targets": "10.42.0.128/25"},
+              "stats": {"hosts": 6}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "task 1 data redirect",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d1d1d1d1-1111-4222-8333-444444444444/data"},
+      "responses": [
+        {
+          "status": 303,
+          "headers": {"Location": "$BASE/scan-bucket/scan_d1d1d1d1_eeeeeeee.json.gz"},
+          "json": {"url": "$BASE/scan-bucket/scan_d1d1d1d1_eeeeeeee.json.gz"}
+        }
+      ]
+    },
+    {
+      "name": "task 1 scan data object",
+      "match": {"method": "GET", "path": "/scan-bucket/scan_d1d1d1d1_eeeeeeee.json.gz"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/gzip"},
+          "body_base64": "H4sIAAAAAAAC/02MyQ7CMAxE73xF5TOOspRFvfElKDRGRNAkqiMWVf13klZIjC/2jOdNkD+JoGuAexvQh2uEbQPZ8v3sXfWdWgdVEbZaazwaY7D9U608aWQfQ63shBR6Lw/aCAnzZoIF2zVlWZCWmTL+wLXs08m5kYrP9UFJ0eoCUUt4i5yDHdboRReUSvRxTILedkgPKscA87z5AixKj1nMAAAA"
+        }
+      ]
+    },
+    {
+      "name": "task 2 data redirect",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d2d2d2d2-5555-4666-8777-888888888888/data"},
+      "responses": [
+        {
+          "status": 303,
+          "headers": {"Location": "$BASE/scan-bucket/scan_d2d2d2d2_eeeeeeee.json.gz"},
+          "json": {"url": "$BASE/scan-bucket/scan_d2d2d2d2_eeeeeeee.json.gz"}
+        }
+      ]
+    },
+    {
+      "name": "task 2 scan data object",
+      "match": {"method": "GET", "path": "/scan-bucket/scan_d2d2d2d2_eeeeeeee.json.gz"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/gzip"},
+          "body_base64": "H4sIAAAAAAAC/02MzQ6DIBCE7z6F2XMhSBWMtz5JQ2WbklYgLulPjO9e0DTp7GV3ZudbIH0iwlADjcYz568BDjUkQ/ezs8W3ch/WZbFWKcV6rTXr/1QqT5zJBV8qHRdcKqHlkQtYqwU27FDnZUMaIkzsBy5lF0/Wzph9Kg+N4K3MkGYLb4GSN9MevfDCRMPHMEeObzPFB+ZjgnWtvm2kiTHMAAAA"
+        }
+      ]
+    },
+    {
+      "name": "destination import",
+      "match": {"method": "PUT", "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "f1f1f1f1-1111-4222-8333-444444444444",
+            "client_id": "22222222-2222-3333-4444-555555555555",
+            "organization_id": "bbbbbbbb-5555-4666-8777-888888888888",
+            "site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+            "type": "import",
+            "status": "new",
+            "name": "Scan Import",
+            "created_at": 1755400000,
+            "updated_at": 1755400000,
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hide source task 1",
+      "match": {"method": "POST", "path": "/api/v1.0/org/tasks/d1d1d1d1-1111-4222-8333-444444444444/hide"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "d1d1d1d1-1111-4222-8333-444444444444",
+            "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+            "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+            "type": "scan",
+            "status": "processed",
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "hide source task 2",
+      "match": {"method": "POST", "path": "/api/v1.0/org/tasks/d2d2d2d2-5555-4666-8777-888888888888/hide"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "d2d2d2d2-5555-4666-8777-888888888888",
+            "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+            "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+            "type": "scan",
+            "status": "processed",
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 9,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1.0/org/tasks",
+        "query_contains": "_oid=aaaaaaaa-1111-4222-8333-444444444444",
+        "header_contains": "Bearer OT-source-fixture-token"
+      },
+      {"method": "GET", "path": "/api/v1.0/org/tasks", "query_contains": "search=type%3Ascan"},
+      {
+        "method": "GET",
+        "path": "/api/v1.0/org/tasks/d1d1d1d1-1111-4222-8333-444444444444/data",
+        "header": {"Accept": "application/octet-stream"}
+      },
+      {"method": "GET", "path": "/scan-bucket/scan_d1d1d1d1_eeeeeeee.json.gz"},
+      {"method": "GET", "path": "/scan-bucket/scan_d2d2d2d2_eeeeeeee.json.gz"},
+      {
+        "method": "PUT",
+        "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import",
+        "query_contains": "_oid=bbbbbbbb-5555-4666-8777-888888888888",
+        "header": {"Authorization": "Bearer OT-destination-fixture-token"}
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import",
+        "header": {"Content-Encoding": "gzip"}
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1.0/org/tasks/d1d1d1d1-1111-4222-8333-444444444444/hide",
+        "query_contains": "_oid=aaaaaaaa-1111-4222-8333-444444444444",
+        "header": {"Authorization": "Bearer OT-source-fixture-token"}
+      },
+      {"method": "POST", "path": "/api/v1.0/org/tasks/d2d2d2d2-5555-4666-8777-888888888888/hide"}
+    ],
+    "requests_absent": [
+      {"method": "PUT", "header_contains": "Bearer OT-source-fixture-token"},
+      {"method": "POST", "path": "/api/v1.0/org/tasks/d1d1d1d1-1111-4222-8333-444444444444/hide", "query_contains": "_oid=bbbbbbbb-5555-4666-8777-888888888888"}
+    ],
+    "log_contains": [
+      "Got 2 task(s) to sync",
+      "Successfully synced task: d1d1d1d1-1111-4222-8333-444444444444",
+      "Successfully synced task: d2d2d2d2-5555-4666-8777-888888888888",
+      "Task hidden: d1d1d1d1-1111-4222-8333-444444444444",
+      "Task hidden: d2d2d2d2-5555-4666-8777-888888888888"
+    ]
+  }
+}

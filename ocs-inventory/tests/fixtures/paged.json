@@ -1,0 +1,1542 @@
+{
+  "name": "paged",
+  "integration": "ocs-inventory",
+  "description": "A full page of 50 computers followed by a short page of one. The REST collection has no cursor and no total, so the walk is driven purely by the offset and by the size of the page that came back: a full page means keep going, a short page means stop. This asserts the second call carries start=50 rather than restarting at zero, that a third call is never made after the short page, and that both pages are parsed into assets. PAGE_SIZE is a constant in the script, so 50 rows is the only way to reach a second page at all.",
+  "kwargs": {
+    "url": "$BASE",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {
+        "method": "GET",
+        "path": "/ocsapi/v1/computers"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "300": {
+              "hardware": {
+                "ID": "300",
+                "DEVICEID": "lab-00-2026-02-01-09-00-00",
+                "NAME": "lab-00",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.10",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00000",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:00",
+                  "IPADDRESS": "10.61.0.10",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "301": {
+              "hardware": {
+                "ID": "301",
+                "DEVICEID": "lab-01-2026-02-02-09-00-00",
+                "NAME": "lab-01",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.11",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00001",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:01",
+                  "IPADDRESS": "10.61.0.11",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "302": {
+              "hardware": {
+                "ID": "302",
+                "DEVICEID": "lab-02-2026-02-03-09-00-00",
+                "NAME": "lab-02",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.12",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00002",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:02",
+                  "IPADDRESS": "10.61.0.12",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "303": {
+              "hardware": {
+                "ID": "303",
+                "DEVICEID": "lab-03-2026-02-04-09-00-00",
+                "NAME": "lab-03",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.13",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00003",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:03",
+                  "IPADDRESS": "10.61.0.13",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "304": {
+              "hardware": {
+                "ID": "304",
+                "DEVICEID": "lab-04-2026-02-05-09-00-00",
+                "NAME": "lab-04",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.14",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00004",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:04",
+                  "IPADDRESS": "10.61.0.14",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "305": {
+              "hardware": {
+                "ID": "305",
+                "DEVICEID": "lab-05-2026-02-06-09-00-00",
+                "NAME": "lab-05",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.15",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00005",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:05",
+                  "IPADDRESS": "10.61.0.15",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "306": {
+              "hardware": {
+                "ID": "306",
+                "DEVICEID": "lab-06-2026-02-07-09-00-00",
+                "NAME": "lab-06",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.16",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00006",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:06",
+                  "IPADDRESS": "10.61.0.16",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "307": {
+              "hardware": {
+                "ID": "307",
+                "DEVICEID": "lab-07-2026-02-08-09-00-00",
+                "NAME": "lab-07",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.17",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00007",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:07",
+                  "IPADDRESS": "10.61.0.17",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "308": {
+              "hardware": {
+                "ID": "308",
+                "DEVICEID": "lab-08-2026-02-09-09-00-00",
+                "NAME": "lab-08",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.18",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00008",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:08",
+                  "IPADDRESS": "10.61.0.18",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "309": {
+              "hardware": {
+                "ID": "309",
+                "DEVICEID": "lab-09-2026-02-10-09-00-00",
+                "NAME": "lab-09",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.19",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00009",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:09",
+                  "IPADDRESS": "10.61.0.19",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "310": {
+              "hardware": {
+                "ID": "310",
+                "DEVICEID": "lab-10-2026-02-11-09-00-00",
+                "NAME": "lab-10",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.20",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00010",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:0a",
+                  "IPADDRESS": "10.61.0.20",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "311": {
+              "hardware": {
+                "ID": "311",
+                "DEVICEID": "lab-11-2026-02-12-09-00-00",
+                "NAME": "lab-11",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.21",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00011",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:0b",
+                  "IPADDRESS": "10.61.0.21",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "312": {
+              "hardware": {
+                "ID": "312",
+                "DEVICEID": "lab-12-2026-02-13-09-00-00",
+                "NAME": "lab-12",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.22",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00012",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:0c",
+                  "IPADDRESS": "10.61.0.22",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "313": {
+              "hardware": {
+                "ID": "313",
+                "DEVICEID": "lab-13-2026-02-14-09-00-00",
+                "NAME": "lab-13",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.23",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00013",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:0d",
+                  "IPADDRESS": "10.61.0.23",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "314": {
+              "hardware": {
+                "ID": "314",
+                "DEVICEID": "lab-14-2026-02-15-09-00-00",
+                "NAME": "lab-14",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.24",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00014",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:0e",
+                  "IPADDRESS": "10.61.0.24",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "315": {
+              "hardware": {
+                "ID": "315",
+                "DEVICEID": "lab-15-2026-02-16-09-00-00",
+                "NAME": "lab-15",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.25",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00015",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:0f",
+                  "IPADDRESS": "10.61.0.25",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "316": {
+              "hardware": {
+                "ID": "316",
+                "DEVICEID": "lab-16-2026-02-17-09-00-00",
+                "NAME": "lab-16",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.26",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00016",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:10",
+                  "IPADDRESS": "10.61.0.26",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "317": {
+              "hardware": {
+                "ID": "317",
+                "DEVICEID": "lab-17-2026-02-18-09-00-00",
+                "NAME": "lab-17",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.27",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00017",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:11",
+                  "IPADDRESS": "10.61.0.27",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "318": {
+              "hardware": {
+                "ID": "318",
+                "DEVICEID": "lab-18-2026-02-19-09-00-00",
+                "NAME": "lab-18",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.28",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00018",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:12",
+                  "IPADDRESS": "10.61.0.28",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "319": {
+              "hardware": {
+                "ID": "319",
+                "DEVICEID": "lab-19-2026-02-20-09-00-00",
+                "NAME": "lab-19",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.29",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00019",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:13",
+                  "IPADDRESS": "10.61.0.29",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "320": {
+              "hardware": {
+                "ID": "320",
+                "DEVICEID": "lab-20-2026-02-21-09-00-00",
+                "NAME": "lab-20",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.30",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00020",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:14",
+                  "IPADDRESS": "10.61.0.30",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "321": {
+              "hardware": {
+                "ID": "321",
+                "DEVICEID": "lab-21-2026-02-22-09-00-00",
+                "NAME": "lab-21",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.31",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00021",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:15",
+                  "IPADDRESS": "10.61.0.31",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "322": {
+              "hardware": {
+                "ID": "322",
+                "DEVICEID": "lab-22-2026-02-23-09-00-00",
+                "NAME": "lab-22",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.32",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00022",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:16",
+                  "IPADDRESS": "10.61.0.32",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "323": {
+              "hardware": {
+                "ID": "323",
+                "DEVICEID": "lab-23-2026-02-24-09-00-00",
+                "NAME": "lab-23",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.33",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00023",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:17",
+                  "IPADDRESS": "10.61.0.33",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "324": {
+              "hardware": {
+                "ID": "324",
+                "DEVICEID": "lab-24-2026-02-25-09-00-00",
+                "NAME": "lab-24",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.34",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00024",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:18",
+                  "IPADDRESS": "10.61.0.34",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "325": {
+              "hardware": {
+                "ID": "325",
+                "DEVICEID": "lab-25-2026-02-26-09-00-00",
+                "NAME": "lab-25",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.35",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00025",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:19",
+                  "IPADDRESS": "10.61.0.35",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "326": {
+              "hardware": {
+                "ID": "326",
+                "DEVICEID": "lab-26-2026-02-27-09-00-00",
+                "NAME": "lab-26",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.36",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00026",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:1a",
+                  "IPADDRESS": "10.61.0.36",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "327": {
+              "hardware": {
+                "ID": "327",
+                "DEVICEID": "lab-27-2026-02-28-09-00-00",
+                "NAME": "lab-27",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.37",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00027",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:1b",
+                  "IPADDRESS": "10.61.0.37",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "328": {
+              "hardware": {
+                "ID": "328",
+                "DEVICEID": "lab-28-2026-02-01-09-00-00",
+                "NAME": "lab-28",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.38",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00028",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:1c",
+                  "IPADDRESS": "10.61.0.38",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "329": {
+              "hardware": {
+                "ID": "329",
+                "DEVICEID": "lab-29-2026-02-02-09-00-00",
+                "NAME": "lab-29",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.39",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00029",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:1d",
+                  "IPADDRESS": "10.61.0.39",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "330": {
+              "hardware": {
+                "ID": "330",
+                "DEVICEID": "lab-30-2026-02-03-09-00-00",
+                "NAME": "lab-30",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.40",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00030",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:1e",
+                  "IPADDRESS": "10.61.0.40",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "331": {
+              "hardware": {
+                "ID": "331",
+                "DEVICEID": "lab-31-2026-02-04-09-00-00",
+                "NAME": "lab-31",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.41",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00031",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:1f",
+                  "IPADDRESS": "10.61.0.41",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "332": {
+              "hardware": {
+                "ID": "332",
+                "DEVICEID": "lab-32-2026-02-05-09-00-00",
+                "NAME": "lab-32",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.42",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00032",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:20",
+                  "IPADDRESS": "10.61.0.42",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "333": {
+              "hardware": {
+                "ID": "333",
+                "DEVICEID": "lab-33-2026-02-06-09-00-00",
+                "NAME": "lab-33",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.43",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00033",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:21",
+                  "IPADDRESS": "10.61.0.43",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "334": {
+              "hardware": {
+                "ID": "334",
+                "DEVICEID": "lab-34-2026-02-07-09-00-00",
+                "NAME": "lab-34",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.44",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00034",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:22",
+                  "IPADDRESS": "10.61.0.44",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "335": {
+              "hardware": {
+                "ID": "335",
+                "DEVICEID": "lab-35-2026-02-08-09-00-00",
+                "NAME": "lab-35",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.45",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00035",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:23",
+                  "IPADDRESS": "10.61.0.45",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "336": {
+              "hardware": {
+                "ID": "336",
+                "DEVICEID": "lab-36-2026-02-09-09-00-00",
+                "NAME": "lab-36",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.46",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00036",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:24",
+                  "IPADDRESS": "10.61.0.46",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "337": {
+              "hardware": {
+                "ID": "337",
+                "DEVICEID": "lab-37-2026-02-10-09-00-00",
+                "NAME": "lab-37",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.47",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00037",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:25",
+                  "IPADDRESS": "10.61.0.47",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "338": {
+              "hardware": {
+                "ID": "338",
+                "DEVICEID": "lab-38-2026-02-11-09-00-00",
+                "NAME": "lab-38",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.48",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00038",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:26",
+                  "IPADDRESS": "10.61.0.48",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "339": {
+              "hardware": {
+                "ID": "339",
+                "DEVICEID": "lab-39-2026-02-12-09-00-00",
+                "NAME": "lab-39",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.49",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00039",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:27",
+                  "IPADDRESS": "10.61.0.49",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "340": {
+              "hardware": {
+                "ID": "340",
+                "DEVICEID": "lab-40-2026-02-13-09-00-00",
+                "NAME": "lab-40",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.50",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00040",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:28",
+                  "IPADDRESS": "10.61.0.50",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "341": {
+              "hardware": {
+                "ID": "341",
+                "DEVICEID": "lab-41-2026-02-14-09-00-00",
+                "NAME": "lab-41",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.51",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00041",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:29",
+                  "IPADDRESS": "10.61.0.51",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "342": {
+              "hardware": {
+                "ID": "342",
+                "DEVICEID": "lab-42-2026-02-15-09-00-00",
+                "NAME": "lab-42",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.52",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00042",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:2a",
+                  "IPADDRESS": "10.61.0.52",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "343": {
+              "hardware": {
+                "ID": "343",
+                "DEVICEID": "lab-43-2026-02-16-09-00-00",
+                "NAME": "lab-43",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.53",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00043",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:2b",
+                  "IPADDRESS": "10.61.0.53",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "344": {
+              "hardware": {
+                "ID": "344",
+                "DEVICEID": "lab-44-2026-02-17-09-00-00",
+                "NAME": "lab-44",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.54",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00044",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:2c",
+                  "IPADDRESS": "10.61.0.54",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "345": {
+              "hardware": {
+                "ID": "345",
+                "DEVICEID": "lab-45-2026-02-18-09-00-00",
+                "NAME": "lab-45",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.55",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00045",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:2d",
+                  "IPADDRESS": "10.61.0.55",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "346": {
+              "hardware": {
+                "ID": "346",
+                "DEVICEID": "lab-46-2026-02-19-09-00-00",
+                "NAME": "lab-46",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.56",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00046",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:2e",
+                  "IPADDRESS": "10.61.0.56",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "347": {
+              "hardware": {
+                "ID": "347",
+                "DEVICEID": "lab-47-2026-02-20-09-00-00",
+                "NAME": "lab-47",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.57",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00047",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:2f",
+                  "IPADDRESS": "10.61.0.57",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "348": {
+              "hardware": {
+                "ID": "348",
+                "DEVICEID": "lab-48-2026-02-21-09-00-00",
+                "NAME": "lab-48",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.58",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00048",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:30",
+                  "IPADDRESS": "10.61.0.58",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            },
+            "349": {
+              "hardware": {
+                "ID": "349",
+                "DEVICEID": "lab-49-2026-02-22-09-00-00",
+                "NAME": "lab-49",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "OSVERSION": "6.8.0-45-generic",
+                "IPADDR": "10.61.0.59",
+                "LASTCOME": "2026-08-15 04:00:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00049",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:31",
+                  "IPADDRESS": "10.61.0.59",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "350": {
+              "hardware": {
+                "ID": "350",
+                "DEVICEID": "lab-50-2026-03-01-09-00-00",
+                "NAME": "lab-50",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "IPADDR": "10.61.0.60",
+                "LASTCOME": "2026-08-15 04:05:00"
+              },
+              "bios": [
+                {
+                  "SSN": "LAB00050",
+                  "SMANUFACTURER": "Dell Inc.",
+                  "SMODEL": "OptiPlex 7010",
+                  "TYPE": "3"
+                }
+              ],
+              "networks": [
+                {
+                  "DESCRIPTION": "eno1",
+                  "TYPE": "Ethernet",
+                  "MACADDR": "00:11:33:00:00:32",
+                  "IPADDRESS": "10.61.0.60",
+                  "STATUS": "Up",
+                  "VIRTUALDEV": "0"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 51,
+    "ids": [
+      "ocs-inventory:127.0.0.1:300",
+      "ocs-inventory:127.0.0.1:349",
+      "ocs-inventory:127.0.0.1:350"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/ocsapi/v1/computers",
+        "query_contains": "start=0"
+      },
+      {
+        "method": "GET",
+        "path": "/ocsapi/v1/computers",
+        "query_contains": "start=50"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/ocsapi/v1/computers",
+        "query_contains": "start=100"
+      }
+    ],
+    "log_contains": [
+      "ocs-inventory: reported 51 computers"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

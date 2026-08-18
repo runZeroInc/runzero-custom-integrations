@@ -1,0 +1,91 @@
+{
+  "name": "chunked",
+  "integration": "zabbix",
+  "description": "Zabbix has NO offset, cursor, or paging parameter of any kind - the complete common-get parameter set is countOutput, editable, excludeSearch, filter, limit, output, preservekeys, search, searchByAny, searchWildcardsEnabled, sortfield, sortorder, and startSearch, and startSearch only anchors a LIKE rather than acting as a cursor. Host groups are therefore what bounds a response, which is sound because a Zabbix host cannot be created without at least one group. This scenario runs five groups at group_chunk=2 and asserts the three successive host.get calls carry DIFFERENT groupids arrays - the closest thing this API has to a cursor. It also proves the consequence that makes group chunking safe: hostid 200 belongs to two groups and is returned by two different chunks, and must collapse to ONE asset rather than tripping the unique_ids invariant.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-api-token",
+    "group_chunk": "2"
+  },
+  "routes": [
+    {
+      "name": "apiinfo",
+      "match": {"method": "POST", "body_contains": "apiinfo.version"},
+      "responses": [{"status": 200, "json": {"jsonrpc": "2.0", "result": "7.2.5", "id": 1}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostgroup-get",
+      "match": {"method": "POST", "body_contains": "hostgroup.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "result": [
+              {"groupid": "1", "name": "Templates"},
+              {"groupid": "2", "name": "Linux servers"},
+              {"groupid": "3", "name": "Network devices"},
+              {"groupid": "4", "name": "Hypervisors"},
+              {"groupid": "5", "name": "Applications"}
+            ],
+            "id": 2
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-get",
+      "match": {"method": "POST", "body_contains": "host.get"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "result": [
+              {"hostid": "100", "host": "srv-100", "name": "srv-100", "status": "0", "flags": "0", "inventory": [], "tags": [], "hostgroups": [{"groupid": "2", "name": "Linux servers"}], "interfaces": [{"interfaceid": "1", "ip": "192.0.2.100", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "1", "error": ""}]},
+              {"hostid": "200", "host": "srv-200", "name": "srv-200", "status": "0", "flags": "0", "inventory": [], "tags": [], "hostgroups": [{"groupid": "2", "name": "Linux servers"}, {"groupid": "4", "name": "Hypervisors"}], "interfaces": [{"interfaceid": "2", "ip": "192.0.2.200", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "1", "error": ""}]}
+            ],
+            "id": 3
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "result": [
+              {"hostid": "200", "host": "srv-200", "name": "srv-200", "status": "0", "flags": "0", "inventory": [], "tags": [], "hostgroups": [{"groupid": "2", "name": "Linux servers"}, {"groupid": "4", "name": "Hypervisors"}], "interfaces": [{"interfaceid": "2", "ip": "192.0.2.200", "dns": "", "port": "10050", "type": "1", "main": "1", "useip": "1", "available": "1", "error": ""}]},
+              {"hostid": "300", "host": "sw-300", "name": "sw-300", "status": "0", "flags": "0", "inventory": [], "tags": [], "hostgroups": [{"groupid": "3", "name": "Network devices"}], "interfaces": [{"interfaceid": "3", "ip": "192.0.2.30", "dns": "", "port": "161", "type": "2", "main": "1", "useip": "1", "available": "1", "error": ""}]}
+            ],
+            "id": 4
+          }
+        },
+        {
+          "status": 200,
+          "json": {"jsonrpc": "2.0", "result": [], "id": 5}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": ["zabbix:$HOST:100", "zabbix:$HOST:200", "zabbix:$HOST:300"],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "body_contains": "\"groupids\":[\"1\",\"2\"]"},
+      {"method": "POST", "body_contains": "\"groupids\":[\"3\",\"4\"]"},
+      {"method": "POST", "body_contains": "\"groupids\":[\"5\"]"}
+    ],
+    "requests_absent": [
+      {"body_contains": "\"groupids\":[\"1\",\"2\",\"3\""}
+    ],
+    "log_contains": [
+      "walking 5 host groups in chunks of 2",
+      "reported 3 hosts"
+    ]
+  },
+  "check_determinism": true
+}

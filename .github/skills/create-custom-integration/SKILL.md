@@ -87,8 +87,8 @@ Choose exactly one verdict:
    ID. Never use the raw local ID by itself.
 3. **No authoritative foreign ID.** Build a deterministic, documented composite
    only from stable source fields. If that composite is not guaranteed unique,
-   set `matchBehavior="no-id-match no-id-break"` and require at least one usable
-   MAC, IP, or hostname for correlation.
+   declare `"matchBehavior": "no-id-match no-id-break"` in `CONFIG` and require at
+   least one usable MAC, IP, or hostname for correlation.
 4. **Identity unresolved.** Stop and ask for documentation or representative
    samples. Do not generate an integration that guesses.
 
@@ -123,9 +123,14 @@ The script must:
 - Use `OPTIONS_HTTP` and `OPTIONS_TLS` plus `get_http_options` for HTTP APIs.
 - Use the runZero `http`, `kwargs`, `net`, parsing, and type helpers.
 - Use `validationMode: "compile"` only for direct-protocol integrations.
-- Handle all pages and stop on the documented pagination condition.
-- Stream each page with `report_assets(page_assets)` and return `None` for
-  inventory APIs that can return large datasets.
+- Handle all pages and stop on the documented pagination condition. Guard each
+  loop with `pager("<label>")` and set `maxPages` in CONFIG rather than
+  declaring a local `MAX_PAGES` constant.
+- Stream each asset with `report_asset(asset)` and return `None`. Do not
+  accumulate batches; the host already writes incrementally.
+- Use `parse_ts` rather than `parse_time`, and the `coerce` helpers rather than
+  hand-rolled `_text`/`_dict`/`_to_int` guards, so one malformed record cannot
+  abort the whole import.
 - Skip malformed records that lack the approved identity instead of inventing
   IDs.
 - Keep credentials out of logs, errors, tags, and custom attributes.
@@ -168,9 +173,14 @@ does not change generated files. Review the complete diff for:
 - Random, temporary, event, session, or child-record IDs.
 - Missing account/tenant namespace on locally scoped IDs.
 - Secrets in logs or examples.
-- Incomplete pagination.
-- Unbounded response accumulation instead of `report_assets`.
-- Hand-written helpers that duplicate the provided Starlark modules.
+- Incomplete pagination, or a locally declared `MAX_PAGES` instead of CONFIG
+  `maxPages` plus `pager()`.
+- Unbounded response accumulation, or manual batching, instead of
+  `report_asset`.
+- Hand-written helpers that duplicate the provided Starlark modules —
+  especially `_text`/`_dict`/`_list`/`_to_int` (use `coerce`), `_routable_ip`
+  and `_hostname` (use `net`), and validate-then-`parse_time` wrappers (use
+  `time.parse_ts`).
 - Undocumented assumptions from unavailable vendor docs.
 
 Do not commit or push unless explicitly requested.
@@ -181,8 +191,8 @@ Report:
 
 1. Documentation sources used.
 2. Objects and fields imported.
-3. The foreign-ID verdict, evidence, namespace, fallback behavior, and chosen
-   `matchBehavior`.
+3. The foreign-ID verdict, evidence, namespace, fallback behavior, and the
+   `matchBehavior` declared in `CONFIG`.
 4. Files created or updated.
 5. Validation commands and results.
 6. Any assumptions or vendor behavior that still requires confirmation.

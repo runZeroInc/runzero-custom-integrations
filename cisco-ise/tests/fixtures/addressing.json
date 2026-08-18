@@ -1,0 +1,50 @@
+{
+  "name": "addressing",
+  "integration": "cisco-ise",
+  "description": "The addressing shapes an ISE ActiveList actually returns. A MAB row with a MAC and no address at all, an 802.1X row with a framed address and no calling_station_id, a row whose calling_station_id is in Cisco dotted-quad notation, and a row whose device_ip_address is 127.0.0.1. Proves the run survives a session with only one of the two correlators, that dotted MACs are normalized to colon form, and that a loopback address never reaches an interface: the loopback row still emits an asset, carried by its MAC alone. A build that put 127.0.0.1 on the interface would fail no_loopback_interfaces here. A fifth row carries NEITHER a calling_station_id NOR any address -- the shape a session logged against a network device rather than an endpoint takes. It has nothing to correlate on (audit_session_id names the SESSION, not the endpoint, and matchBehavior already excludes it from matching), so it cannot become an asset. It used to be dropped in silence; the skip is now logged, and it names the session id rather than user_name, which is a person's login.",
+  "kwargs": {
+    "url": "$BASE",
+    "basic_auth_credential": "Zml4dHVyZS11c2VyOmZpeHR1cmUtcGFzcw=="
+  },
+  "routes": [
+    {
+      "name": "active-session-list",
+      "match": {
+        "method": "GET",
+        "path": "/admin/API/mnt/Session/ActiveList"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<sessionParameters>\n<noOfActiveSession>5</noOfActiveSession>\n<activeSession>\n<user_name>00-11-22-33-44-BB</user_name>\n<calling_station_id>00:11:22:33:44:BB</calling_station_id>\n<nas_ip_address>10.20.0.3</nas_ip_address>\n<audit_session_id>0A14000300000021BF3C1D40</audit_session_id>\n<server>ise-psn-01</server>\n</activeSession>\n<activeSession>\n<user_name>host/WKS-101</user_name>\n<nas_ip_address>10.20.0.3</nas_ip_address>\n<audit_session_id>0A14000300000022BF3C1D41</audit_session_id>\n<server>ise-psn-01</server>\n<framed_ip_address>10.20.6.101</framed_ip_address>\n</activeSession>\n<activeSession>\n<user_name>host/WKS-102</user_name>\n<calling_station_id>0011.2233.44CC</calling_station_id>\n<nas_ip_address>10.20.0.3</nas_ip_address>\n<audit_session_id>0A14000300000023BF3C1D42</audit_session_id>\n<server>ise-psn-01</server>\n<device_ip_address>10.20.6.102</device_ip_address>\n</activeSession>\n<activeSession>\n<user_name>host/WKS-103</user_name>\n<calling_station_id>00:11:22:33:44:DD</calling_station_id>\n<nas_ip_address>10.20.0.3</nas_ip_address>\n<audit_session_id>0A14000300000024BF3C1D43</audit_session_id>\n<server>ise-psn-01</server>\n<device_ip_address>127.0.0.1</device_ip_address>\n</activeSession>\n<activeSession>\n<user_name>svc-radius-probe</user_name>\n<nas_ip_address>10.20.0.3</nas_ip_address>\n<audit_session_id>0A14000300000025BF3C1D44</audit_session_id>\n<server>ise-psn-01</server>\n</activeSession>\n</sessionParameters>\n"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "0A14000300000021BF3C1D40",
+      "0A14000300000022BF3C1D41",
+      "0A14000300000023BF3C1D42",
+      "0A14000300000024BF3C1D43"
+    ],
+    "request_count": 1,
+    "ids_absent": [
+      "0A14000300000025BF3C1D44"
+    ],
+    "log_contains": [
+      "cisco-ise: skipping session with no calling_station_id/ip: session=0A14000300000025BF3C1D44",
+      "cisco-ise: skipped 1 session(s) with no calling_station_id/ip"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

@@ -22,9 +22,10 @@ integration at a time.
    and custom-attribute helpers with the standard Starlark modules.
 6. For paginated imports, call `report_assets(page)` after each page and return
    `None` so the Explorer does not retain the full vendor dataset in memory.
-7. Review the stability and uniqueness of each `ImportAsset.id`. Set
-   `matchBehavior` only when the default id, MAC, IP, and name rules do not match
-   the source's identity model.
+7. Review the stability and uniqueness of each `ImportAsset.id`. Declare a
+   top-level `CONFIG["matchBehavior"]` only when the default id, MAC, IP, and
+   name rules do not match the source's identity model. It is no longer a field
+   on `ImportAsset`.
 8. Run `runzero script --filename <script> --validate`. Direct-protocol scripts
    can declare `"validationMode": "compile"`, but still require a controlled
    endpoint test for their protocol behavior.
@@ -40,7 +41,7 @@ integration at a time.
   generated typed form and validates against the script schema when saved.
 - CONFIG-based scripts reject unknown kwargs and receive canonical enum option
   values after alias and case-insensitive normalization.
-- Leaving `matchBehavior` unset preserves the existing matcher behavior.
+- Leaving `matchBehavior` out of `CONFIG` preserves the existing matcher behavior.
 - Migration does not add an in-product LLM. External authoring tools only draft
   source that must pass normal review and validation.
 - Direct-protocol modules intentionally can reach internal addresses available

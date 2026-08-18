@@ -1,0 +1,60 @@
+{
+  "name": "unusable-addressing",
+  "integration": "manage-engine-endpoint-central",
+  "script": "manage-engine-endpoint-central/manage-engine-endpoint-central.star",
+  "description": "Four rows whose addressing Endpoint Central reports in shapes the old builder could not survive. It built a NetworkInterface unconditionally and returned it in a one-element list, from a hand-rolled v4/v6 loop, so:\n\n401 KILLED THE ENTIRE RUN. Endpoint Central writes the literal string `unknown` in mac_address for an agent that has enrolled but not completed an inventory scan. That went straight into NetworkInterface(macAddress=...), and the runtime rejects it -- `asset Network Interface MAC address \"unknown\" is invalid` -- with no exception to catch, so the whole page was lost and ZERO assets were exported. All four rows must now import, 401 keeping the address that IS usable beside the MAC that is not.\n\n402 SILENTLY LOST ITS ADDRESS. `10.91.1.22:445` did not parse as an address, so ip_address() answered None and the guard dropped it. net.network_interface strips a port suffix and keeps 10.91.1.22.\n\n403 reported the same address twice and its MAC in dash form; one deduped address and the canonical colon form must come out.\n\n404 IS THE EMPTY-INTERFACE CASE ITSELF -- no ip_address, no mac_address at all. It used to produce an interface carrying neither, which correlates with nothing and only adds noise. It must now produce NO interface, and the guard doing that is load-bearing rather than cosmetic: network_interface() answers None here, and passing that None on to ImportAsset would abort the run exactly as 401 did. The asset still imports and correlates on its hostname.\n\nnamespaced_ids is skipped: the id is the bare Endpoint Central resource_id with no server scope, the same pre-existing defect the happy scenario records.",
+  "kwargs": {
+    "url": "$BASE",
+    "oauth_token": "Zoho-oauthtoken fixture-token"
+  },
+  "routes": [
+    {
+      "name": "scancomputers",
+      "match": {"method": "GET", "path": "/api/1.4/inventory/scancomputers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "message_response": {
+              "scancomputers": [
+                {"resource_id": "401", "resource_name": "syn-ec-badmac", "ip_address": "10.91.1.21", "mac_address": "unknown", "os_name": "Windows 11 Enterprise"},
+                {"resource_id": "402", "resource_name": "syn-ec-portsuffix", "ip_address": "10.91.1.22:445", "mac_address": "00:50:56:00:e0:22"},
+                {"resource_id": "403", "resource_name": "syn-ec-dupes", "ip_address": "10.91.1.23,10.91.1.23", "mac_address": "00-50-56-00-e0-23"},
+                {"resource_id": "404", "resource_name": "syn-ec-nonet", "os_name": "Ubuntu 22.04", "scan_status": "pending"}
+              ]
+            }
+          }
+        },
+        {"status": 200, "json": {"message_response": {"scancomputers": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": ["401", "402", "403", "404"],
+    "assets": [
+      {
+        "id": "401",
+        "fields": {"ipAddresses": "10.91.1.21", "hostnames": "syn-ec-badmac"},
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "402",
+        "fields": {"ipAddresses": "10.91.1.22", "macAddresses": "00:50:56:00:e0:22"}
+      },
+      {
+        "id": "403",
+        "fields": {"ipAddresses": "10.91.1.23", "macAddresses": "00:50:56:00:e0:23"}
+      },
+      {
+        "id": "404",
+        "fields": {"hostnames": "syn-ec-nonet"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "request_count": 1
+  },
+  "invariants": {"skip": ["namespaced_ids"]},
+  "check_determinism": true
+}

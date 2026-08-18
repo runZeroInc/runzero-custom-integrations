@@ -1,0 +1,121 @@
+{
+  "name": "happy",
+  "integration": "aruba-clearpass",
+  "description": "One page of endpoints behind the client_credentials token exchange. Proves the OAuth bootstrap is routed and its token is carried as a bearer on the endpoint read, that HAL _embedded.items rows are parsed, that the three MAC spellings ClearPass emits (bare, colon, hyphen) all canonicalize to one id, that profile.device_category promotes a device type, and that a profiled loopback address is dropped while the routable one is kept -- prn-lobby's profile carries 127.0.0.1 alongside 10.30.4.11, and no_loopback_interfaces would fail if it reached an interface. no_mac_in_id is skipped for every aruba-clearpass scenario on purpose: the MAC is the natural key of the ClearPass endpoint database and the integration deliberately canonicalizes it losslessly rather than through normalize_mac, so that two endpoints differing only in the locally-administered bit keep separate identities. See mac-identity for the case that proves it.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "status_filter": "any",
+    "include_sessions": "false",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 28800, "token_type": "Bearer", "scope": "read"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 3001,
+                  "mac_address": "001122334455",
+                  "status": "Known",
+                  "description": "Lobby laser printer",
+                  "randomized_mac": false,
+                  "device_insight_tags": ["Printer", "HP"],
+                  "added_at": "2026-01-05 09:12:33",
+                  "updated_at": "2026-08-01 11:00:00",
+                  "attributes": {"Location": "HQ-1F", "Owner": "facilities"},
+                  "profile": {
+                    "ipv4_address": "10.30.4.11",
+                    "ipv6_address": "127.0.0.1",
+                    "static_ip": true,
+                    "host_name": "prn-lobby",
+                    "device_category": "Printer",
+                    "device_os_family": "HP",
+                    "device_name": "HP LaserJet",
+                    "profiled_by": "DHCP",
+                    "first_profiled_at": "2026-01-05 09:12:40",
+                    "last_profiled_at": "2026-08-01 10:55:12"
+                  },
+                  "nad_detail": {"nad_ip": "10.30.0.1", "nad_port": "GigabitEthernet1/0/12"}
+                },
+                {
+                  "id": 3002,
+                  "mac_address": "00:11:22:33:44:66",
+                  "status": "Unknown",
+                  "description": "",
+                  "randomized_mac": true,
+                  "device_insight_tags": "Smartphone,Apple",
+                  "added_at": "2026-06-11 14:02:00",
+                  "updated_at": "2026-08-14 08:30:00",
+                  "attributes": {},
+                  "profile": {
+                    "ipv4_address": "10.30.9.44",
+                    "host_name": "iphone-guest",
+                    "device_category": "SmartDevice",
+                    "device_os_family": "Apple iOS",
+                    "device_name": "Apple iPhone",
+                    "profiled_by": "HTTP",
+                    "last_profiled_at": "2026-08-14 08:29:00"
+                  }
+                },
+                {
+                  "id": 3003,
+                  "mac_address": "00-11-22-33-44-77",
+                  "status": "Known",
+                  "randomized_mac": false,
+                  "device_insight_tags": [],
+                  "added_at": "2025-11-30 22:41:09",
+                  "updated_at": "2026-08-15 01:15:00",
+                  "attributes": {"Owner": "netops"},
+                  "profile": {
+                    "ipv4_address": "10.30.0.9",
+                    "host_name": "ap-floor2",
+                    "device_category": "Access Point",
+                    "device_os_family": "ArubaOS",
+                    "last_profiled_at": "2026-08-15 01:10:00"
+                  },
+                  "nad_detail": {"nad_ip": "10.30.0.1", "nad_port": "GigabitEthernet1/0/24"}
+                }
+              ]
+            },
+            "_links": {"self": {"href": "/api/endpoint?offset=0"}}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "aruba-clearpass:127.0.0.1:00:11:22:33:44:55",
+      "aruba-clearpass:127.0.0.1:00:11:22:33:44:66",
+      "aruba-clearpass:127.0.0.1:00:11:22:33:44:77"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/api/oauth", "body_contains": "client_credentials"},
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "calculate_count=false"},
+      {"header_contains": "fixture-access-token"}
+    ],
+    "log_contains": ["aruba-clearpass: reported 3 endpoints from 127.0.0.1"]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "permission-denied",
+  "integration": "mikrotik-routeros",
+  "description": "An account whose group is missing the rest-api or read policy. RouterOS answers this with HTTP 500 and 'not enough permissions', NOT 403 - branching on the status code would classify a permissions problem as a server fault and tell the operator to look in the wrong place. This scenario proves the message names the exact /user group add command that fixes it, and that the run ends cleanly rather than half-importing. The router menu is refused too, so no assets are produced and the summary explains the version, service, and policy preconditions in one line.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-underprivileged",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "everything-refused",
+      "match": {"method": "GET", "path_prefix": "/rest/"},
+      "responses": [
+        {
+          "status": 500,
+          "json": {"detail": "not enough permissions (9)", "error": 500, "message": "Internal Server Error"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {"error": 404, "message": "Not Found"}
+  },
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "the account's group is missing a policy",
+      "/system/resource returned nothing",
+      "RouterOS 7.1 or newer is required"
+    ]
+  },
+  "check_determinism": true
+}

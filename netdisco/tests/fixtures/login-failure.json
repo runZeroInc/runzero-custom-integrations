@@ -1,0 +1,28 @@
+{
+  "name": "login-failure",
+  "integration": "netdisco",
+  "description": "Netdisco's token exchange is a real hop that can fail on its own, so a bad credential must produce one clear message rather than a cascade of 401s from every downstream call. POST /login answers 401, and the run must stop there: no device search, no node calls, zero assets. This also documents the second failure mode that looks the same to a caller - a user without the 'api' role authenticates but has no API access, which Netdisco reports on the data calls rather than on login.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "wrong-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/login"},
+      "responses": [{"status": 401, "json": {"error": "Not authorised"}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": "no fixture route"}},
+  "expect": {
+    "asset_count": 0,
+    "requests_absent": [
+      {"path_contains": "/api/v1/search/device"},
+      {"path_contains": "/nodes"}
+    ],
+    "log_contains": ["login failed"]
+  },
+  "check_determinism": true
+}

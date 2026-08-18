@@ -1,0 +1,39 @@
+{
+  "name": "no-integration-api",
+  "integration": "ubiquiti-unifi-protect",
+  "description": "A console whose Protect release predates 5.3 has no /proxy/protect/integration path at all and the UniFi OS proxy answers 404. The run must stop at the preflight with a message naming both causes a 404 can have - too old, or Protect not installed - rather than issuing a dozen more doomed requests or falling back to the unofficial bootstrap endpoint.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path_prefix": "/proxy/protect/integration/"},
+      "responses": [{"status": 404, "text": "<html><head><title>404 Not Found</title></head><body>404 Not Found</body></html>"}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path_contains": "/proxy/protect/integration/v1/meta/info"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/cameras"},
+      {"path_contains": "/nvrs"},
+      {"path_contains": "/proxy/protect/api/bootstrap"}
+    ],
+    "log_contains": [
+      "Integration API",
+      "Protect 5.3"
+    ]
+  },
+
+  "check_determinism": true
+}

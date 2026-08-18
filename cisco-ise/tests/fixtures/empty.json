@@ -1,0 +1,29 @@
+{
+  "name": "empty",
+  "integration": "cisco-ise",
+  "description": "An ActiveList with no active sessions. Proves an idle deployment reports zero assets and finishes cleanly instead of failing the task.",
+  "kwargs": {
+    "url": "$BASE",
+    "basic_auth_credential": "Zml4dHVyZS11c2VyOmZpeHR1cmUtcGFzcw=="
+  },
+  "routes": [
+    {
+      "name": "active-session-list-empty",
+      "match": {"method": "GET", "path": "/admin/API/mnt/Session/ActiveList"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/xml"},
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<sessionParameters>\n<noOfActiveSession>0</noOfActiveSession>\n</sessionParameters>\n"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["Total number of sessions: 0", "No sessions found."]
+  },
+  "invariants": {"skip": []}
+}

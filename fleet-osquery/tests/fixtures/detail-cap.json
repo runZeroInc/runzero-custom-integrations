@@ -1,0 +1,79 @@
+{
+  "name": "detail-cap",
+  "integration": "fleet-osquery",
+  "description": "Per-host detail is an N+1: one extra GET /hosts/{id} per host. With detail_limit=1 and three hosts, exactly one detail request may be issued, the other two hosts must still import without it, and the skip count must be logged. Also proves the detail document is merged over the list record (host 31 gets its disk-encryption tag only from the detail response) and that exclude_software is sent so the list response's inventory is not re-fetched.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_software": "false",
+    "include_labels": "false",
+    "include_policies": "false",
+    "include_host_detail": "true",
+    "detail_limit": "1",
+    "page_size": "10"
+  },
+  "routes": [
+    {
+      "name": "host-detail",
+      "match": {"method": "GET", "path_regex": "/api/v1/fleet/hosts/[0-9]+$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 31,
+              "hostname": "detail-31.corp.example.com",
+              "platform": "darwin",
+              "os_version": "macOS 15.2",
+              "primary_ip": "10.43.0.31",
+              "primary_mac": "3c:22:fb:43:00:31",
+              "disk_encryption_enabled": true,
+              "osquery_version": "5.12.1",
+              "orbit_version": "1.36.0",
+              "seen_time": "2026-02-04T12:00:00Z",
+              "mdm": {"enrollment_status": "On (manual)", "name": "Fleet", "connected_to_fleet": true}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v1/fleet/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"id": 31, "hostname": "detail-31.corp.example.com", "platform": "darwin", "os_version": "macOS 15.2", "primary_ip": "10.43.0.31", "primary_mac": "3c:22:fb:43:00:31", "seen_time": "2026-02-04T12:00:00Z"},
+              {"id": 32, "hostname": "detail-32.corp.example.com", "platform": "darwin", "os_version": "macOS 15.2", "primary_ip": "10.43.0.32", "primary_mac": "3c:22:fb:43:00:32", "seen_time": "2026-02-04T12:00:00Z"},
+              {"id": 33, "hostname": "detail-33.corp.example.com", "platform": "darwin", "os_version": "macOS 15.2", "primary_ip": "10.43.0.33", "primary_mac": "3c:22:fb:43:00:33", "seen_time": "2026-02-04T12:00:00Z"}
+            ]
+          }
+        },
+        {"status": 200, "json": {"hosts": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "fleet-osquery:$HOST:31",
+      "fleet-osquery:$HOST:32",
+      "fleet-osquery:$HOST:33"
+    ],
+    "log_contains": [
+      "detail limit of 1 reached; disk encryption and MDM detail were not imported for 2 of 3 hosts"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/fleet/hosts/31", "query_contains": "exclude_software=true"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/api/v1/fleet/hosts/32"},
+      {"method": "GET", "path": "/api/v1/fleet/hosts/33"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

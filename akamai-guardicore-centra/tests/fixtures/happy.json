@@ -1,0 +1,204 @@
+{
+  "name": "happy",
+  "integration": "akamai-guardicore-centra",
+  "description": "A full v4 run: authenticate, page the 'on' and 'off' asset collections, and resolve each label guid once through the label cache.\n\nIt also pins the deviceType mapping in both directions. Centra types the first asset itself with asset_type Server, which reaches the emitted asset as deviceType Server -- a value runZero accepts. The second asset reports no asset_type at all and must carry NO deviceType: an empty string is still a value, and it would displace the type runZero fingerprints for itself.\n\nnamespaced_ids is skipped because this integration emits the bare Centra asset guid with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {
+        "method": "POST",
+        "path": "/api/v3.0/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-centra-token",
+            "2fa_required": false
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-on",
+      "match": {
+        "method": "GET",
+        "path": "/api/v4.0/assets",
+        "query_contains": "status=on"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 2,
+            "objects": [
+              {
+                "id": "asset-guid-0001",
+                "name": "syn-centra-01",
+                "status": "on",
+                "asset_type": "Server",
+                "bios_uuid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "os_info": {
+                  "type": "Linux",
+                  "full_kernel_version": "5.15.0-105-generic"
+                },
+                "agent": {
+                  "id": "agent-0001",
+                  "agent_version": "5.2.0",
+                  "agent_last_seen": "2026-08-01 09:05:00"
+                },
+                "nics": [
+                  {
+                    "mac_address": "00:50:56:00:c0:01",
+                    "ip_addresses": [
+                      "10.90.1.11"
+                    ]
+                  }
+                ],
+                "labels": [
+                  {
+                    "id": "label-guid-aaa"
+                  },
+                  {
+                    "id": "label-guid-bbb"
+                  }
+                ]
+              },
+              {
+                "id": "asset-guid-0002",
+                "name": "syn-centra-02",
+                "status": "on",
+                "first_seen": "2026-02-05 08:15:00",
+                "last_seen": "2026-08-02 09:00:00",
+                "os_info": {
+                  "type": "Windows"
+                },
+                "agent": {
+                  "id": "agent-0002",
+                  "agent_version": "5.2.0",
+                  "agent_last_seen": "2026-08-02 09:05:00"
+                },
+                "nics": [
+                  {
+                    "mac_address": "00:50:56:00:c0:02",
+                    "ip_addresses": [
+                      "10.90.1.12"
+                    ]
+                  }
+                ],
+                "labels": [
+                  {
+                    "id": "label-guid-aaa"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-off",
+      "match": {
+        "method": "GET",
+        "path": "/api/v4.0/assets",
+        "query_contains": "status=off"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 0,
+            "objects": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "label-aaa",
+      "match": {
+        "method": "GET",
+        "path": "/api/v4.0/labels/label-guid-aaa"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": [
+              {
+                "key": "Environment",
+                "value": "Production"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "label-bbb",
+      "match": {
+        "method": "GET",
+        "path": "/api/v4.0/labels/label-guid-bbb"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": [
+              {
+                "key": "Application Role",
+                "value": "Web Tier"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "asset-guid-0001",
+      "asset-guid-0002"
+    ],
+    "assets": [
+      {"id": "asset-guid-0001", "fields": {"deviceType": "Server"}},
+      {"id": "asset-guid-0002", "fields_absent": ["deviceType"]}
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/v3.0/authenticate"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v4.0/assets",
+        "query_contains": "start_at=0"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v4.0/labels/label-guid-aaa",
+        "header_contains": "fixture-centra-token"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  },
+  "script": "akamai-guardicore-centra/centra-v4-api.star"
+}

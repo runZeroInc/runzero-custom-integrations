@@ -1,0 +1,131 @@
+{
+  "name": "happy",
+  "integration": "workspace-one-uem",
+  "description": "One page of the version-2 PascalCase device search envelope. Covers: the {\"Value\": n} scalar wrapper on Id and LocationGroupId; the future-timestamp clamp (a tenant east of UTC emits zone-less local times that read as ahead of now, and runZero rejects the WHOLE record for a future first/last-seen, so _clamp_ts holds it at now); the 0001-01-01 never-sentinel; the zone-less timestamp that parse_time would otherwise abort on; friendly names with spaces and apostrophes being kept as attributes rather than promoted to hostnames; and loopback/link-local suppression with the MacAddress-only fallback interface. check_determinism is off and `ids` is unasserted for a harness reason: the id is scoped by the tenant host (base_url.split(\"://\")[-1]), which under the fixture server is 127.0.0.1:<ephemeral port> and so differs between runs. Also note the aw-tenant-code header cannot be asserted: the harness only records Authorization and Cookie.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-admin",
+    "password": "fixture-password",
+    "api_key": "fixture-tenant-code",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/mdm/devices/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Total": 4,
+            "Page": 0,
+            "PageSize": 500,
+            "Devices": [
+              {
+                "Id": {"Value": 4101},
+                "Uuid": "1f0c9d84-0000-4000-8000-000000000001",
+                "SerialNumber": "C02FIXTURE001",
+                "MacAddress": "AA:BB:CC:00:11:22",
+                "Platform": "AppleOsX",
+                "Model": "MacBook Pro (14-inch, 2023)",
+                "OperatingSystem": "13.6.4",
+                "OSBuildVersion": "22G513",
+                "OEMInfo": "Apple",
+                "DeviceFriendlyName": "jsmith's MacBook Pro",
+                "DeviceReportedName": "jsmith MBP",
+                "HostName": "mbp-jsmith",
+                "LocalHostName": "mbp-jsmith",
+                "UserName": "jsmith",
+                "UserEmailAddress": "jsmith@example.invalid",
+                "UserId": {"Id": {"Value": 88}},
+                "Ownership": "C",
+                "EnrollmentStatus": "Enrolled",
+                "ComplianceStatus": "Compliant",
+                "CompromisedStatus": false,
+                "LocationGroupId": {"Id": {"Value": 570}, "Name": "Corporate HQ", "Uuid": "0aa00000-0000-4000-8000-0000000000aa"},
+                "LocationGroupName": "Corporate HQ",
+                "LastEnrolledOn": "2025-05-14T09:00:00.000",
+                "LastSeen": "2026-08-15T04:10:00.000",
+                "LastComplianceCheckOn": "0001-01-01T00:00:00.000",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "AA:BB:CC:00:11:22", "IPAddress": "10.100.5.21", "ConnectionType": "Ethernet"},
+                  {"MACAddress": "AA:BB:CC:00:11:23", "IPAddress": "169.254.14.9", "ConnectionType": "Wi-Fi"}
+                ]
+              },
+              {
+                "Id": {"Value": 4102},
+                "Uuid": "1f0c9d84-0000-4000-8000-000000000002",
+                "SerialNumber": "DMPFIXTURE002",
+                "MacAddress": "3C:22:FB:00:44:55",
+                "Platform": "Apple",
+                "Model": "iPhone 14 Pro",
+                "OperatingSystem": "iOS 17.4.1",
+                "DeviceFriendlyName": "Field Tech 12 iPhone",
+                "Ownership": "e",
+                "EnrollmentStatus": "Enrolled",
+                "ComplianceStatus": "NonCompliant",
+                "CompromisedStatus": true,
+                "PhoneNumber": "+15550100",
+                "Imei": "990000862471854",
+                "LocationGroupId": {"Id": {"Value": 571}, "Name": "Field Services"},
+                "LastEnrolledOn": "2026-02-02T08:00:00Z",
+                "LastSeen": "2027-12-31T23:59:00Z",
+                "DeviceNetworkInfo": []
+              },
+              {
+                "Id": {"Value": 4103},
+                "Uuid": "1f0c9d84-0000-4000-8000-000000000003",
+                "SerialNumber": "WINFIXTURE003",
+                "MacAddress": "",
+                "Platform": "WinRT",
+                "Model": "Surface Laptop 5",
+                "OperatingSystem": "10.0.22631.3155",
+                "HostName": "srf-lab-03",
+                "Ownership": "S",
+                "EnrollmentStatus": "Enrolled",
+                "ComplianceStatus": "Compliant",
+                "LastSeen": "2026-08-11T13:45:00Z",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "", "IPAddress": "127.0.0.1"},
+                  {"MACAddress": "00:15:5D:00:AA:01", "IPAddress": "10.100.6.30"}
+                ]
+              },
+              {
+                "Id": {"Value": 4104},
+                "Uuid": "",
+                "SerialNumber": "NOUUIDFIXTURE",
+                "Platform": "Android",
+                "Model": "Galaxy Tab S9",
+                "MacAddress": "F0:1B:6C:00:77:88"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "orderby=deviceid"},
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "sortorder=ASC"},
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=0"},
+      {"header_contains": "Basic"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/apps/search"},
+      {"path_contains": "/osupdate"},
+      {"query_contains": "lgid="}
+    ],
+    "log_contains": [
+      "workspace-one-uem: skipping device with no Uuid: id=4104",
+      "workspace-one-uem: reported 3 of 4 devices"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

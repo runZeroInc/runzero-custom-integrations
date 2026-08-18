@@ -1,0 +1,152 @@
+{
+  "name": "happy",
+  "integration": "bitdefender-gravityzone",
+  "description": "One JSON-RPC inventory page under the company resolved by the getCompanyDetails bootstrap. Proves the RPC routing (method in the POST body, not the path), that Basic auth carries base64(apiKey + ':') with an EMPTY password, that non-endpoint tree nodes and id-less items are skipped rather than imported, and that a loopback-only endpoint yields an asset with no interface.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key"
+  },
+  "routes": [
+    {
+      "name": "company-details",
+      "match": {"method": "POST", "path": "/api/v1.0/jsonrpc/companies", "body_contains": "getCompanyDetails"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "result": {
+              "id": "c0000000000000000000a1",
+              "name": "Fixture Holdings",
+              "type": 1
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-inventory",
+      "match": {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "getNetworkInventoryItems"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "runzero",
+            "jsonrpc": "2.0",
+            "result": {
+              "total": 3,
+              "page": 1,
+              "perPage": 100,
+              "pagesCount": 1,
+              "hasMoreRecords": false,
+              "items": [
+                {
+                  "id": "e0000000000000000000001",
+                  "name": "WKS-ACCT-01",
+                  "type": 5,
+                  "parentId": "g0000000000000000000a1",
+                  "companyId": "c0000000000000000000a1",
+                  "details": {
+                    "label": "",
+                    "fqdn": "wks-acct-01.corp.example.net",
+                    "groupId": "g0000000000000000000a1",
+                    "isManaged": true,
+                    "managedWithBest": true,
+                    "machineType": 1,
+                    "operatingSystemVersion": "Windows 11 Pro",
+                    "ip": "10.42.7.21",
+                    "macs": ["AA:BB:CC:00:11:22", "00:50:56:0a:0b:0c"],
+                    "ssid": "S-1-5-21-1111111111-2222222222-3333333333-1101",
+                    "modules": {"antimalware": true, "firewall": true, "edrSensor": true},
+                    "policy": {"id": "p0000000000000000000a1", "name": "Corporate baseline", "applied": true},
+                    "riskScore": {"value": "12%", "impact": "low", "probability": "low"},
+                    "lastSuccessfulScan": {"date": "2026-08-10T03:00:00", "name": "Quick Scan"}
+                  }
+                },
+                {
+                  "id": "e0000000000000000000002",
+                  "name": "vm-build-02",
+                  "type": 6,
+                  "parentId": "g0000000000000000000a1",
+                  "companyId": "c0000000000000000000a1",
+                  "details": {
+                    "fqdn": "vm-build-02.corp.example.net",
+                    "isManaged": true,
+                    "managedWithBest": true,
+                    "machineType": 2,
+                    "operatingSystemVersion": "Ubuntu 24.04 LTS",
+                    "ip": "10.42.9.44",
+                    "macs": [],
+                    "modules": {"antimalware": true, "edrSensor": false}
+                  }
+                },
+                {
+                  "id": "e0000000000000000000003",
+                  "name": "kiosk-lobby-03",
+                  "type": 5,
+                  "parentId": "g0000000000000000000a1",
+                  "companyId": "c0000000000000000000a1",
+                  "details": {
+                    "fqdn": "kiosk-lobby-03.corp.example.net",
+                    "isManaged": true,
+                    "managedWithBest": true,
+                    "machineType": 1,
+                    "operatingSystemVersion": "Windows 10 IoT Enterprise",
+                    "ip": "127.0.0.1",
+                    "macs": []
+                  }
+                },
+                {
+                  "id": "g0000000000000000000a1",
+                  "name": "Accounting",
+                  "type": 4,
+                  "parentId": "c0000000000000000000a1"
+                },
+                {
+                  "id": "",
+                  "name": "orphan-no-id",
+                  "type": 5,
+                  "companyId": "c0000000000000000000a1",
+                  "details": {
+                    "fqdn": "orphan-no-id.corp.example.net",
+                    "ip": "10.42.7.99",
+                    "macs": []
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000a1:e0000000000000000000001",
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000a1:e0000000000000000000002",
+      "bitdefender-gravityzone:127.0.0.1:c0000000000000000000a1:e0000000000000000000003"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1.0/jsonrpc/companies", "body_contains": "getCompanyDetails"},
+      {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "getNetworkInventoryItems"},
+      {"header_contains": "Basic Zml4dHVyZS1rZXk6"}
+    ],
+    "requests_absent": [
+      {"body_contains": "getManagedEndpointDetails"}
+    ],
+    "log_contains": [
+      "importing under company c0000000000000000000a1 (Fixture Holdings)",
+      "skipping inventory item with no id: name=orphan-no-id",
+      "skipped 1 inventory items that are not endpoints",
+      "reported 3 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

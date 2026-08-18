@@ -1,0 +1,101 @@
+{
+  "name": "paged",
+  "integration": "extrahop",
+  "description": "Two-page limit/offset walk over /devices/search, asserting the second call carries offset=2 (page_size=2) and that the walk stops on the first short page. The second page repeats l3child001, which the live inventory does because the search has no documented sort order; the repeat must be de-duplicated rather than emitted twice.",
+  "kwargs": {
+    "url": "$BASE",
+    "deployment": "enterprise",
+    "api_key": "fixture-api-key",
+    "require_ip_address": "false",
+    "include_software": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/api/v1/networks"},
+      "responses": [
+        {"status": 200, "json": [
+          {"node_id": null, "appliance_uuid": "appl-uuid-0001"},
+          {"node_id": 7, "appliance_uuid": "appl-uuid-0007"}
+        ]}
+      ]
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "POST", "path": "/api/v1/devices/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 101,
+              "discovery_id": "l2parent01",
+              "node_id": null,
+              "is_l3": false,
+              "macaddr": "00:11:22:33:44:01",
+              "dns_name": "gw01.corp.example.com",
+              "role": "gateway",
+              "last_seen_time": 1786000000000
+            },
+            {
+              "id": 102,
+              "discovery_id": "l3child001",
+              "node_id": null,
+              "is_l3": true,
+              "macaddr": "00:11:22:33:44:01",
+              "ipaddr4": "10.30.0.50",
+              "dns_name": "host50.corp.example.com",
+              "role": "pc",
+              "last_seen_time": 1786000000000
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 102,
+              "discovery_id": "l3child001",
+              "node_id": null,
+              "is_l3": true,
+              "macaddr": "00:11:22:33:44:01",
+              "ipaddr4": "10.30.0.50",
+              "dns_name": "host50.corp.example.com",
+              "role": "pc",
+              "last_seen_time": 1786000000000
+            },
+            {
+              "id": 203,
+              "discovery_id": "sensor7dev1",
+              "node_id": 7,
+              "is_l3": false,
+              "macaddr": "00:11:22:33:44:03",
+              "ipaddr4": "10.31.0.9",
+              "dns_name": "far01.corp.example.com",
+              "role": "db_server",
+              "last_seen_time": 1786000000000
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "extrahop:appl-uuid-0001:l2parent01",
+      "extrahop:appl-uuid-0001:l3child001",
+      "extrahop:appl-uuid-0007:sensor7dev1"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1/devices/search", "body_contains": "\"limit\":2,\"offset\":0"},
+      {"method": "POST", "path": "/api/v1/devices/search", "body_contains": "\"limit\":2,\"offset\":2"},
+      {"method": "POST", "path": "/api/v1/devices/search", "body_contains": "\"limit\":2,\"offset\":4"}
+    ],
+    "log_contains": ["extrahop: reported 3 devices"]
+  },
+  "invariants": {"skip": []}
+}

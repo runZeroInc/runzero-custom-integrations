@@ -1,0 +1,103 @@
+{
+  "name": "cluster-name-and-os-version",
+  "integration": "scale-computing",
+  "description": "Two defects that make the import quietly wrong rather than failing it. The cluster map was keyed by the CLUSTER uuid returned by /rest/v1/Cluster but read back with the VM's nodeUUID, which is a NODE uuid, so the lookup never matched: clusterName was always empty and the whole first API call was wasted. And osVersion was filled from the VM's free-text description, so 'IIS front end' was imported as an operating system version. clusterName and clusterId must now be set from the cluster the endpoint reports, the node uuid must be kept under its own key, and the description must be an attribute rather than an OS version.\n\nnamespaced_ids is skipped for the reason given in happy.json.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/rest/v1/Cluster"},
+      "responses": [
+        {"status": 200, "json": [{"uuid": "cluster-uuid-0101", "clusterName": "HC3 Cluster B"}]}
+      ]
+    },
+    {
+      "name": "virdomain",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomain"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "vm-uuid-0101",
+              "name": "vm-web-101",
+              "operatingSystem": "os_windows_server_2019",
+              "description": "IIS front end",
+              "state": "RUNNING",
+              "nodeUUID": "node-uuid-0101",
+              "mem": 8589934592,
+              "numVCPU": 4,
+              "tags": "production,web"
+            },
+            {
+              "uuid": "vm-uuid-0102",
+              "name": "vm-db-101",
+              "operatingSystem": "os_other",
+              "description": "",
+              "state": "SHUTOFF",
+              "nodeUUID": "node-uuid-0102",
+              "mem": 17179869184,
+              "numVCPU": 8,
+              "tags": "production,db"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "virdomain-netdevice",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "nic-uuid-0101",
+              "virDomainUUID": "vm-uuid-0101",
+              "macAddress": "00:11:26:01:00:01",
+              "ipv4Addresses": ["10.122.0.11"],
+              "vlan": 10,
+              "connected": true
+            },
+            {
+              "uuid": "nic-uuid-0102",
+              "virDomainUUID": "vm-uuid-0102",
+              "macAddress": "00:11:26:01:00:02",
+              "ipv4Addresses": ["10.122.0.12"],
+              "vlan": 10,
+              "connected": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["vm-uuid-0101", "vm-uuid-0102"],
+    "assets": [
+      {
+        "id": "vm-uuid-0101",
+        "fields": {
+          "clusterName": "HC3 Cluster B",
+          "clusterId": "cluster-uuid-0101",
+          "nodeUUID": "node-uuid-0101",
+          "description": "IIS front end",
+          "os": "os_windows_server_2019"
+        },
+        "fields_absent": ["osVersion"]
+      },
+      {
+        "id": "vm-uuid-0102",
+        "fields": {"clusterName": "HC3 Cluster B", "nodeUUID": "node-uuid-0102"},
+        "fields_absent": ["osVersion"]
+      }
+    ],
+    "request_count": 3
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

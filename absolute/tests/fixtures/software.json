@@ -1,0 +1,120 @@
+{
+  "name": "software",
+  "integration": "absolute",
+  "description": "The optional second pass over the applications report. The report is sorted by deviceUid so a device's rows can straddle a page boundary; this proves the partial group is carried across the boundary and flushed only when the next deviceUid appears, that a row with no appName is dropped, and that a repeated deviceAppId is deduplicated. unique_ids and has_correlator are skipped deliberately: the software pass emits a second ImportAsset carrying only the id and the software list, so the same foreign id is emitted twice in one run and the second copy has no MAC, IP, or hostname of its own. That is how the enrichment pass is designed to merge, and it is reported as a finding rather than asserted as correct.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key",
+    "import_software": "true",
+    "page_size": "3"
+  },
+  "routes": [
+    {
+      "name": "jws-validate",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": [
+              {
+                "deviceUid": "software-device-0001",
+                "deviceName": "FIXTURE-SW-0001",
+                "serialNumber": "FIXTURESN1001",
+                "localIp": "10.160.0.1",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              },
+              {
+                "deviceUid": "software-device-0002",
+                "deviceName": "FIXTURE-SW-0002",
+                "serialNumber": "FIXTURESN1002",
+                "localIp": "10.160.0.2",
+                "operatingSystem": {"name": "macOS"}
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": "SOFTWAREPAGE2"}},
+            "data": [
+              {
+                "deviceUid": "software-device-0001",
+                "deviceAppId": "fixture-app-0001",
+                "appId": "app-0001",
+                "appName": "Fixture Archiver",
+                "appVersion": "23.01",
+                "appPublisher": "Fixture Software",
+                "installPath": "C:\\Program Files\\FixtureArchiver",
+                "installDateTimeUtc": "2026-03-01T10:00:00.000Z"
+              },
+              {
+                "deviceUid": "software-device-0001",
+                "deviceAppId": "fixture-app-0002",
+                "appName": "Fixture Editor",
+                "appVersion": "8.6.2",
+                "appPublisher": "Fixture Software"
+              },
+              {
+                "deviceUid": "software-device-0001",
+                "deviceAppId": "fixture-app-0002",
+                "appName": "Fixture Editor",
+                "appVersion": "8.6.2"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {}},
+            "data": [
+              {
+                "deviceUid": "software-device-0001",
+                "deviceAppId": "fixture-app-0003",
+                "appName": "Fixture Backup Agent",
+                "appVersion": "3.4.5"
+              },
+              {
+                "deviceUid": "software-device-0001",
+                "deviceAppId": "fixture-app-0004",
+                "appName": "",
+                "appVersion": "1.0.0"
+              },
+              {
+                "deviceAppId": "fixture-app-0005",
+                "appName": "An application with no device",
+                "appVersion": "1.0.0"
+              },
+              {
+                "deviceUid": "software-device-0002",
+                "deviceAppId": "fixture-app-0006",
+                "appName": "Fixture Mail",
+                "appVersion": "2.1.0",
+                "appPublisher": "Fixture Software"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "absolute:$HOST:software-device-0001",
+      "absolute:$HOST:software-device-0002"
+    ],
+    "request_count": 3,
+    "min_software_total": 4,
+    "log_contains": [
+      "absolute: reported 2 devices",
+      "absolute: reported software for 2 devices"
+    ]
+  },
+  "invariants": {"skip": ["unique_ids", "has_correlator"]}
+}

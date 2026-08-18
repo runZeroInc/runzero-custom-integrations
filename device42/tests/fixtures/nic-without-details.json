@@ -1,0 +1,84 @@
+{
+  "name": "nic-without-details",
+  "integration": "device42",
+  "description": "Device42 returns interface records with nothing usable on them -- a macAddresses entry carrying neither 'mac' nor 'mac_address' (a port row the discovery job created before it read the hardware address), and an ipAddresses entry whose 'ip' is non-empty but is not an address. network_interface() answers None for both, and the unguarded interfaces.append() put that None into networkInterfaces, which ImportAsset rejects by ABORTING the whole run: 9102 carries the keyless MAC row, so 9101 -- already parsed and sitting in the same page's list -- was lost with it, and 9103 was never reached. All three assets must import, the unusable interfaces must be dropped rather than emitted, and the addressing that IS usable on those same assets must survive. namespaced_ids is skipped because the id is the bare Device42 id with no appliance scope, exactly as the happy scenario does -- that is a separate identity concern, not this one.",
+  "kwargs": {"url": "$BASE", "auth_scheme": "basic", "credential": "Zml4dHVyZTpmaXh0dXJl"},
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/1.0/devices/all/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "code": 0,
+            "msg": "ok",
+            "Devices": [
+              {
+                "id": 9101,
+                "name": "syn-d42-101.example.com",
+                "os": "Ubuntu",
+                "osver": "22.04",
+                "hw_model": "PowerEdge R640",
+                "manufacturer": "Dell",
+                "type": "physical",
+                "ip_addresses": [{"ip": "192.0.2.10", "macaddress": "00:11:22:33:44:c1"}],
+                "mac_addresses": [{"mac": "00:11:22:33:44:c2"}]
+              },
+              {
+                "id": 9102,
+                "name": "syn-d42-102.example.com",
+                "os": "Ubuntu",
+                "osver": "24.04",
+                "type": "physical",
+                "ip_addresses": [{"ip": "198.51.100.21", "macaddress": "00:11:22:33:44:d2"}],
+                "mac_addresses": [{"port_name": "eth0", "vendor": "Synthetic NIC Co"}]
+              },
+              {
+                "id": 9103,
+                "name": "syn-d42-103.example.com",
+                "os": "Windows",
+                "osver": "2019",
+                "type": "virtual",
+                "ip_addresses": [
+                  {"ip": "not-an-address"},
+                  {"ip": "203.0.113.30"}
+                ],
+                "mac_addresses": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["9101", "9102", "9103"],
+    "assets": [
+      {
+        "id": "9101",
+        "fields": {
+          "ipAddresses": "192.0.2.10",
+          "macAddresses": "00:11:22:33:44:c1\t00:11:22:33:44:c2"
+        }
+      },
+      {
+        "id": "9102",
+        "fields": {
+          "ipAddresses": "198.51.100.21",
+          "macAddresses": "00:11:22:33:44:d2"
+        }
+      },
+      {
+        "id": "9103",
+        "fields": {"ipAddresses": "203.0.113.30", "hostnames": "syn-d42-103.example.com"},
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "request_count": 1
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

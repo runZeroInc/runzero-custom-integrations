@@ -1,0 +1,84 @@
+# A real Microsoft SQL Server engine, spoken to over real TDS.
+#
+# This is the first stack in the suite whose integration is not HTTP at all.
+# mssql-databases.star loads `runzero.sql` and dials TDS directly, so until this
+# case existed neither the fixture harness (which serves HTTP) nor the live
+# harness had ever executed a single line of it against anything. Everything
+# here -- the driver, the DSN, the datetime marshalling, the row-to-string
+# conversion -- is exercised for the first time by this stack.
+#
+# ---------------------------------------------------------------------------
+# Why Azure SQL Edge and not mcr.microsoft.com/mssql/server
+# ---------------------------------------------------------------------------
+# mssql/server is published for linux/amd64 only. On an arm64 host it therefore
+# runs under QEMU, and sqlservr does not survive QEMU: it aborts during startup
+# with
+#
+#   /opt/mssql/bin/sqlservr: Invalid mapping of address 0x4005341000 in
+#   reserved address space below 0x400000000000
+#
+# which is a property of QEMU's address-space layout, not of the image or of
+# anything this test does. There is no flag that works around it. (Docker
+# Desktop's Rosetta backend can run it, but that is a machine setting this
+# suite must not depend on, and it is off here.)
+#
+# azure-sql-edge ships a native arm64 build of the same database engine --
+# `SELECT @@VERSION` reports "Microsoft Azure SQL Edge Developer (RTM) -
+# 15.0.2000.1574 (ARM64)". It speaks the same TDS protocol, exposes the same
+# sys.databases and sys.master_files catalog views this integration queries, and
+# answers @@SERVERNAME and @@VERSION the same way. That makes it a real server
+# for every line of code under test here, on both host architectures.
+#
+# The trade is honest and worth naming: Edge is a subset of the full product, so
+# it boots four system databases rather than the full server's four-plus, and it
+# reports "Azure SQL Edge" in @@VERSION. If this suite ever runs somewhere with
+# a native amd64 host, swapping the `sqledge` service for
+# mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04 (ACCEPT_EULA=Y rather
+# than 1) is the only change needed -- the query, the seed and every assertion
+# except the osVersion string carry over unchanged.
+services:
+  sqledge:
+    image: mcr.microsoft.com/azure-sql-edge:1.0.7
+    # @@SERVERNAME is taken from the container hostname at first boot, and the
+    # integration puts @@SERVERNAME in `hostnames`. Pinning it makes the emitted
+    # hostname a constant the manifest can assert; the default is the random
+    # container id, which would differ on every run.
+    hostname: rz-mssql
+    environment:
+      # Edge wants "1" where the full server wants "Y".
+      ACCEPT_EULA: "1"
+      MSSQL_PID: Developer
+      # SQL Server's own complexity rules: upper, lower, digit, symbol, 8+.
+      # Deliberately free of ',' and of the URL delimiters @ : / ? #. The first
+      # would be split into a fabricated second parameter by the runZero CLI's
+      # --kwargs flag; the rest would corrupt the sqlserver:// DSN the script
+      # builds by string interpolation, since it does not percent-encode.
+      MSSQL_SA_PASSWORD: "runZero-Test-Pw-2026!"
+      # Bound the buffer pool. Left alone the engine sizes itself against the
+      # whole machine, and this suite shares a host with other stacks.
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    ports:
+      # TDS, published on the harness-allocated port. The integration reaches it
+      # from the host exactly as a deployed runZero would reach a real server.
+      - "${RZ_HOST_PORT}:1433"
+
+  # A SQL client, and nothing else. The readiness gate and the seed script both
+  # need to run T-SQL, and neither the host nor the Edge image has a client:
+  # Edge is a slim image with no sqlcmd, and mssql-tools is published for amd64
+  # only, so there is nothing to install on an arm64 host either.
+  #
+  # The full mssql/server image *does* carry sqlcmd, and sqlcmd -- unlike
+  # sqlservr -- is an ordinary binary that runs happily under QEMU. So the image
+  # is started here with its entrypoint replaced: the database engine never
+  # runs, only the client tools are borrowed from it. That keeps the tag
+  # Microsoft's own rather than some third party's, needs no build step, and
+  # costs one already-pulled image layer.
+  sqlclient:
+    image: mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
+    platform: linux/amd64
+    entrypoint: ["/bin/sh", "-c"]
+    # Bounded rather than `sleep infinity`: if the harness is killed between
+    # `compose up` and teardown, this container stops by itself within the hour
+    # instead of holding a share of the host indefinitely.
+    command: ["sleep 3600"]
+    depends_on: [sqledge]

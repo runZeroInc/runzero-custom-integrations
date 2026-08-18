@@ -1,0 +1,64 @@
+{
+  "name": "future-timestamp",
+  "integration": "trend-vision-one",
+  "description": "One endpoint reports a clock-skewed lastConnectedDateTime in the year 2099; the other is clean. The platform rejects an asset whose last-seen time is in the future with 'Last Seen Time cannot be in the future', and the rejection is raised by report_assets -- called once per page -- so an unclamped value does not cost only the skewed endpoint, it fails the whole page and exports zero assets. _parse_timestamp caps the parsed value at now, so both endpoints are imported and the value as reported survives in the trend_vision_one_epp_agent_last_connected attribute.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "api_token": "fixture-vision-one-key",
+    "import_software": "false",
+    "fetch_interfaces": "false",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "totalCount": 2,
+          "items": [
+            {
+              "agentGuid": "cccccccc-3333-4000-8000-000000000001",
+              "endpointName": "SKEWED-CLOCK-01",
+              "type": "desktop",
+              "osName": "Windows 11",
+              "osVersion": "10.0.22631",
+              "ipAddresses": ["10.130.1.10"],
+              "eppAgent": {"status": "on", "version": "12.5.1234",
+                           "lastConnectedDateTime": "2099-06-01T12:00:00Z"}
+            },
+            {
+              "agentGuid": "cccccccc-3333-4000-8000-000000000002",
+              "endpointName": "HEALTHY-02",
+              "type": "server",
+              "osName": "Ubuntu",
+              "osVersion": "22.04",
+              "ipAddresses": ["10.130.2.20"],
+              "eppAgent": {"status": "on", "version": "12.5.1234",
+                           "lastConnectedDateTime": "2026-06-01T12:00:00Z"}
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "trend-vision-one:$HOST:cccccccc-3333-4000-8000-000000000001",
+        "fields": {
+          "trend_vision_one_epp_agent_last_connected": "2099-06-01T12:00:00Z"
+        }
+      }
+    ],
+    "request_count": 1,
+    "log_contains": [
+      "trend-vision-one: 2 endpoints reported by the API"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "name": "v3-nic-without-details",
+  "integration": "akamai-guardicore-centra",
+  "script": "akamai-guardicore-centra/centra-v3-api.star",
+  "description": "The v4 script's unguarded network_interface append, in the v3 script's own NIC shape (guest_agent_details.network[].hardware_address / ip_addresses[].address). A network entry with an empty ip_addresses list and a null hardware_address, or one whose hardware_address the agent reported unparseably, makes network_interface() answer None; appending that None made ImportAsset abort the whole run, losing asset 0302 later on the same page and asset 0303 on the v3.0 'off' page. All three assets must import and the unusable NICs must be dropped. namespaced_ids is skipped because the script uses Centra's own asset guid as the foreign id, unscoped, exactly as the happy and degraded scenarios do -- that is a separate identity concern, not this one.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {"method": "POST", "path": "/api/v3.0/authenticate"},
+      "responses": [{"status": 200, "json": {"access_token": "fixture-centra-token", "2fa_required": false}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-on",
+      "match": {"method": "GET", "path": "/api/v4.0/assets", "query_contains": "status=on"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 2,
+            "objects": [
+              {
+                "id": "asset-guid-0301",
+                "name": "syn-centra-301",
+                "status": "on",
+                "is_on": true,
+                "active": true,
+                "bios_uuid": "aaaaaaaa-0000-4000-8000-000000000301",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "guest_agent_details": {
+                  "hostname": "syn-centra-301",
+                  "agent_version": "5.2.0",
+                  "agent_type": "RevealAgent",
+                  "os_details": {
+                    "os_version_name": "Ubuntu 22.04",
+                    "os_type": "Linux",
+                    "os_kernel_major": 5,
+                    "os_kernel_minor": 15
+                  },
+                  "hardware": {
+                    "vendor": "VMware, Inc.",
+                    "architecture": "x86_64",
+                    "serial": "VMW-0301",
+                    "hw_uuid": "bbbbbbbb-0000-4000-8000-000000000301"
+                  },
+                  "network": [
+                    {
+                      "hardware_address": "00:50:56:00:c3:01",
+                      "ip_addresses": [{"address": "198.51.100.11"}]
+                    },
+                    {
+                      "hardware_address": null,
+                      "ip_addresses": []
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "asset-guid-0302",
+                "name": "syn-centra-302",
+                "status": "on",
+                "is_on": true,
+                "active": true,
+                "bios_uuid": "aaaaaaaa-0000-4000-8000-000000000302",
+                "first_seen": "2026-02-05 08:15:00",
+                "last_seen": "2026-08-02 09:00:00",
+                "guest_agent_details": {
+                  "hostname": "syn-centra-302",
+                  "agent_version": "5.2.0",
+                  "agent_type": "RevealAgent",
+                  "os_details": {
+                    "os_version_name": "Windows Server 2022",
+                    "os_type": "Windows"
+                  },
+                  "hardware": {
+                    "vendor": "VMware, Inc.",
+                    "hw_uuid": "bbbbbbbb-0000-4000-8000-000000000302"
+                  },
+                  "network": [
+                    {
+                      "hardware_address": "00:50:56:00:c3:02",
+                      "ip_addresses": [{"address": "198.51.100.12"}]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-off",
+      "match": {"method": "GET", "path": "/api/v3.0/assets", "query_contains": "status=off"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "objects": [
+              {
+                "id": "asset-guid-0303",
+                "name": "syn-centra-303",
+                "status": "off",
+                "is_on": false,
+                "active": false,
+                "bios_uuid": "aaaaaaaa-0000-4000-8000-000000000303",
+                "first_seen": "2026-03-05 08:15:00",
+                "last_seen": "2026-08-03 09:00:00",
+                "guest_agent_details": {
+                  "hostname": "syn-centra-303",
+                  "agent_version": "5.2.0",
+                  "os_details": {"os_version_name": "Ubuntu 20.04", "os_type": "Linux"},
+                  "hardware": {"vendor": "VMware, Inc.", "hw_uuid": "bbbbbbbb-0000-4000-8000-000000000303"},
+                  "network": [
+                    {
+                      "hardware_address": "not-a-mac",
+                      "ip_addresses": []
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["asset-guid-0301", "asset-guid-0302", "asset-guid-0303"],
+    "assets": [
+      {
+        "id": "asset-guid-0301",
+        "fields": {
+          "ipAddresses": "198.51.100.11",
+          "macAddresses": "00:50:56:00:c3:01"
+        }
+      },
+      {
+        "id": "asset-guid-0302",
+        "fields": {
+          "ipAddresses": "198.51.100.12",
+          "macAddresses": "00:50:56:00:c3:02"
+        }
+      },
+      {
+        "id": "asset-guid-0303",
+        "fields": {"hostnames": "syn-centra-303"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "request_count": 3
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

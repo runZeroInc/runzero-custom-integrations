@@ -1,0 +1,98 @@
+{
+  "name": "happy",
+  "description": "Proves the new url parameter reaches the API and that IP-based assets and their findings parse. The country assertion is a regression lock on a typo: the attribute was read from asset.get('coutry'), so it was always empty while countryCode beside it worked. namespaced_ids is skipped: the id is bitsight:<asset_type>:<asset_name> with no company_id scope, so two portfolio companies sharing an asset name collide, and a reclassification re-identifies the asset (reported defect). no_placeholder_hostnames is skipped: a Bitsight asset IS an internet-facing address, so the address is legitimately the name here.",
+  "kwargs": {
+    "url": "$BASE",
+    "company_id": "co-fixture",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "match": {
+        "method": "GET",
+        "path_contains": "/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "links": {
+              "next": null
+            },
+            "results": [
+              {
+                "asset": "198.51.100.10",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "high",
+                "country": "United States"
+              },
+              {
+                "asset": "198.51.100.11",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "low",
+                "country": "United States"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path_contains": "/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "links": {
+              "next": null
+            },
+            "results": [
+              {
+                "risk_vector_label": "Patching Cadence",
+                "severity": 7.0,
+                "vulnerability_name": "CVE-2026-1234",
+                "details": {
+                  "vulnerability_name": "CVE-2026-1234"
+                },
+                "first_seen": "2026-01-05",
+                "last_seen": "2026-02-05"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "min_assets": 2,
+    "assets": [
+      {
+        "id": "bitsight:ip:198.51.100.10",
+        "fields": {"country": "United States"}
+      }
+    ],
+    "requests_include": [
+      {
+        "path_contains": "/ratings/v1/companies/co-fixture/assets"
+      },
+      {
+        "header_contains": "Basic "
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids",
+      "no_placeholder_hostnames"
+    ]
+  }
+}

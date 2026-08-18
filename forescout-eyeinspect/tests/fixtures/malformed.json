@@ -1,0 +1,104 @@
+{
+  "name": "malformed",
+  "integration": "forescout-eyeinspect",
+  "description": "Junk rows and off-contract field types mixed into good ones. eyeInspect does not publish the element shape of open_ports or mac_addresses, so this pins what the coercions actually do: a bare string row is dropped, a null id and a blank id are each skipped with a log line, open_ports typed as a single object still yields a service, open_ports typed as a comma-separated string yields one service per parseable token and silently drops the unparseable one, mac_addresses typed as an object yields no MAC rather than a garbage one, and an unparseable timestamp is preserved as a custom attribute instead of aborting parse_time.\n\nThe alerts fetch is also exercised in its failure mode: host 8007 advertises alerts, the alerts call 500s through its retries, and the host must still be imported with no findings rather than being lost.\n\nDeliberately NOT in this fixture: a host whose first_seen or last_seen is in the future. That case aborts the entire run at report_assets and loses every asset on the page; it is reported as a bug rather than encoded as expected behaviour here.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "last_seen_days": "0",
+    "include_alerts": "true",
+    "include_cve_details": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v1/hosts", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 8,
+            "results": [
+              "a-bare-string-where-an-object-is-documented",
+              {"id": null, "ip": "10.82.0.1", "main_name": "syn-null-id"},
+              {"id": "", "ip": "10.82.0.2", "main_name": "syn-blank-id"},
+              {
+                "id": 8003,
+                "ip": "10.82.0.5",
+                "main_name": "syn-bad-timestamps",
+                "role": "PLC",
+                "alert_count": 0,
+                "first_seen": "not-a-timestamp",
+                "last_seen": "2026-13-45T99:99:99Z"
+              },
+              {
+                "id": 8004,
+                "ip": "10.82.0.6",
+                "main_name": "syn-object-open-ports",
+                "alert_count": 0,
+                "open_ports": {"port": 502, "protocol": "tcp"},
+                "mac_addresses": {"unexpected": "object"}
+              },
+              {
+                "id": 8005,
+                "ip": "10.82.0.7",
+                "main_name": "syn-string-open-ports",
+                "alert_count": 0,
+                "open_ports": "502/tcp,102/tcp,notaport"
+              },
+              {
+                "id": 8006,
+                "main_name": "syn-no-address-no-mac",
+                "alert_count": 0
+              },
+              {
+                "id": 8007,
+                "ip": "10.82.0.9",
+                "main_name": "syn-alerts-unavailable",
+                "alert_count": 12
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts-drained",
+      "match": {"method": "GET", "path": "/api/v1/hosts"},
+      "responses": [{"status": 200, "json": {"total_count": 8, "results": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "alerts-broken",
+      "match": {"method": "GET", "path": "/api/v1/alerts"},
+      "responses": [{"status": 500, "json": {"error": "alert store unavailable"}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "forescout-eyeinspect:127.0.0.1:8003",
+      "forescout-eyeinspect:127.0.0.1:8004",
+      "forescout-eyeinspect:127.0.0.1:8005",
+      "forescout-eyeinspect:127.0.0.1:8006",
+      "forescout-eyeinspect:127.0.0.1:8007"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=8007"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1/alerts", "query_contains": "host_id=8004"}
+    ],
+    "min_services_total": 3,
+    "log_contains": [
+      "skipping host with no id: ip=10.82.0.1",
+      "skipping host with no id: ip=10.82.0.2",
+      "failed to fetch alerts for host 8007",
+      "reported 5 assets"
+    ]
+  },
+  "invariants": {"skip": []}
+}

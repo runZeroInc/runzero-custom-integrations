@@ -1,0 +1,443 @@
+{
+  "name": "happy",
+  "integration": "ntopng",
+  "description": "One monitored interface, its layer 2 device table, and its active host table. Proves the v2 reads are POSTs with a JSON body even though they are reads; that the MAC table supplies the manufacturer and device type the host table does not carry; that a name field holding the host's own IP address does not become a hostname and a decorated 'name [label]' is split into both halves; that ntopng's 00:00:00:00:00:00 placeholder MAC is not read as hardware; that multicast groups and loopback are not endpoints; and that a future timestamp is clamped rather than dropping the record. No Service objects are produced: ntopng observes flows, and a host that made an HTTPS request is a client, not a listener on 443.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/ntopng/interfaces.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [
+              {
+                "ifid": 1,
+                "ifname": "eth0",
+                "name": "eth0",
+                "is_packet_interface": true,
+                "is_pcap_interface": false,
+                "is_zmq_interface": false
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "macs",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/mac/macs_list.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [
+              {
+                "mac": "AA:BB:CC:DD:EE:41",
+                "manufacturer": "Dell Inc. [ OptiPlex 7090 ]",
+                "device_type": {
+                  "device_type_label": "Workstation",
+                  "workstation": true
+                },
+                "name": {
+                  "name": "desk-4101",
+                  "has_name": true
+                },
+                "hosts": 1,
+                "arp": "1.2 K",
+                "seen_since": 1786690000,
+                "bytes_sent": 4012345,
+                "bytes_rcvd": 5800000,
+                "throughput": 90400,
+                "throughput_type": "bps",
+                "traffic": 9812345,
+                "breakdown": ""
+              },
+              {
+                "mac": "00:1B:21:AA:BB:CC",
+                "manufacturer": "Intel Corporate",
+                "device_type": {
+                  "device_type_label": "Unknown"
+                },
+                "name": {
+                  "has_name": false,
+                  "num_hosts": 1,
+                  "host_label": "192.0.2.42"
+                },
+                "hosts": 1,
+                "arp": 0,
+                "seen_since": 1786590000,
+                "bytes_sent": 60,
+                "bytes_rcvd": 40,
+                "throughput": 0,
+                "throughput_type": "bps",
+                "traffic": 100,
+                "breakdown": ""
+              },
+              {
+                "mac": "00:00:00:00:00:00",
+                "manufacturer": "",
+                "device_type": {
+                  "device_type_label": ""
+                },
+                "name": {
+                  "has_name": false,
+                  "num_hosts": 0,
+                  "host_label": ""
+                },
+                "hosts": 0,
+                "arp": 0,
+                "seen_since": 1786000000,
+                "bytes_sent": 0,
+                "bytes_rcvd": 0,
+                "throughput": 0,
+                "throughput_type": "bps",
+                "traffic": 0
+              }
+            ],
+            "recordsTotal": 3,
+            "recordsFiltered": 3
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [],
+            "recordsTotal": 3
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": {
+              "perPage": 250,
+              "currentPage": 1,
+              "data": [
+                {
+                  "key": "192_0_2_41",
+                  "first_seen": 1786700000,
+                  "last_seen": 1786841000,
+                  "vlan": 0,
+                  "ip": "192.0.2.41",
+                  "os": 1,
+                  "num_alerts": 0,
+                  "country": "",
+                  "is_blacklisted": false,
+                  "mac": "AA:BB:CC:DD:EE:41",
+                  "pool": {
+                    "id": 0,
+                    "name": "Not Assigned"
+                  },
+                  "name": "desk-4101.corp.example.com [Reception PC]",
+                  "score": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  },
+                  "thpt": {
+                    "pps": 12.0,
+                    "bps": 90400.0
+                  },
+                  "bytes": {
+                    "total": 9812345,
+                    "sent": 4012345,
+                    "recvd": 5800000
+                  },
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "num_flows": {
+                    "total": 7,
+                    "as_client": 6,
+                    "as_server": 1
+                  }
+                },
+                {
+                  "key": "192_0_2_42",
+                  "first_seen": 1786600000,
+                  "last_seen": 1786840500,
+                  "vlan": 30,
+                  "ip": "192.0.2.42",
+                  "os": 5,
+                  "num_alerts": 2,
+                  "country": "",
+                  "is_blacklisted": false,
+                  "mac": "00:1B:21:AA:BB:CC",
+                  "pool": {
+                    "id": 3,
+                    "name": "Servers"
+                  },
+                  "name": "192.0.2.42",
+                  "thpt": {
+                    "pps": 3,
+                    "bps": 4000
+                  },
+                  "bytes": {
+                    "total": 100,
+                    "sent": 60,
+                    "recvd": 40
+                  },
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "num_flows": {
+                    "total": 1,
+                    "as_client": 0,
+                    "as_server": 1
+                  }
+                },
+                {
+                  "key": "198_51_100_9",
+                  "first_seen": 1786500000,
+                  "last_seen": 1786840000,
+                  "vlan": 0,
+                  "ip": "198.51.100.9",
+                  "os": 0,
+                  "num_alerts": 0,
+                  "mac": "00:00:00:00:00:00",
+                  "name": "router-hop.example.net",
+                  "thpt": {
+                    "pps": 0,
+                    "bps": 0
+                  },
+                  "bytes": {
+                    "total": 0,
+                    "sent": 0,
+                    "recvd": 0
+                  },
+                  "is_localhost": false,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": false,
+                  "num_flows": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  }
+                },
+                {
+                  "key": "224_0_0_251",
+                  "first_seen": 1786700000,
+                  "last_seen": 1786841000,
+                  "vlan": 0,
+                  "ip": "224.0.0.251",
+                  "os": 0,
+                  "mac": "01:00:5E:00:00:FB",
+                  "name": "224.0.0.251",
+                  "is_localhost": false,
+                  "is_multicast": true,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": false,
+                  "thpt": {
+                    "pps": 1,
+                    "bps": 100
+                  },
+                  "bytes": {
+                    "total": 1,
+                    "sent": 1,
+                    "recvd": 0
+                  },
+                  "num_flows": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  }
+                },
+                {
+                  "key": "127_0_0_1",
+                  "first_seen": 1786700000,
+                  "last_seen": 1786841000,
+                  "vlan": 0,
+                  "ip": "127.0.0.1",
+                  "os": 5,
+                  "mac": "00:00:00:00:00:00",
+                  "name": "localhost",
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "thpt": {
+                    "pps": 0,
+                    "bps": 0
+                  },
+                  "bytes": {
+                    "total": 0,
+                    "sent": 0,
+                    "recvd": 0
+                  },
+                  "num_flows": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  }
+                },
+                {
+                  "key": "192_0_2_43",
+                  "first_seen": 4102444800,
+                  "last_seen": 4102444800,
+                  "vlan": 0,
+                  "ip": "192.0.2.43",
+                  "os": 4,
+                  "mac": "AA:BB:CC:DD:EE:43",
+                  "name": "skewed-clock",
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "thpt": {
+                    "pps": 0,
+                    "bps": 0
+                  },
+                  "bytes": {
+                    "total": 0,
+                    "sent": 0,
+                    "recvd": 0
+                  },
+                  "num_flows": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  }
+                }
+              ],
+              "sort": [
+                [
+                  "column_ip",
+                  "asc"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "rc": -1,
+      "rc_str": "NOT_FOUND",
+      "rc_str_hr": "Not found",
+      "rsp": {}
+    }
+  },
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "ntopng:$HOST:0:192.0.2.41",
+      "ntopng:$HOST:30:192.0.2.42",
+      "ntopng:$HOST:0:198.51.100.9",
+      "ntopng:$HOST:0:192.0.2.43"
+    ],
+    "ids_absent": [
+      "ntopng:$HOST:0:224.0.0.251",
+      "ntopng:$HOST:0:127.0.0.1"
+    ],
+    "assets": [
+      {
+        "id": "ntopng:$HOST:0:192.0.2.41",
+        "fields": {
+          "os": "Windows",
+          "deviceType": "Desktop",
+          "manufacturer": "Dell Inc. [ OptiPlex 7090 ]",
+          "macAddresses": "a8:bb:cc:dd:ee:41",
+          "ipAddresses": "192.0.2.41",
+          "hostnames": "desk-4101.corp.example.com",
+          "ntopng_host_pool": "Not Assigned"
+        }
+      },
+      {
+        "id": "ntopng:$HOST:30:192.0.2.42",
+        "fields": {
+          "os": "Linux",
+          "manufacturer": "Intel Corporate",
+          "ntopng_vlan": "30"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      },
+      {
+        "id": "ntopng:$HOST:0:198.51.100.9",
+        "fields": {
+          "hostnames": "router-hop.example.net",
+          "ipAddresses": "198.51.100.9"
+        },
+        "fields_absent": [
+          "macAddresses"
+        ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/ntopng/interfaces.lua"
+      },
+      {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/mac/macs_list.lua",
+        "body_contains": "\"ifid\":\"1\""
+      },
+      {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua",
+        "body_contains": "\"mode\":\"local\""
+      },
+      {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua",
+        "body_contains": "\"perPage\":250"
+      },
+      {
+        "header_contains": "Token fixture-token"
+      }
+    ],
+    "log_contains": [
+      "ntopng: found 1 monitored interface(s)",
+      "ntopng: indexed 2 MACs on interface 1",
+      "ntopng: reported 4 assets from interface 1"
+    ],
+    "min_services_total": 0
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

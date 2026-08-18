@@ -1,0 +1,106 @@
+{
+  "name": "happy",
+  "integration": "solarwinds-information-service",
+  "description": "Four Orion nodes through one SWIS query.\n\nThe scenario exists because this integration shipped with `params = {'query': ''}` -- it asked the Information Service for nothing and therefore imported nothing, on every run, silently. request_include pins the SWQL actually reaching the wire so an empty query cannot come back.\n\nIdentity is the other half. build_assets falls back NodeId -> Fqdn -> IpAddress, so node 3 carries no NodeId and must key on its Fqdn, and node 4 carries neither and must key on its address. Node 5 has none of the three and must be counted, not imported: it is the only record the skip line may describe.\n\nnetwork_interface returns None when nothing usable survives, and appending that aborts the whole run at ImportAsset, so node 3's empty IpAddress is deliberate -- it proves the guard holds and the asset still imports on hostname alone.\n\nIDS ARE NAMESPACED BY THE SWIS SERVER. Orion's NodeId is a small per-install integer and Fqdn and IpAddress are unique only inside one installation, so a bare id collides as soon as two Orion servers are imported into one runZero account -- with integers counting from 1 that is close to certain. The id therefore carries the configured URL's host, which is the only thing distinguishing the two that this API exposes. $HOST expands to the fixture server's host so the scoped ids can still be asserted exactly against an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "query",
+      "match": {
+        "method": "GET",
+        "path": "/SolarWinds/InformationService/v3/Json/Query"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "results": [
+              {
+                "NodeId": 101,
+                "Fqdn": "core-sw01.corp.example.com",
+                "OsVersion": "NX-OS 9.3(10)",
+                "Vendor": "Cisco",
+                "IpAddress": "10.60.0.11",
+                "CpuPercentUtilization": 17,
+                "PercentMemoryUsed": 42,
+                "Status": 1,
+                "SysObjectId": "1.3.6.1.4.1.9.12.3.1.3.1084",
+                "Uptime": 8812345
+              },
+              {
+                "NodeId": 102,
+                "Fqdn": "esx-02.corp.example.com",
+                "OsVersion": "VMware ESXi 8.0.2",
+                "Vendor": "VMware",
+                "IpAddress": "10.60.0.12",
+                "Status": 1
+              },
+              {
+                "Fqdn": "no-nodeid.corp.example.com",
+                "OsVersion": "Linux",
+                "Vendor": "Red Hat",
+                "IpAddress": "",
+                "Status": 1
+              },
+              {
+                "IpAddress": "10.60.0.14",
+                "OsVersion": "Windows Server 2022",
+                "Vendor": "Microsoft"
+              },
+              {
+                "OsVersion": "Unknown",
+                "Vendor": "Unknown"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "request_count": 1,
+    "ids": [
+      "swis:$HOST:node:101",
+      "swis:$HOST:node:102",
+      "swis:$HOST:node:no-nodeid.corp.example.com",
+      "swis:$HOST:node:10.60.0.14"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/SolarWinds/InformationService/v3/Json/Query",
+        "query_contains": "FROM+Orion.Nodes"
+      }
+    ],
+    "assets": [
+      {
+        "id": "swis:$HOST:node:101",
+        "fields": {
+          "hostnames": "core-sw01.corp.example.com",
+          "os": "NX-OS 9.3(10)",
+          "ipAddresses": "10.60.0.11",
+          "percentCpuUtilization": "17",
+          "sysObjectId": "1.3.6.1.4.1.9.12.3.1.3.1084"
+        }
+      },
+      {
+        "id": "swis:$HOST:node:no-nodeid.corp.example.com",
+        "fields": {
+          "hostnames": "no-nodeid.corp.example.com"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      }
+    ],
+    "log_contains": [
+      "swis: skipped 1 nodes with no NodeId/Fqdn/IpAddress",
+      "swis: reported 4 assets"
+    ]
+  }
+}

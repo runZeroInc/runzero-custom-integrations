@@ -1,0 +1,43 @@
+# A real Snipe-IT backed by a real MySQL, serving the same /api/v1/hardware
+# endpoint a hosted Snipe-IT serves.
+#
+# Both tags are pinned. Snipe-IT reshapes the hardware payload between majors
+# (v6 renamed several top-level keys and moved others under `custom_fields`),
+# which is exactly the drift this test exists to catch -- so the version under
+# test has to be a deliberate choice rather than whatever :latest resolved to.
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: snipeit
+      MYSQL_DATABASE: snipeit
+      MYSQL_USER: snipeit
+      MYSQL_PASSWORD: snipeit
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-usnipeit", "-psnipeit"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  snipeit:
+    image: snipe/snipe-it:v7.0.13
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Laravel refuses to boot without a 32-byte APP_KEY. A fixed one keeps the
+      # container reproducible; it protects nothing here, and the instance is
+      # destroyed at the end of the test.
+      APP_KEY: "base64:cnVuemVyby1pbnRlZ3JhdGlvbi10ZXN0LWtleS0zMmI="
+      APP_URL: "http://127.0.0.1:${RZ_HOST_PORT}"
+      APP_DEBUG: "false"
+      APP_ENV: production
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_DATABASE: snipeit
+      DB_USERNAME: snipeit
+      DB_PASSWORD: snipeit
+      # Keep the container from trying to reach an SMTP server during seeding.
+      MAIL_MAILER: log
+    ports:
+      - "${RZ_HOST_PORT}:80"

@@ -1,0 +1,103 @@
+{
+  "name": "happy",
+  "integration": "snipe-it",
+  "description": "One page of hardware. Proves the bearer token reaches /api/v1/hardware, that model/category/manufacturer are read out of their nested objects, that the MAC Address custom field becomes the interface, and that a row with no id, asset_tag or serial is skipped with a log line. Addresses come from the custom fields, matched either on field_format ('Management Address', format IP, holding two addresses in one value) or on a conventional field name ('IP Address', no field_format) -- a v7 hardware row returns no address of its own. One thing this still pins that is wrong: no hostname is ever emitted, so an asset's correlators are only its MAC and addresses.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-snipe-token"
+  },
+  "routes": [
+    {
+      "name": "hardware",
+      "match": {"method": "GET", "path": "/api/v1/hardware"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "total": 3,
+          "rows": [
+            {
+              "id": 12,
+              "name": "hq-laptop-12",
+              "asset_tag": "RZ-0012",
+              "serial": "SER0000012",
+              "model": {"id": 4, "name": "Latitude 7440"},
+              "model_number": "LAT7440",
+              "category": {"id": 1, "name": "Laptop"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "status_label": {"id": 1, "name": "Ready to Deploy", "status_type": "deployable"},
+              "location": {"id": 3, "name": "HQ"},
+              "supplier": {"id": 5, "name": "Acme Reseller"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:3A:B7", "field_format": "MAC"},
+                "IP Address": {"field": "_snipeit_ip_address_4", "value": "10.140.1.12"}
+              },
+              "created_at": {"datetime": "2026-01-05 09:00:00", "formatted": "Mon Jan 05, 2026 9:00AM"},
+              "updated_at": {"datetime": "2026-06-01 09:00:00", "formatted": "Mon Jun 01, 2026 9:00AM"},
+              "purchase_cost": "1450.00",
+              "purchase_date": "2026-01-02",
+              "warranty_months": 36,
+              "notes": "issued to sales"
+            },
+            {
+              "id": 13,
+              "name": "dc-switch-13",
+              "asset_tag": "RZ-0013",
+              "serial": "SER0000013",
+              "model": {"id": 7, "name": "CBS350-24T"},
+              "category": {"id": 2, "name": "Network Device"},
+              "manufacturer": {"id": 3, "name": "Cisco Systems"},
+              "status_label": {"id": 2, "name": "Deployed", "status_type": "deployable"},
+              "location": {"id": 4, "name": "DC1"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:3A:C8", "field_format": "MAC"},
+                "Rack Unit": {"field": "_snipeit_rack_unit_2", "value": "14"},
+                "Management Address": {"field": "_snipeit_management_address_5", "value": "10.140.2.13, 2001:db8:140::13", "field_format": "IP"}
+              },
+              "created_at": {"datetime": "2026-02-05 09:00:00"},
+              "updated_at": {"datetime": "2026-06-02 09:00:00"}
+            },
+            {
+              "id": null,
+              "name": "unidentifiable-row",
+              "asset_tag": "",
+              "serial": "",
+              "model": {"id": 9, "name": "Unknown"},
+              "category": {"id": 3, "name": "Accessory"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:3A:D9"}
+              }
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "assets": [
+      {
+        "id": "snipe-it:$HOST:hardware:12",
+        "fields": {"macAddresses": "00:1b:44:11:3a:b7", "ipAddresses": "10.140.1.12", "deviceType": "Laptop", "asset.tag": "RZ-0012", "serial.number": "SER0000012", "name": "hq-laptop-12"},
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "snipe-it:$HOST:hardware:13",
+        "fields": {"macAddresses": "00:1b:44:11:3a:c8", "ipAddresses": "10.140.2.13\t2001:db8:140::13", "deviceType": "Network Device", "location": "DC1"},
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "asset_count": 2,
+    "ids": ["snipe-it:$HOST:hardware:12", "snipe-it:$HOST:hardware:13"],
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/hardware"},
+      {"header_contains": "fixture-snipe-token"}
+    ],
+    "log_contains": [
+      "snipe-it: skipping hardware with no id/asset_tag/serial"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "name": "malformed",
+  "integration": "palo-alto-device-security",
+  "description": "Junk in both payloads must be skipped without losing the run: a device with no deviceid, a device whose ip_address is a list rather than a scalar, a finding with neither a ticket id nor a name, and a finding whose vulnerability_name is a lower-case CVE. The platform validates Vulnerability.cve against ^CVE-[0-9]{4}-[0-9]{4,19}$ and rejects the WHOLE record on a miss, so the script only assigns cve when the name matches; this scenario proves the lower-case value is carried as a plain name and the asset still imports. no_mac_in_id is skipped because IoT Security deviceid is the device MAC.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "tsg_id": "tsg-malformed",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "lookback_days": "30"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/oauth2/access_token"},
+      "responses": [{"status": 200, "json": {"access_token": "malformed-token"}}]
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/iot/pub/v1/vulnerability/list"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "deviceid": "00:aa:bb:cc:dd:01",
+                "name": "good-host",
+                "ip": "10.70.0.1",
+                "zb_ticketid": "TCK-OK-1",
+                "vulnerability_name": "CVE-2025-40001",
+                "risk_level": "High",
+                "detected_date": "2026-06-01T00:00:00Z"
+              },
+              {
+                "deviceid": "00:aa:bb:cc:dd:01",
+                "zb_ticketid": "TCK-LOWER-1",
+                "vulnerability_name": "cve-2025-40002",
+                "risk_level": "Medium",
+                "detected_date": "2026-06-02T00:00:00Z"
+              },
+              {
+                "deviceid": "00:aa:bb:cc:dd:01",
+                "risk_level": "Low"
+              },
+              {
+                "deviceid": "",
+                "zb_ticketid": "TCK-ORPHAN",
+                "vulnerability_name": "CVE-2025-40003",
+                "risk_level": "High"
+              },
+              {
+                "deviceid": "00:aa:bb:cc:dd:01",
+                "zb_ticketid": "TCK-NOTS-1",
+                "vulnerability_name": "CVE-2025-40004",
+                "risk_level": "not-a-known-level",
+                "detected_date": "yesterday afternoon"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/iot/pub/v2/device/list"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "deviceid": "00:aa:bb:cc:dd:01",
+                "hostname": "good-host",
+                "ip_address": "10.70.0.1",
+                "mac_address": "00:aa:bb:cc:dd:01",
+                "category": "Sensor",
+                "last_activity": "2026-08-01T00:00:00Z"
+              },
+              {
+                "hostname": "no-deviceid-host",
+                "ip_address": "10.70.0.2",
+                "mac_address": "00:aa:bb:cc:dd:02"
+              },
+              {
+                "deviceid": "   ",
+                "hostname": "blank-deviceid-host",
+                "ip_address": "10.70.0.3"
+              },
+              {
+                "deviceid": "00:aa:bb:cc:dd:04",
+                "hostname": "multi-address-host",
+                "ip_address": ["10.70.0.4", "127.0.0.1", "10.70.0.5"],
+                "mac_address": "00:aa:bb:cc:dd:04",
+                "first_seen_date": "not-a-timestamp",
+                "last_activity": ["2026-08-02T00:00:00Z"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "palo-alto-device-security:tsg-malformed:00:aa:bb:cc:dd:01",
+      "palo-alto-device-security:tsg-malformed:00:aa:bb:cc:dd:04"
+    ],
+    "ids_absent": [
+      "palo-alto-device-security:tsg-malformed:",
+      "palo-alto-device-security:tsg-malformed:   "
+    ],
+    "log_contains": [
+      "skipping device with no deviceid: hostname=no-deviceid-host",
+      "skipping device with no deviceid: hostname=blank-deviceid-host",
+      "indexed 3 vulnerabilities across 1 devices"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

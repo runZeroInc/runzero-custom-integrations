@@ -1,0 +1,56 @@
+{
+  "name": "no-mac",
+  "integration": "snipe-it",
+  "description": "REGRESSION LOCK on the networkInterfaces=[None] abort. A stock Snipe-IT install has no 'MAC Address' custom field, so hardware rows arrive with custom_fields empty or absent -- the common case, not an edge case. build_assets then set mac = None and called network_interface(ips=[], mac=None), which returns None, and handed ImportAsset networkInterfaces=[None]. The runtime rejects that with 'network_interfaces must be an iterable of NetworkInterface objects' and the WHOLE run aborted with zero assets, including the rows that were fine. It was aggravated by the ips list assembled from networks.v4/networks.v6 being discarded, which left a MAC as the only thing that could ever produce an interface.\n\nBoth halves are pinned here. Hardware 21 has an empty custom_fields map plus an IP Address custom field, which is where a v7 install actually records an address; hardware 22 has no custom_fields key at all, which is the stock shape, and must import with no interface whatsoever rather than aborting the run.\n\nSkips has_correlator: hardware 22 is exactly the row that has nothing to correlate on. A v7 hardware payload carries no address data, `name` goes to a custom attribute rather than to hostnames, and a stock install has no MAC field, so a row like this can only sit alone. That is a real remaining defect in this integration -- recorded here and in tests/docker/manifest.json rather than papered over.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-snipe-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v1/hardware"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "total": 2,
+          "rows": [
+            {
+              "id": 21,
+              "name": "hq-desktop-21",
+              "asset_tag": "RZ-0021",
+              "serial": "SER0000021",
+              "model": {"id": 4, "name": "OptiPlex 7010"},
+              "category": {"id": 5, "name": "Desktop"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "custom_fields": {
+                "IP Address": {"field": "_snipeit_ip_address_4", "value": "10.150.1.21"}
+              }
+            },
+            {
+              "id": 22,
+              "name": "hq-desktop-22",
+              "asset_tag": "RZ-0022",
+              "serial": "SER0000022",
+              "model": {"id": 4, "name": "OptiPlex 7010"},
+              "category": {"id": 5, "name": "Desktop"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."}
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "assets": [
+      {"id": "snipe-it:$HOST:hardware:21", "fields": {"ipAddresses": "10.150.1.21", "deviceType": "Desktop"}, "fields_absent": ["macAddresses"]},
+      {"id": "snipe-it:$HOST:hardware:22", "fields": {"deviceType": "Desktop"}, "fields_absent": ["macAddresses", "ipAddresses"]}
+    ],
+    "asset_count": 2,
+    "ids": ["snipe-it:$HOST:hardware:21", "snipe-it:$HOST:hardware:22"],
+    "request_count": 1
+  },
+  "invariants": {
+    "skip": ["has_correlator"]
+  }
+}

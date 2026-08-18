@@ -1,0 +1,76 @@
+{
+  "name": "auth-refresh",
+  "integration": "redhat-insights",
+  "description": "The 15-minute service account token is rejected part way through the walk. The first host page answers 401, and the run must mint a second token at the SSO URL, retry the same page with it, and finish the remaining page rather than returning what it had.",
+  "kwargs": {
+    "url": "$BASE",
+    "sso_url": "$BASE",
+    "client_id": "fixture-service-account",
+    "client_secret": "fixture-secret",
+    "scope": "api.console",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "first-fixture-token", "expires_in": 900}},
+        {"status": 200, "json": {"access_token": "second-fixture-token", "expires_in": 900}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-1",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=1"},
+      "responses": [
+        {"status": 401, "json": {"errors": [{"status": 401, "detail": "Unauthorized: token expired"}]}},
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "results": [
+              {"id": "20000000-0000-4000-8000-000000000001", "org_id": "10009999", "fqdn": "reauth-a.fixture.example", "ip_addresses": ["10.91.0.1"]},
+              {"id": "20000000-0000-4000-8000-000000000002", "org_id": "10009999", "fqdn": "reauth-b.fixture.example", "ip_addresses": ["10.91.0.2"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-2",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "results": [
+              {"id": "20000000-0000-4000-8000-000000000003", "org_id": "10009999", "fqdn": "reauth-c.fixture.example", "ip_addresses": ["10.91.0.3"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "redhat-insights:10009999:20000000-0000-4000-8000-000000000001",
+      "redhat-insights:10009999:20000000-0000-4000-8000-000000000003"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token", "body_contains": "scope=api.console"},
+      {"header_contains": "Bearer first-fixture-token"},
+      {"header_contains": "Bearer second-fixture-token"},
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"}
+    ],
+    "log_contains": [
+      "redhat-insights: reported 3 of 3 systems"
+    ]
+  },
+  "invariants": {"skip": []}
+}

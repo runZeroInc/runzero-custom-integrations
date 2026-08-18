@@ -5,8 +5,9 @@ CONFIG = {
     "name": "Proxmox",
     "type": "inbound",
     "description": "Imports VMs, containers, and nodes from Proxmox VE.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "base_url",
@@ -36,9 +37,14 @@ CONFIG = {
 }
 load('requests', 'Session')
 load('json', json_decode='decode', json_encode='encode')
-load('runzero.types', 'ImportAsset', 'NetworkInterface')
+load('runzero.types', 'ImportAsset', 'NetworkInterface', 'to_custom_attributes')
 load('net', 'ip_address')
 load('kwargs', 'get_bool')
+
+# to_custom_attributes joins the prefix to each key with the separator, so the
+# separator has to be passed too or every attribute is named proxmox.<key>.
+ATTR_PREFIX = "proxmox"
+ATTR_SEPARATOR = "_"
 
 # Toggle debug prints on or off
 DEBUG = False
@@ -89,6 +95,67 @@ def extract_mac_from_config(config_val):
                     return val.upper()
     return None
 
+def _host_scope(base_url):
+    """Derive a per-deployment scope from the base URL, for standalone hosts
+    that belong to no cluster. Strips the scheme, any credentials, the port and
+    any path, leaving the bare host so the value is stable across runs even if
+    the operator later adds a port or a trailing path to the configured URL."""
+    text = base_url
+    for scheme in ["https://", "http://"]:
+        if text.startswith(scheme):
+            text = text[len(scheme):]
+            break
+    text = text.split("/")[0]
+    if "@" in text:
+        text = text.split("@")[-1]
+    # An IPv6 literal is bracketed and its colons are part of the address, so
+    # only strip a port when the colon is not inside brackets.
+    if text.startswith("["):
+        end = text.find("]")
+        if end > 0:
+            text = text[:end + 1]
+    elif ":" in text:
+        text = text.split(":")[0]
+    return text or "proxmox"
+
+
+def _json_object(resp):
+    """Decode a Proxmox response body into a dict, or return an empty dict.
+
+    Every Proxmox endpoint answers with a JSON object wrapping the payload in
+    'data'. Two things make an unguarded decode unsafe: json_decode aborts the
+    whole script on malformed input rather than returning an error, and reading
+    .get off a list aborts it too. An appliance returning an HTML error page, an
+    empty body, or a bare array would otherwise end the run with no diagnostic.
+    """
+    if not resp or not resp.body:
+        return {}
+    body = resp.body.strip()
+    if not body.startswith("{"):
+        return {}
+    decoded = json_decode(body)
+    if type(decoded) != 'dict':
+        return {}
+    return decoded
+
+
+def _attrs(values):
+    """Namespace a flat attribute dict and drop the keys Proxmox left unset.
+
+    Two problems this fixes. A None value is rendered by the platform as the
+    literal string "None", so an absent uptime or memory total read back as a
+    real value. And an unprefixed key like 'cluster' or 'status' collides with
+    the same key from any other integration once the asset merges, so each one
+    is namespaced.
+    """
+    kept = {}
+    for key, value in values.items():
+        if value == None or value == "":
+            continue
+        kept[key] = value
+    return to_custom_attributes(kept, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
+
+
 def main(*args, **kwargs):
     """
     Comprehensive Proxmox integration: nodes, VMs, and LXC containers.
@@ -107,7 +174,7 @@ def main(*args, **kwargs):
             token_id     = token_id     or legacy.get('api_token_id', '')
             token_secret = legacy.get('api_token_secret', token_secret)
     if not (base_url and token_id and token_secret):
-        print("ERROR: Missing base_url or credentials")
+        print("proxmox: base_url, api_token_id, and api_token_secret are all required")
         return []
 
     # --- 2) Setup session & fetch Proxmox version ---
@@ -121,23 +188,36 @@ def main(*args, **kwargs):
     api_url      = base_url + "/api2/json"
 
     ver_resp = session.get(api_url + "/version")
-    version = json_decode(ver_resp.body).get('data', {}).get('release', '')
+    ver_body = _json_object(ver_resp)
+    ver_data = ver_body.get('data', {})
+    version = ver_data.get('release', '') if type(ver_data) == 'dict' else ''
 
-    # Get cluster name from cluster status
-    cluster_name = 'proxmox'  # default fallback
+    # Get cluster name from cluster status. This value scopes every asset id, so
+    # the fallback matters: a STANDALONE host is not in a cluster and reports no
+    # cluster entry at all, which is the common single-server deployment. A
+    # literal constant here gave every standalone host the same scope, so two of
+    # them systematically collided -- VMID 100 exists on both, and both minted
+    # "proxmox-vm-100" for different machines, merging unrelated guests onto one
+    # asset. The base URL host is unique per deployment and is used instead, the
+    # same way the other single-appliance integrations in this repo scope theirs.
+    # Clustered deployments are unaffected: they report a real cluster name and
+    # keep the ids they already have.
+    cluster_name = _host_scope(base_url)
     cluster_status_resp = session.get(api_url + "/cluster/status")
-    cluster_status_body = json_decode(cluster_status_resp.body) if cluster_status_resp and cluster_status_resp.body else {}
-    cluster_status = cluster_status_body.get('data', []) if cluster_status_body else []
+    cluster_status_body = _json_object(cluster_status_resp)
+    cluster_status = cluster_status_body.get('data', [])
     if type(cluster_status) == 'list':
         for item in cluster_status:
             if type(item) == 'dict' and item.get('type') == 'cluster':
-                cluster_name = item.get('name', 'proxmox')
+                name = item.get('name', '')
+                if name:
+                    cluster_name = name
                 break
 
     # Get cluster config for management IPs
     cluster_config_resp = session.get(api_url + "/cluster/config/nodes")
-    cluster_config_body = json_decode(cluster_config_resp.body) if cluster_config_resp and cluster_config_resp.body else {}
-    cluster_config = cluster_config_body.get('data', []) if cluster_config_body else []
+    cluster_config_body = _json_object(cluster_config_resp)
+    cluster_config = cluster_config_body.get('data', [])
     mgmt_ip_by_node = {}
     if type(cluster_config) == 'list':
         for node_cfg in cluster_config:
@@ -151,10 +231,15 @@ def main(*args, **kwargs):
 
     # --- 3) Discover cluster nodes ---
     cluster_nodes_resp = session.get(api_url + "/cluster/resources?type=node")
-    cluster_nodes_body = json_decode(cluster_nodes_resp.body) if cluster_nodes_resp and cluster_nodes_resp.body else {}
-    cluster_nodes = cluster_nodes_body.get('data', []) if cluster_nodes_body else []
+    cluster_nodes_body = _json_object(cluster_nodes_resp)
+    cluster_nodes = cluster_nodes_body.get('data', [])
+
+    if type(cluster_nodes) != 'list':
+        cluster_nodes = []
 
     for cn in cluster_nodes:
+        if type(cn) != 'dict':
+            continue
         node_name = cn.get('node')
         if not node_name:
             continue
@@ -188,7 +273,7 @@ def main(*args, **kwargs):
         }
 
         if DEBUG:
-            print("Node: {} | IP: {} | Status: {}".format(node_name, mgmt_ip, status_val))
+            print("proxmox: node {} at {} is {}".format(node_name, mgmt_ip, status_val))
 
         assets.append(ImportAsset(
             id                = "{}-node-{}".format(cluster_name, node_name),
@@ -200,12 +285,12 @@ def main(*args, **kwargs):
             model             = "Hypervisor",
             deviceType        = "Hypervisor",
             tags              = ["proxmox", "hypervisor", "node"],
-            customAttributes  = node_attrs,
+            customAttributes  = _attrs(node_attrs),
         ))
 
         # --- 4) QEMU VMs on this node ---
         vms_resp = session.get(api_url + "/nodes/{}/qemu".format(node_name))
-        vms_body = json_decode(vms_resp.body) if vms_resp and vms_resp.body else {}
+        vms_body = _json_object(vms_resp)
         vms = vms_body.get('data', []) if vms_body else []
         
         for vm in vms:
@@ -216,7 +301,7 @@ def main(*args, **kwargs):
             
             # Get VM config for MAC address
             config_resp = session.get(api_url + "/nodes/{}/qemu/{}/config".format(node_name, vmid))
-            config_body = json_decode(config_resp.body) if config_resp and config_resp.body else {}
+            config_body = _json_object(config_resp)
             config = config_body.get('data', {}) if config_body else {}
             
             # Extract MAC from first network interface (net0)
@@ -231,7 +316,7 @@ def main(*args, **kwargs):
             
             if is_running and mac_addr:
                 ga_resp = session.get(api_url + "/nodes/{}/qemu/{}/agent/network-get-interfaces".format(node_name, vmid))
-                ga_json = json_decode(ga_resp.body) if ga_resp and ga_resp.body else {}
+                ga_json = _json_object(ga_resp)
                 ga_data = ga_json.get('data', {}) if ga_json else {}
                 ga_result = ga_data.get('result', []) if ga_data else []
                 
@@ -286,7 +371,7 @@ def main(*args, **kwargs):
             os_version = ""
             if is_running:
                 os_resp = session.get(api_url + "/nodes/{}/qemu/{}/agent/get-osinfo".format(node_name, vmid))
-                os_json = json_decode(os_resp.body) if os_resp and os_resp.body else {}
+                os_json = _json_object(os_resp)
                 os_data = os_json.get('data', {}) if os_json else {}
                 os_info = os_data.get('result', {}) if os_data else {}
                 if type(os_info) == 'dict' and 'error' not in os_info:
@@ -312,12 +397,18 @@ def main(*args, **kwargs):
                     for ip in iface.ipv6Addresses:
                         all_ips.append(str(ip))
                 ip_summary = ', '.join(all_ips[:3]) if all_ips else 'none'
-                print("VM {}: {} | MAC: {} | IPs: {} | Status: {}".format(
+                print("proxmox: VM {} ({}) mac={} ips={} status={}".format(
                     vmid, vm_name, mac_addr or 'none', ip_summary, vm_status
                 ))
 
             assets.append(ImportAsset(
-                id                = "{}-{}-vm-{}".format(cluster_name, node_name, vmid),
+                # VMIDs are unique across the whole cluster, not per node, so
+                # the node name adds nothing to uniqueness — and including it
+                # would change the id whenever a guest moves between nodes,
+                # which live migration and HA failover do routinely, minting a
+                # duplicate asset on every such event. The node is kept as a
+                # custom attribute instead.
+                id                = "{}-vm-{}".format(cluster_name, vmid),
                 hostnames         = [],
                 networkInterfaces = vm_ifaces,
                 os                = os_name,
@@ -326,12 +417,12 @@ def main(*args, **kwargs):
                 model             = "Virtual Machine",
                 deviceType        = "Virtual Machine",
                 tags              = ["proxmox", "vm", "qemu"],
-                customAttributes  = vm_attrs,
+                customAttributes  = _attrs(vm_attrs),
             ))
 
         # --- 5) LXC containers on this node ---
         cts_resp = session.get(api_url + "/nodes/{}/lxc".format(node_name))
-        cts_body = json_decode(cts_resp.body) if cts_resp and cts_resp.body else {}
+        cts_body = _json_object(cts_resp)
         cts = cts_body.get('data', []) if cts_body else []
         
         for ct in cts:
@@ -342,7 +433,7 @@ def main(*args, **kwargs):
             
             # Get LXC config for hostname
             config_resp = session.get(api_url + "/nodes/{}/lxc/{}/config".format(node_name, ct_id))
-            config_body = json_decode(config_resp.body) if config_resp and config_resp.body else {}
+            config_body = _json_object(config_resp)
             config = config_body.get('data', {}) if config_body else {}
             hostname = config.get('hostname', ct_name) if config else ct_name
 
@@ -352,7 +443,7 @@ def main(*args, **kwargs):
             
             if is_running:
                 ifaces_resp = session.get(api_url + "/nodes/{}/lxc/{}/interfaces".format(node_name, ct_id))
-                ifaces_body = json_decode(ifaces_resp.body) if ifaces_resp and ifaces_resp.body else {}
+                ifaces_body = _json_object(ifaces_resp)
                 ifaces_data = ifaces_body.get('data', []) if ifaces_body else []
                 
                 # Find first external interface and use its MAC + IPs together
@@ -414,12 +505,14 @@ def main(*args, **kwargs):
 
             if DEBUG:
                 ip_summary = ', '.join(external_ips[:3]) if external_ips else 'none'
-                print("LXC {}: {} | MAC: {} | IPs: {} | Status: {}".format(
+                print("proxmox: container {} ({}) mac={} ips={} status={}".format(
                     ct_id, hostname, mac_addr or 'none', ip_summary, ct_status
                 ))
 
             assets.append(ImportAsset(
-                id                = "{}-{}-ct-{}".format(cluster_name, node_name, ct_id),
+                # Cluster-unique, and deliberately free of the node name — see
+                # the VM id above; containers migrate for the same reasons.
+                id                = "{}-ct-{}".format(cluster_name, ct_id),
                 hostnames=[hostname],
                 networkInterfaces = ct_ifaces,
                 os                = config.get('ostype', 'LXC Container'),
@@ -428,13 +521,10 @@ def main(*args, **kwargs):
                 model             = "Container",
                 deviceType        = "Container",
                 tags              = ["proxmox", "container", "lxc"],
-                customAttributes  = ct_attrs,
+                customAttributes  = _attrs(ct_attrs),
             ))
-
-    if DEBUG:
-        print("=" * 60)
-        print("Total assets discovered: {}".format(len(assets)))
 
     # Stream assets to runZero via report_assets instead of returning a list.
     report_assets(assets)
+    print("proxmox: reported {} assets".format(len(assets)))
     return None

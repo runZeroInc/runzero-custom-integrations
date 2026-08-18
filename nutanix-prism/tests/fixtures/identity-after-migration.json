@@ -1,0 +1,70 @@
+{
+  "name": "identity-after-migration",
+  "integration": "nutanix-prism",
+  "description": "Second half of the migration identity pair. The SAME guest uuid as identity-before-migration, now running on node B (host_uuid changed), holding a different DHCP lease, and renamed in Prism. Its asset id must be byte-identical to the one the before scenario emits -- the expectation below is the same literal string. The host node it moved to also keeps its own id even though its management address changed, so a node re-IP does not fork the hypervisor asset either.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-viewer",
+    "password": "fixture-password",
+    "import_vms": "true",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      "responses": [
+        {"status": 200, "json": {"uuid": "00000000-0000-4000-8000-c1u57e40000a", "name": "fixture-cluster-renamed", "version": "6.5.4.0"}}
+      ]
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 2},
+            "entities": [
+              {"uuid": "aaaaaaaa-0000-4000-8000-000000000001", "name": "NTNX-SYN01-A", "hypervisor_address": "10.55.0.11", "hypervisor_type": "kKvm", "hypervisor_full_name": "Nutanix 20190916.321", "block_model": "NX-3060-G7"},
+              {"uuid": "aaaaaaaa-0000-4000-8000-000000000002", "name": "NTNX-SYN01-B-RENAMED", "hypervisor_address": "10.77.0.12", "hypervisor_type": "kKvm", "hypervisor_full_name": "Nutanix 20201105.2244", "block_model": "NX-3060-G7"}
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/vms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 1},
+            "entities": [
+              {
+                "uuid": "bbbbbbbb-0000-4000-8000-00000000beef",
+                "name": "syn-migrating-01-renamed",
+                "power_state": "on",
+                "host_uuid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "vm_nics": [{"mac_address": "50:6b:8d:00:0b:ee", "ip_addresses": ["10.77.10.99"]}]
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-00000000beef",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000002"
+    ]
+  },
+  "invariants": {"skip": []}
+}

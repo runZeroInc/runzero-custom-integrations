@@ -1,0 +1,247 @@
+{
+  "name": "happy",
+  "integration": "ubiquiti-unifi-protect",
+  "description": "Full sweep of the Protect Integration API. Response shapes follow the official OpenAPI specification for Protect 7.2.105 (developer.ui.com/protect); values are synthetic. Proves the /meta/info preflight, that /nvrs returns a SINGLE OBJECT despite the plural path, that epoch-millisecond timestamps are converted and a future one clamped, that a null name does not reach hostnames, and that the collect_extended toggle keeps the 7.x-only paths unrequested.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/meta/info"},
+      "responses": [{"status": 200, "json": {"applicationVersion": "7.2.105"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/nvrs"},
+      "comment": "Plural path, single object. Not an array.",
+      "responses": [
+        {"status": 200, "json": {
+          "id": "66d025b301ebc903e80003ea",
+          "mac": "F4E2C6A1B003",
+          "guid": "6b8fdd7c-7e4c-4156-bb39-be05ca855491",
+          "name": "Lab Console",
+          "type": "UNVR-PRO",
+          "modelKey": "nvr",
+          "armMode": {"status": "armed", "armProfileId": "672094f900e26303e800062a", "armedAt": 1755248000000, "willBeArmedAt": 4102444800000, "breachEventCount": 0},
+          "doorbellSettings": {"defaultMessageText": "Leave it at the door", "defaultMessageResetTimeoutMs": 60000, "customMessages": [], "customImages": []}
+        }}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/cameras"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": "672094f900e26303e800062a",
+            "mac": "24A43C3DFEB9",
+            "guid": "1f0c7ad4-8f1d-4a02-9b2e-0f6b0a1c2d3e",
+            "name": "Front Door",
+            "type": "UVC G4 Doorbell",
+            "modelKey": "camera",
+            "state": "CONNECTED",
+            "hasPackageCamera": true,
+            "hdrType": "auto",
+            "isMicEnabled": true,
+            "micVolume": 100,
+            "videoMode": "default",
+            "activePatrolSlot": null,
+            "lcdMessage": {"type": "CUSTOM_MESSAGE", "text": "Back soon", "resetAt": 4102444800000},
+            "featureFlags": {"supportFullHdSnapshot": true, "hasHdr": true, "hasMic": true, "hasSpeaker": true, "hasLedStatus": true, "videoModes": ["default", "highFps"], "smartDetectTypes": ["person", "vehicle"], "smartDetectAudioTypes": ["smoke"]}
+          },
+          {
+            "id": "672094f900e26303e800062b",
+            "mac": "24A43C11AA22",
+            "guid": null,
+            "name": null,
+            "type": "UVC G5 Bullet",
+            "modelKey": "camera",
+            "state": "DISCONNECTED",
+            "hasPackageCamera": false,
+            "hdrType": "off",
+            "isMicEnabled": false,
+            "videoMode": "default",
+            "activePatrolSlot": null,
+            "featureFlags": {"hasHdr": false, "hasMic": true, "hasSpeaker": false, "videoModes": ["default"], "smartDetectTypes": ["person"]}
+          },
+          {
+            "id": "672094f900e26303e800062c",
+            "mac": "",
+            "guid": null,
+            "name": null,
+            "type": null,
+            "modelKey": "camera",
+            "state": "CONNECTING"
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/sensors"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": "672094f900e26303e800071a",
+            "mac": "D021F98B6AED",
+            "guid": "aa11bb22-cc33-dd44-ee55-ff6677889900",
+            "name": "Server Room Door",
+            "type": "UP-Sense",
+            "modelKey": "sensor",
+            "state": "CONNECTED",
+            "mountType": "door",
+            "scheduleMode": "always",
+            "isOpened": false,
+            "openStatusChangedAt": 1755248400000,
+            "isMotionDetected": false,
+            "motionDetectedAt": null,
+            "alarmTriggeredAt": null,
+            "leakDetectedAt": null,
+            "tamperingDetectedAt": null,
+            "wirelessConnectionState": {"signalState": {"signalQuality": 88, "signalStrength": -54}, "batteryStatus": {"percentage": 94, "isLow": false}, "bridge": "672094f900e26303e800081a"},
+            "featureFlags": {"temperature": true, "humidity": true, "light": true, "motion": true, "waterLeak": false, "open": true, "tamper": true, "smoke": false},
+            "stats": {"light": {"value": 12, "status": "neutral"}, "humidity": {"value": 41, "status": "neutral"}, "temperature": {"value": 21, "status": "neutral"}}
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/lights"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": "672094f900e26303e800091a",
+            "mac": "24A43C778899",
+            "guid": "bb22cc33-dd44-ee55-ff66-778899001122",
+            "name": "Car Park Flood",
+            "type": "UP-FloodLight",
+            "modelKey": "light",
+            "state": "CONNECTED",
+            "camera": "672094f900e26303e800062a",
+            "isDark": true,
+            "isLightOn": false,
+            "isLightForceEnabled": false,
+            "isPirMotionDetected": false,
+            "lastMotion": 1755248100000,
+            "lightDeviceSettings": {"isIndicatorEnabled": true, "pirDuration": 15000, "pirSensitivity": 50, "ledLevel": 4}
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/chimes"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": "672094f900e26303e800a11a",
+            "mac": "24A43CAABBCC",
+            "guid": "cc33dd44-ee55-ff66-7788-990011223344",
+            "name": "Hallway Chime",
+            "type": "UP-Chime",
+            "modelKey": "chime",
+            "state": "CONNECTED",
+            "cameraIds": ["672094f900e26303e800062a"],
+            "ringSettings": []
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/viewers"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": "672094f900e26303e800b11a",
+            "mac": "24A43CDDEEFF",
+            "guid": "dd44ee55-ff66-7788-9900-112233445566",
+            "name": "Reception Viewport",
+            "type": "UVC-Viewport",
+            "modelKey": "viewer",
+            "state": "CONNECTED",
+            "liveview": null,
+            "streamLimit": 16
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 7,
+    "ids": [
+      "ubiquiti-unifi-protect:$HOST:nvr:66d025b301ebc903e80003ea",
+      "ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062a",
+      "ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062b",
+      "ubiquiti-unifi-protect:$HOST:sensor:672094f900e26303e800071a",
+      "ubiquiti-unifi-protect:$HOST:light:672094f900e26303e800091a",
+      "ubiquiti-unifi-protect:$HOST:chime:672094f900e26303e800a11a",
+      "ubiquiti-unifi-protect:$HOST:viewer:672094f900e26303e800b11a"
+    ],
+    "ids_absent": [
+      "ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062c"
+    ],
+    "assets": [
+      {
+        "id": "ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062a",
+        "fields": {
+          "deviceType": "IP Camera",
+          "model": "UVC G4 Doorbell",
+          "hostnames": "Front Door",
+          "macAddresses": "24:a4:3c:3d:fe:b9",
+          "unifi_protect_state": "CONNECTED",
+          "unifi_protect_has_package_camera": "true",
+          "unifi_protect_protect_version": "7.2.105"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062b",
+        "comment": "name is null, which is legal on every Protect device type. The MAC must carry the asset alone and no None may reach hostnames.",
+        "fields": {"macAddresses": "24:a4:3c:11:aa:22", "unifi_protect_state": "DISCONNECTED"},
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "ubiquiti-unifi-protect:$HOST:nvr:66d025b301ebc903e80003ea",
+        "comment": "armMode.willBeArmedAt is a scheduled future time; it must not be used as a timestamp.",
+        "fields": {"deviceType": "NVR", "model": "UNVR-PRO", "unifi_protect_arm_status": "armed"}
+      },
+      {
+        "id": "ubiquiti-unifi-protect:$HOST:sensor:672094f900e26303e800071a",
+        "fields": {
+          "deviceType": "IoT Sensor",
+          "unifi_protect_mount_type": "door",
+          "unifi_protect_battery_percentage": "94",
+          "unifi_protect_signal_quality": "88"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/proxy/protect/integration/v1/meta/info"},
+      {"header": {"X-API-KEY": "fixture-api-key"}},
+      {"path_contains": "/proxy/protect/integration/v1/nvrs"},
+      {"path_contains": "/proxy/protect/integration/v1/cameras"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/speakers"},
+      {"path_contains": "/sirens"},
+      {"path_contains": "/alarm-hubs"},
+      {"query_contains": "limit"}
+    ],
+    "log_contains": [
+      "unifi-protect: Protect 7.2.105 on",
+      "unifi-protect: skipping camera 672094f900e26303e800062c with no MAC and no name",
+      "unifi-protect: reported 7 devices in total"
+    ]
+  },
+
+  "check_determinism": true
+}

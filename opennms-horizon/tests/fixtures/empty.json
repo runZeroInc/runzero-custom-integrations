@@ -1,0 +1,55 @@
+{
+  "name": "empty",
+  "integration": "opennms-horizon",
+  "description": "A freshly installed OpenNMS with nothing provisioned yet. Each of the four endpoints answers emptiness the way its own API version really does, and the two versions do not agree: the experimental v2 collections return 204 No Content with no body at all (AbstractDaoRestService.get returns Response.status(Status.NO_CONTENT) whenever the DAO matches fewer than one row), while the stable v1 collections return 200 with a populated envelope. The two v1 shapes are both represented, because JAXB does not emit a consistent one for an empty list - /rest/ifservices answers with the count/totalCount/offset envelope and no 'monitored-service' key at all, and /rest/nodes answers with the same envelope carrying an empty 'node' array. Proves that all three of those are read as 'this collection is empty' and none is read as 'this endpoint failed': a 204 in particular decodes to None rather than to an envelope, and mistaking it for a malformed response would send the run down the one-request-per-node fallback path against a server whose v2 tree is working perfectly. The run must report zero assets, say so, and exit cleanly rather than failing.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero-ro",
+    "password": "fixture-not-a-real-password"
+  },
+  "routes": [
+    {
+      "name": "v2-ipinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/ipinterfaces"},
+      "responses": [{"status": 204}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v2-snmpinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces"},
+      "responses": [{"status": 204}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v1-ifservices",
+      "match": {"method": "GET", "path": "/opennms/rest/ifservices"},
+      "responses": [{"status": 200, "json": {"count": 0, "totalCount": 0, "offset": 0}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v1-nodes",
+      "match": {"method": "GET", "path": "/opennms/rest/nodes"},
+      "responses": [{"status": 200, "json": {"count": 0, "totalCount": 0, "offset": 0, "node": []}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "requests_include": [
+      {"method": "GET", "path": "/opennms/api/v2/ipinterfaces", "query_contains": "limit=200&offset=0"},
+      {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces", "query_contains": "limit=200&offset=0"},
+      {"method": "GET", "path": "/opennms/rest/ifservices", "query_contains": "limit=200&offset=0"},
+      {"method": "GET", "path": "/opennms/rest/nodes", "query_contains": "limit=200&offset=0"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/rest/nodes/"},
+      {"query_contains": "offset=200"}
+    ],
+    "log_contains": [
+      "opennms: indexed IP interfaces for 0 nodes",
+      "opennms: no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

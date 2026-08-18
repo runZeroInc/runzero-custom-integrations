@@ -1,0 +1,117 @@
+{
+  "name": "happy",
+  "integration": "bigfix",
+  "description": "The two-stage session-relevance walk: a cheap census of computer ids, then one tuple query over that id range. Proves the BESAPI XML is parsed at the shipped default property list, that the ~|~ multi-value separator is split back into individual values, that the OS short code is expanded and only a trailing dotted build number promoted to osVersion (the Red Hat string keeps its release in the name), that the RFC 1123 last report time is rebuilt into a parsable timestamp, and that the software property becomes Software with its version split out of both the 'name (1.2.3)' and 'name 1.2.3' forms. Computer 102 reports 127.0.0.1 as its only address and no MAC: it must still import, as an asset with no interface at all, because giving every agent that cannot read a NIC the same address would merge the estate onto one host. An unreadable census id, a blank tuple id, and a row of the wrong tuple width are each skipped with a count.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "software_property": "Installed Applications",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "range-query",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "whose"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Tuple><Answer type=\"string\">101</Answer><Answer type=\"string\">WEB01</Answer><Answer type=\"string\">web01.corp.example.com</Answer><Answer type=\"string\">Win2019 10.0.17763.5458</Answer><Answer type=\"string\">10.70.0.101</Answer><Answer type=\"string\">Fri, 07 Nov 2025 15:18:14 +0000</Answer><Answer type=\"string\">00:11:22:AA:00:01~|~00:11:22:AA:00:02</Answer><Answer type=\"string\">SN-BF-101</Answer><Answer type=\"string\">Dell Inc.</Answer><Answer type=\"string\">PowerEdge R650</Answer><Answer type=\"string\">2400 MHz Xeon Gold 6338</Answer><Answer type=\"string\">65536 MB</Answer><Answer type=\"string\">2.15.0</Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\">11.0.2.63</Answer><Answer type=\"string\">SYSTEM</Answer><Answer type=\"string\">OU=Servers,DC=corp,DC=example,DC=com</Answer><Answer type=\"string\">10.70.0.0</Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\">relay01.corp.example.com</Answer><Answer type=\"string\">Google Chrome (131.0.6778.86)~|~7-Zip 24.09~|~Notepad++</Answer></Tuple><Tuple><Answer type=\"string\">102</Answer><Answer type=\"string\">LAPTOP02</Answer><Answer type=\"string\">laptop02.corp.example.com</Answer><Answer type=\"string\">Win11 10.0.22631.4169</Answer><Answer type=\"string\">127.0.0.1</Answer><Answer type=\"string\">Sat, 08 Nov 2025 09:02:00 +0000</Answer><Answer type=\"string\"></Answer><Answer type=\"string\">SN-BF-102</Answer><Answer type=\"string\">LENOVO</Answer><Answer type=\"string\">ThinkPad X1 Carbon</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Laptop</Answer><Answer type=\"string\">11.0.2.63</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple><Tuple><Answer type=\"string\">103</Answer><Answer type=\"string\">RHEL03</Answer><Answer type=\"string\">rhel03.corp.example.com</Answer><Answer type=\"string\">Linux Red Hat Enterprise Linux Server release 9.3 (Plow)</Answer><Answer type=\"string\">10.70.0.103</Answer><Answer type=\"string\">Sat, 08 Nov 2025 10:15:30 +0000</Answer><Answer type=\"string\">00:11:22:AA:00:03</Answer><Answer type=\"string\">SN-BF-103</Answer><Answer type=\"string\">HPE</Answer><Answer type=\"string\">ProLiant DL360 Gen10</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">openssl 3.0.7~|~curl (8.4.0)</Answer></Tuple><Tuple><Answer type=\"string\"></Answer><Answer type=\"string\">NOID</Answer><Answer type=\"string\">noid.corp.example.com</Answer><Answer type=\"string\">Win10 10.0.19045.1</Answer><Answer type=\"string\">10.70.0.199</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">SN-BF-199</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple><Tuple><Answer type=\"string\">104</Answer><Answer type=\"string\">SHORTROW</Answer><Answer type=\"string\">shortrow.corp.example.com</Answer><Answer type=\"string\"></Answer></Tuple></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "computer-id-census",
+      "match": {
+        "method": "GET",
+        "path": "/api/query"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Answer type=\"string\">103</Answer><Answer type=\"string\">101</Answer><Answer type=\"string\">102</Answer><Answer type=\"string\">not-a-number</Answer></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "bigfix:$HOST:101",
+      "bigfix:$HOST:102",
+      "bigfix:$HOST:103"
+    ],
+    "min_software_total": 5,
+    "request_count": 2,
+    "log_contains": [
+      "skipped 1 computers with an unreadable id",
+      "skipped 1 rows that did not match the requested tuple width",
+      "skipping computer row with no id",
+      "reported 3 assets"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "output=xml"
+      },
+      {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "whose"
+      },
+      {
+        "header_contains": "Basic"
+      }
+    ],
+    "assets": [
+      {
+        "id": "bigfix:$HOST:101",
+        "fields": {
+          "ipAddresses": "10.70.0.101",
+          "macAddresses": "00:11:22:aa:00:01\t00:11:22:aa:00:02",
+          "os": "Windows Server 2019",
+          "osVersion": "10.0.17763.5458",
+          "deviceType": "Server",
+          "manufacturer": "Dell Inc.",
+          "model": "PowerEdge R650"
+        }
+      },
+      {
+        "id": "bigfix:$HOST:102",
+        "fields": {
+          "deviceType": "Laptop",
+          "bigfix_ip_address": "127.0.0.1"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "bigfix:$HOST:103",
+        "fields": {
+          "os": "Linux Red Hat Enterprise Linux Server release 9.3 (Plow)"
+        },
+        "fields_absent": [
+          "osVersion"
+        ]
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

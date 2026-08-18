@@ -1,0 +1,92 @@
+{
+  "name": "v7-shape",
+  "integration": "snipe-it",
+  "description": "REGRESSION LOCK for two defects found against a real snipe/snipe-it:v7.0.13 container.\n\n(a) The foreign id was `str(asset['id'])` -- the bare per-instance auto-increment primary key. Every Snipe-IT install numbers its register from 1, so two instances imported into one runZero account collide on 1, 2, 3 and overwrite each other's assets. The id is now scoped on the hostname of the configured URL, and the namespaced_ids invariant enforces it here rather than being skipped as it was in every snipe-it scenario before.\n\n(b) build_assets read asset['networks'] and walked networks['v4'] / networks['v6']. The v7 API returns no such key, so that whole block was dead code and no address ever reached an interface from it. Hardware 32 is the proof: it carries a fully populated legacy `networks` block and NO address custom field, and must emit with no ipAddresses at all. A run that still reads the key would import 203.0.113.32 and fail this assertion. Addresses now come from where Snipe-IT actually keeps them, a custom field on the model's fieldset -- the same place the MAC this script already reads comes from. Hardware 31 matches on field_format (the operator named the field 'Mgmt IP', which no name list would guess), and hardware 33 matches on the conventional field name with no field_format, which is what a field created with the free-form ANY format looks like.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-snipe-token"
+  },
+  "routes": [
+    {
+      "name": "hardware",
+      "match": {"method": "GET", "path": "/api/v1/hardware"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "total": 3,
+          "rows": [
+            {
+              "id": 31,
+              "name": "hq-server-31",
+              "asset_tag": "RZ-0031",
+              "serial": "SER0000031",
+              "model": {"id": 11, "name": "PowerEdge R650"},
+              "category": {"id": 4, "name": "Server"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:5A:31", "field_format": "MAC"},
+                "Mgmt IP": {"field": "_snipeit_mgmt_ip_6", "value": "192.0.2.31", "field_format": "IPv4"}
+              }
+            },
+            {
+              "id": 32,
+              "name": "legacy-networks-32",
+              "asset_tag": "RZ-0032",
+              "serial": "SER0000032",
+              "model": {"id": 11, "name": "PowerEdge R650"},
+              "category": {"id": 4, "name": "Server"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:5A:32", "field_format": "MAC"}
+              },
+              "networks": {"v4": [{"ip_address": "203.0.113.32"}], "v6": [{"ip_address": "2001:db8:5a::32"}]}
+            },
+            {
+              "id": 33,
+              "name": "free-form-field-33",
+              "asset_tag": "RZ-0033",
+              "serial": "SER0000033",
+              "model": {"id": 7, "name": "CBS350-24T"},
+              "category": {"id": 2, "name": "Network Device"},
+              "manufacturer": {"id": 3, "name": "Cisco Systems"},
+              "custom_fields": {
+                "IP Address": {"field": "_snipeit_ip_address_7", "value": "192.0.2.33, 2001:db8:5a::33"},
+                "Rack Unit": {"field": "_snipeit_rack_unit_2", "value": "14"}
+              }
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "assets": [
+      {
+        "id": "snipe-it:$HOST:hardware:31",
+        "fields": {"macAddresses": "00:1b:44:11:5a:31", "ipAddresses": "192.0.2.31", "deviceType": "Server"}
+      },
+      {
+        "id": "snipe-it:$HOST:hardware:32",
+        "fields": {"macAddresses": "00:1b:44:11:5a:32", "deviceType": "Server"},
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "snipe-it:$HOST:hardware:33",
+        "fields": {"ipAddresses": "192.0.2.33\t2001:db8:5a::33", "deviceType": "Network Device"},
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "asset_count": 3,
+    "ids": [
+      "snipe-it:$HOST:hardware:31",
+      "snipe-it:$HOST:hardware:32",
+      "snipe-it:$HOST:hardware:33"
+    ],
+    "ids_absent": ["31", "32", "33"],
+    "request_count": 1
+  },
+  "invariants": {
+    "skip": []
+  }
+}

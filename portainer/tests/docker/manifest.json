@@ -1,0 +1,68 @@
+{
+  "name": "portainer-ce",
+  "integration": "portainer",
+  "description": "Imports the Docker host from a real Portainer CE server proxying a real Docker Engine API, asserting the daemon identity the seed script read back through the same proxy.",
+  "compose": "compose.yml",
+  "service": "portainer",
+  "port": 9000,
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "portainer api answering",
+      "http": {"path": "/api/status", "status": [200], "body_contains": "InstanceID"},
+      "timeout": 180,
+      "interval": 2
+    }
+  ],
+
+  "seed": "seed.py",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "${seed.api_key}",
+    "mode": "portainer",
+    "import_containers": "none",
+    "import_published_ports": "false"
+  },
+
+  "_kwargs_reason": "Containers and published ports are deliberately not imported. The Docker daemon under test is the host's own daemon, which also runs whatever else happens to be on the machine -- other agents' containers, leftovers from earlier cases -- so any assertion over the container list would depend on what else the host was doing at that moment. The host asset is fully determined by the daemon, so that is what this case asserts.",
+
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "docker:$HOST:host:${seed.daemon_id}",
+        "fields": {
+          "hostnames": "${seed.daemon_name}",
+          "deviceType": "Server",
+          "docker.daemon_id": "${seed.daemon_id}",
+          "docker.daemon_name": "${seed.daemon_name}",
+          "docker.server_version": "${seed.server_version}",
+          "docker.architecture": "${seed.architecture}",
+          "docker.os_type": "${seed.os_type}",
+          "docker.swarm_state": "inactive",
+          "portainer.endpoint_id": "${seed.environment_id}",
+          "portainer.endpoint_name": "${seed.environment_name}",
+          "portainer.endpoint_type": "docker-local",
+          "portainer.endpoint_status": "up",
+          "portainer.endpoint_url": "unix:///var/run/docker.sock",
+          "tags": "docker\tdocker-host"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "log_contains": [
+      "[PORTAINER] collecting 1 Docker environment(s)",
+      "SUCCESS: reported 1 ImportAsset(s) from 1 environment(s)"
+    ]
+  },
+
+  "_fields_absent_reason": "A local environment is reached over a unix socket, so Portainer records no URL host and Docker's /info carries no address for the daemon itself. The integration correlates the host on its daemon id and hostname instead, which is why the asset declares no-mac-break/no-ip-break.",
+
+  "invariants": {"skip": []},
+
+  "check_determinism": true,
+  "startup_timeout": 300,
+  "timeout": 300
+}

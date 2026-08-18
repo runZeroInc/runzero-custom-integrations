@@ -1,0 +1,130 @@
+{
+  "name": "identity-stability",
+  "integration": "ubiquiti-unifi-network",
+  "description": "The regression test for MAC-as-foreign-id. Two client records and three device records that a MAC-keyed import gets wrong, and an id-keyed import gets right.\n\nClients: a phone reporting a per-SSID randomized MAC -- iOS, Android, Windows and macOS all randomize by default, so a MAC-keyed asset goes stale every time one re-randomizes. Its emitted id must contain no MAC at all, so a new MAC next week lands on the same asset. It also pins the normalization hazard: the reported MAC 9e:.. is locally administered, network_interface clears that bit, and the interface therefore carries 9c:.. -- a value another randomizing endpoint can also normalize to, which is exactly why a MAC must not be an identity. The second client returns its MAC upper-cased with dashes, a spelling the controller is free to choose and which fragments an un-normalized MAC id into a second asset for one device; its id must be unaffected.\n\nDevices: a model string the mapper does not recognise must leave deviceType UNSET rather than asserting the literal 'Unknown', which is not a runZero device type and overwrites the platform's own fingerprint with a value that means nothing. fields_absent pins that. The recognised model beside it proves the mapper still fires.\n\nA device record with no id is skipped and logged rather than keyed on its MAC.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "HQ",
+    "page_limit": "100"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {"status": 200, "json": {"data": [{"id": "site-hq-uuid", "name": "HQ"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-hq-uuid/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 100, "count": 2, "totalCount": 2, "data": [
+            {
+              "id": "phone-stable-id",
+              "name": "jans-phone",
+              "macAddress": "9e:11:22:33:44:01",
+              "ipAddress": "10.20.0.31",
+              "type": "WIRELESS",
+              "connectedAt": "2026-03-01T08:00:00Z"
+            },
+            {
+              "id": "laptop-stable-id",
+              "name": "eng-laptop-07",
+              "macAddress": "00-11-22-AB-CD-EF",
+              "ipAddress": "10.20.0.32",
+              "type": "WIRED",
+              "connectedAt": "2026-03-01T10:00:00Z"
+            }
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-hq-uuid/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 100, "count": 3, "totalCount": 3, "data": [
+            {
+              "id": "dev-unrecognised",
+              "name": "uxg-edge-01",
+              "model": "UXG-Lite",
+              "macAddress": "00:11:22:aa:00:01",
+              "ipAddress": "10.20.0.4",
+              "state": "ONLINE"
+            },
+            {
+              "id": "dev-recognised",
+              "name": "sw-idf-02",
+              "model": "USW-Lite-8-PoE",
+              "macAddress": "00:11:22:aa:00:02",
+              "ipAddress": "10.20.0.5",
+              "state": "ONLINE"
+            },
+            {
+              "name": "device-with-no-id",
+              "model": "USW-Flex",
+              "macAddress": "00:11:22:aa:00:03",
+              "ipAddress": "10.20.0.6",
+              "state": "ONLINE"
+            }
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "unifi:site-hq-uuid:client:phone-stable-id",
+      "unifi:site-hq-uuid:client:laptop-stable-id",
+      "unifi:site-hq-uuid:device:dev-unrecognised",
+      "unifi:site-hq-uuid:device:dev-recognised"
+    ],
+    "ids_absent": [
+      "9e:11:22:33:44:01",
+      "00-11-22-AB-CD-EF",
+      "00:11:22:aa:00:03",
+      "unifi:site-hq-uuid:device:"
+    ],
+    "assets": [
+      {
+        "id": "unifi:site-hq-uuid:device:dev-unrecognised",
+        "fields": {
+          "model": "UXG-Lite",
+          "manufacturer": "Ubiquiti",
+          "unifi_site_id": "site-hq-uuid"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "unifi:site-hq-uuid:device:dev-recognised",
+        "fields": {"deviceType": "Switch"}
+      },
+      {
+        "id": "unifi:site-hq-uuid:client:phone-stable-id",
+        "fields": {"hostnames": "jans-phone", "macAddresses": "9c:11:22:33:44:01"}
+      },
+      {
+        "id": "unifi:site-hq-uuid:client:laptop-stable-id",
+        "fields": {
+          "hostnames": "eng-laptop-07",
+          "macAddresses": "00:11:22:ab:cd:ef"
+        }
+      }
+    ],
+    "log_contains": [
+      "unifi: skipped 1 devices with no id (first mac: 00:11:22:aa:00:03)",
+      "unifi: reported 2 client assets",
+      "unifi: reported 2 device assets"
+    ]
+  }
+}

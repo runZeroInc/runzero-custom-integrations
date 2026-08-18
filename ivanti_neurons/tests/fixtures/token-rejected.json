@@ -1,0 +1,40 @@
+{
+  "name": "token-rejected",
+  "integration": "ivanti_neurons",
+  "script": "ivanti_neurons/ivanti_neurons.star",
+  "description": "REGRESSION LOCK on a token call that answers 200 with no access_token -- the shape a rejected client pair produces on an endpoint that reports failure in the body rather than the status line.\n\nget_token returns None for that, and 'Bearer ' + None aborts the script, so main() has to stop before get_assets rather than hand the token on. The run must end quietly after the single token request, with a reason in the log and no device request at all. Note that zero assets and one request are what the ABORT produces too, so those assertions alone would be vacuous; the discriminator is the second log line, which sits after the guard and is therefore only reached when the run ends deliberately rather than dying.\n\nNo assets is the correct outcome here, so the asset invariants have nothing to check.",
+  "kwargs": {
+    "url": "$BASE",
+    "tenant_id": "fixture-tenant",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"error": "invalid_client", "error_description": "Client authentication failed."}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/devices"}
+    ],
+    "log_contains": [
+      "ivanti-neurons: authentication response carried no access_token",
+      "ivanti-neurons: no access token, nothing to import"
+    ]
+  }
+}

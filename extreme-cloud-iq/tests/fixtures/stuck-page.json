@@ -1,0 +1,510 @@
+{
+  "name": "stuck-page",
+  "integration": "extreme-cloud-iq",
+  "description": "An ExtremeCloud IQ that ignores `page` and answers every request with the same full page of a hundred. The walk's own exits are an empty page, a short page, and a handful of error shapes -- none of which this produces -- so before the repeated-page check it spun until the task timed out with nothing in the log to say why.\n\nThis is the scenario the page ceiling used to be responsible for, and it is why the ceiling is no longer the primary guard: at the derived ceiling of 100,000 pages a stuck tenant would have been hammered a hundred thousand times before anything stopped it. The repeated-page check settles it in two device requests instead, and can never truncate genuine data because it only fires on a page that adds nothing.\n\nrequest_count is exact at 3: the login, page one, and the one re-fetch that reveals the repeat. A walk that does not notice issues more; one that stops too early issues fewer.\n\nThe route matching page=3 exists ONLY as a terminator. Serving the stuck page with when_exhausted=repeat_last alone would make a regressed walk run forever and fail this scenario by TIMING OUT rather than by failing an assertion; with the terminator it stops one request later and fails on request_count, requests_absent and the missing log line instead.\n\nThe check runs BEFORE the page is reported, so the repeated rows never reach runZero -- which is what keeps asset_count at 1 and the ids unique. Every page carries a full hundred rows because a shorter page is exactly what ends the walk; the first row is a real device so the scenario still proves rows are parsed and reported, and the other ninety-nine have neither id nor serial_number and are skipped.\n\nnamespaced_ids is skipped for the reason recorded in happy: the emitted id is the bare CloudIQ device id with no tenant scope.\n\nThe stuck page carries XIQ's own total_count, so the truncation line can report retrieved against available rather than a bare count the reader cannot judge. log_contains pins that line verbatim -- limit value, which limit it was, and how much of the estate was actually collected.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-xiq-token",
+            "token_type": "Bearer",
+            "expires_in": 86400
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/devices",
+        "query_contains": "page=3&"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 3,
+            "count": 0,
+            "total_count": 4999,
+            "total_pages": 50,
+            "data": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "count": 100,
+            "total_count": 4999,
+            "total_pages": 50,
+            "data": [
+              {
+                "id": 500000000009999,
+                "hostname": "xiq-ceiling-ap",
+                "device_function": "AP",
+                "product_type": "AP305C",
+                "mac_address": "00:11:22:AA:99:01",
+                "ip_address": "10.60.9.11",
+                "serial_number": "SYNXIQCEIL01",
+                "device_admin_state": "MANAGED",
+                "connected": true
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              },
+              {
+                "hostname": "xiq-stuck-page-no-id",
+                "device_admin_state": "MANAGED"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "500000000009999"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "path": "/devices",
+        "query_contains": "page=1&"
+      },
+      {
+        "path": "/devices",
+        "query_contains": "page=2&"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/devices",
+        "query_contains": "page=3&"
+      }
+    ],
+    "log_contains": [
+      "extreme-cloud-iq: paging stopped after 2 pages: the API returned the same page twice. Retrieved 1/4999 available assets"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

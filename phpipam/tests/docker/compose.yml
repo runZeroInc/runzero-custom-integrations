@@ -1,0 +1,108 @@
+# A real phpIPAM 1.8.1, behind real TLS, on a real MariaDB.
+#
+# ---------------------------------------------------------------------------
+# Why there is a TLS terminator in front of it
+# ---------------------------------------------------------------------------
+# phpipam.star refuses a URL that does not start with https:// before it makes a
+# single request, and the `url` parameter documents why: "Must be HTTPS: phpIPAM
+# refuses every API request that does not arrive over TLS." So a plain-HTTP
+# stack cannot test this integration at all -- it would fail in the argument
+# check and never reach the software.
+#
+# Worth being precise about where the requirement actually lives, because it is
+# not quite where the parameter description says. In this image,
+# api/index.php:108 enforces HTTPS only when the API app's security mode is
+# `ssl_token` or `ssl_code`; an app created with security `none` is served over
+# plain HTTP quite happily. The hard requirement is the *client's*. Either way
+# TLS has to be here, so it is, and the seed creates the app in `none` so the
+# case is not also testing phpIPAM's app-code crypto.
+#
+# The phpipam-www image publishes port 80 only and has no TLS of its own, so
+# Caddy terminates. `caddy reverse-proxy --from https://localhost` mints a
+# certificate from Caddy's own internal CA at startup: no openssl in the
+# stack (nginx:alpine has none), no certificate committed to the repository,
+# and no bind mount -- which matters, because a bind-mounted config file is
+# only visible to the daemon if the host path happens to be shared with it, and
+# no other stack in this suite mounts one.
+#
+# Every tag is pinned. phpIPAM reshaped API responses between 1.5 and 1.7 (the
+# address payload gained `custom_fields` and the device payload moved several
+# keys), which is exactly the drift this test exists to catch.
+services:
+  db:
+    image: mariadb:11.4.4
+    environment:
+      MARIADB_ROOT_PASSWORD: ipamroot
+      MARIADB_DATABASE: phpipam
+      MARIADB_USER: phpipam
+      MARIADB_PASSWORD: phpipampw
+    # phpipam-www creates its whole schema on first boot and will fail outright
+    # against a server that is listening but has not finished initialising
+    # InnoDB, so the dependency below waits for this rather than for the port.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  phpipam-www:
+    image: phpipam/phpipam-www:v1.8.1
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: Etc/UTC
+      IPAM_DATABASE_HOST: db
+      IPAM_DATABASE_NAME: phpipam
+      IPAM_DATABASE_USER: phpipam
+      IPAM_DATABASE_PASS: phpipampw
+      # The grant phpIPAM writes for its own user. The web container's address
+      # comes from Docker's pool and is not knowable here, so the grant is
+      # wildcarded; the database is only reachable on the compose network.
+      IPAM_DATABASE_WEBHOST: "%"
+      # Without this the API is unreachable, whichever security mode the app
+      # uses -- which is the trap this stack exists to have already sprung.
+      # api/index.php offers exactly two ways in: an app with `ssl_token` or
+      # `ssl_code` security, which requires Tools::isHttps(); or an app with
+      # `none`, which additionally requires api_allow_unsafe===true in
+      # config.php. Everything else answers `503 SSL connection is required for
+      # API`, including a request that genuinely arrived over TLS.
+      #
+      # It does, because TLS is terminated in the `tls` service and Apache sees
+      # plain HTTP, so $_SERVER['HTTPS'] is unset. Common::isHttps() consults
+      # X-Forwarded-Proto only when trust_x_forwarded_headers is on, and it is
+      # off by default. Turning it on is what makes the seeded `ssl_token` app
+      # work, and it is also what a real deployment behind a terminating proxy
+      # has to do -- so this configures the realistic arrangement rather than
+      # reaching for api_allow_unsafe.
+      IPAM_TRUST_X_FORWARDED: "true"
+
+  # phpIPAM's scheduled worker. It is not needed to serve the API and this case
+  # does not depend on anything it does, but it is half of a real deployment and
+  # a schema change that breaks it is worth seeing here: the container exits
+  # rather than looping if it cannot reach the database, which shows up in the
+  # compose logs printed on failure.
+  phpipam-cron:
+    image: phpipam/phpipam-cron:v1.8.1
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: Etc/UTC
+      IPAM_DATABASE_HOST: db
+      IPAM_DATABASE_NAME: phpipam
+      IPAM_DATABASE_USER: phpipam
+      IPAM_DATABASE_PASS: phpipampw
+      SCAN_INTERVAL: 1h
+
+  tls:
+    image: caddy:2.8.4-alpine
+    depends_on: [phpipam-www]
+    # `--from https://localhost` is what selects Caddy's internal CA: for the
+    # localhost name it issues a certificate locally instead of trying to reach
+    # an ACME server, which would fail and hang the stack. The certificate is
+    # not trusted by anything, so the integration runs with
+    # tls_disable_validation=true; see manifest.json.
+    command: ["caddy", "reverse-proxy", "--from", "https://localhost", "--to", "phpipam-www:80"]
+    ports:
+      - "${RZ_HOST_PORT}:443"

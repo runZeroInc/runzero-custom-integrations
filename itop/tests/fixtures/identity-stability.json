@@ -1,0 +1,106 @@
+{
+  "name": "identity-stability",
+  "integration": "itop",
+  "description": "The same iTop object after a rename, an organization move, a location move, a model change, and a new management address. Its foreign id must be unchanged, because it is built from the object key alone and never from anything an operator edits. This is the regression test for an id that embedded a mutable field.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "include_interfaces": "false",
+    "classes": "Server"
+  },
+  "routes": [
+    {
+      "name": "servers",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22Server%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::11": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 11,
+                "fields": {
+                  "id": "11",
+                  "name": "srv-db-01-renamed.example.com",
+                  "description": "Moved and renamed",
+                  "organization_name": "Demo B",
+                  "business_criticity": "medium",
+                  "move2production": "2024-03-11",
+                  "serialnumber": "SN-11-ABC",
+                  "location_name": "Lyon DC",
+                  "status": "production",
+                  "brand_name": "Dell",
+                  "model_name": "PowerEdge R760",
+                  "asset_number": "AST-9999",
+                  "purchase_date": "",
+                  "end_of_warranty": "",
+                  "managementip": "203.0.113.11",
+                  "rack_name": "R02",
+                  "enclosure_name": "",
+                  "nb_u": "2",
+                  "osfamily_name": "Linux",
+                  "osversion_name": "RHEL 10",
+                  "oslicence_name": "",
+                  "cpu": "2 x Xeon Gold 6438",
+                  "ram": "512"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 1"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "itop:$HOST:Server:11"
+    ],
+    "assets": [
+      {
+        "id": "itop:$HOST:Server:11",
+        "fields": {
+          "hostnames": "srv-db-01-renamed.example.com",
+          "ipAddresses": "203.0.113.11",
+          "itop_organization": "Demo B",
+          "itop_serialnumber": "SN-11-ABC",
+          "model": "PowerEdge R760"
+        }
+      }
+    ],
+    "log_contains": [
+      "itop: reported 1 assets from Server"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

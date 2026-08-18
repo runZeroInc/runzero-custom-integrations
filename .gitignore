@@ -2,3 +2,17 @@
 test/*
 local/*
 .DS_Store
+
+# Credentials for the live endpoint tests. .env.example is the committed
+# template; .env holds real vendor secrets and must never be committed.
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc
+
+# Working plan document for the open-source integration programme. Scratch
+# material for getting the work moving, not a repo deliverable.
+OPEN-NEXT.md
+tests/.last-failures.json

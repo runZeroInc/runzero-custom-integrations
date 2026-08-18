@@ -1,0 +1,125 @@
+{
+  "name": "vulnerabilities",
+  "integration": "kenna",
+  "description": "Findings are joined onto the asset page with a batched asset[id][] filter rather than by walking the whole vulnerability table, so the second request must carry the percent-encoded array key with the page's asset id in it. The findings deliberately include a lower-case cve_id, which must be upper-cased, and a scanner identifier that is not a CVE at all, which must be dropped: Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ BEFORE the type normalizes case, and a value that fails it takes the entire ImportAsset record with it. asset_count=1 is therefore the assertion that every finding validated - a single bad CVE would produce zero assets.\n\ncheck_determinism is off because the Kenna asset id is scoped by the API host AND port and the fixture server binds a fresh random port on each run.",
+  "check_determinism": false,
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-risk-token",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "assets-search",
+      "match": {"method": "GET", "path": "/assets/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"page": 1, "pages": 1, "total_count": 1},
+            "assets": [
+              {
+                "id": 2001,
+                "primary_locator": "ip_address",
+                "locator": "10.91.0.1",
+                "ip_address": "10.91.0.1",
+                "hostname": "vuln-host-01",
+                "operating_system": "Red Hat Enterprise Linux",
+                "os_version": "9.4",
+                "status": "active",
+                "risk_meter_score": 900,
+                "created_at": "2024-01-15T00:00:00Z",
+                "last_seen_time": "2026-08-11T03:00:00Z",
+                "network_ports": [
+                  {"port_number": 22, "protocol": "tcp", "state": "open", "name": "SSH", "product": "OpenSSH", "version": "9.6"},
+                  {"port_number": 443, "protocol": "tcp", "state": "open", "name": "HTTPS"},
+                  {"port_number": 0, "protocol": "tcp", "state": "open"},
+                  {"port_number": 161, "protocol": "icmp", "state": "open"}
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vulnerabilities-search",
+      "match": {"method": "GET", "path": "/vulnerabilities/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"page": 1, "pages": 1, "total_count": 5},
+            "vulnerabilities": [
+              {
+                "id": 5001,
+                "asset_id": 2001,
+                "cve_id": "CVE-2024-12345",
+                "cve_description": "A synthetic remote code execution flaw used only by this fixture.",
+                "solution": "Apply the vendor update.",
+                "severity": 10,
+                "cvss_v3": {"score": 9.8, "temporal_score": 9.1},
+                "cvss_v2": {"score": 10.0},
+                "risk_meter_score": 95,
+                "status": "open",
+                "easily_exploitable": true,
+                "malware_exploitable": false,
+                "scanner_vulnerabilities": [{"port": 22, "name": "synthetic-plugin"}],
+                "cve_published_at": "2024-06-01T00:00:00Z",
+                "first_found_on": "2026-01-05T00:00:00Z",
+                "last_seen_time": "2026-08-01T00:00:00Z",
+                "connectors": [{"name": "Fixture Nessus", "vendor": "Tenable", "connector_definition_name": "Nessus"}]
+              },
+              {
+                "id": 5002,
+                "asset_id": 2001,
+                "cve_id": "cve-2026-4321",
+                "description": "Lower-case identifier, which must be upper-cased rather than rejected.",
+                "severity": 7,
+                "risk_meter_score": 50,
+                "status": "open",
+                "port": [443]
+              },
+              {
+                "id": 5003,
+                "asset_id": 2001,
+                "cve_id": "QID-38657",
+                "identifiers": ["QID-38657"],
+                "description": "A scanner identifier that is not a CVE and must not reach Vulnerability.cve.",
+                "severity": 4,
+                "risk_meter_score": 20,
+                "status": "open",
+                "port": [443, 5003]
+              },
+              {
+                "id": null,
+                "asset_id": 2001,
+                "cve_id": "CVE-2024-00001"
+              },
+              {
+                "id": 5005,
+                "asset_id": 9999,
+                "cve_id": "CVE-2024-55555",
+                "severity": 5
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "min_services_total": 2,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/assets/search"},
+      {"method": "GET", "path": "/vulnerabilities/search", "query_contains": "asset%5Bid%5D%5B%5D=2001"},
+      {"method": "GET", "path": "/vulnerabilities/search", "query_contains": "page=1"}
+    ],
+    "log_contains": ["kenna: indexed 5 vulnerabilities across 2 assets"]
+  },
+  "invariants": {"skip": []}
+}

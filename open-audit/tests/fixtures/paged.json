@@ -1,0 +1,72 @@
+{
+  "name": "paged",
+  "integration": "open-audit",
+  "description": "limit/offset paging over the devices collection. Open-AudIT publishes no cursor and its meta.total is a count of the filtered set rather than a page pointer, so the walk advances the offset itself and stops on the first short page. Asserts that the second request carries offset=2 -- the page size the first request asked for -- that the sort is pinned to devices.id so a row cannot appear on two pages while another is skipped, and that no third request is made once a page comes back shorter than the limit. Detail collection is off so the only requests are the login and the two collection pages.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_interfaces": "false",
+    "collect_software": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-paged-session; Path=/"}, "json": {"id": "3", "name": "runzero"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 2, "offset": 0, "total": 3, "filtered": 3},
+            "included": [],
+            "logs": [],
+            "data": [
+              {"id": 101, "type": "devices", "attributes": {"id": 101, "name": "page1-a", "ip": "192.0.2.101", "type": "computer", "class": "server", "os_name": "Debian GNU/Linux 12", "last_seen": "2026-08-14 10:00:00"}},
+              {"id": 102, "type": "devices", "attributes": {"id": 102, "name": "page1-b", "ip": "192.0.2.102", "type": "computer", "class": "desktop", "os_name": "Microsoft Windows 11 Pro", "last_seen": "2026-08-14 10:05:00"}}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 2, "offset": 2, "total": 3, "filtered": 3},
+            "included": [],
+            "logs": [],
+            "data": [
+              {"id": 103, "type": "devices", "attributes": {"id": 103, "name": "page2-a", "ip": "192.0.2.103", "type": "printer", "last_seen": "2026-08-14 10:10:00"}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "request_count": 3,
+    "ids": ["open-audit:$HOST:101", "open-audit:$HOST:102", "open-audit:$HOST:103"],
+    "requests_include": [
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "offset=2"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "sort=devices.id"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "limit=2"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=4"},
+      {"path_contains": "/open-audit/index.php/devices/"}
+    ],
+    "log_contains": ["open-audit: imported 3 devices, 0 with detail"]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

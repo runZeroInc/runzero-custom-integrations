@@ -1,0 +1,88 @@
+{
+  "name": "empty",
+  "integration": "adguard-home",
+  "description": "An AdGuard Home instance with its DHCP server switched off and no client ever observed. Proves the run reports the appliance and finishes cleanly rather than failing, and that a DhcpStatus with enabled=false and empty lease arrays is a normal outcome. no_mac_in_id is skipped for consistency with the other adguard-home scenarios, which key clients on the MAC from the DHCP server; no client asset is emitted here.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "status",
+      "match": {"method": "GET", "path": "/control/status"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v0.107.52",
+            "language": "en",
+            "dns_addresses": ["192.0.2.10"],
+            "dns_port": 53,
+            "http_port": 3000,
+            "protection_enabled": true,
+            "protection_disabled_duration": 0,
+            "dhcp_available": false,
+            "running": true
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-status",
+      "match": {"method": "GET", "path": "/control/dhcp/status"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "enabled": false,
+            "interface_name": "",
+            "v4": {"gateway_ip": "", "subnet_mask": "", "range_start": "", "range_end": "", "lease_duration": 86400},
+            "v6": {"range_start": "", "lease_duration": 86400},
+            "leases": [],
+            "static_leases": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path": "/control/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "clients": [],
+            "auto_clients": [],
+            "supported_tags": ["device_laptop", "device_phone"]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["adguard-home:$HOST:appliance"],
+    "assets": [
+      {
+        "id": "adguard-home:$HOST:appliance",
+        "fields": {
+          "ipAddresses": "192.0.2.10",
+          "adguard_dhcp_enabled": "false"
+        }
+      }
+    ],
+    "log_contains": [
+      "DHCP leases read: 0 dynamic, 0 static",
+      "reported 1 appliance and 0 clients"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

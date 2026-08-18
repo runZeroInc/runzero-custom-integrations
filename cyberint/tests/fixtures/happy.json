@@ -1,0 +1,119 @@
+{
+  "name": "happy",
+  "integration": "cyberint",
+  "description": "Cyberint publishes alerts, not devices, so the import pivots each alert onto the domains it names in related_assets and emits one asset per domain carrying those alerts as findings. Proves the cookie-authenticated POST is made, that severity is mapped to a rank, that an alert with no id is skipped, that a related asset that is not a domain is ignored, and that two alerts naming the same domain land on one asset.\n\n`namespaced_ids` is skipped because this integration violates it: the id is the domain with dots replaced by dashes and no tenant scope at all, so two Cyberint tenants that both watch example.com collide onto one asset. Reported as a defect with this batch.\n\nEach domain's FIRST alert used to be attached twice -- build() seeded the list with `related_assets[domain] = [vuln]` and then appended the same vuln unconditionally, so shop.example.com came out with alert-0001, alert-0001, alert-0002 and portal.example.com with alert-0002 twice. That is fixed; the exact count is pinned by the duplicate-vulns scenario, which can bound it from above via the 99-child cap.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-cyberint-cookie"
+  },
+  "routes": [
+    {
+      "name": "alerts",
+      "match": {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "alerts": [
+              {
+                "id": "alert-0001",
+                "severity": "critical",
+                "title": "Exposed administrative interface",
+                "description": "An administrative interface is reachable from the public internet.",
+                "recommendation": "Restrict the interface to an allowlisted network.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "shop.example.com"
+                  },
+                  {
+                    "type": "ip",
+                    "name": "203.0.113.5"
+                  }
+                ]
+              },
+              {
+                "id": "alert-0002",
+                "severity": "medium",
+                "title": "Expiring TLS certificate",
+                "description": "The certificate expires within 14 days.",
+                "recommendation": "Renew the certificate.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "shop.example.com"
+                  },
+                  {
+                    "type": "domain",
+                    "name": "portal.example.com"
+                  }
+                ]
+              },
+              {
+                "id": "",
+                "severity": "high",
+                "title": "Alert with no id",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "ghost.example.com"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "shop-example-com",
+      "portal-example-com"
+    ],
+    "ids_absent": [
+      "ghost-example-com"
+    ],
+    "assets": [
+      {
+        "id": "shop-example-com",
+        "fields": {
+          "hostnames": "shop.example.com"
+        }
+      },
+      {
+        "id": "portal-example-com",
+        "fields": {
+          "hostnames": "portal.example.com"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "request_count": 1,
+    "log_contains": [
+      "cyberint: skipped 1 alerts with no id"
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts"
+      },
+      {
+        "header": {
+          "Cookie": "access_token=fixture-cyberint-cookie"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

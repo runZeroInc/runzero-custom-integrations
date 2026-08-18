@@ -1,0 +1,70 @@
+{
+  "name": "malformed-guest-list",
+  "integration": "proxmox",
+  "description": "The four bootstrap calls succeed and the node is discovered, then the QEMU guest list answers 502 with the HTML error page a front-end proxy serves. The guest-list, guest-config, guest-agent and LXC bodies go through _json_object like the bootstrap calls do, so the HTML is refused rather than fed to json_decode -- which aborts the whole script, and because proxmox accumulates assets in a list and calls report_assets once at the very end, would discard the node asset already built and let the run import nothing. The node survives, the guest list is treated as empty, and the LXC call that follows still happens. Also asserts the custom attributes are namespaced (proxmox_cluster, not cluster) and that a field Proxmox left unset is absent rather than stored as the literal string 'None'. Skips namespaced_ids: the cluster name scopes the id but is joined with '-' rather than ':'.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "svc@pve!runzero",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api2/json/version"},
+      "responses": [{"status": 200, "json": {"data": {"release": "8.2"}}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/cluster/status"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"type": "cluster", "name": "lab-cluster", "quorate": 1}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/cluster/config/nodes"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"node": "pve1", "nodeid": 1, "ring0_addr": "10.30.0.11"}
+      ]}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/cluster/resources"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"type": "node", "node": "pve1", "status": "online", "maxcpu": 32}
+      ]}}]
+    },
+    {
+      "name": "qemu-list-behind-a-broken-proxy",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/qemu"},
+      "responses": [{
+        "status": 502,
+        "headers": {"Content-Type": "text/html"},
+        "text": "<html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1></body></html>"
+      }]
+    },
+    {
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/lxc"},
+      "responses": [{"status": 200, "json": {"data": []}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["lab-cluster-node-pve1"],
+    "assets": [
+      {
+        "id": "lab-cluster-node-pve1",
+        "fields": {
+          "proxmox_cluster": "lab-cluster",
+          "proxmox_status": "online",
+          "proxmox_cpu_total": "32"
+        },
+        "fields_absent": ["cluster", "status", "proxmox_uptime", "proxmox_mem_total"]
+      }
+    ],
+    "min_requests": 6,
+    "requests_include": [
+      {"method": "GET", "path": "/api2/json/nodes/pve1/qemu"},
+      {"method": "GET", "path": "/api2/json/nodes/pve1/lxc"}
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

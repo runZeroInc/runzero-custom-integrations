@@ -1,0 +1,182 @@
+{
+  "name": "happy",
+  "integration": "halcyon",
+  "description": "Proves the new url parameter reaches every one of Halcyon's three endpoints -- the login, the asset search, and the per-asset detail call -- and that a row parses. Covers the detail enrichment merge (addresses and dates come from the detail call, name and OS from the search row), the {\"ipAddressType\",\"value\"} address shape including an IPv6 entry, and graceful degradation when a detail call 404s: that asset must still be imported, carrying its hostname but no interface.\n\nThe two assets also bracket the device-type hint. Neither the search row nor the detail record names a chassis, so operatingSystem is the only statement of role: asset a reports 'Windows Server 2022' and must come out typed Server, while asset b runs Ubuntu, which is a workstation as often as a server, and must carry NO deviceType.\n\nnamespaced_ids is skipped: the id is the bare Halcyon asset uuid with no tenant scope. Halcyon has no tenant identifier in the API surface the script uses, so there is nothing available to scope it with. The id-less search row is skipped, and the skip is now logged with the record's name; it used to be dropped in silence, so a page that returned nothing but such rows reported an empty tenant.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/identity/auth/login",
+        "body_contains": "svc-runzero@example.com"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "accessToken": "fixture-access-token"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-search",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "7f0e0001-0000-4000-8000-000000000001",
+                "name": "syn-halcyon-a.example.com",
+                "operatingSystem": "Windows Server 2022",
+                "agentVersion": "1.9.3",
+                "heartbeat": "Healthy",
+                "policyGroup": {
+                  "owner": "syn-soc-team"
+                },
+                "registeredDate": "2026-01-02T03:04:05Z"
+              },
+              {
+                "id": "7f0e0002-0000-4000-8000-000000000002",
+                "name": "syn-halcyon-b.example.com",
+                "operatingSystem": "Ubuntu 22.04",
+                "agentVersion": "1.9.3",
+                "registeredDate": "2026-01-03T03:04:05Z"
+              },
+              {
+                "id": null,
+                "name": "syn-halcyon-no-id.example.com",
+                "operatingSystem": "Windows 11"
+              }
+            ],
+            "pagination": {
+              "currentPage": 1,
+              "totalPages": 1
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "detail-a",
+      "match": {
+        "method": "GET",
+        "path": "/v2/assets/7f0e0001-0000-4000-8000-000000000001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "7f0e0001-0000-4000-8000-000000000001",
+            "name": "syn-halcyon-a.example.com",
+            "ipAddresses": [
+              {
+                "ipAddressType": "IPv4",
+                "value": "192.0.2.40"
+              },
+              {
+                "ipAddressType": "IPv6",
+                "value": "2001:db8::40"
+              }
+            ],
+            "macAddresses": [
+              "00:11:22:33:55:01"
+            ],
+            "createdDate": "2026-01-02T03:04:05Z",
+            "lastHeartbeatDate": "2026-01-04T05:06:07Z",
+            "lastUpdatedDate": "2026-01-04T05:06:07Z",
+            "policyGroup": {
+              "owner": "syn-soc-team"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-b-missing",
+      "match": {
+        "method": "GET",
+        "path": "/v2/assets/7f0e0002-0000-4000-8000-000000000002"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "error": "asset not found"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "7f0e0001-0000-4000-8000-000000000001",
+      "7f0e0002-0000-4000-8000-000000000002"
+    ],
+    "min_requests": 4,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/identity/auth/login"
+      },
+      {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "header_contains": "fixture-access-token"
+      },
+      {
+        "method": "GET",
+        "path": "/v2/assets/7f0e0001-0000-4000-8000-000000000001"
+      }
+    ],
+    "assets": [
+      {
+        "id": "7f0e0001-0000-4000-8000-000000000001",
+        "fields": {
+          "hostnames": "syn-halcyon-a.example.com",
+          "os": "Windows Server 2022",
+          "deviceType": "Server",
+          "macAddresses": "00:11:22:33:55:01",
+          "agentVersion": "1.9.3",
+          "policyGroupOwner": "syn-soc-team",
+          "lastHeartbeatDate": "2026-01-04T05:06:07Z"
+        }
+      },
+      {
+        "id": "7f0e0002-0000-4000-8000-000000000002",
+        "fields": {
+          "hostnames": "syn-halcyon-b.example.com",
+          "os": "Ubuntu 22.04"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses",
+          "deviceType"
+        ]
+      }
+    ],
+    "log_contains": [
+      "halcyon: skipping asset with no id: name=syn-halcyon-no-id.example.com"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

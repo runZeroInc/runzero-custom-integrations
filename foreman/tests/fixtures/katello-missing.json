@@ -1,0 +1,107 @@
+{
+  "name": "katello-missing",
+  "integration": "foreman",
+  "description": "The Katello package endpoint is an add-on: Red Hat Satellite and orcharhino serve it and a plain Foreman answers 404. Proves that a 404 on the FIRST host that asks is not treated as an error but switches package import off for the rest of the run, so the third host is never asked for packages at all, while the per-host interface fetch keeps running and every host is still imported. Host 41 is served real packages first, proving the NVRA split into version, release, and architecture still happens on the hosts that do have an inventory.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-token",
+    "include_facts": "false",
+    "include_interfaces": "true",
+    "include_packages": "true",
+    "detail_limit": "0"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v2/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "per_page": 100,
+            "results": [
+              {"id": 41, "name": "sat-41.corp.example.net", "ip": "10.230.0.41", "mac": "00:1a:2b:00:bb:41", "domain_name": "corp.example.net", "operatingsystem_name": "RedHat 9.4", "managed": true, "created_at": "2025-02-01T10:00:00.000Z", "last_report": "2026-08-14T06:00:00.000Z", "content_facet_attributes": {"content_view": {"name": "RHEL9 CV"}, "lifecycle_environment": {"name": "Production"}, "applicable_package_count": 3, "upgradable_package_count": 1, "errata_counts": {"security": 2, "bugfix": 1, "total": 3}}},
+              {"id": 42, "name": "sat-42.corp.example.net", "ip": "10.230.0.42", "mac": "00:1a:2b:00:bb:42", "domain_name": "corp.example.net", "operatingsystem_name": "RedHat 9.4", "managed": true, "created_at": "2025-02-02T10:00:00.000Z", "last_report": "2026-08-14T06:01:00.000Z"},
+              {"id": 43, "name": "sat-43.corp.example.net", "ip": "10.230.0.43", "mac": "00:1a:2b:00:bb:43", "domain_name": "corp.example.net", "operatingsystem_name": "RedHat 9.4", "managed": true, "created_at": "2025-02-03T10:00:00.000Z", "last_report": "2026-08-14T06:02:00.000Z"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "packages-41",
+      "match": {"method": "GET", "path": "/api/v2/hosts/41/packages"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "per_page": 100,
+            "results": [
+              {"id": 1, "name": "bash", "nvra": "bash-5.1.8-9.el9.x86_64", "nvrea": "bash-0:5.1.8-9.el9.x86_64", "rpm_id": "rpm-0001"},
+              {"id": 2, "name": "openssl", "nvra": "openssl-3.0.7-27.el9.x86_64", "nvrea": "openssl-1:3.0.7-27.el9.x86_64", "rpm_id": "rpm-0002", "upgradable_versions": ["3.0.7-28.el9"]},
+              {"id": 3, "name": "", "nvra": "-1.0.x86_64"},
+              {"id": 4, "name": "bash", "nvra": "bash-5.1.8-9.el9.x86_64", "nvrea": "bash-0:5.1.8-9.el9.x86_64"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "packages-42-not-installed",
+      "match": {"method": "GET", "path": "/api/v2/hosts/42/packages"},
+      "responses": [
+        {"status": 404, "json": {"error": {"message": "Route not found"}}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "packages-43-must-not-be-asked",
+      "match": {"method": "GET", "path": "/api/v2/hosts/43/packages"},
+      "responses": [
+        {"status": 500, "text": "package import should already be switched off"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-detail",
+      "match": {"method": "GET", "path_regex": "/api/v2/hosts/4[123]$"},
+      "responses": [
+        {"status": 200, "json": {"interfaces": [{"identifier": "eth0", "mac": "00:1a:2b:00:bb:41", "ip": "10.230.0.41", "type": "Nic::Managed"}]}},
+        {"status": 200, "json": {"interfaces": [{"identifier": "eth0", "mac": "00:1a:2b:00:bb:42", "ip": "10.230.0.42", "type": "Nic::Managed"}]}},
+        {"status": 200, "json": {"interfaces": [{"identifier": "eth0", "mac": "00:1a:2b:00:bb:43", "ip": "10.230.0.43", "type": "Nic::Managed"}]}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "foreman:127.0.0.1:41",
+      "foreman:127.0.0.1:42",
+      "foreman:127.0.0.1:43"
+    ],
+    "request_count": 6,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/hosts/41/packages", "query_contains": "per_page=100"},
+      {"method": "GET", "path": "/api/v2/hosts/42/packages"},
+      {"method": "GET", "path": "/api/v2/hosts/43"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2/hosts/43/packages"},
+      {"path": "/api/v2/fact_values"}
+    ],
+    "min_software_total": 2,
+    "log_contains": [
+      "foreman: this server has no Katello package inventory, skipping packages: status 404",
+      "foreman: reported 3 assets so far"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

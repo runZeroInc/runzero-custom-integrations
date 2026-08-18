@@ -1,0 +1,77 @@
+{
+  "name": "paged",
+  "integration": "netdisco",
+  "description": "A three-page device walk at page_size=2, with node collection off. Netdisco's device search returns a bare JSON array with no total and no next link, so the only paging contract is limit/offset and the only stop condition is a page shorter than the one requested. Asserts that each successive call carries the offset the previous page implies (0, then 2, then 4), that the requested limit is echoed on every call, and that NO fourth call is made after the short third page. It also asserts the requested field list reaches the server and that snmp_comm is never among the fields asked for, because fields=all would return the SNMP community string in cleartext.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "page_size": "2",
+    "collect_nodes": "false",
+    "collect_device_ips": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/login"},
+      "responses": [{"status": 200, "json": {"api_key": "0123456789abcdef0123456789abcdef"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/v1/search/device"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"ip": "198.51.100.21", "dns": "sw-a01.example.com", "name": "sw-a01", "model": "EX3400-48P", "os": "junos", "os_ver": "20.4R3", "vendor": "juniper", "serial": "JN000001AA", "layers": "00000110", "mac": "3c:61:04:00:00:01", "creation": "2024-05-01 08:00:00", "last_discover": "2026-08-15 02:00:00", "module_serials": ["JN000001AA"]},
+            {"ip": "198.51.100.22", "dns": "sw-a02.example.com", "name": "sw-a02", "model": "EX3400-48P", "os": "junos", "os_ver": "20.4R3", "vendor": "juniper", "serial": "JN000002AA", "layers": "00000110", "mac": "3c:61:04:00:00:02", "creation": "2024-05-01 08:00:00", "last_discover": "2026-08-15 02:00:00", "module_serials": ["JN000002AA"]}
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {"ip": "198.51.100.23", "dns": "sw-a03.example.com", "name": "sw-a03", "model": "EX3400-48P", "os": "junos", "os_ver": "20.4R3", "vendor": "juniper", "serial": "JN000003AA", "layers": "00000110", "mac": "3c:61:04:00:00:03", "creation": "2024-05-01 08:00:00", "last_discover": "2026-08-15 02:00:00", "module_serials": ["JN000003AA"]},
+            {"ip": "198.51.100.24", "dns": "sw-a04.example.com", "name": "sw-a04", "model": "EX3400-48P", "os": "junos", "os_ver": "20.4R3", "vendor": "juniper", "serial": "JN000004AA", "layers": "00000110", "mac": "3c:61:04:00:00:04", "creation": "2024-05-01 08:00:00", "last_discover": "2026-08-15 02:00:00", "module_serials": ["JN000004AA"]}
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {"ip": "198.51.100.25", "dns": "sw-a05.example.com", "name": "sw-a05", "model": "EX3400-48P", "os": "junos", "os_ver": "20.4R3", "vendor": "juniper", "serial": "JN000005AA", "layers": "00000110", "mac": "3c:61:04:00:00:05", "creation": "2024-05-01 08:00:00", "last_discover": "2026-08-15 02:00:00", "module_serials": ["JN000005AA"]}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": "no fixture route"}},
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "netdisco:$HOST:device:198.51.100.21",
+      "netdisco:$HOST:device:198.51.100.23",
+      "netdisco:$HOST:device:198.51.100.25"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/login"},
+      {"method": "GET", "query_contains": "offset=0"},
+      {"method": "GET", "query_contains": "offset=2"},
+      {"method": "GET", "query_contains": "offset=4"},
+      {"method": "GET", "query_contains": "limit=2"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=6"},
+      {"query_contains": "snmp_comm"},
+      {"query_contains": "fields=all"},
+      {"path_contains": "/nodes"},
+      {"path_contains": "/device_ips"}
+    ],
+    "log_contains": ["reported 5 devices"]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,68 @@
+{
+  "name": "happy",
+  "description": "Proves the url parameter reaches the API and that assets parse. The third row is the regression test for the drop that used to be here: `syn-no-mac` reports Stairwell's `-` MAC placeholder and a perfectly good address, and it must arrive as an asset carrying that address and no MAC. It was previously skipped outright -- the `continue` sat in the ASSET loop rather than an interface loop -- so an environment of hosts with no reported MAC imported as nothing at all. namespaced_ids is still skipped: the id is the bare Stairwell asset number with no tenant scope (reported defect, see README).",
+  "kwargs": {
+    "url": "$BASE",
+    "environment_id": "env-1",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/environments/env-1/assets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "assets": [
+              {
+                "name": "environments/env-1/assets/1001",
+                "label": "syn-host-a",
+                "ipAddress": "10.70.0.10",
+                "macAddress": "00:11:22:33:44:aa",
+                "os": "Ubuntu",
+                "osVersion": "22.04",
+                "state": "ACTIVE"
+              },
+              {
+                "name": "environments/env-1/assets/1002",
+                "label": "syn-host-b",
+                "ipAddress": "10.70.0.11",
+                "macAddress": "00:11:22:33:44:bb",
+                "os": "macOS",
+                "osVersion": "14.2",
+                "state": "ACTIVE"
+              },
+              {
+                "name": "environments/env-1/assets/1003",
+                "label": "syn-no-mac",
+                "ipAddress": "10.70.0.12",
+                "macAddress": "-",
+                "os": "Linux"
+              }
+            ],
+            "nextPageToken": ""
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["1001", "1002", "1003"],
+    "requests_include": [{"header_contains": "fixture-token"}],
+    "assets": [
+      {
+        "id": "1001",
+        "fields": {"ipAddresses": "10.70.0.10", "os": "Ubuntu 22.04"}
+      },
+      {
+        "id": "1003",
+        "fields": {"ipAddresses": "10.70.0.12", "hostnames": "syn-no-mac", "os": "Linux"},
+        "fields_absent": ["macAddresses"]
+      }
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

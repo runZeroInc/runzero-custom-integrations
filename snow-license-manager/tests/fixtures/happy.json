@@ -1,0 +1,171 @@
+{
+  "name": "happy",
+  "integration": "snow-license-manager",
+  "script": "snow-license-manager/snow-license-manager.star",
+  "description": "One page of the computers collection plus the per-computer applications call each row triggers. Each computer's application row becomes a Software record, and `requests_absent` pins the tier that must NOT exist: GET /api/customers/{cid}/applications/{app_id}. A dead get_app_details() used to wrap that endpoint with its call site commented out; it could not have run as written (one argument passed to five parameters, in a function holding no credentials), and enabling it would have cost one request per COMPUTER-APPLICATION PAIR, not per computer. It was removed, and this assertion is what keeps it removed -- the licensing data it would have fetched is available from the whole-catalog endpoint in a single request instead. Proves the SLM envelope is unwrapped correctly -- the collection is `Body`, each row's fields are nested one level further under its own `Body`, and paging is driven by `Meta`, whose PageSize entry is absent on the last page and is the only thing that ends the walk.\n\nThe device-type mapping is what this file mainly pins. Snow does not publish a form-factor enum; it records the chassis as flags on the computer, and only the true cases say anything. IsPortable makes a Laptop and IsServer makes a Server, but a row with both false must carry NO deviceType -- it could be a desktop, a thin client, or the virtual machine that IsVirtual row actually is, and Snow has not said which. The virtual row is here precisely because assuming 'not portable, not a server' means desktop would type it wrongly.\n\nCAVEAT worth knowing when reading this: the SLM Web API is hypermedia and self-describing, and Flexera publishes no resource schema for it, so these field names cannot be checked against a vendor reference. They are the ones the integration already read before this scenario existed. The mapping is written so that this cannot do harm -- a flag Snow does not return reads as false and produces no device type, rather than a wrong one.\n\nnamespaced_ids is skipped: the asset id is the bare SLM computer Id with no customer scope, so two Snow customers imported into one runZero account would collide. Pre-existing, not introduced here.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixture-customer",
+    "username": "svc-runzero",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 4}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 9001,
+                  "Name": "syn-snow-laptop",
+                  "Manufacturer": "Dell Inc.",
+                  "Model": "Latitude 7440",
+                  "OperatingSystem": "Windows 11 Enterprise",
+                  "OperatingSystemServicePack": "23H2",
+                  "BiosSerialNumber": "SNOWSER9001",
+                  "IsPortable": true,
+                  "IsServer": false,
+                  "IsVirtual": false,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:90:01", "IpAddress": "10.70.1.11"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": {
+                  "Id": 9002,
+                  "Name": "syn-snow-server",
+                  "Manufacturer": "Dell Inc.",
+                  "Model": "PowerEdge R650",
+                  "OperatingSystem": "Windows Server 2022",
+                  "BiosSerialNumber": "SNOWSER9002",
+                  "IsPortable": false,
+                  "IsServer": true,
+                  "IsVirtual": false,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:90:02", "IpAddress": "10.70.1.12"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": {
+                  "Id": 9003,
+                  "Name": "syn-snow-virtual",
+                  "Manufacturer": "VMware, Inc.",
+                  "Model": "VMware Virtual Platform",
+                  "OperatingSystem": "Windows 10 Enterprise",
+                  "BiosSerialNumber": "SNOWSER9003",
+                  "IsPortable": false,
+                  "IsServer": false,
+                  "IsVirtual": true,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:90:03", "IpAddress": "10.70.1.13"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": {
+                  "Name": "syn-snow-no-id",
+                  "OperatingSystem": "Windows 10 Enterprise",
+                  "IsPortable": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications",
+      "match": {"method": "GET", "path_regex": "/api/customers/fixture-customer/computers/[0-9]+/applications$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 1}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 77001,
+                  "Name": "Acme CAD 2026",
+                  "ManufacturerId": 4100,
+                  "ManufacturerName": "Acme Software",
+                  "FamilyId": 8800,
+                  "FamilyName": "Acme CAD",
+                  "InstallDate": "2026-02-10T08:00:00",
+                  "FirstUsed": "2026-02-11T09:30:00",
+                  "LastUsed": "2026-08-01T16:45:00",
+                  "DiscoveredDate": "2026-02-10T12:00:00",
+                  "IsInstalled": true,
+                  "LicenseRequired": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["9001", "9002", "9003"],
+    "assets": [
+      {
+        "id": "9001",
+        "fields": {
+          "hostnames": "syn-snow-laptop",
+          "macAddresses": "00:11:22:44:90:01",
+          "ipAddresses": "10.70.1.11",
+          "deviceType": "Laptop"
+        }
+      },
+      {
+        "id": "9002",
+        "fields": {
+          "hostnames": "syn-snow-server",
+          "macAddresses": "00:11:22:44:90:02",
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "9003",
+        "fields": {
+          "hostnames": "syn-snow-virtual",
+          "macAddresses": "00:11:22:44:90:03"
+        },
+        "fields_absent": ["deviceType"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers", "query_contains": "%24inlinecount=allpages"},
+      {"query_contains": "%24skip=0"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9001/applications"},
+      {"header_contains": "Basic"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/customers/fixture-customer/applications/"}
+    ],
+    "min_software_total": 3,
+    "log_contains": [
+      "snow: skipping computer with no Id/BiosSerialNumber: name=syn-snow-no-id"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}
