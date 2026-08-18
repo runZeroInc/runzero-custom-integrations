@@ -1,0 +1,94 @@
+{
+  "name": "paged",
+  "integration": "miradore",
+  "description": "Five devices at rows=2 over the site-path endpoint. The path probe and page 1 both match the page=1 route, so this takes four requests: probe, then pages 1-3. Each page is matched on its own page=N option, so a walk that failed to advance would re-read page 1 and the id assertions would fail. The short final page ends the loop.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme",
+    "page_size": "2",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "page-1",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "page%3D1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"5\"><Device><ID>1</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.1</LocalIPAddress><MACAddress>00:11:22:BB:00:01</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-01</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device><Device><ID>2</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.2</LocalIPAddress><MACAddress>00:11:22:BB:00:02</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-02</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "page-2",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "page%3D2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"5\"><Device><ID>3</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.3</LocalIPAddress><MACAddress>00:11:22:BB:00:03</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-03</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device><Device><ID>4</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.4</LocalIPAddress><MACAddress>00:11:22:BB:00:04</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-04</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "page-3",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "page%3D3"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"5\"><Device><ID>5</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.5</LocalIPAddress><MACAddress>00:11:22:BB:00:05</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-05</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "miradore:acme:1",
+      "miradore:acme:2",
+      "miradore:acme:3",
+      "miradore:acme:4",
+      "miradore:acme:5"
+    ],
+    "request_count": 4,
+    "log_contains": [
+      "using /acme/API/Device",
+      "reported 5 of 5 devices matched by the query"
+    ],
+    "requests_include": [
+      {
+        "query_contains": "rows%3D2%2Cpage%3D2"
+      },
+      {
+        "query_contains": "rows%3D2%2Cpage%3D3"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

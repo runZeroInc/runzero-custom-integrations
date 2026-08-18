@@ -1,0 +1,70 @@
+{
+  "name": "path-fallback",
+  "integration": "miradore",
+  "description": "The site-path form is tried first because Miradore Online serves each site under its own segment. A deployment that serves the API at the root answers 500 there, and the walk must fall back to the site-less path rather than giving up -- the failure mode that made this integration import nothing against a real site. Asserts both paths were requested and that the log names the one that worked.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme"
+  },
+  "routes": [
+    {
+      "name": "site-path-rejected",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 500,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<Content><Error><Description>Internal server error</Description><Code>500</Code></Error></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "root-path",
+      "match": {
+        "method": "GET",
+        "path": "/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"1\"><Device><ID>7</ID><Platform>iOS</Platform><IPAddress>10.40.0.7</IPAddress><MACAddress>00:11:22:CC:00:07</MACAddress><Status>Active</Status><InvDevice><DeviceName>core-only-07</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone15,2</Model></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "miradore:acme:7"
+    ],
+    "log_contains": [
+      "/acme/API/Device did not answer",
+      "using /API/Device",
+      "reported 1 of 1 devices matched by the query"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      {
+        "method": "GET",
+        "path": "/API/Device"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

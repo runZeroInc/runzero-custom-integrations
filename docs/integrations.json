@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-18T02:31:12.738278Z",
-  "totalIntegrations": 106,
+  "lastUpdated": "2026-08-18T07:44:33.675167Z",
+  "totalIntegrations": 107,
   "integrationDetails": [
     {
       "name": "Absolute Secure Endpoint",
@@ -379,6 +379,13 @@
       "maturity": "alpha",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mikrotik-routeros/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mikrotik-routeros/mikrotik-routeros.star"
+    },
+    {
+      "name": "Miradore",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/miradore/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/miradore/miradore.star"
     },
     {
       "name": "Mosyle",

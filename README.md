@@ -71,6 +71,7 @@ If you need help setting up a custom integration, you can create an [issue](http
 - [Maze](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/)
 - [Microsoft SQL Server databases](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mssql-databases/)
 - [MikroTik RouterOS](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mikrotik-routeros/)
+- [Miradore](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/miradore/)
 - [Mosyle](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mosyle/)
 - [Nautobot](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/nautobot/)
 - [Netdata](https://github.com/runZeroInc/runzero-custom-integrations/blob/main/netdata/)
