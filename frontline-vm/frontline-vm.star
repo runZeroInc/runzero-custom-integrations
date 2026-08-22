@@ -1,4 +1,4 @@
-# Copyright 2026 runZero, Inc. Available under the MIT License
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
 
 CONFIG = {
     "id": "runzero-frontline-vm",
