@@ -1,0 +1,186 @@
+{
+  "name": "happy",
+  "integration": "efficientip-solidserver",
+  "description": "One space, DHCP and DNS joins on, IPv4 and IPv6 addresses. Proves the native X-IPM auth headers ride every request; that the interleaved free-gap pseudo-row is dropped; that the lease supplies the MAC and client hostname when IPAM has none, its first-time drives firstSeen, and the Fingerbank OS stays an attribute; that an EIP:-prefixed reservation pseudo-MAC is discarded; that the AAAA record's long-form address canonicalizes to the same join key as the IPAM row's compressed form; and that 204 No Content ends a walk without an error.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_dns": "true"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/rest/ip_site_list"},
+      "responses": [
+        {"status": 200, "json": [{"errno": "0", "site_id": "3", "site_name": "Local", "site_is_template": "0"}]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "leases4",
+      "match": {"method": "GET", "path": "/rest/dhcp_range_lease_list"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "dhcplease_id": "17",
+            "dhcplease_addr": "10.211.132.72",
+            "dhcplease_ip_addr": "0ad38448",
+            "dhcplease_mac_addr": "00:11:22:33:44:55",
+            "dhcplease_clientname": "ws72-dhcp",
+            "dhcplease_first_time": "1754000000",
+            "dhcplease_time": "1755100000",
+            "dhcplease_end_time": "1755500000",
+            "dhcplease_fingerbank_os": "Windows 10",
+            "mac_vendor": "Dell Inc.",
+            "dhcp_name": "smart-dhcp"
+          }
+        ]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "leases6",
+      "match": {"method": "GET", "path": "/rest/dhcp6_lease6_list"},
+      "responses": [{"status": 204, "text": ""}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "statics4",
+      "match": {"method": "GET", "path": "/rest/dhcp_static_list"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "dhcphost_id": "9",
+            "dhcphost_addr": "10.211.132.80",
+            "dhcphost_ip_addr": "0ad38450",
+            "dhcphost_mac_addr": "EIP:99:00:00:01",
+            "dhcphost_name": "printer-80.corp.example.net",
+            "dhcphost_domain": "corp.example.net",
+            "dhcphost_state": "used"
+          }
+        ]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "statics6",
+      "match": {"method": "GET", "path": "/rest/dhcp6_static6_list"},
+      "responses": [{"status": 204, "text": ""}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "dns",
+      "match": {"method": "GET", "path": "/rest/dns_rr_list"},
+      "responses": [
+        {"status": 200, "json": [
+          {"rr_id": "100", "rr_full_name": "ws72.corp.example.net", "rr_type": "A", "value1": "10.211.132.72", "ttl": "3600", "dns_name": "smart-dns"},
+          {"rr_id": "101", "rr_full_name": "v6host.corp.example.net", "rr_type": "AAAA", "value1": "2001:0db8:0000:0000:0000:0000:0000:0001", "ttl": "3600", "dns_name": "smart-dns"}
+        ]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses4",
+      "match": {"method": "GET", "path": "/rest/ip_address_list"},
+      "responses": [
+        {"status": 200, "json": [
+          {"errno": "0", "type": "free", "free_start_ip_addr": "0ad38400", "free_end_ip_addr": "0ad38447", "site_name": "Local"},
+          {
+            "errno": "0",
+            "type": "ip",
+            "ip_id": "188",
+            "ip_addr": "0ad38448",
+            "hostaddr": "10.211.132.72",
+            "name": "ws72",
+            "mac_addr": "",
+            "site_id": "3",
+            "site_name": "Local",
+            "subnet_name": "office-lan",
+            "ip_class_parameters": "owner=IT&location=HQ"
+          },
+          {
+            "errno": "0",
+            "type": "ip",
+            "ip_id": "196",
+            "ip_addr": "0ad38450",
+            "hostaddr": "10.211.132.80",
+            "name": "printer-80",
+            "mac_addr": "EIP:99:00:00:01",
+            "site_id": "3",
+            "site_name": "Local",
+            "subnet_name": "office-lan",
+            "ip_class_parameters": ""
+          }
+        ]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses6",
+      "match": {"method": "GET", "path": "/rest/ip6_address6_list"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "errno": "0",
+            "ip6_id": "9",
+            "ip6_addr": "20010db8000000000000000000000001",
+            "hostaddr": "2001:db8::1",
+            "ip6_name": "v6host",
+            "ip6_mac_addr": "00:aa:bb:cc:dd:ee",
+            "site_id": "3",
+            "site_name": "Local",
+            "subnet6_name": "office-v6"
+          }
+        ]}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "efficientip:$HOST:Local:10.211.132.72",
+      "efficientip:$HOST:Local:10.211.132.80",
+      "efficientip:$HOST:Local:2001:db8::1"
+    ],
+    "assets": [
+      {
+        "id": "efficientip:$HOST:Local:10.211.132.72",
+        "fields": {
+          "macAddresses": "00:11:22:33:44:55",
+          "efficientip_dhcp_fingerbankOS": "Windows 10",
+          "efficientip_space": "Local"
+        }
+      },
+      {
+        "id": "efficientip:$HOST:Local:10.211.132.80",
+        "fields": {
+          "hostnames": "printer-80\tprinter-80.corp.example.net"
+        },
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "efficientip:$HOST:Local:2001:db8::1",
+        "fields": {
+          "macAddresses": "00:aa:bb:cc:dd:ee"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/rest/ip_site_list", "header": {"x-ipm-username": "Zml4dHVyZS11c2Vy"}},
+      {"method": "GET", "path": "/rest/ip_address_list", "query_contains": "limit=1000"},
+      {"method": "GET", "path": "/rest/ip_address_list", "query_contains": "ORDERBY=ip_addr"},
+      {"method": "GET", "path": "/rest/ip_address_list", "query_contains": "type%3D%27ip%27"}
+    ],
+    "log_contains": [
+      "efficientip: indexed 1 leases and 1 reservations",
+      "efficientip: indexed DNS names for 2 addresses",
+      "efficientip: space Local: reported 2 IPv4 addresses",
+      "efficientip: space Local: reported 1 IPv6 addresses",
+      "efficientip: reported 3 assets"
+    ]
+  },
+  "check_determinism": true
+}

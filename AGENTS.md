@@ -324,7 +324,7 @@ assets.append(ImportAsset(
     networkInterfaces=[
         NetworkInterface(macAddress="aa:bb:cc:dd:ee:ff", ipv4Addresses=[ip_address("10.0.0.5")])
     ],
-    software=[Software(name="nginx", version="1.25.3", serviceTransport="tcp")],
+    software=[Software(id="nginx", product="nginx", version="1.25.3", serviceTransport="tcp")],
     vulnerabilities=[Vulnerability(cve="CVE-2023-0001", serviceTransport="tcp", serviceAddress="10.0.0.5")],
     customAttributes={"location": "SFO-1", "serial": "ABC123"}
 ))

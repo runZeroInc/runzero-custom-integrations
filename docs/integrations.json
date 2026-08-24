@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-18T07:44:33.675167Z",
-  "totalIntegrations": 107,
+  "lastUpdated": "2026-08-23T10:35:24.731709Z",
+  "totalIntegrations": 111,
   "integrationDetails": [
     {
       "name": "Absolute Secure Endpoint",
@@ -101,6 +101,13 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cortex-xdr/cortex-xdr.star"
     },
     {
+      "name": "CyberArk EPM",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberark-epm/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cyberark-epm/cyberark-epm.star"
+    },
+    {
       "name": "Cybereason",
       "type": "inbound",
       "maturity": "alpha",
@@ -141,6 +148,13 @@
       "maturity": "beta",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/drata/drata.star"
+    },
+    {
+      "name": "EfficientIP SOLIDserver",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/efficientip-solidserver/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/efficientip-solidserver/efficientip-solidserver.star"
     },
     {
       "name": "exe.dev",
@@ -374,6 +388,13 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/mssql-databases/mssql-databases.star"
     },
     {
+      "name": "Microsoft WSUS",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/wsus/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/wsus/wsus.star"
+    },
+    {
       "name": "MikroTik RouterOS",
       "type": "inbound",
       "maturity": "alpha",
@@ -561,6 +582,13 @@
       "maturity": "beta",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-task-sync/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/runzero-task-sync/runzero-task-sync.star"
+    },
+    {
+      "name": "SAP LeanIX",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/leanix/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/leanix/leanix.star"
     },
     {
       "name": "Scale Computing",

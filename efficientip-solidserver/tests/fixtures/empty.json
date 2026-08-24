@@ -1,0 +1,25 @@
+{
+  "name": "empty",
+  "integration": "efficientip-solidserver",
+  "description": "An appliance that answers the space list with 204 No Content, which is how SOLIDserver reports zero matches. Must report zero assets and finish cleanly, not fail on the empty body.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/rest/ip_site_list"},
+      "responses": [{"status": 204, "text": ""}],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["efficientip: no spaces retrieved"]
+  },
+  "check_determinism": false
+}

@@ -1,0 +1,111 @@
+{
+  "name": "happy",
+  "integration": "leanix",
+  "description": "Token exchange plus one GraphQL page holding three nodes: a product-named IT component, an FQDN-named System, and a node with no id. Proves the Basic apitoken exchange happens before GraphQL, that the bearer token is carried on the data call, that only the FQDN-shaped name is imported as a hostname, that each asset is labeled with its fact sheet type, and that the id-less node is skipped and counted.\n\nInvariant has_correlator is skipped by design: LeanIX is a logical inventory and a product-named IT component genuinely carries no MAC, IP, or hostname. Standing alone without merging is the intended behavior for those records, as documented in the README.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "fact_sheet_types": "ITComponent,System",
+    "page_size": 100
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/services/mtm/v1/oauth2/token"},
+      "responses": [
+        {"status": 200, "json": {"scope": "", "expired": false, "access_token": "bearer-tok-1", "token_type": "bearer", "expires_in": 3599}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 3,
+                "pageInfo": {"hasNextPage": false, "endCursor": "END"},
+                "edges": [
+                  {
+                    "node": {
+                      "id": "28fe4aa2-6e46-41a1-a131-72afb3acf256",
+                      "name": "PostgreSQL 14",
+                      "displayName": "PostgreSQL 14",
+                      "type": "ITComponent",
+                      "description": "Relational database",
+                      "status": "ACTIVE",
+                      "updatedAt": "2026-08-01T10:00:00Z",
+                      "tags": [{"id": "t1", "name": "Database"}],
+                      "lifecycle": {"asString": "active"}
+                    }
+                  },
+                  {
+                    "node": {
+                      "id": "5c1f9d70-9a1b-4a51-bb6d-0a4b6f6f4a11",
+                      "name": "erp-db01.corp.example.com",
+                      "displayName": "erp-db01.corp.example.com (P2W)",
+                      "type": "System",
+                      "description": "SAP ERP production database server",
+                      "status": "ACTIVE",
+                      "updatedAt": "2026-08-02T11:30:00Z",
+                      "tags": [],
+                      "lifecycle": {"asString": "active"}
+                    }
+                  },
+                  {
+                    "node": {
+                      "name": "orphan with no id",
+                      "type": "ITComponent",
+                      "tags": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "leanix:$HOST:28fe4aa2-6e46-41a1-a131-72afb3acf256",
+      "leanix:$HOST:5c1f9d70-9a1b-4a51-bb6d-0a4b6f6f4a11"
+    ],
+    "assets": [
+      {
+        "id": "leanix:$HOST:5c1f9d70-9a1b-4a51-bb6d-0a4b6f6f4a11",
+        "fields": {
+          "hostnames": "erp-db01.corp.example.com",
+          "leanix_type": "System"
+        }
+      },
+      {
+        "id": "leanix:$HOST:28fe4aa2-6e46-41a1-a131-72afb3acf256",
+        "fields": {
+          "leanix_name": "PostgreSQL 14",
+          "leanix_lifecycle": "active"
+        },
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/services/mtm/v1/oauth2/token", "header_contains": "Basic "},
+      {"method": "POST", "path_contains": "/services/pathfinder/v1/graphql", "header_contains": "Bearer bearer-tok-1"}
+    ],
+    "log_contains": [
+      "leanix: workspace reports 3 fact sheets of types ITComponent,System",
+      "leanix: skipped 1 records without a usable id",
+      "leanix: reported 2 assets"
+    ]
+  },
+  "invariants": {"skip": ["has_correlator"]},
+  "check_determinism": true
+}

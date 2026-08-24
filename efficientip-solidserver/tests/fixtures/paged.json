@@ -1,0 +1,58 @@
+{
+  "name": "paged",
+  "integration": "efficientip-solidserver",
+  "description": "The IPv4 address walk pages: a full page at offset 0, then a short page at offset 2 that ends the loop. Proves the offset arithmetic and that the second request actually carries offset=2. DHCP and DNS joins are off to keep the surface to the paging behavior; IPv6 is off for the same reason.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_dhcp": "false",
+    "include_ipv6": "false",
+    "page_size": 2
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/rest/ip_site_list"},
+      "responses": [
+        {"status": 200, "json": [{"site_id": "3", "site_name": "Local"}]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses-page2",
+      "match": {"method": "GET", "path": "/rest/ip_address_list", "query_contains": "offset=2"},
+      "responses": [
+        {"status": 200, "json": [
+          {"type": "ip", "ip_id": "3", "ip_addr": "0a000003", "hostaddr": "10.0.0.3", "name": "host-3", "mac_addr": "00:00:5e:00:53:03", "site_id": "3", "site_name": "Local"}
+        ]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses-page1",
+      "match": {"method": "GET", "path": "/rest/ip_address_list", "query_contains": "offset=0"},
+      "responses": [
+        {"status": 200, "json": [
+          {"type": "ip", "ip_id": "1", "ip_addr": "0a000001", "hostaddr": "10.0.0.1", "name": "host-1", "mac_addr": "00:00:5e:00:53:01", "site_id": "3", "site_name": "Local"},
+          {"type": "ip", "ip_id": "2", "ip_addr": "0a000002", "hostaddr": "10.0.0.2", "name": "host-2", "mac_addr": "00:00:5e:00:53:02", "site_id": "3", "site_name": "Local"}
+        ]}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "efficientip:$HOST:Local:10.0.0.1",
+      "efficientip:$HOST:Local:10.0.0.2",
+      "efficientip:$HOST:Local:10.0.0.3"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/rest/ip_address_list", "query_contains": "offset=2"}
+    ]
+  },
+  "check_determinism": true
+}

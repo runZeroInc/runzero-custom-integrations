@@ -211,7 +211,12 @@ def _build_software(prod_rows):
         name = r.get("Name") or ""
         if not name:
             continue
-        out.append(Software(name=name, version=r.get("Version") or ""))
+        out.append(Software(
+            id=name[:255],
+            product=name[:255],
+            vendor=(r.get("Vendor") or "")[:255],
+            version=(r.get("Version") or "")[:255],
+        ))
     return out
 
 

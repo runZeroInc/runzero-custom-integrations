@@ -1,0 +1,110 @@
+{
+  "name": "happy",
+  "integration": "cyberark-epm",
+  "description": "Logon at the dispatcher, one set, one endpoints-search page with two endpoints. Proves the ManagerURL and session token from the logon are used for the data calls (Authorization: basic <token>), that the foreign id prefers legacyId over id, that platformType maps to deviceType, that the reported IP lands on an interface, and that install/lastConnected drive the seen timestamps. The second endpoint has no legacyId and no IP, so its id falls back to the endpoint id and it correlates by hostname alone.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "11e1a111-0001-4001-8001-000000000001", "Name": "Workstations", "Description": "", "IsNPVDI": false}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/11e1a111-0001-4001-8001-000000000001/Endpoints/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 2,
+            "returnedCount": 2,
+            "endpoints": [
+              {
+                "id": "f3c20fc4-c5c7-4ff9-b36b-f9d942101ce8",
+                "legacyId": "c7993469-15cf-4c87-9bed-39a00fae15f3",
+                "setId": "11e1a111-0001-4001-8001-000000000001",
+                "name": "WS-ALPHA-01",
+                "platform": "Windows",
+                "version": "23.10.1.1655",
+                "connectionStatus": "Connected",
+                "loggedInUser": "CORP\\alice",
+                "platformType": "Desktop",
+                "npvdi": false,
+                "lastConnected": "2026-08-20T16:02:55.442Z",
+                "installTime": "2025-02-04T10:46:01.707Z",
+                "ip": "10.20.30.40"
+              },
+              {
+                "id": "0a651c02-9f01-4b2f-8b1c-2f2f2f2f2f2f",
+                "setId": "11e1a111-0001-4001-8001-000000000001",
+                "name": "mac-studio-7",
+                "platform": "MacOS",
+                "version": "23.10.1.900",
+                "connectionStatus": "NeverConnected",
+                "platformType": "Laptop",
+                "npvdi": false,
+                "installTime": "2026-01-11T09:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cyberark-epm:$HOST:c7993469-15cf-4c87-9bed-39a00fae15f3",
+      "cyberark-epm:$HOST:0a651c02-9f01-4b2f-8b1c-2f2f2f2f2f2f"
+    ],
+    "assets": [
+      {
+        "id": "cyberark-epm:$HOST:c7993469-15cf-4c87-9bed-39a00fae15f3",
+        "fields": {
+          "hostnames": "WS-ALPHA-01",
+          "deviceType": "Desktop",
+          "ipAddresses": "10.20.30.40",
+          "setName": "Workstations",
+          "connectionStatus": "Connected"
+        }
+      },
+      {
+        "id": "cyberark-epm:$HOST:0a651c02-9f01-4b2f-8b1c-2f2f2f2f2f2f",
+        "fields": {
+          "hostnames": "mac-studio-7",
+          "deviceType": "Laptop",
+          "connectionStatus": "NeverConnected"
+        },
+        "fields_absent": ["ipAddresses"]
+      }
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/EPM/API/Auth/EPM/Logon"},
+      {"method": "GET", "path_contains": "/EPM/API/Sets", "header_contains": "basic session-tok-1"},
+      {"method": "POST", "path_contains": "/Endpoints/search", "query_contains": "limit=1000"}
+    ],
+    "log_contains": [
+      "cyberark-epm: importing 1 set(s)",
+      "cyberark-epm: reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

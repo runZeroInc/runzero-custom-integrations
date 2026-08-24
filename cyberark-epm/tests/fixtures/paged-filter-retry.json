@@ -1,0 +1,85 @@
+{
+  "name": "paged-filter-retry",
+  "integration": "cyberark-epm",
+  "description": "A tenant that rejects the empty search body with a 400. The script retries with the documented platform filter and then pages: the filtered route serves a full page (page_size endpoints) followed by a short page, and the second request must carry offset=1. Proves the 400 fallback, the offset walk, and that the platform-filter retry is logged so a missed Unknown-platform endpoint is explainable.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "page_size": 1
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "22e2a222-0002-4002-8002-000000000002", "Name": "Servers"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoints-filtered",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/22e2a222-0002-4002-8002-000000000002/Endpoints/search", "body_contains": "platform IN"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 2,
+            "returnedCount": 1,
+            "endpoints": [
+              {"id": "aaaa1111-0000-4000-8000-000000000001", "legacyId": "bbbb1111-0000-4000-8000-000000000001", "setId": "22e2a222-0002-4002-8002-000000000002", "name": "srv-01", "platform": "Windows", "version": "24.1.0.100", "connectionStatus": "Connected", "platformType": "Server", "installTime": "2025-05-01T00:00:00Z", "lastConnected": "2026-08-19T00:00:00Z", "ip": "10.7.7.1"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 2,
+            "returnedCount": 1,
+            "endpoints": [
+              {"id": "aaaa2222-0000-4000-8000-000000000002", "legacyId": "bbbb2222-0000-4000-8000-000000000002", "setId": "22e2a222-0002-4002-8002-000000000002", "name": "srv-02", "platform": "Linux", "version": "24.1.0.100", "connectionStatus": "Disconnected", "platformType": "Server", "installTime": "2025-05-02T00:00:00Z", "lastConnected": "2026-08-10T00:00:00Z", "ip": "10.7.7.2"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {"filteredCount": 2, "returnedCount": 0, "endpoints": []}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoints-empty-body",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/22e2a222-0002-4002-8002-000000000002/Endpoints/search"},
+      "responses": [
+        {"status": 400, "json": {"error": "filter is mandatory"}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cyberark-epm:$HOST:bbbb1111-0000-4000-8000-000000000001",
+      "cyberark-epm:$HOST:bbbb2222-0000-4000-8000-000000000002"
+    ],
+    "requests_include": [
+      {"method": "POST", "path_contains": "/Endpoints/search", "query_contains": "offset=0"},
+      {"method": "POST", "path_contains": "/Endpoints/search", "query_contains": "offset=1"}
+    ],
+    "log_contains": [
+      "cyberark-epm: empty search body rejected; retrying with a platform filter",
+      "cyberark-epm: reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

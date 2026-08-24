@@ -1,0 +1,86 @@
+{
+  "name": "legacy-fallback",
+  "integration": "cyberark-epm",
+  "description": "An older tenant where the endpoints search API answers 404. The set is walked with the deprecated Computers API instead, whose PascalCase fields are reshaped onto the same asset builder. Proves the fallback fires, the reshaped record maps (ComputerType to deviceType, LastSeen to the last-seen timestamp), and the id stays the same agent GUID either way.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "33e3a333-0003-4003-8003-000000000003", "Name": "Legacy Set"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoints-404",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/33e3a333-0003-4003-8003-000000000003/Endpoints/search"},
+      "responses": [
+        {"status": 404, "text": "not found"}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/EPM/API/Sets/33e3a333-0003-4003-8003-000000000003/Computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Computers": [
+              {
+                "AgentId": "dddd4444-0000-4000-8000-000000000004",
+                "AgentVersion": "11.5.0.100",
+                "ComputerName": "OLD-SRV-9",
+                "ComputerType": "Server",
+                "Platform": "Windows",
+                "InstallTime": "2024-03-01T00:00:00Z",
+                "Status": "Alive",
+                "LastSeen": "2026-08-15T12:00:00Z",
+                "LoggedIn": "CORP\\svc"
+              }
+            ],
+            "TotalCount": 1
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["cyberark-epm:$HOST:dddd4444-0000-4000-8000-000000000004"],
+    "assets": [
+      {
+        "id": "cyberark-epm:$HOST:dddd4444-0000-4000-8000-000000000004",
+        "fields": {
+          "hostnames": "OLD-SRV-9",
+          "deviceType": "Server",
+          "connectionStatus": "Alive",
+          "agentVersion": "11.5.0.100"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/Computers", "query_contains": "limit=1000"}
+    ],
+    "log_contains": [
+      "cyberark-epm: endpoints API unavailable; falling back to the computers API",
+      "cyberark-epm: reported 1 assets"
+    ]
+  },
+  "check_determinism": true
+}
