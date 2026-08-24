@@ -53,7 +53,8 @@
             }
           ]
         }
-      }],
+      },
+      {"status": 200, "json": {"ok": 1, "status": 200, "result": []}}],
       "when_exhausted": "error"
     }
   ],
@@ -86,7 +87,7 @@
       }
     ],
     "asset_count": 5,
-    "request_count": 1
+    "request_count": 2
   },
   "invariants": {
     "skip": ["namespaced_ids"]

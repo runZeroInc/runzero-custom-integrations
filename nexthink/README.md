@@ -107,6 +107,7 @@ The script imports assets from Nexthink using NQL export workflow and maps:
    - **Client secret** (`client_secret`): the Client Secret from the OAuth credential
    - **NQL query ID** (`query_id`): optional; your saved query ID, defaults to `#runzero_integration`
    - **OAuth scope** (`scope`): optional; defaults to `service:integration`. Leave it alone.
+   - **Export poll timeout (seconds)** (`poll_timeout`): optional; defaults to `300`. How long to wait for the asynchronous export to complete before giving up. Raise it if a large estate's export logs `NQL export did not complete in time`.
 
 ### 3. Configure runZero custom integration
 
@@ -153,10 +154,14 @@ This integration is asynchronous, and watching a command-line run is the cleares
 way to see where it gets stuck. It performs four steps in order:
 
 1. `POST <auth_url>/oauth2/default/v1/token` — Basic auth with the client ID and
-   secret, `grant_type=client_credentials`, `scope=service:integration`.
-2. `POST <api_url>/api/v1/nql/export?queryId=<query_id>` — returns an `exportId`.
+   secret, with `grant_type=client_credentials` and `scope=service:integration`
+   in the form-encoded body.
+2. `POST <api_url>/api/v1/nql/export` with a JSON body of
+   `{"queryId": "<query_id>"}` — returns an `exportId`.
 3. `GET <api_url>/api/v1/nql/status/<exportId>` — polled until `status` reaches
-   `COMPLETED`. The other states are `SUBMITTED`, `IN_PROGRESS`, and `ERROR`.
+   `COMPLETED`, for up to `poll_timeout` seconds (default 300; raise it for a
+   large estate whose export takes longer). The other states are `SUBMITTED`,
+   `IN_PROGRESS`, and `ERROR`.
 4. A download of `resultsFileUrl`, which is a pre-signed URL. **No `Authorization`
    header is sent to it** — adding one makes the storage backend reject the
    request with `Only one auth mechanism allowed`.

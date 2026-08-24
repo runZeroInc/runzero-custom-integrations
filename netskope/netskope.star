@@ -8,6 +8,7 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    "maxPages": 5000,
     "params": [
         {
             "key": "url",
@@ -32,9 +33,11 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options')
+load('coerce', 'as_dict', 'dicts')
 
 NETSKOPE_API_GROUPBYS = 'nsdeviceuid'
 NETSKOPE_API_ATTRIBUTES = [
+    'client_version',
     'deleted',
     'device_classification_status',
     'device_id',
@@ -53,9 +56,11 @@ NETSKOPE_API_ATTRIBUTES = [
     'timestamp',
     'ur_normalized',
     'user',
+    'username',
     'userkey',
     'usergroup',
     'user_added_time',
+    'user_source',
     'user_status'
 ]
 
@@ -80,17 +85,29 @@ def device_type_for_os(os_name):
     return ''
 
 def get_assets(base_url, token, config_kwargs):
-    hasNextPage = True
     page_offset = 0
     page_limit = 20000
-    assets = []
     reported = 0
 
     fields = ','.join(NETSKOPE_API_ATTRIBUTES)
-    headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
+    # Netskope's REST API v2 documents the endpoint-scoped token in the
+    # Netskope-Api-Token header. Some tenants also accept Authorization:
+    # Bearer, so both are sent with the same token and either server
+    # behavior authenticates.
+    headers = {
+        'Content-Type': 'application/json',
+        'Netskope-Api-Token': token,
+        'Authorization': 'Bearer ' + token,
+    }
     http_options = get_http_options(config_kwargs, headers=headers)
 
-    while hasNextPage:
+    # The server may cap a page below the requested limit, so a short page
+    # does NOT mean the last page. The offset advances by however many rows
+    # actually arrived, and the walk ends on an empty page, a repeated page
+    # (a server ignoring `offset`), or the CONFIG maxPages backstop.
+    prev_signature = None
+    p = pager('clientstatus')
+    while p.next():
         query = '?groupbys={}&fields={}&offset={}&limit={}'.format(NETSKOPE_API_GROUPBYS, fields, page_offset, page_limit)
         url = base_url + '/api/v2/events/datasearch/clientstatus' + query
 
@@ -100,18 +117,23 @@ def get_assets(base_url, token, config_kwargs):
             print('failed to retrieve assets:', err)
             return reported
 
-        assets = (response or {}).get('result', [])
+        # `result` can arrive present-but-null; dicts() turns that (and any
+        # stray non-dict rows) into a clean list instead of aborting on
+        # len(None).
+        assets = dicts(as_dict(response).get('result'))
+        if not assets:
+            break
 
-        if len(assets) == page_limit:
-            # Build and stream this page before fetching the next so the full
-            # device set is never held in memory at once.
-            reported += report_assets(build_assets(assets))
-            page_offset = page_offset + page_limit
-        elif len(assets) > 0 and len(assets) < page_limit:
-            reported += report_assets(build_assets(assets))
-            hasNextPage = False
-        else:
-            hasNextPage = False
+        signature = (len(assets), str(assets[0]))
+        if signature == prev_signature:
+            print('netskope: server repeated the page at offset {}; stopping to avoid re-importing'.format(page_offset))
+            break
+        prev_signature = signature
+
+        # Build and stream this page before fetching the next so the full
+        # device set is never held in memory at once.
+        reported += report_assets(build_assets(assets))
+        page_offset = page_offset + len(assets)
 
     return reported
 
@@ -185,6 +207,7 @@ def build_assets(assets_json):
                     'netskopeTS':item.get('timestamp'),
                     'userInfoDeviceClassificationStatus':item.get('device_classification_status'),
                     'userInfoUserKey':item.get('userkey'),
+                    'user':item.get('user'),
                     'userName':item.get('username'),
                     'userNormalized':item.get('ur_normalized'),
                     'userSource':item.get('user_source'),

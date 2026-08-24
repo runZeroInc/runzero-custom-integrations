@@ -347,7 +347,7 @@ replaces `.` with `_` in incoming variable names
 would otherwise be unusable. Two filters are sent:
 
 - `devices.org_id=<id>` when **Organisation ID** is set.
-- `devices.status=notin(deleted,lost,retired)` unless **Include retired devices** is on. Set exclusion has no dedicated syntax; `notin(...)` is it, and it maps to a `whereNotIn` clause.
+- `devices.status=notin(deleted,lost,retired)` unless **Include retired devices** is on. Set exclusion has no dedicated syntax; `notin(...)` is it, and it maps to a `whereNotIn` clause. A server version that fails to parse `notin(...)` as an operator would treat it as a literal equality matching nothing, so an empty **first** page with this filter applied is retried once without it and the same exclusion is applied per record client-side — a genuinely empty estate answers empty both ways.
 
 `properties` names the ~50 columns to return. Open-AudIT **validates each one
 against the actual table and silently removes any it does not recognise**,
@@ -365,13 +365,16 @@ decode as JSON — which is what this integration keys on, alongside a genuine 4
 or 403. On that signal it logs in again once and retries; a second failure is
 reported rather than looped.
 
-The login itself runs on a `requests.Session`, the only transport here with a
-cookie jar. The raw HTTP client follows redirects and keeps no jar, so reading
-`Set-Cookie` off the response would capture whatever the *final* hop set rather
-than the authenticated session — a failure mode that has produced silently
-unauthenticated runs elsewhere in this repository. The cookie is then replayed
-as a plain `Cookie` header on the data calls, which keeps the configured proxy,
-timeout, custom CA, and retry budget in play for the calls that move inventory.
+The login itself runs on the same HTTP option set as the data calls — proxy,
+timeout, custom CA, client certificate — so an HTTPS server behind a private CA
+authenticates at logon exactly as it does on every later request. (It used to
+run on a `requests.Session` for the cookie jar, but `Session` accepts only
+`insecure_skip_verify`, so the `tls_*` CA and client-certificate options never
+reached the logon and a private-CA install failed at step one.) With
+`Accept: application/json` the logon controller answers JSON directly on both
+success and failure rather than redirecting, so the `ci_session` cookie is read
+straight off that one response's `Set-Cookie` header and then replayed as a
+plain `Cookie` header on the data calls.
 
 ### Timestamps
 

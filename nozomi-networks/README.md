@@ -6,7 +6,7 @@
 
 ## Nozomi Networks requirements
 
-- A Guardian, CMC, or Vantage instance reachable from the runZero Explorer over HTTPS.
+- A Guardian or CMC appliance reachable from the runZero Explorer over HTTPS. The `/api/open/*` paths this integration uses are the on-premise N2OS Open API; Vantage (the SaaS offering) exposes its own, different API and is not supported by this script.
 - An Open API key pair (`key_name` and `key_token`) belonging to a **local** user. Nozomi does not issue Open API keys to remotely authenticated users.
 - The user's group needs the **Queries and exports** permission. Nozomi additionally supports per-table query restrictions, so the group must be allowed to query the `assets` table, and the `asset_cves` table if CVE import is enabled.
 
@@ -14,7 +14,7 @@
 
 ### Nozomi Networks configuration
 
-1. Sign in to the Guardian, CMC, or Vantage web interface as an administrator.
+1. Sign in to the Guardian or CMC web interface as an administrator.
 2. Create or select a **local** user and confirm its group holds the **Queries and exports** permission.
 3. Generate an Open API key for that user and record both halves: the **key name** and the **key token**. The token is shown once.
 4. Confirm API access from the Explorer host, for example:
@@ -30,7 +30,7 @@
    - The script embeds its `CONFIG` block, so the credential form is generated automatically with the fields below.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
    - Select the type `Custom Integration Script Secrets`.
-   - **Nozomi Networks URL** (`url`): base URL of the Guardian, CMC, or Vantage instance, for example `https://guardian.example.com`.
+   - **Nozomi Networks URL** (`url`): base URL of the Guardian or CMC appliance, for example `https://guardian.example.com`.
    - **API key name** (`key_name`): the `key_name` half of the Open API key pair.
    - **API key token** (`key_token`): the `key_token` half of the Open API key pair.
    - **Asset query filter** (`asset_filter`): optional; an N2OS filter appended to the assets query, for example `where level == 4`.

@@ -1,0 +1,123 @@
+{
+  "name": "status-filter-fallback",
+  "integration": "open-audit",
+  "description": "Two fixes locked together. FIRST: a server version that does not parse notin(deleted,lost,retired) as a value operator treats it as a literal equality that matches nothing, so the filtered first page comes back empty; the walk must retry exactly once WITHOUT the server-side filter and exclude retired devices per record instead -- device 503 (status retired) must not import, while the two production devices must. SECOND: the never-sentinel timestamps. Open-AudIT's schema default for first_seen/last_seen is 2000-01-01 00:00:00, meaning never; parse_ts used to be called with now as its DEFAULT, so an absent, unparseable, or never-sentinel timestamp invented freshness for dead records. Device 501 carries real timestamps and must import them exactly; device 502 carries the sentinel in both fields and must import with NEITHER firstSeenTS nor lastSeenTS.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_interfaces": "false"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-fallback-session; Path=/"}, "json": {"id": "3", "name": "runzero"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-filtered-then-not",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "header": 200, "total": 0, "filtered": 0},
+            "included": [],
+            "data": []
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "header": 200, "total": 3, "filtered": 3},
+            "included": [],
+            "data": [
+              {
+                "id": 501,
+                "type": "devices",
+                "attributes": {
+                  "id": 501,
+                  "name": "wks-501",
+                  "ip": "10.63.0.1",
+                  "status": "production",
+                  "type": "computer",
+                  "os_name": "Ubuntu 24.04.1 LTS",
+                  "first_seen": "2026-01-10 08:00:00",
+                  "last_seen": "2026-08-01 08:00:00"
+                }
+              },
+              {
+                "id": 502,
+                "type": "devices",
+                "attributes": {
+                  "id": 502,
+                  "name": "never-seen-502",
+                  "ip": "10.63.0.2",
+                  "status": "production",
+                  "type": "computer",
+                  "first_seen": "2000-01-01 00:00:00",
+                  "last_seen": "2000-01-01 00:00:00"
+                }
+              },
+              {
+                "id": 503,
+                "type": "devices",
+                "attributes": {
+                  "id": 503,
+                  "name": "retired-503",
+                  "ip": "10.63.0.3",
+                  "status": "retired",
+                  "type": "computer",
+                  "first_seen": "2020-05-01 08:00:00",
+                  "last_seen": "2021-05-01 08:00:00"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "open-audit:$HOST:501",
+      "open-audit:$HOST:502"
+    ],
+    "ids_absent": ["open-audit:$HOST:503"],
+    "assets": [
+      {
+        "id": "open-audit:$HOST:501",
+        "fields": {
+          "hostnames": "wks-501",
+          "ipAddresses": "10.63.0.1",
+          "firstSeenTS": "1768032000",
+          "lastSeenTS": "1785571200"
+        }
+      },
+      {
+        "id": "open-audit:$HOST:502",
+        "fields": {
+          "hostnames": "never-seen-502",
+          "ipAddresses": "10.63.0.2"
+        },
+        "fields_absent": ["firstSeenTS", "lastSeenTS"]
+      }
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "devices.status=notin"}
+    ],
+    "log_contains": [
+      "open-audit: no devices matched the status filter; retrying without it and excluding retired devices client-side",
+      "open-audit: excluded 1 retired devices client-side",
+      "open-audit: reported 2 devices"
+    ]
+  },
+  "invariants": {"skip": []}
+}

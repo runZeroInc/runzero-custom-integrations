@@ -335,6 +335,7 @@ def fetch_macs(ctx, ifid):
     host table carries neither, so the two have to be joined."""
     macs = {}
     offset = 0
+    prev_signature = None
     _pager1 = pager("ntopng-1")
     while _pager1.next():
         payload = {
@@ -349,6 +350,14 @@ def fetch_macs(ctx, ifid):
         rows = as_list(data.get("rsp"))
         if not rows:
             break
+        # A proxy or build that ignores start/length answers every request
+        # with the identical full list; without this guard the loop would spin
+        # (deduped, importing nothing new) until the pager backstop raised.
+        signature = (len(rows), str(rows[0]))
+        if signature == prev_signature:
+            print("ntopng: MAC listing for interface {} repeated a page at offset {}; stopping".format(ifid, offset))
+            break
+        prev_signature = signature
         for row in rows:
             if type(row) != "dict":
                 continue

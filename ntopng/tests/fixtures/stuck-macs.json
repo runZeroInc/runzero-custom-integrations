@@ -1,0 +1,88 @@
+{
+  "name": "stuck-macs",
+  "integration": "ntopng",
+  "description": "A macs_list route that ignores start/length and answers every request with the identical full page -- what a caching proxy or an ntopng build without server-side paging produces. fetch_macs advances its offset but its only natural exit is a short page, so without a repeated-page guard the walk would spin (deduped, importing nothing new) until the 1M-page pager raised. The guard must stop on the first replay with a log line, keep the MACs already indexed, and let the host walk continue: the one host still imports with its MAC-table manufacturer joined on.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "interfaces",
+      "match": {"method": "POST", "path": "/lua/rest/v2/get/ntopng/interfaces.lua"},
+      "responses": [
+        {"status": 200, "json": {"rc": 0, "rc_str": "OK", "rsp": [{"ifid": 1, "ifname": "eth0", "name": "eth0"}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "macs-replayed",
+      "match": {"method": "POST", "path": "/lua/rest/v2/get/mac/macs_list.lua"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rsp": [
+              {
+                "mac": "AA:BB:CC:DD:EE:51",
+                "manufacturer": "Dell Inc.",
+                "device_type": {"device_type_label": "Workstation"},
+                "hosts": 1
+              },
+              {
+                "mac": "AA:BB:CC:DD:EE:52",
+                "manufacturer": "Lenovo",
+                "device_type": {"device_type_label": "Laptop"},
+                "hosts": 1
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "POST", "path": "/lua/rest/v2/get/host/active.lua"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rsp": {
+              "perPage": 2,
+              "currentPage": 1,
+              "data": [
+                {
+                  "key": "192_0_2_51",
+                  "first_seen": 1786700000,
+                  "last_seen": 1786841000,
+                  "vlan": 0,
+                  "ip": "192.0.2.51",
+                  "mac": "AA:BB:CC:DD:EE:51",
+                  "name": "desk-5101"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["ntopng:$HOST:0:192.0.2.51"],
+    "request_count": 4,
+    "log_contains": [
+      "ntopng: MAC listing for interface 1 repeated a page at offset 2; stopping",
+      "ntopng: indexed 2 MACs on interface 1",
+      "ntopng: reported 1 assets from interface 1"
+    ]
+  },
+  "invariants": {"skip": []}
+}

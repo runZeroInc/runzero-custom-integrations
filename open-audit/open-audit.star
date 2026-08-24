@@ -101,10 +101,9 @@ CONFIG = {
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface', 'ip_address', 'ip_in_network', 'routable_ip')
-load('http', 'get_json', 'url_encode', 'url_parse')
+load('http', http_post='post', 'get_json', 'url_encode', 'url_parse')
 load('kwargs', 'get_string', 'get_http_options', 'get_bool', 'get_int')
-load('requests', 'Session')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 
 load('coerce', 'as_text', 'dicts')
 VENDOR = "open-audit"
@@ -504,7 +503,7 @@ def _tags(record, virtual_adapters):
     return tags
 
 
-def build_asset(record, included, scope, ceiling):
+def build_asset(record, included, scope):
     """Build one ImportAsset from a devices row and its optional sub-tables."""
     device_id = as_text(record.get("id"))
     netifs, macs, virtual = collect_interfaces(record, included)
@@ -595,15 +594,43 @@ def build_asset(record, included, scope, ceiling):
     if os_version:
         args["osVersion"] = os_version
 
-    first_seen = parse_ts(record.get("first_seen"), ceiling)
-    if first_seen:
-        args["firstSeenTS"] = first_seen
+    # first_seen/last_seen may be absent, unparseable, or the schema's
+    # 2000-01-01 "never" default. None of those may invent freshness for a
+    # dead record, so the sentinel is checked and parse_ts falls back to None
+    # (dropping the field) rather than to now. Future values are still
+    # clamped to now by parse_ts itself.
+    raw_first = as_text(record.get("first_seen"))
+    if raw_first and raw_first != NEVER_TIMESTAMP:
+        first_seen = parse_ts(raw_first)
+        if first_seen:
+            args["firstSeenTS"] = first_seen
 
     asset = ImportAsset(**args)
-    last_seen = parse_ts(record.get("last_seen"), ceiling)
-    if last_seen != None:
-        asset.lastSeenTS = last_seen
+    raw_last = as_text(record.get("last_seen"))
+    if raw_last and raw_last != NEVER_TIMESTAMP:
+        last_seen = parse_ts(raw_last)
+        if last_seen != None:
+            asset.lastSeenTS = last_seen
     return asset
+
+
+def _cookie_from_headers(headers, name):
+    """Extract one cookie's value from the Set-Cookie response headers. The
+    http module exposes response headers as a dict of canonically cased names
+    to a list of values."""
+    if type(headers) != "dict":
+        return ""
+    values = headers.get("Set-Cookie")
+    if values == None:
+        return ""
+    if type(values) != "list":
+        values = [values]
+    for value in values:
+        first = as_text(value).split(";")[0].strip()
+        eq = first.find("=")
+        if eq > 0 and first[:eq].strip() == name:
+            return first[eq + 1:].strip()
+    return ""
 
 
 def login(ctx):
@@ -611,23 +638,26 @@ def login(ctx):
 
     Open-AudIT has no bearer-token mode. /index.php/logon sets a CodeIgniter
     session cookie, and every later request is authenticated by that cookie
-    alone. The login runs on a requests.Session because that is the only
-    transport here with a cookie jar: the raw HTTP client follows redirects and
-    keeps no jar, so reading Set-Cookie off the response would capture whatever
-    the final hop set rather than the authenticated session. The cookie is then
-    replayed as a plain header on the data calls, which keeps the configured
-    proxy, timeout, custom CA, and retry budget in play for the calls that
-    move the actual inventory.
+    alone. The logon runs on the same option set as the data calls, so the
+    configured proxy, timeout, custom CA, and client certificate apply at
+    login exactly as they do afterwards -- a requests.Session only accepts
+    insecure_skip_verify, which failed TLS at login against a private-CA
+    server every data call would have trusted. With Accept: application/json
+    the logon controller answers JSON directly on both success and failure
+    instead of redirecting, so the ci_session cookie is read straight off the
+    Set-Cookie header of that one response. The cookie is then replayed as a
+    plain header on the data calls.
     """
-    session = Session(insecure_skip_verify=ctx["insecure"])
-    headers = dict(ctx["base_options"].get("headers", {}))
+    options = dict(ctx["base_options"])
+    headers = dict(options.get("headers", {}))
     headers["Content-Type"] = "application/x-www-form-urlencoded"
     # Without an Accept of application/json the logon controller answers HTML
     # and redirects on both success and failure, which makes the two outcomes
     # indistinguishable from here.
     headers["Accept"] = "application/json"
+    options["headers"] = headers
     body = url_encode({"username": ctx["username"], "password": ctx["password"]})
-    resp = session.post(ctx["base"] + LOGON_PATH, headers=headers, body=bytes(body))
+    resp = http_post(ctx["base"] + LOGON_PATH, body=bytes(body), **options)
     if resp == None:
         print("open-audit: no response from {}".format(LOGON_PATH))
         return False
@@ -638,11 +668,7 @@ def login(ctx):
         print("open-audit: logon failed with status {}".format(resp.status_code))
         return False
 
-    token = ""
-    cookies = session.cookies.get(ctx["base_url"])
-    for cookie in cookies if type(cookies) == "list" else []:
-        if cookie.name == SESSION_COOKIE:
-            token = cookie.value
+    token = _cookie_from_headers(resp.headers, SESSION_COOKIE)
     if not token:
         print("open-audit: logon set no {} cookie; check that {} is the application path".format(
             SESSION_COOKIE, ctx["app_path"]))
@@ -747,7 +773,9 @@ def fetch_and_report(ctx):
     skipped = 0
     detailed = 0
     capped = 0
-    ceiling = now()
+    retired = 0
+    server_status_filter = not ctx["include_retired"]
+    client_status_filter = False
 
     _pager = pager("open-audit")
 
@@ -763,7 +791,7 @@ def fetch_and_report(ctx):
         }
         if ctx["org_id"]:
             params["devices.org_id"] = ctx["org_id"]
-        if not ctx["include_retired"]:
+        if server_status_filter:
             # Open-AudIT reads the operator off the front of the value, so
             # notin(...) is how a set exclusion is expressed.
             params["devices.status"] = "notin(" + ",".join(RETIRED_STATUSES) + ")"
@@ -777,6 +805,16 @@ def fetch_and_report(ctx):
 
         rows = _envelope_rows(data)
         if not rows:
+            # A version that does not parse notin(...) as an operator treats
+            # it as a literal equality that matches nothing, so an empty FIRST
+            # page is retried once without the server-side filter and the
+            # exclusion applied per record here instead. A genuinely empty
+            # estate answers empty both ways and still imports nothing.
+            if server_status_filter and offset == 0:
+                print("open-audit: no devices matched the status filter; retrying without it and excluding retired devices client-side")
+                server_status_filter = False
+                client_status_filter = True
+                continue
             break
 
         assets = []
@@ -794,6 +832,10 @@ def fetch_and_report(ctx):
                 continue
             record["id"] = device_id
 
+            if client_status_filter and as_text(record.get("status")).lower() in RETIRED_STATUSES:
+                retired += 1
+                continue
+
             included = {}
             if ctx["includes"]:
                 if detailed < ctx["max_detail"]:
@@ -801,7 +843,7 @@ def fetch_and_report(ctx):
                     detailed += 1
                 else:
                     capped += 1
-            assets.append(build_asset(record, included, ctx["scope"], ceiling))
+            assets.append(build_asset(record, included, ctx["scope"]))
 
         if assets:
             reported += report_assets(assets)
@@ -811,6 +853,8 @@ def fetch_and_report(ctx):
             break
         offset += ctx["page_size"]
 
+    if retired:
+        print("open-audit: excluded {} retired devices client-side".format(retired))
     return reported, skipped, detailed, capped
 
 
@@ -856,7 +900,6 @@ def main(**kwargs):
         "page_size": page_size,
         "base_options": base_options,
         "http_options": base_options,
-        "insecure": base_options.get("tls", {}).get("insecure", False) == True,
     }
 
     if not login(ctx):

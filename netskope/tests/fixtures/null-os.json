@@ -45,7 +45,8 @@
             }
           ]
         }
-      }],
+      },
+      {"status": 200, "json": {"ok": 1, "result": []}}],
       "when_exhausted": "error"
     }
   ],
@@ -63,7 +64,7 @@
       {"id": "NSDEV-NULL-ID-0003", "fields": {"os": "macOS", "hostnames": "no-nsdeviceuid-03"}},
       {"id": "NSDEV-NULL-HOSTNAME-0004", "fields": {"os": "Windows"}, "fields_absent": ["hostnames"]}
     ],
-    "request_count": 1
+    "request_count": 2
   },
   "invariants": {
     "skip": ["namespaced_ids"]

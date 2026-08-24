@@ -501,6 +501,7 @@ def fetch_and_report_hosts(ctx):
     """
     reported = 0
     total = -1
+    prev_signature = None
     _pager1 = pager("nutanix-prism-1")
     while _pager1.next():
         page = _pager1.page
@@ -520,6 +521,17 @@ def fetch_and_report_hosts(ctx):
             return reported
         if not entities:
             break
+
+        # A Prism build that honors `count` but ignores `page` answers every
+        # request with the same first page, and the loop's other exits (a
+        # short or empty page) never fire. Stop on the first replay, BEFORE
+        # reporting, so the page is not imported twice.
+        first = entities[0] if type(entities[0]) == "dict" else {}
+        signature = (len(entities), _clean(first.get("uuid")))
+        if signature == prev_signature:
+            print("nutanix-prism: hosts listing repeated page {}; stopping to avoid re-importing".format(page))
+            break
+        prev_signature = signature
 
         if total < 0:
             total = _total(data)

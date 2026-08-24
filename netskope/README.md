@@ -22,10 +22,10 @@
    - Click **Add Endpoint** and add `/api/v2/events/datasearch/clientstatus`, then set its privilege to **Read** (which grants `GET`). Read and write would additionally grant `POST`, `PUT`, `PATCH`, and `DELETE`, and is not needed here.
 3. Save. The token value is displayed **once**, on the confirmation page, with a **Copy Token** button. There is no way to retrieve it afterwards.
 4. Note your tenant URL, for example `https://acme.goskope.com`.
-5. Confirm the token from the Explorer host. Netskope accepts the token either as its own header or as a bearer token; this integration sends the latter:
+5. Confirm the token from the Explorer host. The documented v2 header is `Netskope-Api-Token`; some tenants also accept it as a bearer token, so the integration sends both forms with the same value and either one authenticates:
 
    ```bash
-   curl -s -H 'Authorization: Bearer <token>' \
+   curl -s -H 'Netskope-Api-Token: <token>' \
      'https://acme.goskope.com/api/v2/events/datasearch/clientstatus?limit=1'
    ```
 

@@ -321,7 +321,7 @@ defensively, which is why `tag:type:active` appears on every node and
 
 ### Verification status
 
-Verified against the four fixture scenarios in `opennms-horizon/tests/fixtures/`
+Verified against the six fixture scenarios in `opennms-horizon/tests/fixtures/`
 run under the real scanner, and against OpenNMS documentation and OpenNMS source.
 The fixture payloads are built from the shape of real OpenNMS ReST captures —
 the server's own `v1/nodes.json` and `v1/ifservices.json` test resources, which

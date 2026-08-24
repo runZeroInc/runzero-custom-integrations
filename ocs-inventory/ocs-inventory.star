@@ -694,6 +694,7 @@ def fetch_and_report_computers(ctx):
     the page, so only software costs an extra request."""
     reported = 0
     start = 0
+    prev_signature = None
     _pager = pager("ocs-inventory")
     while _pager.next():
         # limit is mandatory: the route answers a missing or zero limit with a
@@ -714,6 +715,14 @@ def fetch_and_report_computers(ctx):
             return reported
         if not data:
             break
+        # A server whose route ignores `start` replays page one forever, and a
+        # full replayed page never trips the short-page exit. Stop on the first
+        # repeat, BEFORE reporting, so the page is not imported twice.
+        signature = (len(data), str(sorted(data.keys())))
+        if signature == prev_signature:
+            print("ocs-inventory: the computers route repeated a page at start={}; stopping to avoid re-importing".format(start))
+            break
+        prev_signature = signature
         reported += report_assets(build_assets(ctx, data))
         if len(data) < PAGE_SIZE:
             break

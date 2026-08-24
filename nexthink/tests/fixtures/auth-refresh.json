@@ -1,7 +1,7 @@
 {
   "name": "auth-refresh",
   "integration": "nexthink",
-  "description": "The Nexthink token is short-lived, so the export call can be rejected with a 401 in the middle of a run. Proves the 401 is turned into a re-authentication rather than an abort: a second token is minted, the export is started again with it, and the run continues. The export then reports FAILED, which must be logged by name and end the run with zero assets rather than looping until the poll budget is spent.",
+  "description": "The Nexthink token is short-lived, so the export call can be rejected with a 401 in the middle of a run. Proves the 401 is turned into a re-authentication rather than an abort: a second token is minted, the export is started again with it (as the documented POST with a JSON queryId body), and the run continues. The export then reports FAILED, which must be logged by name and end the run with zero assets rather than looping until the poll budget is spent.",
   "kwargs": {
     "auth_url": "$BASE",
     "api_url": "$BASE",
@@ -38,7 +38,7 @@
     {
       "name": "start-export-401-then-ok",
       "match": {
-        "method": "GET",
+        "method": "POST",
         "path": "/api/v1/nql/export"
       },
       "responses": [
@@ -90,9 +90,9 @@
     ],
     "requests_include": [
       {
-        "method": "GET",
+        "method": "POST",
         "path": "/api/v1/nql/export",
-        "query_contains": "queryId=custom_devices_query"
+        "body_contains": "\"queryId\":\"custom_devices_query\""
       },
       {
         "header_contains": "expired-token"

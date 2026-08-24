@@ -49,6 +49,15 @@ CONFIG = {
             "required": False,
             "default": "service:integration",
         },
+        {
+            "key": "poll_timeout",
+            "label": "Export poll timeout (seconds)",
+            "description": "How long to wait for the asynchronous NQL export to complete. Large estates can take several minutes.",
+            "type": "int",
+            "required": False,
+            "default": 300,
+            "min": 10,
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -57,20 +66,21 @@ CONFIG = {
 }
 
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
-load('http', http_post='post', http_get='get', url_parse='url_parse')
+load('http', http_post='post', http_get='get', url_parse='url_parse', 'url_encode')
 load('json', json_encode='encode', json_decode='decode')
 load('base64', base64_encode='encode')
 load('net', 'ip_address')
-load('kwargs', 'require', 'get_string', 'get_http_options')
+load('csv', csv_read='read_all')
+load('kwargs', 'require', 'get_string', 'get_int', 'get_http_options')
 load('time', 'sleep')
 
 # Nexthink runs the export asynchronously, so the status endpoint is polled
-# until it reports COMPLETED. The loop used to re-request immediately, issuing
-# every attempt back to back and giving the export no wall-clock time at all to
-# finish. The sleep turns the budget into real time: 45 attempts with a two
-# second gap between them is an 88 second wait, in place of effectively none.
+# until it reports COMPLETED, with a sleep between attempts so the budget is
+# real wall-clock time. The budget itself is the poll_timeout CONFIG
+# parameter (default 300 seconds), because a large estate's export routinely
+# needs minutes and a too-small fixed budget imports nothing on every run.
 STATUS_POLL_INTERVAL = "2s"
-MAX_STATUS_POLLS = 45
+STATUS_POLL_INTERVAL_SECONDS = 2
 
 # Nexthink's NQL device table carries an explicit form factor at
 # `device.hardware.type`, documented as "the device form factor" and taking
@@ -116,12 +126,6 @@ def _build_os_version(build_value):
             return "{}.{}".format(parts[0], parts[1])
     return text
 
-def _encode_query_id(query_id):
-    qid = _safe_str(query_id)
-    if qid.startswith("#"):
-        return "%23{}".format(qid[1:])
-    return qid
-
 def _body_to_text(body):
     if type(body) == "string":
         return body
@@ -153,62 +157,13 @@ def _parse_ip_addrs(ip_raw):
         ip6s.append(parsed)
     return ip4s, ip6s
 
-def _parse_csv_line(line):
-    fields = []
-    current = ""
-    in_quotes = False
-    quote_escaped = False
-
-    for i in range(len(line)):
-        ch = line[i]
-
-        if quote_escaped:
-            quote_escaped = False
-            continue
-
-        if in_quotes:
-            if ch == '"':
-                if i + 1 < len(line) and line[i + 1] == '"':
-                    current += '"'
-                    quote_escaped = True
-                else:
-                    in_quotes = False
-            else:
-                current += ch
-        else:
-            if ch == '"':
-                in_quotes = True
-            elif ch == ',':
-                fields.append(current)
-                current = ""
-            else:
-                current += ch
-
-    fields.append(current)
-    return fields
-
 def parse_csv_rows(csv_text):
-    lines = csv_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    if len(lines) == 0 or lines[0] == "":
+    # csv.read_all handles quoting properly, including a quoted field that
+    # contains a newline -- the case a hand-rolled split-on-newlines parser
+    # corrupts. Rows shorter than the header are padded with "".
+    if not csv_text:
         return []
-
-    headers = _parse_csv_line(lines[0])
-    rows = []
-
-    for line in lines[1:]:
-        if not line:
-            continue
-        values = _parse_csv_line(line)
-        row = {}
-        for idx in range(len(headers)):
-            key = headers[idx]
-            if idx < len(values):
-                row[key] = values[idx]
-            else:
-                row[key] = ""
-        rows.append(row)
-
-    return rows
+    return csv_read(csv_text)
 
 def get_token(client_id, client_secret, base_url, scope, config):
     token_url = "{}/oauth2/default/v1/token".format(base_url)
@@ -221,11 +176,14 @@ def get_token(client_id, client_secret, base_url, scope, config):
         "Accept": "application/json",
     }
 
-    params = {"grant_type": "client_credentials"}
+    # Okta-hosted token endpoints require grant_type (and scope) in the
+    # x-www-form-urlencoded BODY; parameters riding the query string are
+    # rejected with invalid_grant/unsupported_grant_type.
+    form = {"grant_type": "client_credentials"}
     if scope:
-        params["scope"] = scope
+        form["scope"] = scope
 
-    response = http_post(token_url, params=params, **get_http_options(config, headers=headers))
+    response = http_post(token_url, body=bytes(url_encode(form)), **get_http_options(config, headers=headers))
     if response.status_code != 200:
         print("nexthink: failed to get token from {}: status {}".format(
             _log_path(token_url), response.status_code))
@@ -235,13 +193,19 @@ def get_token(client_id, client_secret, base_url, scope, config):
     return data.get("access_token")
 
 def start_nql_export(token, api_url, query_id, config):
-    url = "{}/api/v1/nql/export?queryId={}".format(api_url, _encode_query_id(query_id))
+    # Nexthink documents the export start as POST /api/v1/nql/export with a
+    # JSON body carrying queryId. A GET with a query parameter is rejected by
+    # the real API. The raw http_post never retries, so a slow export is not
+    # started twice.
+    url = "{}/api/v1/nql/export".format(api_url)
     headers = {
         "Authorization": "Bearer {}".format(token),
         "Accept": "application/json",
+        "Content-Type": "application/json",
     }
+    payload = {"queryId": _safe_str(query_id)}
 
-    response = http_get(url, **get_http_options(config, headers=headers))
+    response = http_post(url, body=bytes(json_encode(payload)), **get_http_options(config, headers=headers))
     if response.status_code == 200:
         # json_decode aborts the script on malformed input, and reading .get off
         # a list aborts it too, so the body is screened before either happens.
@@ -288,7 +252,7 @@ def get_export_status(token, api_url, export_id, config):
         _log_path(url), response.status_code))
     return None
 
-def fetch_all_export_rows(token, api_url, query_id, client_id, client_secret, auth_url, scope, config):
+def fetch_all_export_rows(token, api_url, query_id, client_id, client_secret, auth_url, scope, max_polls, config):
     export_id = start_nql_export(token, api_url, query_id, config)
     if export_id == "__UNAUTHORIZED__":
         token = get_token(client_id, client_secret, auth_url, scope, config)
@@ -299,7 +263,7 @@ def fetch_all_export_rows(token, api_url, query_id, client_id, client_secret, au
         return []
 
     status_data = None
-    for attempt in range(0, MAX_STATUS_POLLS):
+    for attempt in range(0, max_polls):
         # The gap goes between attempts, not before the first one, so an export
         # that is already finished still costs a single request and no wait.
         if attempt > 0:
@@ -377,16 +341,23 @@ def main(**kwargs):
     query_id = get_string(kwargs, "query_id", default="#runzero_integration")
     scope = get_string(kwargs, "scope", default="service:integration")
 
+    # The wall-clock budget for the asynchronous export, spent in
+    # 2-second poll intervals.
+    poll_timeout = get_int(kwargs, "poll_timeout", default=300)
+    max_polls = poll_timeout // STATUS_POLL_INTERVAL_SECONDS
+    if max_polls < 1:
+        max_polls = 1
+
     token = get_token(client_id, client_secret, auth_url, scope, kwargs)
     if not token:
         return []
 
-    rows = fetch_all_export_rows(token, api_url, query_id, client_id, client_secret, auth_url, scope, kwargs)
+    rows = fetch_all_export_rows(token, api_url, query_id, client_id, client_secret, auth_url, scope, max_polls, kwargs)
     if type(rows) != "list" or len(rows) == 0:
         print("No rows returned from Nexthink export workflow")
         return []
 
-    assets = []
+    reported = 0
 
     for row in rows:
         asset_id = row.get("device.uid")
@@ -422,7 +393,10 @@ def main(**kwargs):
             "nexthink.collector.local_ip": _safe_str(row.get("device.collector.local_ip")),
         }
 
-        assets.append(ImportAsset(
+        # Report each asset as it is built so a failure partway through the
+        # walk keeps everything already reported, instead of buffering the
+        # whole estate for one flush at the end.
+        reported += report_asset(ImportAsset(
             id=str(asset_id),
             hostnames=[hostname] if hostname else [],
             os=os_name,
@@ -432,6 +406,5 @@ def main(**kwargs):
             customAttributes=custom_attrs,
         ))
 
-    # Stream assets to runZero via report_assets instead of returning a list.
-    report_assets(assets)
+    print("nexthink: reported {} assets".format(reported))
     return None

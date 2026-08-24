@@ -48,6 +48,7 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'oauth2_token', 'bearer')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_int')
+load('coerce', 'as_dict')
 
 # devices-detailed takes no page-size option that this script exposes; 500 is
 # the page it asks for and the row count that means "there is more".
@@ -82,7 +83,7 @@ def get_token(api_url, client_id, client_secret, config_kwargs):
         **get_http_options(config_kwargs)
     )
 
-def get_assets(api_url, token, config_kwargs, max_pages):
+def get_assets(api_url, client_id, client_secret, token, config_kwargs, max_pages):
     after = ''
     reported = 0
     pages = 0
@@ -95,6 +96,19 @@ def get_assets(api_url, token, config_kwargs, max_pages):
     for _page in range(0, max_pages):
         query = {'pageSize': PAGE_SIZE, 'after': after}
         devices, err = get_json(url, params=query, **http_options)
+
+        # NinjaOne tokens live 3600 seconds; a walk that outlasts one gets a
+        # fresh token and the same page retried once rather than ending the
+        # run with a partial import.
+        if err and err.startswith('status 401'):
+            print('ninjaone: bearer token rejected mid-run; re-authenticating')
+            token = get_token(api_url, client_id, client_secret, config_kwargs)
+            if not token:
+                print('failed to refresh bearer token')
+                return reported
+            headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
+            http_options = get_http_options(config_kwargs, headers=headers)
+            devices, err = get_json(url, params=query, **http_options)
 
         if err:
             print('failed to retrieve assets:', err)
@@ -166,13 +180,18 @@ def build_assets(assets_json):
             if name and name not in hostnames:
                 hostnames.append(name)
 
+        # A device can carry `os`, `system`, `ipAddresses`, or `macAddresses`
+        # PRESENT but null -- .get's default only covers the absent key, and
+        # None.get / iterating None aborts the whole task. as_dict/`or []`
+        # turn the null into the empty shape.
+        os_info = as_dict(item.get('os'))
+        sys_info = as_dict(item.get('system'))
+
         # parse network interfaces
-        ips = []
-        macs = []
         networks = []
 
-        ips = item.get('ipAddresses', [])
-        
+        ips = item.get('ipAddresses') or []
+
         # check for assets with weird address blocks and rebuilt ips
         rebuilt_ips = []
         for ip in ips:
@@ -189,7 +208,7 @@ def build_assets(assets_json):
         # address-less device onto the same existing asset and merge unrelated
         # machines. These devices still correlate on MAC and hostname.
 
-        macs = item.get('macAddresses', [])
+        macs = item.get('macAddresses') or []
         if macs:
             for m in macs:
                 network = network_interface(ips=ips, mac=m)
@@ -205,8 +224,8 @@ def build_assets(assets_json):
                 id=str(id),
                 hostnames=hostnames,
                 networkInterfaces=networks,
-                os=item.get('os', {}).get('name', ''),
-                manufacturer=item.get('system', {}).get('manufacturer', ''),
+                os=os_info.get('name', ''),
+                manufacturer=sys_info.get('manufacturer', ''),
                 customAttributes=to_custom_attributes({
                     'id':id,
                     'displayName':item.get('displayName'),
@@ -222,25 +241,25 @@ def build_assets(assets_json):
                     'ipAddresses':item.get('ipAddresses'),
                     'macAddresses':item.get('macAddresses'),
                     'publicIP':item.get('publicIP'),
-                    'osManufacturer':item.get('os', {}).get('manufacturer'),
-                    'osName':item.get('os', {}).get('name'),
-                    'osArchitecture':item.get('os', {}).get('architecture'),
-                    'osBuildNumber':item.get('os', {}).get('buildNumber'),
-                    'osReleaseId':item.get('os', {}).get('manufacturer'),
-                    'osServicePackMajorVersion':item.get('os', {}).get('servicePackMajorVersion'),
-                    'osServicePackMinorVersion':item.get('os', {}).get('servicePackMinorVersion'),
-                    'osLanguage':item.get('os', {}).get('language'),
-                    'osNeedsReboot':item.get('os', {}).get('needsReboot'),
-                    'systemManufacturer':item.get('system', {}).get('manufacturer'),
-                    'systemModel':item.get('system', {}).get('model'),
-                    'systemBiosSerialNumber':item.get('system', {}).get('biosSerialNumber'),
-                    'systemSerialNumber':item.get('system', {}).get('serialNumberr'),
-                    'systemDomain':item.get('system', {}).get('domain'),
-                    'systemDomainRole':item.get('system', {}).get('domainRole'),
-                    'systemProcessors':item.get('system', {}).get('numberOfProcessors'),
-                    'systemTotalPhysicalMemory':item.get('system', {}).get('totalPhysicalMemory'),
-                    'systemVirtualMachine':item.get('system', {}).get('virtualMachine'),
-                    'systemChassisType':item.get('system', {}).get('chassisType'),
+                    'osManufacturer':os_info.get('manufacturer'),
+                    'osName':os_info.get('name'),
+                    'osArchitecture':os_info.get('architecture'),
+                    'osBuildNumber':os_info.get('buildNumber'),
+                    'osReleaseId':os_info.get('releaseId'),
+                    'osServicePackMajorVersion':os_info.get('servicePackMajorVersion'),
+                    'osServicePackMinorVersion':os_info.get('servicePackMinorVersion'),
+                    'osLanguage':os_info.get('language'),
+                    'osNeedsReboot':os_info.get('needsReboot'),
+                    'systemManufacturer':sys_info.get('manufacturer'),
+                    'systemModel':sys_info.get('model'),
+                    'systemBiosSerialNumber':sys_info.get('biosSerialNumber'),
+                    'systemSerialNumber':sys_info.get('serialNumber'),
+                    'systemDomain':sys_info.get('domain'),
+                    'systemDomainRole':sys_info.get('domainRole'),
+                    'systemProcessors':sys_info.get('numberOfProcessors'),
+                    'systemTotalPhysicalMemory':sys_info.get('totalPhysicalMemory'),
+                    'systemVirtualMachine':sys_info.get('virtualMachine'),
+                    'systemChassisType':sys_info.get('chassisType'),
                     'lastLoggedInUser':item.get('lastLoggedInUser'),
                     'deviceType':item.get('deviceType')
                 }),
@@ -269,7 +288,7 @@ def main(**kwargs):
         return None
 
     # get and stream assets page-by-page via report_assets
-    reported = get_assets(api_url, token, kwargs, max_pages)
+    reported = get_assets(api_url, client_id, client_secret, token, kwargs, max_pages)
     if not reported:
         print('no assets retrieved')
     

@@ -17,7 +17,7 @@
     },
     {
       "name": "start-export",
-      "match": {"method": "GET", "path": "/api/v1/nql/export"},
+      "match": {"method": "POST", "path": "/api/v1/nql/export"},
       "responses": [{"status": 200, "json": {"exportId": "exp-0005"}}],
       "when_exhausted": "error"
     },

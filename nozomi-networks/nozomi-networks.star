@@ -4,7 +4,7 @@ CONFIG = {
     "id": "runzero-nozomi-networks",
     "name": "Nozomi Networks",
     "type": "inbound",
-    "description": "Imports OT, IoT, and IT assets and their CVE findings from a Nozomi Networks Guardian, CMC, or Vantage instance.",
+    "description": "Imports OT, IoT, and IT assets and their CVE findings from a Nozomi Networks Guardian or CMC appliance via the on-premise N2OS Open API.",
     "version": "1",
     "maturity": "alpha",
     "minVersion": "5.1.260818.0",
@@ -19,7 +19,7 @@ CONFIG = {
             "type": "url",
             "required": True,
             "placeholder": "https://guardian.example.com",
-            "description": "Base URL of the Guardian, CMC, or Vantage instance. The /api/open/ paths are appended automatically.",
+            "description": "Base URL of the Guardian or CMC appliance. The /api/open/ paths are appended automatically; they are the on-premise N2OS Open API, which Vantage (SaaS) does not serve.",
         },
         {
             "key": "key_name",
@@ -62,6 +62,7 @@ load('net', 'network_interface')
 load('http', http_post='post', 'get_json', 'basic', 'url_encode', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_bool')
 load('time', 'from_timestamp')
+load('re', re_match='match')
 
 load('coerce', 'as_text', 'dedupe')
 VENDOR = "nozomi-networks"
@@ -84,6 +85,9 @@ MAX_INTERFACES = 32
 MAX_CHILDREN = 99
 MAX_TAGS = 40
 MAX_CVE_ROWS = 20000
+# Vulnerability.cve is validated against this pattern by the platform and a
+# malformed id fails the WHOLE record, so values are screened before assignment.
+CVE_RE = r"^CVE-[0-9]{4}-[0-9]{4,19}$"
 DIGITS = "0123456789"
 # The assets table uses "-" where a property was never determined.
 UNKNOWN = ["", "-", "n/a", "unknown", "none"]
@@ -302,7 +306,12 @@ def fetch_cves(ctx):
             kept += 1
 
         fetched += len(rows)
-        if len(rows) < PAGE_SIZE or fetched >= MAX_CVE_ROWS:
+        if len(rows) < PAGE_SIZE:
+            break
+        if fetched >= MAX_CVE_ROWS:
+            # A full final page means the table likely holds more; say so
+            # loudly, because a silent cap looks exactly like a complete import.
+            print("nozomi-networks: CVE ingestion stopped at the {}-row cap; findings beyond it were NOT imported".format(MAX_CVE_ROWS))
             break
         if page < MAX_PAGE:
             page += 1
@@ -325,13 +334,22 @@ def build_vulnerabilities(ctx, rows):
         if not row_id and not cve:
             continue
 
+        # A value that is not shaped like a CVE id -- a vendor advisory id, a
+        # joined list, a typo in the appliance data -- would raise inside the
+        # Vulnerability constructor and abort the task mid-stream. Screen it:
+        # only a well-formed id is asserted as cve, and anything else still
+        # travels as the finding's name and as an attribute.
+        cve_id = cve.upper()
+        if not re_match(CVE_RE, cve_id):
+            cve_id = ""
+
         params = {
             "id": "{}:{}:cve:{}".format(VENDOR, ctx["scope"], row_id or cve),
             "name": (_clean(row.get("name")) or cve or row_id)[:255],
             "category": "CVE",
         }
-        if cve:
-            params["cve"] = cve
+        if cve_id:
+            params["cve"] = cve_id
 
         summary = _clean(row.get("summary"))
         if summary:
@@ -394,6 +412,9 @@ def build_vulnerabilities(ctx, rows):
 
         params["customAttributes"] = to_custom_attributes({
             "cve_row_id": row_id,
+            # The raw value as the appliance reported it, kept even when it was
+            # not well-formed enough to assert as the cve field.
+            "cve_id": cve,
             "cve_score": row.get("score"),
             "cve_epss_score": row.get("epss_score"),
             "cve_is_kev": row.get("is_kev"),
@@ -424,8 +445,11 @@ def build_software(ctx, asset, primary_ip):
     params = {
         "id": "{}:{}:asset:{}:firmware".format(VENDOR, ctx["scope"], asset.get("id")),
         "product": product or "Firmware",
-        "serviceAddress": primary_ip or "127.0.0.1",
     }
+    # An asset with no IP gets a firmware record with no serviceAddress rather
+    # than a loopback placeholder, which is identical on every host.
+    if primary_ip:
+        params["serviceAddress"] = primary_ip
     if vendor:
         params["vendor"] = vendor
     if firmware:

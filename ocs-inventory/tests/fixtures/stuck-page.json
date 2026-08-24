@@ -1,0 +1,559 @@
+{
+ "name": "stuck-page",
+ "integration": "ocs-inventory",
+ "description": "A server whose computers route ignores `start` and answers every request with the identical full page of 50 -- what a misrouted rewrite rule or a caching proxy produces. The walk's natural exits are an empty page and a short page, and a replayed full page is neither, so without a repeated-page guard the loop would re-import the same 50 computers until the 1M-page pager backstop raised. The guard compares the page's key set to the previous page and must stop on the first replay, BEFORE reporting, so the 50 computers come out exactly once (unique_ids is the other half of this lock). Software enrichment is disabled to keep the scenario about the paging.",
+ "kwargs": {
+  "url": "$BASE",
+  "include_software": "false"
+ },
+ "routes": [
+  {
+   "name": "computers",
+   "match": {
+    "method": "GET",
+    "path": "/ocsapi/v1/computers"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "400": {
+       "hardware": {
+        "ID": "400",
+        "DEVICEID": "stuck-400-2026-04-01-09-00-00",
+        "NAME": "stuck-400",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.10",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "401": {
+       "hardware": {
+        "ID": "401",
+        "DEVICEID": "stuck-401-2026-04-01-09-00-00",
+        "NAME": "stuck-401",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.11",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "402": {
+       "hardware": {
+        "ID": "402",
+        "DEVICEID": "stuck-402-2026-04-01-09-00-00",
+        "NAME": "stuck-402",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.12",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "403": {
+       "hardware": {
+        "ID": "403",
+        "DEVICEID": "stuck-403-2026-04-01-09-00-00",
+        "NAME": "stuck-403",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.13",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "404": {
+       "hardware": {
+        "ID": "404",
+        "DEVICEID": "stuck-404-2026-04-01-09-00-00",
+        "NAME": "stuck-404",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.14",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "405": {
+       "hardware": {
+        "ID": "405",
+        "DEVICEID": "stuck-405-2026-04-01-09-00-00",
+        "NAME": "stuck-405",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.15",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "406": {
+       "hardware": {
+        "ID": "406",
+        "DEVICEID": "stuck-406-2026-04-01-09-00-00",
+        "NAME": "stuck-406",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.16",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "407": {
+       "hardware": {
+        "ID": "407",
+        "DEVICEID": "stuck-407-2026-04-01-09-00-00",
+        "NAME": "stuck-407",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.17",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "408": {
+       "hardware": {
+        "ID": "408",
+        "DEVICEID": "stuck-408-2026-04-01-09-00-00",
+        "NAME": "stuck-408",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.18",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "409": {
+       "hardware": {
+        "ID": "409",
+        "DEVICEID": "stuck-409-2026-04-01-09-00-00",
+        "NAME": "stuck-409",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.19",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "410": {
+       "hardware": {
+        "ID": "410",
+        "DEVICEID": "stuck-410-2026-04-01-09-00-00",
+        "NAME": "stuck-410",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.20",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "411": {
+       "hardware": {
+        "ID": "411",
+        "DEVICEID": "stuck-411-2026-04-01-09-00-00",
+        "NAME": "stuck-411",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.21",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "412": {
+       "hardware": {
+        "ID": "412",
+        "DEVICEID": "stuck-412-2026-04-01-09-00-00",
+        "NAME": "stuck-412",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.22",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "413": {
+       "hardware": {
+        "ID": "413",
+        "DEVICEID": "stuck-413-2026-04-01-09-00-00",
+        "NAME": "stuck-413",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.23",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "414": {
+       "hardware": {
+        "ID": "414",
+        "DEVICEID": "stuck-414-2026-04-01-09-00-00",
+        "NAME": "stuck-414",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.24",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "415": {
+       "hardware": {
+        "ID": "415",
+        "DEVICEID": "stuck-415-2026-04-01-09-00-00",
+        "NAME": "stuck-415",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.25",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "416": {
+       "hardware": {
+        "ID": "416",
+        "DEVICEID": "stuck-416-2026-04-01-09-00-00",
+        "NAME": "stuck-416",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.26",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "417": {
+       "hardware": {
+        "ID": "417",
+        "DEVICEID": "stuck-417-2026-04-01-09-00-00",
+        "NAME": "stuck-417",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.27",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "418": {
+       "hardware": {
+        "ID": "418",
+        "DEVICEID": "stuck-418-2026-04-01-09-00-00",
+        "NAME": "stuck-418",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.28",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "419": {
+       "hardware": {
+        "ID": "419",
+        "DEVICEID": "stuck-419-2026-04-01-09-00-00",
+        "NAME": "stuck-419",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.29",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "420": {
+       "hardware": {
+        "ID": "420",
+        "DEVICEID": "stuck-420-2026-04-01-09-00-00",
+        "NAME": "stuck-420",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.30",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "421": {
+       "hardware": {
+        "ID": "421",
+        "DEVICEID": "stuck-421-2026-04-01-09-00-00",
+        "NAME": "stuck-421",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.31",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "422": {
+       "hardware": {
+        "ID": "422",
+        "DEVICEID": "stuck-422-2026-04-01-09-00-00",
+        "NAME": "stuck-422",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.32",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "423": {
+       "hardware": {
+        "ID": "423",
+        "DEVICEID": "stuck-423-2026-04-01-09-00-00",
+        "NAME": "stuck-423",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.33",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "424": {
+       "hardware": {
+        "ID": "424",
+        "DEVICEID": "stuck-424-2026-04-01-09-00-00",
+        "NAME": "stuck-424",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.34",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "425": {
+       "hardware": {
+        "ID": "425",
+        "DEVICEID": "stuck-425-2026-04-01-09-00-00",
+        "NAME": "stuck-425",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.35",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "426": {
+       "hardware": {
+        "ID": "426",
+        "DEVICEID": "stuck-426-2026-04-01-09-00-00",
+        "NAME": "stuck-426",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.36",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "427": {
+       "hardware": {
+        "ID": "427",
+        "DEVICEID": "stuck-427-2026-04-01-09-00-00",
+        "NAME": "stuck-427",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.37",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "428": {
+       "hardware": {
+        "ID": "428",
+        "DEVICEID": "stuck-428-2026-04-01-09-00-00",
+        "NAME": "stuck-428",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.38",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "429": {
+       "hardware": {
+        "ID": "429",
+        "DEVICEID": "stuck-429-2026-04-01-09-00-00",
+        "NAME": "stuck-429",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.39",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "430": {
+       "hardware": {
+        "ID": "430",
+        "DEVICEID": "stuck-430-2026-04-01-09-00-00",
+        "NAME": "stuck-430",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.40",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "431": {
+       "hardware": {
+        "ID": "431",
+        "DEVICEID": "stuck-431-2026-04-01-09-00-00",
+        "NAME": "stuck-431",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.41",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "432": {
+       "hardware": {
+        "ID": "432",
+        "DEVICEID": "stuck-432-2026-04-01-09-00-00",
+        "NAME": "stuck-432",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.42",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "433": {
+       "hardware": {
+        "ID": "433",
+        "DEVICEID": "stuck-433-2026-04-01-09-00-00",
+        "NAME": "stuck-433",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.43",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "434": {
+       "hardware": {
+        "ID": "434",
+        "DEVICEID": "stuck-434-2026-04-01-09-00-00",
+        "NAME": "stuck-434",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.44",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "435": {
+       "hardware": {
+        "ID": "435",
+        "DEVICEID": "stuck-435-2026-04-01-09-00-00",
+        "NAME": "stuck-435",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.45",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "436": {
+       "hardware": {
+        "ID": "436",
+        "DEVICEID": "stuck-436-2026-04-01-09-00-00",
+        "NAME": "stuck-436",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.46",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "437": {
+       "hardware": {
+        "ID": "437",
+        "DEVICEID": "stuck-437-2026-04-01-09-00-00",
+        "NAME": "stuck-437",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.47",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "438": {
+       "hardware": {
+        "ID": "438",
+        "DEVICEID": "stuck-438-2026-04-01-09-00-00",
+        "NAME": "stuck-438",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.48",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "439": {
+       "hardware": {
+        "ID": "439",
+        "DEVICEID": "stuck-439-2026-04-01-09-00-00",
+        "NAME": "stuck-439",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.49",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "440": {
+       "hardware": {
+        "ID": "440",
+        "DEVICEID": "stuck-440-2026-04-01-09-00-00",
+        "NAME": "stuck-440",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.50",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "441": {
+       "hardware": {
+        "ID": "441",
+        "DEVICEID": "stuck-441-2026-04-01-09-00-00",
+        "NAME": "stuck-441",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.51",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "442": {
+       "hardware": {
+        "ID": "442",
+        "DEVICEID": "stuck-442-2026-04-01-09-00-00",
+        "NAME": "stuck-442",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.52",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "443": {
+       "hardware": {
+        "ID": "443",
+        "DEVICEID": "stuck-443-2026-04-01-09-00-00",
+        "NAME": "stuck-443",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.53",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "444": {
+       "hardware": {
+        "ID": "444",
+        "DEVICEID": "stuck-444-2026-04-01-09-00-00",
+        "NAME": "stuck-444",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.54",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "445": {
+       "hardware": {
+        "ID": "445",
+        "DEVICEID": "stuck-445-2026-04-01-09-00-00",
+        "NAME": "stuck-445",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.55",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "446": {
+       "hardware": {
+        "ID": "446",
+        "DEVICEID": "stuck-446-2026-04-01-09-00-00",
+        "NAME": "stuck-446",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.56",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "447": {
+       "hardware": {
+        "ID": "447",
+        "DEVICEID": "stuck-447-2026-04-01-09-00-00",
+        "NAME": "stuck-447",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.57",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "448": {
+       "hardware": {
+        "ID": "448",
+        "DEVICEID": "stuck-448-2026-04-01-09-00-00",
+        "NAME": "stuck-448",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.58",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      },
+      "449": {
+       "hardware": {
+        "ID": "449",
+        "DEVICEID": "stuck-449-2026-04-01-09-00-00",
+        "NAME": "stuck-449",
+        "OSNAME": "Ubuntu 24.04.1 LTS",
+        "IPADDR": "10.62.0.59",
+        "LASTCOME": "2026-08-15 08:00:00"
+       }
+      }
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  }
+ ],
+ "expect": {
+  "asset_count": 50,
+  "ids": [
+   "ocs-inventory:$HOST:400",
+   "ocs-inventory:$HOST:449"
+  ],
+  "request_count": 2,
+  "requests_include": [
+   {
+    "method": "GET",
+    "path": "/ocsapi/v1/computers",
+    "query_contains": "start=0"
+   },
+   {
+    "method": "GET",
+    "path": "/ocsapi/v1/computers",
+    "query_contains": "start=50"
+   }
+  ],
+  "requests_absent": [
+   {
+    "path": "/ocsapi/v1/computers",
+    "query_contains": "start=100"
+   }
+  ],
+  "log_contains": [
+   "ocs-inventory: the computers route repeated a page at start=50; stopping to avoid re-importing",
+   "ocs-inventory: reported 50 computers"
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

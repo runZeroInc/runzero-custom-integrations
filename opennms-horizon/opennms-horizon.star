@@ -132,9 +132,12 @@ LABEL_SOURCES = {
 # The SNMP primary flag on an IP interface.
 PRIMARY_TYPES = {"P": "primary", "S": "secondary", "N": "not-eligible"}
 
-# ifType values that describe a software construct rather than a network port.
-# 24 is softwareLoopback, 53 propVirtual, 131 tunnel, 150 mplsTunnel,
-# 161 ieee8023adLag, 136 l3ipvlan, 135 l2vlan.
+# ifType values that describe a software construct rather than a network port:
+# 24 softwareLoopback, 53 propVirtual, 131 tunnel, 150 mplsTunnel. LAG (161)
+# and VLAN (135 l2vlan, 136 l3ipvlan) interfaces are deliberately NOT filtered
+# here: they usually clone their parent port's MAC, which the same-MAC pooling
+# in build_interfaces merges into one endpoint, and one that carries a unique
+# MAC or an address is a real correlation signal that would be lost.
 VIRTUAL_IF_TYPES = ["24", "53", "131", "150"]
 
 # A DNS label sequence, used to decide whether an interface hostname is a real
@@ -345,12 +348,16 @@ def index_services(ctx):
 
     The global monitored-service list is a flattened view with its own shape:
     the envelope key is hyphenated, and it identifies a node by LABEL rather
-    than by id, which is why the index is keyed on the label. It carries no
-    port number, because an OpenNMS monitored service has none anywhere in the
-    model - the port a poller uses lives in poller-configuration.xml, not on
-    the service - so these become names on the asset rather than runZero
-    services."""
-    index = {}
+    than by id. OpenNMS allows two nodes to share a label, so a label-only
+    index would merge their service lists onto both assets - each service is
+    therefore also keyed by label PLUS its own ipAddress, and the per-node
+    lookup matches on an address the node actually carries. The label-only
+    entries remain as the fallback for nodes whose interfaces were not
+    collected. It carries no port number, because an OpenNMS monitored service
+    has none anywhere in the model - the port a poller uses lives in
+    poller-configuration.xml, not on the service - so these become names on
+    the asset rather than runZero services."""
+    index = {"by_addr": {}, "by_label": {}}
 
     def absorb(records):
         for record in records:
@@ -358,15 +365,57 @@ def index_services(ctx):
             name = as_text(record.get("serviceName"), join=",").strip()
             if not label or not name:
                 continue
-            entry = index.setdefault(label, {"names": [], "down": []})
-            if name not in entry["names"]:
-                entry["names"].append(name)
-            if record.get("isDown") == True and name not in entry["down"]:
-                entry["down"].append(name)
+            addr = as_text(record.get("ipAddress"), join=",").strip()
+            buckets = [index["by_label"].setdefault(label, {"names": [], "down": []})]
+            if addr:
+                buckets.append(index["by_addr"].setdefault(label + "|" + addr, {"names": [], "down": []}))
+            for entry in buckets:
+                if name not in entry["names"]:
+                    entry["names"].append(name)
+                if record.get("isDown") == True and name not in entry["down"]:
+                    entry["down"].append(name)
 
     if walk(ctx, v1_url(ctx, IFSERVICES_PATH), "monitored-service", "monitored services", absorb) < 0:
         return {}
     return index
+
+
+def lookup_services(service_index, record, ip_records):
+    """Resolve one node's monitored services from the index.
+
+    Matches by label plus one of the node's own collected addresses, so two
+    nodes sharing a label do not merge service lists. When addresses were
+    collected and none matches, the label-wide entry belongs to a different
+    node with the same label (or the node has no services), so nothing is
+    attached. A node with no collected addresses falls back to the label-wide
+    entry, which is the old behavior."""
+    if not service_index:
+        return {}
+    label = as_text(record.get("label"), join=",").strip()
+    if not label:
+        return {}
+    by_addr = as_dict(service_index.get("by_addr"))
+    merged = {"names": [], "down": []}
+    matched = False
+    for ip_record in ip_records:
+        addr = as_text(as_dict(ip_record).get("ipAddress"), join=",").strip()
+        if not addr:
+            continue
+        entry = by_addr.get(label + "|" + addr)
+        if not entry:
+            continue
+        matched = True
+        for name in entry["names"]:
+            if name not in merged["names"]:
+                merged["names"].append(name)
+        for name in entry["down"]:
+            if name not in merged["down"]:
+                merged["down"].append(name)
+    if matched:
+        return merged
+    if ip_records:
+        return {}
+    return as_dict(as_dict(service_index.get("by_label")).get(label))
 
 
 def fetch_node_interfaces(ctx, node_id):
@@ -667,7 +716,7 @@ def collect(ctx, ip_index, snmp_index, service_index):
                 ip_records = []
 
             snmp_records = snmp_index.get(node_id, []) if snmp_index != None else []
-            services = as_dict(service_index.get(as_text(record.get("label"), join=",").strip()))
+            services = lookup_services(service_index, record, ip_records)
             assets.append(build_asset(ctx, record, ip_records, snmp_records, services))
 
         reported += report_assets(assets)

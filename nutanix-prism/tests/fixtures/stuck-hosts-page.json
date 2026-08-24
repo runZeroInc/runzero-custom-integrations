@@ -1,0 +1,64 @@
+{
+  "name": "stuck-hosts-page",
+  "integration": "nutanix-prism",
+  "description": "A Prism build that honors `count` but ignores `page`, answering every hosts request with the same full first page. The walk's natural exits are a short or an empty page, and a replayed full page is neither -- without a repeated-page guard it would spin until the pager backstop raised, re-importing the same nodes on the way. The guard must stop on the first replay, BEFORE reporting, so both nodes come out exactly once (the unique_ids invariant is the other half of this lock). VM import is disabled to keep the scenario about the hosts walk.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-viewer",
+    "password": "fixture-password",
+    "import_vms": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      "responses": [
+        {"status": 200, "json": {"uuid": "00000000-0000-4000-8000-c1u57e40000a", "name": "fixture-cluster", "version": "6.5.3.5"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-replayed",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 4, "count": 2, "page": 1},
+            "entities": [
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000021",
+                "name": "NTNX-STUCK-A",
+                "hypervisor_address": "10.56.0.11"
+              },
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000022",
+                "name": "NTNX-STUCK-B",
+                "hypervisor_address": "10.56.0.12"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000021",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000022"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts", "query_contains": "count=2&page=1"},
+      {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts", "query_contains": "count=2&page=2"}
+    ],
+    "log_contains": [
+      "nutanix-prism: hosts listing repeated page 2; stopping to avoid re-importing",
+      "nutanix-prism: reported 2 hypervisor nodes"
+    ]
+  },
+  "invariants": {"skip": []}
+}

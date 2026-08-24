@@ -1,7 +1,7 @@
 {
   "name": "export-workflow",
   "integration": "nexthink",
-  "description": "The three-step NQL export: a client_credentials token exchange against the login host, a GET that starts the export and returns an exportId, and a status poll that reports RUNNING before COMPLETED. All three steps are routed and the poll must advance past RUNNING rather than accepting the first answer. The default query id '#runzero_integration' must reach the wire percent-encoded as %23, because an unescaped # would truncate the URL at the fragment and silently export the wrong query.\n\nThis scenario ends with a COMPLETED export that publishes no resultsFileUrl, which proves that case is reported cleanly with zero assets. The fourth step -- the CSV fetch itself -- is covered by download-results.json, which points resultsFileUrl back at the fixture server ($BASE is expanded inside route bodies as well as kwargs), and by download-unreachable.json for a URL that cannot be fetched at all.",
+  "description": "The three-step NQL export: a client_credentials token exchange against the login host with grant_type and scope in the x-www-form-urlencoded BODY (Okta rejects token requests whose grant_type rides the query string), a POST to /api/v1/nql/export with a JSON {\"queryId\": ...} body -- the documented contract; the old GET-with-query-param start was rejected by the real API -- and a status poll that reports RUNNING before COMPLETED. All three steps are routed and the poll must advance past RUNNING rather than accepting the first answer. The default query id '#runzero_integration' travels inside the JSON body, so no fragment-encoding is needed.\n\nThis scenario ends with a COMPLETED export that publishes no resultsFileUrl, which proves that case is reported cleanly with zero assets. The fourth step -- the CSV fetch itself -- is covered by download-results.json, which points resultsFileUrl back at the fixture server ($BASE is expanded inside route bodies as well as kwargs), and by download-unreachable.json for a URL that cannot be fetched at all.",
   "kwargs": {
     "auth_url": "$BASE",
     "api_url": "$BASE",
@@ -30,7 +30,7 @@
     {
       "name": "start-export",
       "match": {
-        "method": "GET",
+        "method": "POST",
         "path": "/api/v1/nql/export"
       },
       "responses": [
@@ -77,17 +77,17 @@
       {
         "method": "POST",
         "path": "/oauth2/default/v1/token",
-        "query_contains": "grant_type=client_credentials"
+        "body_contains": "grant_type=client_credentials"
       },
       {
         "method": "POST",
         "path": "/oauth2/default/v1/token",
-        "query_contains": "scope=service%3Aintegration"
+        "body_contains": "scope=service%3Aintegration"
       },
       {
-        "method": "GET",
+        "method": "POST",
         "path": "/api/v1/nql/export",
-        "query_contains": "queryId=%23runzero_integration"
+        "body_contains": "\"queryId\":\"#runzero_integration\""
       },
       {
         "method": "GET",
@@ -95,6 +95,17 @@
       },
       {
         "header_contains": "nexthink-token-1"
+      }
+    ],
+    "requests_absent": [
+      {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token",
+        "query_contains": "grant_type"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/nql/export"
       }
     ]
   },

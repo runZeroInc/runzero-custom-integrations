@@ -1,0 +1,36 @@
+{
+  "name": "auth-failure",
+  "integration": "opennms-horizon",
+  "description": "A credential the server rejects outright: every route answers 401. The v2 interface walk degrades to the per-node fallback path, the service walk degrades to none, and the nodes fetch -- the one that matters -- must end the run with the authentication failure NAMED in the log and zero assets, rather than aborting or retrying. OpenNMS sends no 401 challenge, so the preemptive Basic header is the only auth attempt there is.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero-ro",
+    "password": "wrong-password"
+  },
+  "routes": [
+    {
+      "name": "everything-401",
+      "match": {"path_prefix": "/opennms/"},
+      "responses": [
+        {"status": 401, "text": "Unauthorized"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/opennms/api/v2/ipinterfaces"},
+      {"method": "GET", "path": "/opennms/rest/ifservices"},
+      {"method": "GET", "path": "/opennms/rest/nodes"}
+    ],
+    "log_contains": [
+      "opennms: the v2 interface collection is unavailable; falling back to one request per node",
+      "opennms: authentication to the OpenNMS server failed:",
+      "opennms: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": false
+}

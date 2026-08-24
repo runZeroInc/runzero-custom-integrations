@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "netskope",
-  "description": "One page of the clientstatus datasearch. Proves the groupbys/fields/offset/limit query is assembled and the bearer token is sent, that one interface is emitted per reported MAC, that a record with neither _id.nsdeviceuid nor device_id is skipped with a log line, and that a Mac osName is normalised to macOS. It also brackets the device-type hint: Netskope's own os enum separates 'Windows Server' (documented value 4) from 'Windows' (0), so app-srv-04 must come out typed Server even though its make and model are the VMware placeholders that tell runZero's hardware fingerprinter nothing, while the Windows laptop and the Mac must carry NO deviceType, because neither os says whether it is a desktop or a laptop. No netskope asset carries an address: the clientstatus event reports MACs and no IP, so an interface exists only where a MAC did. (The hardcoded ips = [\"127.0.0.1\"] that used to be built into every interface here is gone; the no-address scenario is its regression lock.) Skips namespaced_ids: netskope uses the bare nsdeviceuid as the foreign id, with no tenant scope, so two Netskope tenants imported into one runZero instance would collide -- see the report accompanying these fixtures.",
+  "description": "One page of the clientstatus datasearch. Proves the groupbys/fields/offset/limit query is assembled and the token is sent BOTH as the documented Netskope-Api-Token header and as Authorization: Bearer (either server behavior authenticates), that a short page is followed by one more request that must answer empty before the walk ends (a server may cap pages below the requested limit, so a short page is not proof of the last page), that one interface is emitted per reported MAC, that a record with neither _id.nsdeviceuid nor device_id is skipped with a log line, and that a Mac osName is normalised to macOS. It also brackets the device-type hint: Netskope's own os enum separates 'Windows Server' (documented value 4) from 'Windows' (0), so app-srv-04 must come out typed Server even though its make and model are the VMware placeholders that tell runZero's hardware fingerprinter nothing, while the Windows laptop and the Mac must carry NO deviceType, because neither os says whether it is a desktop or a laptop. No netskope asset carries an address: the clientstatus event reports MACs and no IP, so an interface exists only where a MAC did. (The hardcoded ips = [\"127.0.0.1\"] that used to be built into every interface here is gone; the no-address scenario is its regression lock.) Skips namespaced_ids: netskope uses the bare nsdeviceuid as the foreign id, with no tenant scope, so two Netskope tenants imported into one runZero instance would collide -- see the report accompanying these fixtures.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "fixture-netskope-token"
@@ -73,7 +73,8 @@
             }
           ]
         }
-      }],
+      },
+      {"status": 200, "json": {"ok": 1, "status": 200, "result": []}}],
       "when_exhausted": "error"
     }
   ],
@@ -101,13 +102,15 @@
       "NSDEV-0000-0000-0002",
       "NSDEV-0000-0000-0004"
     ],
-    "request_count": 1,
+    "request_count": 2,
     "requests_include": [
       {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus", "query_contains": "groupbys=nsdeviceuid"},
       {"query_contains": "offset=0"},
+      {"query_contains": "offset=4"},
       {"query_contains": "limit=20000"},
-      {"query_contains": "fields=deleted"},
-      {"header_contains": "fixture-netskope-token"}
+      {"query_contains": "fields=client_version"},
+      {"header": {"Netskope-Api-Token": "fixture-netskope-token"}},
+      {"header": {"Authorization": "Bearer fixture-netskope-token"}}
     ],
     "log_contains": [
       "netskope: skipping record with no nsdeviceuid/device_id"
