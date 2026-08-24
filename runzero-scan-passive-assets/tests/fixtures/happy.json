@@ -2,11 +2,12 @@
   "name": "happy",
   "integration": "runzero-scan-passive-assets",
   "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
-  "description": "The whole loop for an internal integration that emits no assets and is therefore only observable through the requests it makes: export the passively-seen assets, group their in-policy addresses by the Explorer that saw them, schedule one active scan per Explorer, WAIT for those scans to finish, then delete the placeholder assets they superseded. Export rows use the real /api/v1.0/export/org/assets.json shape narrowed by fields=id,addresses,last_agent_id -- addresses is an array of strings and last_agent_id is a nullable UUID. Four behaviours are pinned. Grouping: two assets seen by the same Explorer must produce ONE scan whose targets are newline-joined, not two scans; the third asset's Explorer gets its own. Filtering inside a kept asset: 198.51.100.7 sits on an asset that also has an in-policy address, so it survives the record-level filter and can only be dropped by the per-address ALLOW_LIST check -- requests_absent on a scan body carrying it is the assertion, and it is why the allowed and denied addresses share a record. Completion: each PUT answers with a DISTINCT task id -- as two real scans would -- and each is polled at GET /api/v1.0/org/tasks/<id> until it reports `processed`, the status runZero's cruncher sets once a scan's results have been ingested (models/task.go, actions/cruncher_task.go). Deletion: only then does the bulk delete fire, carrying exactly the asset ids that were scanned, deduplicated even though asset 2 contributed two addresses, and the API answers 204 rather than 200 -- the script tests for 204 specifically, so a fixture returning 200 would take the failure branch.",
+  "description": "The whole loop for an internal integration that emits no assets and is therefore only observable through the requests it makes: export the passively-seen assets, group their in-policy addresses by the Explorer that saw them, schedule one active scan per Explorer, WAIT for those scans to finish, then delete the placeholder assets they superseded. delete_assets is passed explicitly because it now ships OFF -- whether the superseding scan merges onto the very passive asset being deleted is an unresolved question, so deletion is opt-in. Export rows use the real /api/v1.0/export/org/assets.json shape narrowed by fields=id,addresses,last_agent_id -- addresses is an array of strings and last_agent_id is a nullable UUID. Four behaviours are pinned. Grouping: two assets seen by the same Explorer must produce ONE scan whose targets are newline-joined, not two scans; the third asset's Explorer gets its own, and that third asset also carries a 172.16/12 address, which is in policy now that ALLOW_LIST names all three RFC1918 ranges. Filtering inside a kept asset: 198.51.100.7 sits on an asset that also has an in-policy address, so it survives the record-level filter and can only be dropped by the per-address ALLOW_LIST check -- requests_absent on a scan body carrying it is the assertion, and it is why the allowed and denied addresses share a record. Completion: each PUT answers with a DISTINCT task id -- as two real scans would -- and each is polled at GET /api/v1.0/org/tasks/<id> until it reports `processed`, the status runZero's cruncher sets once a scan's results have been ingested (models/task.go, actions/cruncher_task.go). Deletion: only then does the bulk delete fire, carrying exactly the asset ids that were scanned, deduplicated even though asset 2 contributed two addresses, and the API answers 204 rather than 200 -- the script tests for 204 specifically, so a fixture returning 200 would take the failure branch.",
   "kwargs": {
     "url": "$BASE",
     "site_id": "77777777-6666-5555-4444-333333333333",
-    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0",
+    "delete_assets": "true"
   },
   "routes": [
     {
@@ -37,7 +38,8 @@
             {
               "id": "11111111-aaaa-4bbb-8ccc-000000000003",
               "addresses": [
-                "192.168.7.31"
+                "192.168.7.31",
+                "172.16.9.9"
               ],
               "last_agent_id": "b1b1b1b1-5555-4666-8777-888888888888"
             }
@@ -180,7 +182,7 @@
       {
         "method": "PUT",
         "path": "/api/v1.0/org/sites/77777777-6666-5555-4444-333333333333/scan",
-        "body_contains": "192.168.7.31"
+        "body_contains": "192.168.7.31\\n172.16.9.9"
       },
       {
         "method": "POST",

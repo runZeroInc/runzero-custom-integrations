@@ -64,22 +64,23 @@ Some things are set on the credential and two are still script globals:
   parameter, default `15`.
 - `ALLOW_LIST` — a script global near the top of
   `runzero-scan-passive-assets/runzero-scan-passive-assets.star`. It ships as
-  `["10.0.0.0/8", "192.168.0.0/16"]`. **`172.16.0.0/12` is not in that default**,
-  so an estate that uses that range gets its assets silently skipped until you
-  add it.
-- `DELETE_ASSETS` — a script global, and it ships as **`True`**. Left alone, a run
-  deletes the passive assets whose scan completed. Set it to `False` before the
-  first run and turn it on only once you have seen which assets the filter
-  actually selects.
+  `["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]` — all three RFC1918
+  ranges. Narrow it if part of that space is not yours to scan.
+- **Delete passive assets after their scan completes** (`delete_assets`) — a
+  credential parameter, and it ships **off**. The delete-after-scan design has
+  an unresolved merge question: the active scan of the same IP in the same site
+  may merge onto the very passive asset being tracked (IP-match is the platform
+  default for a record whose only correlator is that IP), in which case the
+  delete would erase the freshly scanned asset. Leave it off to queue the scans
+  and keep every passive record; turn it on only after confirming in your
+  environment that scanned results land on a separate asset.
 
 ## Steps
 
 ### Script configuration
 
 1. Open `runzero-scan-passive-assets/runzero-scan-passive-assets.star`.
-2. Update the global configuration values near the top of the file:
-   - `ALLOW_LIST`: list of allowed IPv4 CIDR ranges. Targets outside it are dropped.
-   - `DELETE_ASSETS`: set to `False` for the first run.
+2. (Optional) Narrow `ALLOW_LIST` near the top of the file if part of the RFC1918 space is not yours to scan. Deletion is controlled by the `delete_assets` credential parameter and is off by default.
 3. (Optional) Adjust the search filter in the export request if you want to include more than `source:sample source_count:1`.
 
 ### runZero configuration
@@ -106,8 +107,8 @@ Some things are set on the credential and two are still script globals:
 
 The runZero Explorer binary runs a script directly. For this integration that is
 more than a convenience: it is the only way to watch which addresses pass the
-allow list before anything is scanned or deleted. Set `DELETE_ASSETS = False`
-first. `--kwargs` is repeated once per parameter:
+allow list before anything is scanned or deleted. Leave `delete_assets` unset
+(it defaults to off). `--kwargs` is repeated once per parameter:
 
 ```bash
 runzero script --filename runzero-scan-passive-assets/runzero-scan-passive-assets.star \
@@ -132,7 +133,7 @@ add `--overwrite` when re-running into the same path.
 
 **This command has side effects on your account.** Unlike every inbound
 integration in this repository, a command-line run here is not a dry run: it
-creates real scan tasks in the target site, and with `DELETE_ASSETS = True` it
+creates real scan tasks in the target site, and with `delete_assets=true` it
 deletes assets. There is no flag that makes it read-only.
 
 `--kwargs` takes the value verbatim as long as the whole argument holds a single `=`, so
@@ -180,7 +181,7 @@ needs setting for a script with a different entry point. Note that
 - The task exports passive assets matching the search filter and groups allowed IPv4 addresses by `last_agent_id`.
 - The script creates one scan per agent with the matching targets.
 - It then polls each scan task until it completes or `scan_wait_seconds` expires. A run therefore lasts as long as the scans it queued, up to that bound.
-- If `DELETE_ASSETS` is enabled, the passive assets belonging to a *completed* scan are removed. Everything else is kept.
+- If `delete_assets` is enabled on the credential, the passive assets belonging to a *completed* scan are removed. Everything else is kept.
 - You can review task activity on the [tasks](https://console.runzero.com/tasks) page.
 
 ## Asset identity
@@ -195,7 +196,7 @@ What it does instead is act on runZero's own inventory through runZero's own API
 1. `GET /api/v1.0/export/org/assets.json?search=source:sample+source_count:1&fields=id,addresses,last_agent_id` — finds assets whose **only** source is passive traffic sampling.
 2. Filters their IPv4 addresses against `ALLOW_LIST` and groups the survivors by `last_agent_id`, the Explorer that last saw each one.
 3. `PUT /api/v1.0/org/sites/<site_id>/scan` — queues one scan per Explorer, targeting that Explorer's addresses.
-4. `POST /api/v1.0/org/assets/bulk/delete` — when `DELETE_ASSETS` is on, removes the passive assets it just queued scans for.
+4. `POST /api/v1.0/org/assets/bulk/delete` — when `delete_assets` is on, removes the passive assets it just queued scans for.
 
 The identity that matters here is runZero's own, and it appears twice in ways worth
 understanding:
@@ -203,7 +204,7 @@ understanding:
 - **`asset["id"]` is the runZero asset UUID**, and it is used for exactly one thing: the bulk-delete payload. It is never re-imported, so it never participates in merging.
 - **The scan targets are bare IPv4 addresses**, not asset references. The Explorer scans an address and whatever answers becomes an asset by runZero's normal active-discovery identity rules — which is the entire point. The passive record is deleted precisely so the actively-discovered asset that replaces it starts clean rather than merging onto a thin, sampling-derived one.
 
-That sequencing is what makes `DELETE_ASSETS` load-bearing rather than cosmetic, and it is why
+That sequencing is what makes `delete_assets` matter rather than being cosmetic, and it is why
 the delete waits. **The scan must have finished before its assets are deleted.** Earlier
 revisions fired the bulk delete the moment the scans were *queued*, which is the one order that
 cannot be right: the passive record is the only evidence the host exists, the scan meant to
@@ -221,23 +222,24 @@ assets belonging to an Explorer whose scan reached `processed` (or `completed`) 
 `processed` is the status runZero's cruncher sets once a scan's results have been ingested, so
 it is the point at which the active asset really has superseded the passive one.
 
-Even so, leave `DELETE_ASSETS = False` until you have seen a full cycle complete on your own
-estate.
+Even so, `delete_assets` ships off — and should stay off until you have seen a full cycle
+complete on your own estate *and* confirmed the scanned results land on a separate asset
+rather than merging onto the passive record (see the Future note below).
 
 ### Notes
 
 - Only IPv4 addresses are considered; IPv6 addresses are skipped. `is_ip_allowed()` returns `False` for anything that is not version 4, so an IPv6-only passive asset is never scanned and — because it also never enters `asset_ids` — never deleted either.
 - The allow list applies before scans are created, so verify `ALLOW_LIST` matches your internal ranges.
-- Disabling `DELETE_ASSETS` is recommended for initial testing.
+- `delete_assets` defaults to off, which is the right setting for initial testing and stays right until the merge question below is settled for your environment.
 - The `search` filter is a script constant, not a parameter. `source:sample source_count:1` is deliberately narrow: `source_count:1` is what restricts it to assets that *nothing else* has ever seen, and dropping it would sweep in assets that active scanning already knows about.
 - Scan parameters are hardcoded in `scan_payload` — rate 1000, 3 passes, screenshots on, tagged `type=AUTOMATED`. They are not credential fields, so tuning them for a slow or fragile segment means editing the script.
 - An asset with no `last_agent_id` is skipped entirely. There is no Explorer to attribute the scan to, so it can neither be scanned nor deleted.
 
 ## Future
 
-- **Promote the remaining script globals to `CONFIG` parameters.** `scan_wait_seconds` and `scan_poll_seconds` are parameters now; `ALLOW_LIST`, `DELETE_ASSETS`, and the export search still require editing and re-saving the script. `ALLOW_LIST` is the sharpest example: it ships without `172.16.0.0/12`, so an estate using that range gets silently skipped, and the fix is a source edit rather than a credential change. A `list`-typed parameter and two bools would remove the most common failure mode this integration has.
+- **Promote the remaining script globals to `CONFIG` parameters.** `scan_wait_seconds`, `scan_poll_seconds`, and `delete_assets` are parameters now; `ALLOW_LIST` (which now covers all three RFC1918 ranges) and the export search still require editing and re-saving the script. A `list`-typed parameter would finish the job.
 - **Hand the wait back to the scheduler.** The delete now waits for the scans in-process, which is correct but costs a task slot for as long as the scans take (bounded by `scan_wait_seconds`). The cheaper shape is to queue the scans on one run and delete on a *later* one, which needs run-to-run state that a custom integration does not have — a `hidden` flag or a tag written onto the passive assets would approximate it, and it is also what would let the wait be removed entirely rather than merely bounded.
-- **Deleting an asset the scan may have merged into.** The delete is by asset UUID and it fires after the scan has been ingested, so if the active scan merged into the same runZero asset rather than creating a new one, the delete removes the freshly scanned asset. Whether it merges depends on the platform's normal matching (address, MAC, name) against a record that has only an address, and it was not established here. The safe reading is that this integration is for estates where the passive record is genuinely a placeholder; a check that the asset's source count grew before deleting it would settle the question properly.
+- **Deleting an asset the scan may have merged into — the reason `delete_assets` ships off.** The delete is by asset UUID and it fires after the scan has been ingested, so if the active scan merged into the same runZero asset rather than creating a new one, the delete removes the freshly scanned asset. Whether it merges depends on the platform's normal matching (address, MAC, name) against a record that has only an address, and it was not established here — which is why deletion is now opt-in rather than the default. A check that the asset's source count grew before deleting it would settle the question properly and would let the default flip back on.
 - **Scan by asset rather than by address.** Targets are currently a newline-joined list of IPv4 strings. runZero's scan API also accepts hostnames and CIDR ranges, so a passive asset known only by a name, or one whose addresses are IPv6, could be scanned instead of skipped. Extending `is_ip_allowed()` to handle IPv6 prefixes is the prerequisite, and it is a small change — the current implementation converts dotted quads to integers by hand precisely because it only ever handles v4.
 - **Use scan templates instead of an inline payload.** runZero supports scan templates, and `/api/v1.0/org/sites/<site_id>/scan` can reference one rather than carrying eighteen hardcoded tuning values. That would let an operator manage scan behavior in the console, where the rest of their scan configuration already lives, and would remove the block of magic numbers from the script.
 - **Other "assets only one source has seen" workflows.** The export search is the interesting, generalizable part. `source:sample source_count:1` finds passively-observed-only assets, but the same three-step shape — export a query, group by Explorer, queue a scan — would serve any coverage gap expressible as a runZero search: assets last seen more than N days ago, assets in a site with no recent scan, assets discovered by an integration that active scanning has never confirmed. Parameterizing the search turns this from one workflow into a general scan-orchestration primitive.

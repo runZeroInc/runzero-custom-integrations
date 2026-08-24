@@ -8,6 +8,11 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Bound on the paging loop. A server that keeps answering with a full page
+    # -- because it ignores 'offset', or because its 'total' never settles
+    # while rows are being added -- must not spin forever; hitting this raises
+    # so a truncated register is an error rather than a silent partial import.
+    "maxPages": 10000,
     "params": [
         {
             "key": "url",
@@ -50,7 +55,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'network_interface')
+load('net', 'network_interface', 'clean_hostname')
 load('http', 'get_json', 'bearer', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_int')
 
@@ -99,11 +104,6 @@ def custom_field_ips(custom_fields):
                 ips.append(text)
     return ips
 
-# Bound on the paging loop. A server that keeps answering with a full page --
-# because it ignores 'offset', or because its 'total' never settles while rows
-# are being added -- must not spin forever.
-MAX_PAGES = 10000
-
 def build_assets(assets_json, scope):
     assets_import = []
     for asset in assets_json:
@@ -148,7 +148,9 @@ def build_assets(assets_json, scope):
         checkout_count = asset.get(str('checkout_counter'), '')
         company_info = asset.get('company', {})
         if company_info:
-            company_name = company_info.get('')
+            company_name = company_info.get('name', '')
+        else:
+            company_name = ''
         created_info = asset.get('created_at', {})
         if created_info:
             created = created_info.get('datetime', '')
@@ -214,6 +216,13 @@ def build_assets(assets_json, scope):
         network = network_interface(ips=ips, mac=mac)
         interfaces = [network] if network else []
 
+        # The asset name is usually the device's real hostname, and without it
+        # a stock install's rows carry no correlator at all and can never merge
+        # with scanned assets. clean_hostname rejects free-text labels,
+        # placeholders, and IP-shaped values, so only a name that can actually
+        # be a hostname is imported as one; the raw name stays an attribute.
+        host = clean_hostname(name)
+
         assets_import.append(
             ImportAsset(
                 # Snipe-IT's hardware id is a per-instance auto-increment
@@ -225,6 +234,7 @@ def build_assets(assets_json, scope):
                 model=model,
                 deviceType=device_type,
                 manufacturer=manufacturer,
+                hostnames=[host] if host else [],
                 networkInterfaces=interfaces,
                 customAttributes=to_custom_attributes({
                     "age": age,
@@ -233,6 +243,7 @@ def build_assets(assets_json, scope):
                     "byod": byod,
                     "checkin.count": checkin_count,
                     "checkout.count": checkout_count,
+                    "company.name": company_name,
                     "eol": eol,
                     "eol.date": eol_date,
                     "expected.checkin": expected_checkin,
@@ -292,9 +303,12 @@ def stream_assets(base_url, scope, http_options, page_size, max_assets):
     fetched = 0
     reported = 0
     total = 0
-    complete = False
 
-    for page in range(MAX_PAGES):
+    # Bounded by CONFIG["maxPages"]: running out of pages raises, naming the
+    # label and the key, so a register the server keeps re-serving surfaces as
+    # an error rather than a silently truncated import.
+    _pager = pager("hardware")
+    while _pager.next():
         params = {'limit': page_size, 'offset': fetched}
         data, err = get_json(url, params=params, **http_options)
         if err:
@@ -310,7 +324,6 @@ def stream_assets(base_url, scope, http_options, page_size, max_assets):
         # two requests, and kept from the previous page when a response omits it.
         total = to_count(data.get('total')) or total
         if not rows:
-            complete = True
             break
 
         fetched += len(rows)
@@ -330,15 +343,10 @@ def stream_assets(base_url, scope, http_options, page_size, max_assets):
         # single-page truncation this pagination replaced.
         if total:
             if fetched >= total:
-                complete = True
                 break
         elif len(rows) < page_size:
-            complete = True
             break
 
-    if not complete:
-        print('snipe-it: stopped at the {}-page safety limit after {} hardware records; the register may be larger'.format(
-            MAX_PAGES, fetched))
     return reported
 
 

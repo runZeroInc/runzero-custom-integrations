@@ -100,15 +100,18 @@ def get_tasks(src_url, src_org_id, src_task_search_filter, src_token, config_kwa
     return data or []
 
 def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_org_id, dst_site_id, hide_tasks_on_sync, config_kwargs):
-    # Download data from SaaS
+    # Download data from SaaS. The org id travels on this call too: with an
+    # account-level token, the task list resolves against ?_oid= while a /data
+    # call without it resolves against the token's default org and 404s, so
+    # every task would print "Failed to download" and nothing would sync.
     print("Pulling task with ID {}".format(task_id))
-    download_url = "{}/api/v1.0/org/tasks/{}/data".format(src_url, task_id)
+    download_url = "{}/api/v1.0/org/tasks/{}/data?_oid={}".format(src_url, task_id, src_org_id)
     download = http_get(
         download_url,
         timeout=3600,
         **get_http_options(config_kwargs, "src_http_", "src_tls_", {"Authorization": bearer(src_token), "Accept": "application/octet-stream", "Content-Encoding": "gzip"}),
     )
-    if download.status_code != 200:
+    if not download or download.status_code != 200:
         print("Failed to download task:", task_id)
         return False
 
@@ -123,7 +126,16 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
     # exception handling, so calling gzip_decompress on that aborts the whole
     # run and every task after this one is silently never synced.
     unzipped = download.body
+    if not unzipped:
+        print("Task data was empty; skipping task:", task_id)
+        return False
     if unzipped[0:1] != "{":
+        # Only a real gzip member (magic byte 0x1f) may reach gzip_decompress:
+        # a 200 carrying an HTML proxy page or a truncated body would otherwise
+        # raise, aborting the run and silently skipping every later task.
+        if unzipped[0:1] != "\x1f":
+            print("Task data was neither JSON nor gzip; skipping task:", task_id)
+            return False
         unzipped = gzip_decompress(unzipped)
     upload_url = "{}/api/v1.0/org/sites/{}/import?_oid={}".format(dst_url, dst_site_id, dst_org_id)
     upload = http_put(
@@ -133,7 +145,7 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
         **get_http_options(config_kwargs, "dst_http_", "dst_tls_", {"Authorization": bearer(dst_token), "Content-Type": "application/octet-stream", "Content-Encoding": "gzip"}),
     )
 
-    if upload.status_code != 200:
+    if not upload or upload.status_code != 200:
         print("Failed to upload task:", task_id)
         return False
 
@@ -145,8 +157,13 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
             hide_url,
             **get_http_options(config_kwargs, "src_http_", "src_tls_", {"Authorization": bearer(src_token), "Content-Type": "application/json"}),
         )
-        if hide.status_code == 200:
+        if hide and hide.status_code == 200:
             print("Task hidden:", task_id)
+        else:
+            # A silent hide failure re-syncs the same task on every run with
+            # no visible cause, so the failure has to reach the log.
+            print("Failed to hide task {}: status {}".format(
+                task_id, hide.status_code if hide else "no response"))
 
     return True
 

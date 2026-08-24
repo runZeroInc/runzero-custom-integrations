@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "snipe-it",
-  "description": "One page of hardware. Proves the bearer token reaches /api/v1/hardware, that model/category/manufacturer are read out of their nested objects, that the MAC Address custom field becomes the interface, and that a row with no id, asset_tag or serial is skipped with a log line. Addresses come from the custom fields, matched either on field_format ('Management Address', format IP, holding two addresses in one value) or on a conventional field name ('IP Address', no field_format) -- a v7 hardware row returns no address of its own. One thing this still pins that is wrong: no hostname is ever emitted, so an asset's correlators are only its MAC and addresses.",
+  "description": "One page of hardware. Proves the bearer token reaches /api/v1/hardware, that model/category/manufacturer/company are read out of their nested objects, that the MAC Address custom field becomes the interface, and that a row with no id, asset_tag or serial is skipped with a log line. Addresses come from the custom fields, matched either on field_format ('Management Address', format IP, holding two addresses in one value) or on a conventional field name ('IP Address', no field_format) -- a v7 hardware row returns no address of its own. The asset name is now also imported as a hostname when it survives the clean_hostname scrubber, so a stock install's rows finally carry a correlator; the raw name stays a custom attribute either way.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "fixture-snipe-token"
@@ -24,6 +24,7 @@
               "model_number": "LAT7440",
               "category": {"id": 1, "name": "Laptop"},
               "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "company": {"id": 6, "name": "Acme Holdings"},
               "status_label": {"id": 1, "name": "Ready to Deploy", "status_type": "deployable"},
               "location": {"id": 3, "name": "HQ"},
               "supplier": {"id": 5, "name": "Acme Reseller"},
@@ -77,13 +78,13 @@
     "assets": [
       {
         "id": "snipe-it:$HOST:hardware:12",
-        "fields": {"macAddresses": "00:1b:44:11:3a:b7", "ipAddresses": "10.140.1.12", "deviceType": "Laptop", "asset.tag": "RZ-0012", "serial.number": "SER0000012", "name": "hq-laptop-12"},
-        "fields_absent": ["hostnames"]
+        "fields": {"hostnames": "hq-laptop-12", "macAddresses": "00:1b:44:11:3a:b7", "ipAddresses": "10.140.1.12", "deviceType": "Laptop", "asset.tag": "RZ-0012", "serial.number": "SER0000012", "name": "hq-laptop-12", "company.name": "Acme Holdings"},
+        "fields_absent": []
       },
       {
         "id": "snipe-it:$HOST:hardware:13",
-        "fields": {"macAddresses": "00:1b:44:11:3a:c8", "ipAddresses": "10.140.2.13\t2001:db8:140::13", "deviceType": "Network Device", "location": "DC1"},
-        "fields_absent": ["hostnames"]
+        "fields": {"hostnames": "dc-switch-13", "macAddresses": "00:1b:44:11:3a:c8", "ipAddresses": "10.140.2.13\t2001:db8:140::13", "deviceType": "Network Device", "location": "DC1"},
+        "fields_absent": ["company.name"]
       }
     ],
     "asset_count": 2,

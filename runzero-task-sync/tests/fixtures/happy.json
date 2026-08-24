@@ -209,6 +209,7 @@
       {
         "method": "GET",
         "path": "/api/v1.0/org/tasks/d1d1d1d1-1111-4222-8333-444444444444/data",
+        "query_contains": "_oid=aaaaaaaa-1111-4222-8333-444444444444",
         "header": {"Accept": "application/octet-stream"}
       },
       {"method": "GET", "path": "/scan-bucket/scan_d1d1d1d1_eeeeeeee.json.gz"},

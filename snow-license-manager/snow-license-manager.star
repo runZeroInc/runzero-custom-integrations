@@ -8,6 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Backstop for the Meta-driven pagers below: the walk normally ends when a
+    # page arrives without the PageSize meta entry, and if a server never omits
+    # it this is what stops the loop instead of the 1,000,000-page default.
+    "maxPages": 10000,
     "params": [
         {
             "key": "url",
@@ -42,10 +46,21 @@ CONFIG = {
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('base64', base64_encode='encode', base64_decode='decode')
+load('coerce', 'as_text', 'as_dict', 'as_list', 'dicts', 'as_int')
 load('http', 'get_json', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
 load('net', 'network_interface')
-load('time', 'parse_time')
+load('time', 'parse_ts')
+
+
+def _ts_attr(value, default=''):
+    """Unix epoch for a Snow timestamp attribute, or the raw value when it
+    cannot be parsed. parse_ts never raises, so one date-only or already-offset
+    timestamp on one record cannot abort the whole import."""
+    ts = parse_ts(value)
+    if ts:
+        return ts.unix
+    return value if value else default
 
 def _is_true(value):
     """Read a Snow boolean, which arrives as a bool, a string, or 0/1."""
@@ -76,10 +91,36 @@ def device_type(item):
     return None
 
 
+def _indexed_attrs(custom_attributes, prefix, value):
+    """Flatten a hardware sub-collection (disks, drives, adapters, monitors)
+    into indexed custom attribute keys. The collection arrives as a list of
+    dicts or, for a single entry, as a bare dict; anything else is skipped."""
+    entries = dicts(value)
+    for index in range(len(entries)):
+        for k, v in entries[index].items():
+            custom_attributes[prefix + '.' + str(index) + '.' + str(k)] = v
+
+
+def get_computer_detail(base_url, customer_id, asset_id, creds, config_kwargs):
+    """Fetch one computer's full record and return its Body dict, or {}.
+
+    Only called when a computers-list row carries no Hardware block at all --
+    the fallback for an SLM build whose list returns summary rows."""
+    url = base_url + '/api/customers/' + customer_id + '/computers/' + str(asset_id)
+    headers = {'Accept': 'application/json',
+               'Authorization': 'Basic ' + creds}
+    http_options = get_http_options(config_kwargs, headers=headers)
+    data, err = get_json(url, **http_options)
+    if err:
+        print('failed to retrieve computer detail for ' + str(asset_id) + ': ' + err)
+        return {}
+    return as_dict(as_dict(data).get('Body'))
+
+
 def build_assets(base_url, customer_id, assets, creds, config_kwargs):
     assets_import = []
-    for entry in assets:
-        item = entry.get('Body', {})
+    for entry in dicts(assets):
+        item = as_dict(entry.get('Body'))
         raw_id = item.get('Id') or item.get('BiosSerialNumber')
         if not raw_id:
             print("snow: skipping computer with no Id/BiosSerialNumber: name=" + str(item.get('Name', '')))
@@ -91,13 +132,22 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
         os = item.get('OperatingSystem', '')
         os_version = item.get('OperatingSystemServicePack', '')
 
+        # The list row is expected to carry the Hardware block, but whether the
+        # real SLM computers LIST returns full rows or summary rows is not
+        # confirmed against a live install. When Hardware is absent entirely,
+        # the per-computer detail record is fetched as a fallback so a
+        # summary-row server still imports interfaces instead of hostname-only
+        # records; a server whose list rows are full never pays the extra call.
+        hw = item.get('Hardware')
+        if hw == None:
+            detail = get_computer_detail(base_url, customer_id, asset_id, creds, config_kwargs)
+            hw = detail.get('Hardware')
+        hw = as_dict(hw)
+
         # create the network interfaces
         interfaces = []
-        adapters = item.get('Hardware', {}).get('NetworkAdapters', [])
-        for adapter in adapters:
-            addresses = adapter.get('IpAddress', '').split(';')
-            if type(addresses) != 'list':
-                addresses = [addresses]
+        for adapter in dicts(hw.get('NetworkAdapters')):
+            addresses = as_text(adapter.get('IpAddress')).split(';')
             interface = network_interface(ips=addresses, mac=adapter.get('MacAddress', None))
             # network_interface returns None when nothing usable survives;
             # appending it aborts the whole run at ImportAsset.
@@ -105,11 +155,7 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
                 interfaces.append(interface)
 
         # Retrieve and map custom attributes
-        hw = item.get('Hardware', {})
-        bios_date = hw.get('BiosDate', '')
-        #Reformat bios_date timestamp for runZero parsing
-        if bios_date and bios_date != '':
-            bios_date = parse_time(bios_date + 'Z').unix
+        bios_date = _ts_attr(hw.get('BiosDate'))
         bios_sn = item.get('BiosSerialNumber', '')
         bios_version = hw.get('BiosVersion', '')
         core_count = item.get('CoreCount', '')
@@ -119,10 +165,7 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
         is_portable = item.get('IsPortable', '')
         is_server = item.get('IsServer', '')
         is_virtual = item.get('IsVirtual', '')
-        last_scan_date = item.get('LastScanDate', '')
-        # Reformat last_scan_date timestamp for runZero parsing
-        if last_scan_date and last_scan_date != '':
-            last_scan_date = parse_time(last_scan_date + 'Z').unix
+        last_scan_date = _ts_attr(item.get('LastScanDate'))
         memory_slots = hw.get('MemorySlots', '')
         memory_slots_avail = hw.get('MemorySlotsAvailable', '')
         most_freq_user = item.get('MostFrequentUserId', '')
@@ -141,7 +184,10 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
         total_disk_space_mb = hw.get('TotalDiskSpaceMb', '')
         total_disk_space_avail_mb = hw.get('TotalDiskSpaceAvailableMb', '')
         updated_by = item.get('UpdatedBy', '')
-        updated_date = item.get('UpdatedData', '')
+        # Both spellings: 'UpdatedData' is what this script always read, but
+        # 'UpdatedDate' is the plausible real field name; neither is confirmed
+        # against a live install, so whichever is present wins.
+        updated_date = item.get('UpdatedDate') or item.get('UpdatedData', '')
 
         custom_attributes = {
             'biosDate': bios_date,
@@ -176,46 +222,12 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
             'updatedDate': updated_date
         }
         
-        logical_disks = hw.get('LogicalDisks', None)
-        if logical_disks and type(logical_disks) == 'list':
-            for disk in logical_disks:
-                if disk:
-                    for k, v in disk.items():
-                        custom_attributes['logicalDisks.' + str(logical_disks.index(disk)) + '.' + k] = v
-        if logical_disks and type(logical_disks) == 'dict':
-            for k, v in logical_disks.items():
-                custom_attributes['logicalDisks.0.' + k] = v
-
-
-        optical_drives = hw.get('OpticalDrives', None)
-        if optical_drives and type(optical_drives) == 'list':
-            for drive in optical_drives:
-                if drive:
-                    for k, v in drive.items():
-                        custom_attributes['opticalDrives.' + str(optical_drives.index(drive)) + '.' + k] = v
-        if optical_drives and type(optical_drives) == 'dict':
-            for k, v in optical_drives.items():
-                    custom_attributes['opticalDrives.0.' + k] = v
-
-        display_adapters = hw.get('DisplayAdapters', None)
-        if display_adapters and type(display_adapters) == 'list':
-            for adapter in display_adapters:
-                if adapter:
-                    for k, v in adapter.items():
-                        custom_attributes['displayAdapter.' + str(display_adapters.index(adapter)) + '.' + k] = v
-        if display_adapters and type(display_adapters) == 'dict':
-            for k, v in display_adapters.items():
-                    custom_attributes['displayAdapter.0.' + k] = v
-
-        monitors = hw.get('Monitors', None)
-        if monitors and type(monitors) == 'list':
-            for monitor in monitors:
-                if monitor:
-                    for k, v in monitor.items():
-                        custom_attributes['monitor.' + str(monitors.index(monitor)) + '.' + k] = v
-        if monitors and type(monitors) == 'dict':
-            for k, v in monitors.items():
-                    custom_attributes['monitor.0.' + k] = v
+        # Each of these arrives as a list of dicts or, for a single entry, as a
+        # bare dict; dicts() accepts both and skips nulls and stray strings.
+        _indexed_attrs(custom_attributes, 'logicalDisks', hw.get('LogicalDisks'))
+        _indexed_attrs(custom_attributes, 'opticalDrives', hw.get('OpticalDrives'))
+        _indexed_attrs(custom_attributes, 'displayAdapter', hw.get('DisplayAdapters'))
+        _indexed_attrs(custom_attributes, 'monitor', hw.get('Monitors'))
 
         # Retrieve software information for asset
         # create software entries
@@ -223,7 +235,9 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
         applications = get_apps(base_url, customer_id, asset_id, creds, config_kwargs)
         for app in applications:
             software_entry = build_app(app)
-            software.append(software_entry)
+            # build_app declines rows with no Id rather than aborting the run.
+            if software_entry:
+                software.append(software_entry)
 
         # Build assets for import
         assets_import.append(
@@ -243,8 +257,13 @@ def build_assets(base_url, customer_id, assets, creds, config_kwargs):
     return assets_import
 
 def build_app(software_entry):
-    app = software_entry.get('Body', {})
+    """Convert one application row into a Software record, or None to skip it."""
+    app = as_dict(as_dict(software_entry).get('Body'))
     app_id = app.get('Id', None)
+    if not app_id:
+        # Software(id=None) fails the whole record; skip the row instead.
+        print('snow: skipping application row with no Id: name=' + str(app.get('Name', '')))
+        return None
     # NO PER-APPLICATION DETAIL CALL IS MADE HERE, DELIBERATELY.
     #
     # A `get_app_details()` helper used to sit below, wrapping
@@ -278,30 +297,12 @@ def build_app(software_entry):
     family_name = app.get('FamilyName', '')
     bundled_app_id = app.get('BundleApplicationId', '')
     bundled_app_name = app.get('BundleApplicationName', '')
-    last_used = app.get('LastUsed', '')
-    # Reformat last_used timestamp for runZero parsing
-    if last_used and last_used != '':
-        last_used = parse_time(last_used + 'Z').unix
-    else:
-        last_used = 'n/a'
-    first_used = app.get('FirstUsed', '')
-    # Reformat first_used timestamp for runZero parsing
-    if first_used and first_used != '':
-        first_used = parse_time(first_used + 'Z').unix
-    else:
-        first_used = 'n/a'
-    install_date = app.get('InstallDate', '')
-    # Reformat install_date timestamp for runZero parsing
-    if install_date and install_date != '':
-        install_date = parse_time(install_date + 'Z').unix
-    else:
-        install_date = 'n/a'
-    discovered_date = app.get('DiscoveredDate', '')
-    # Reformat discovered_date timestamp for runZero parsing
-    if discovered_date and discovered_date != '':
-        discovered_date = parse_time(discovered_date + 'Z').unix
-    else:
-        discovered_date = 'n/a'
+    # Timestamps become unix epochs via parse_ts, which never raises; a value
+    # that cannot be parsed is carried raw and an absent one reads 'n/a'.
+    last_used = _ts_attr(app.get('LastUsed'), 'n/a')
+    first_used = _ts_attr(app.get('FirstUsed'), 'n/a')
+    install_date = _ts_attr(app.get('InstallDate'), 'n/a')
+    discovered_date = _ts_attr(app.get('DiscoveredDate'), 'n/a')
     run = app.get('Run', '')
     avg_usage_time = app.get('AvgUsageTime', '')
     users = app.get('Users', '')
@@ -368,18 +369,25 @@ def get_computers(base_url, customer_id, creds, config_kwargs):
             print('failed to retrieve assets at $skip=' + str(items_returned) + ': ' + err)
             break
         elif data:
-            meta = data['Meta']
+            # Direct indexing on the envelope aborts the run if a 200 arrives
+            # without the Meta/Body shape, so every level is coerced instead.
+            data = as_dict(data)
             has_page_size = False
-            for item in meta:
-                if item['Name'] == 'Count':
-                    total_items = item.get('Value')
-                if item['Name'] == 'PageSize':
+            page_size = 0
+            for item in dicts(data.get('Meta')):
+                name = item.get('Name')
+                if name == 'Count':
+                    total_items = as_int(item.get('Value'))
+                if name == 'PageSize':
                     has_page_size = True
-                    items_returned += item.get('Value')
-            computers = data['Body']
+                    page_size = as_int(item.get('Value'))
+            computers = as_list(data.get('Body'), wrap=False)
             reported += report_assets(build_assets(base_url, customer_id, computers, creds, config_kwargs))
-            if not has_page_size: # The last page lacks the page size meta value
+            if not has_page_size or page_size <= 0:
+                # The last page lacks the PageSize meta value, and a PageSize
+                # that cannot advance $skip would re-request the same rows.
                 break
+            items_returned += page_size
             print(str(items_returned) + ' computers of ' + str(total_items) + ' returned from API')
         else:
             break
@@ -410,18 +418,24 @@ def get_apps(base_url, customer_id, asset_id, creds, config_kwargs):
             print('failed to retrieve application for ' + str(asset_id) + ' at $skip=' + str(items_returned) + ': ' + err)
             break
         elif data:
-            meta = data['Meta']
+            # Same envelope coercion as get_computers: a 200 without the
+            # Meta/Body shape must not abort the run.
+            data = as_dict(data)
             has_page_size = False
-            for item in meta:
-                if item['Name'] == 'Count':
-                    total_items = item.get('Value')
-                if item['Name'] == 'PageSize':
+            page_size = 0
+            for item in dicts(data.get('Meta')):
+                name = item.get('Name')
+                if name == 'Count':
+                    total_items = as_int(item.get('Value'))
+                if name == 'PageSize':
                     has_page_size = True
-                    items_returned += item.get('Value')
-            applications = data['Body']
-            applications_all.extend(applications)
-            if not has_page_size: # The last page lacks the page size meta value
+                    page_size = as_int(item.get('Value'))
+            applications_all.extend(dicts(data.get('Body')))
+            if not has_page_size or page_size <= 0:
+                # The last page lacks the PageSize meta value, and a PageSize
+                # that cannot advance $skip would re-request the same rows.
                 break
+            items_returned += page_size
             print(str(items_returned) + ' applications of ' + str(total_items) + ' returned from API')
         else:
             # A 2xx with an empty body decodes to None, which matches neither

@@ -18,7 +18,7 @@ git clone https://github.com/runZeroInc/runzero-custom-integrations.git
 
 **username** and **password** — a SolarWinds Platform Web Console account, configured in the Credentials section of runZero. These are not API keys; SWIS authenticates with HTTP Basic against a normal console account.
 
-**A SWQL query** — this integration ships with an **empty query** and imports nothing until you supply one. See the configuration steps below. This is the most common reason a correctly configured task returns zero assets.
+**A SWQL query** — this integration ships with a default query that selects only documented `Orion.Nodes` properties (`NodeID`, `Caption`, `DNS`, `SysName`, `IPAddress`, `Vendor`, `MachineType`, `NodeDescription`, `IOSVersion`, `CPULoad`, `PercentMemoryUsed`, `MemoryUsed`, `ResponseTime`, `Status`, `StatusDescription`, `SysObjectID`, `SystemUpTime`), so a stock install imports out of the box. Narrow or extend it via the `query` credential parameter; alias any column you add to the name the script reads.
 
 ### Which port
 
@@ -83,7 +83,7 @@ validation fail by default. Either install a trusted certificate on the server
 1. (Make any neccessary changes to the script to align with your environment. 
     - Modify API calls as needed to filter assets
      >- Determine the proper SWQL query needed to return the data set to import to runZero
-     >- Add this query to the integration script in the 'params' variable within the 'get_assets' function.
+     >- Set it in the **SWQL query** (`query`) credential parameter; the default selects the documented `Orion.Nodes` columns the script maps.
     - Modify attribute mapping based on the data returned by the SWQL query as needed
         >- The integration script outlines some common example attributes that could be brought in from Solarwinds but the attributes that are actually retrieved will be determined by the SWQL query passed in the API call params
         >- Modify the asset attributes and custom attributes to match the data provided by the SWQL query following the pattern outlined in the script
@@ -110,8 +110,7 @@ validation fail by default. Either install a trusted certificate on the server
 ### Running it from the command line
 
 The runZero CLI runs a script directly, which is the fastest way to iterate on a
-SWQL query — and because this integration ships with an empty query, iterating on
-one is most of the work. Each `CONFIG` parameter is a `--kwargs key=value` pair:
+custom SWQL query. Each `CONFIG` parameter is a `--kwargs key=value` pair:
 
 ```bash
 runzero script --filename solarwinds-information-service/solarwinds-information-service.star \
@@ -197,19 +196,19 @@ is whatever your query happens to select, and getting that wrong produces a sile
 identity failure rather than an error.
 
 - Target entity: a **node** in SolarWinds Orion — a device Orion polls, which may be a server, a switch, a router, a firewall, a UPS, or anything else with an address Orion monitors.
-- Source ID field: `NodeId`, falling back to `Fqdn`, then to `IpAddress`. A row with none of the three is skipped and logged.
+- Source ID field: `NodeID`, falling back to `DNS`, then to `IPAddress`. A row with none of the three is skipped and logged.
 - Documentation evidence: `NodeID` is the primary key of `Orion.Nodes` and the value every other Orion entity joins a node with — `Orion.NodesCustomProperties`, `Orion.NPM.Interfaces`, `Orion.Volumes`, and the rest all carry a `NodeID` foreign key. The [Cortex.Orion.Node schema reference](https://solarwinds.github.io/OrionSDK/schema/Cortex.Orion.Node.html) documents it as the node key, and SWIS URIs for a node are built from it. It is the right field, and it is not the one you will get by accident.
 - Uniqueness scope: one Orion installation, and the id now says which one. `NodeID` is a small per-installation auto-increment integer that every Orion numbers from 1, so a bare id collided systematically on low integers as soon as two Orion servers were imported into one runZero organization. The id is therefore namespaced on the host from the configured SWIS URL — `swis:<swis-host>:node:<id>` — which is the only thing distinguishing two installations that this API exposes.
 - Cardinality: one asset per node **if the query returns one row per node**. A SWQL query that joins to interfaces, volumes, or any other child entity returns one row per child, and the script builds one `ImportAsset` per row — several rows sharing a `NodeId` produce several assets with the same foreign id, which the platform merges last-write-wins. Nothing errors; the attributes simply become arbitrary. Keep the query on `Orion.Nodes` and pull child data with a separate pass if you need it.
 - Stability: `NodeID` is stable for the life of the node record and survives rename, re-addressing, and re-polling. It does not survive deleting and re-adding the node, which is a routine way Orion estates are corrected.
 - Reuse behavior: not documented. Orion's node ids are sequential integers and a restored database can certainly re-issue them.
 - Presence: **entirely under your control, and this is the trap.** The two fallbacks fire when the SWQL query does not select `NodeID`:
-  - A query selecting `Fqdn` but not `NodeID` silently keys every asset on its **hostname**. That works until a device is renamed, at which point it becomes a new asset.
-  - A query selecting neither keys on **`IpAddress`**, which is far worse — a DHCP device changes identity whenever its lease changes, and two nodes that have ever shared an address merge into one.
+  - A query selecting `DNS` but not `NodeID` silently keys every asset on its **hostname**. That works until a device is renamed, at which point it becomes a new asset.
+  - A query selecting neither keys on **`IPAddress`**, which is far worse — a DHCP device changes identity whenever its lease changes, and two nodes that have ever shared an address merge into one.
 
   Neither case logs anything. The run succeeds, the asset count looks right, and the identity is wrong. Select `NodeID` in every query, whether or not you map it to anything.
-- Final runZero ID: `swis:<swis-host>:node:<NodeId>`, falling back to the `Fqdn` or `IpAddress` in the same slot when the query returned no `NodeId`.
-- Missing-ID behavior: the row is skipped and tallied, and the run prints one `swis: skipped N nodes with no NodeId/Fqdn/IpAddress` line at the end rather than a line per row — a query selecting the wrong columns would otherwise log once per node in the estate.
+- Final runZero ID: `swis:<swis-host>:node:<NodeID>`, falling back to the `DNS` or `IPAddress` value in the same slot when the query returned no `NodeID`.
+- Missing-ID behavior: the row is skipped and tallied, and the run prints one `swis: skipped N nodes with no NodeID/DNS/IPAddress` line at the end rather than a line per row — a query selecting the wrong columns would otherwise log once per node in the estate.
 - Match behavior: **left at the platform default** — all eight flags on.
 - Verdict: authoritative within one Orion installation **when the query selects `NodeID`**; hostname- or address-derived and not authoritative otherwise.
 
@@ -230,8 +229,9 @@ The usual companion preset `no-mac-break no-ip-break no-name-break` would be wro
 
 Two mapping details worth knowing:
 
-- **`IpAddress` is wrapped in a list before parsing** — `network_interface(ips=[addresses], ...)` — so a node reporting several addresses in one field yields one address, not several. Orion's `Orion.Nodes.IPAddress` is a single primary address by design; secondary addresses live on `Orion.NodeIPAddresses`, which this integration does not read.
-- **`OsVersion` is mapped to `os`, not to `osVersion`.** On Orion that field carries a descriptive string rather than a bare version number, so it reads better as the OS; nothing is mapped to `osVersion` at all.
+- **`IPAddress` is wrapped in a list before parsing** — `network_interface(ips=[...], ...)` — so a node reporting several addresses in one field yields one address, not several. Orion's `Orion.Nodes.IPAddress` is a single primary address by design; secondary addresses live on `Orion.NodeIPAddresses`, which this integration does not read.
+- **`IOSVersion` is mapped to `osVersion`; nothing is mapped to `os`.** `Orion.Nodes` has no OS-name property — `MachineType` mixes hardware models and OS strings — so the OS name is left to runZero fingerprinting and `MachineType`/`NodeDescription` are carried as custom attributes.
+- **Hostnames are scrubbed.** `DNS`, `SysName`, and `Caption` all feed the hostname list, but each goes through the `net.hostname` filter first: a `DNS` field holding a bare IP, or a `Caption` that is a free-text label, must not become a searchable hostname.
 
 ## Future
 

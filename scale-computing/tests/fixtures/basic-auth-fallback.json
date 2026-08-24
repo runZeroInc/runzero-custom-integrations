@@ -1,0 +1,100 @@
+{
+  "name": "basic-auth-fallback",
+  "integration": "scale-computing",
+  "description": "A cluster that rejects per-request HTTP Basic auth with a 401. Whether HyperCore v1 accepts Basic on every route is unverified against a real cluster -- Scale's own tooling authenticates via POST /rest/v1/login and a session cookie -- so the script keeps Basic as the first attempt and falls back to the login session once when Basic gets a 401. The first Cluster call answers 401, the login succeeds, the Cluster call is retried, and the rest of the walk proceeds; a run without the fallback imports nothing, ever, on such a cluster.\n\nThe network device row also carries a link-local 169.254 guest address alongside the real one, pinning that guest-reported IP lists are filtered through routable_ips before they become an interface -- an unfiltered link-local address cross-correlates unrelated VMs (and the no_loopback_interfaces invariant would fail).\n\nnamespaced_ids is skipped because the foreign id is the bare HC3 VirDomain UUID with no cluster or appliance scope, as in the other scenarios. Pre-existing, not introduced here.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/rest/v1/Cluster"},
+      "responses": [
+        {"status": 401, "json": {"error": "Authentication required"}},
+        {"status": 200, "json": [{"uuid": "cluster-uuid-0301", "clusterName": "HC3 Cluster D"}]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/rest/v1/login"},
+      "responses": [
+        {"status": 200, "json": {"sessionID": "fixture-session-0301"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "virdomain",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomain"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "vm-uuid-0301",
+              "name": "vm-edge-01",
+              "operatingSystem": "os_other",
+              "description": "Edge relay",
+              "state": "RUNNING",
+              "nodeUUID": "node-uuid-0301",
+              "mem": 4294967296,
+              "numVCPU": 2,
+              "tags": "edge",
+              "created": 1750000000,
+              "modified": 1786000000
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "virdomain-netdevice",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "nic-uuid-0301",
+              "virDomainUUID": "vm-uuid-0301",
+              "macAddress": "00:11:26:00:03:01",
+              "ipv4Addresses": ["10.123.0.11", "169.254.10.9"],
+              "vlan": 10,
+              "connected": true
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["vm-uuid-0301"],
+    "assets": [
+      {
+        "id": "vm-uuid-0301",
+        "fields": {
+          "hostnames": "vm-edge-01",
+          "macAddresses": "00:11:26:00:03:01",
+          "ipAddresses": "10.123.0.11",
+          "clusterName": "HC3 Cluster D"
+        }
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/rest/v1/Cluster", "header_contains": "Basic "},
+      {"method": "POST", "path": "/rest/v1/login", "body_contains": "fixture-user"},
+      {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"}
+    ],
+    "log_contains": [
+      "scale-computing: Basic auth was rejected; continuing with a /rest/v1/login session",
+      "scale-computing: reported 1 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

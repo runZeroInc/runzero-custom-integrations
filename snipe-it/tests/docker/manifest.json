@@ -1,7 +1,7 @@
 {
   "name": "snipe-it",
   "integration": "snipe-it",
-  "description": "Imports three hardware rows created over a real Snipe-IT REST API, proving the per-row MAC custom-field mapping, that a row without a MAC does not inherit the previous row's, and that the foreign id carries the instance scope rather than being the bare auto-increment primary key.",
+  "description": "Imports three hardware rows created over a real Snipe-IT REST API, proving the per-row MAC custom-field mapping, that a row without a MAC does not inherit the previous row's, that the asset name imports as a hostname (the correlator a stock install's rows otherwise lack), and that the foreign id carries the instance scope rather than being the bare auto-increment primary key.",
   "compose": "compose.yml",
   "service": "snipeit",
   "port": 80,
@@ -30,6 +30,7 @@
       {
         "id": "snipe-it:$HOST:hardware:${seed.web_id}",
         "fields": {
+          "hostnames": "web01",
           "macAddresses": "00:11:22:33:44:55",
           "deviceType": "Servers",
           "manufacturer": "Dell Inc.",
@@ -46,6 +47,7 @@
       {
         "id": "snipe-it:$HOST:hardware:${seed.db_id}",
         "fields": {
+          "hostnames": "db01",
           "macAddresses": "00:11:22:33:44:66",
           "name": "db01",
           "asset.tag": "RZ-0002"
@@ -54,6 +56,7 @@
       {
         "id": "snipe-it:$HOST:hardware:${seed.monitor_id}",
         "fields": {
+          "hostnames": "monitor01",
           "name": "monitor01",
           "asset.tag": "RZ-0003"
         },
@@ -63,10 +66,7 @@
   },
 
   "invariants": {
-    "skip": ["has_correlator"]
-  },
-  "_invariants_skip_reason": {
-    "has_correlator": "KNOWN DEFECT, and this scenario is the evidence. RZ-0003 has no MAC, and a real Snipe-IT v7 hardware payload carries no address data of its own -- addresses live in a custom field on the model's fieldset, and this row has none. The asset's `name` goes to a custom attribute rather than to hostnames, so the row emits with nothing to correlate on. The dead read of asset['networks'] that used to stand in for an address source is gone; giving a nameless row a correlator is an unresolved data-model question rather than a bug fix."
+    "skip": []
   },
 
   "check_determinism": true,

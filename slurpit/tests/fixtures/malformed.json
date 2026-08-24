@@ -1,0 +1,71 @@
+{
+  "name": "malformed",
+  "integration": "slurpit",
+  "description": "Rows in the shapes that must cost one record, never the run. The devices page carries a healthy device, a bare string where an object is documented (skipped silently by dicts), a null-id row (skipped with a log line), and a row whose address is not an IP and whose hostname is the localhost placeholder (skipped as uncorrelatable). The sites endpoint answers an OBJECT where a bare array is documented, which must degrade to no site context rather than failing the run -- the healthy device still imports, just without site attributes.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/platform/ping"},
+      "responses": [{"status": 200, "json": {"status": "up"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/sites"},
+      "responses": [
+        {"status": 200, "json": {"unexpected": "object shape"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/devices"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": 11, "hostname": "sw11", "fqdn": "sw11.lab.example", "address": "10.21.0.11",
+            "device_os": "ios", "os_version": "15.2(7)E3", "serial": "FTX1111ABCD",
+            "device_type": "Switch", "brand": "Cisco", "disabled": "0", "blacklisted": "0",
+            "site": "HQ", "tags": "", "createddate": "2025-01-04 08:00:00",
+            "changeddate": "2026-08-15 06:30:00", "last_seen": "2026-08-15 06:30:00"
+          },
+          "a bare string where a device object is documented",
+          {
+            "id": null, "hostname": "ghost", "address": "10.21.0.12", "disabled": "0"
+          },
+          {
+            "id": 7, "hostname": "localhost", "fqdn": null, "address": "not-an-ip",
+            "disabled": "0", "site": "", "tags": ""
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["slurpit:$HOST:device:11"],
+    "ids_absent": ["slurpit:$HOST:device:7"],
+    "assets": [
+      {
+        "id": "slurpit:$HOST:device:11",
+        "fields": {
+          "deviceType": "Switch",
+          "manufacturer": "Cisco",
+          "ipAddresses": "10.21.0.11"
+        },
+        "fields_absent": ["slurpit_site_city", "slurpit_site_country"]
+      }
+    ],
+    "request_count": 3,
+    "log_contains": [
+      "slurpit: /sites returned an object where a list was expected",
+      "slurpit: skipping device row with no id",
+      "slurpit: skipping device 7 with no usable address or hostname",
+      "slurpit: reported 1 devices"
+    ]
+  },
+  "check_determinism": true
+}

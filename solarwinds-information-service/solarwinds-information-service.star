@@ -33,8 +33,8 @@ CONFIG = {
             "label": "SWQL query",
             "type": "textarea",
             "required": False,
-            "default": "SELECT N.NodeID AS NodeId, N.Fqdn, N.OsVersion, N.Vendor, N.IPAddress AS IpAddress, N.CpuPercentUtilization, N.DiscoveryProfileId, N.PercentMemoryUsed, N.MemoryUsed, N.Pollers, N.ResponseTime, N.Status, N.SysObjectId, N.Uptime FROM Orion.Nodes N",
-            "description": "SWQL executed against the Information Service. The default selects the columns this integration maps; alias any column you add to the name the script reads. Which columns exist depends on the Orion version and the modules installed, so narrow or extend this to match your estate.",
+            "default": "SELECT N.NodeID, N.Caption, N.DNS, N.SysName, N.IPAddress, N.Vendor, N.MachineType, N.NodeDescription, N.IOSVersion, N.CPULoad, N.PercentMemoryUsed, N.MemoryUsed, N.ResponseTime, N.Status, N.StatusDescription, N.SysObjectID, N.SystemUpTime FROM Orion.Nodes N",
+            "description": "SWQL executed against the Information Service. The default selects only documented Orion.Nodes properties and the script reads them by those names; alias any column you add to the name the script reads. Which columns exist depends on the Orion version and the modules installed, so narrow or extend this to match your estate.",
         },
     ],
     "includes": {
@@ -43,19 +43,25 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('base64', base64_encode='encode', base64_decode='decode')
-load('http', 'get_json', 'url_encode', 'url_parse')
+load('base64', base64_encode='encode')
+load('http', http_get='get', 'url_parse')
+load('jsonstream', 'iter_array')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
+load('net', 'network_interface', 'clean_hostnames')
 
-# Repeated as a constant because a CONFIG default is applied by the console but
-# not on every path that can reach main(); see the note in AGENTS.md.
 VENDOR = "swis"
+
+# The default SWQL. Every property named here exists on Orion.Nodes in the
+# published OrionSDK schema; an earlier build selected invented names (Fqdn,
+# OsVersion, Uptime, Pollers...) which SWIS rejects outright, so a stock
+# install imported nothing until the operator rewrote the query.
+DEFAULT_QUERY = "SELECT N.NodeID, N.Caption, N.DNS, N.SysName, N.IPAddress, N.Vendor, N.MachineType, N.NodeDescription, N.IOSVersion, N.CPULoad, N.PercentMemoryUsed, N.MemoryUsed, N.ResponseTime, N.Status, N.StatusDescription, N.SysObjectID, N.SystemUpTime FROM Orion.Nodes N"
 
 
 def _scope(base_url):
     """Return the SWIS server's host, used to namespace every asset id.
 
-    Orion's NodeId is a small per-install integer and Fqdn and IpAddress are
+    Orion's NodeID is a small per-install integer and DNS and IPAddress are
     only unique inside one installation, so an unscoped id collides the moment
     two Orion servers are imported into one runZero account -- and with
     integers counting from 1, a collision is close to certain rather than
@@ -68,82 +74,86 @@ def _scope(base_url):
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
 
 
-DEFAULT_QUERY = "SELECT N.NodeID AS NodeId, N.Fqdn, N.OsVersion, N.Vendor, N.IPAddress AS IpAddress, N.CpuPercentUtilization, N.DiscoveryProfileId, N.PercentMemoryUsed, N.MemoryUsed, N.Pollers, N.ResponseTime, N.Status, N.SysObjectId, N.Uptime FROM Orion.Nodes N"
-load('net', 'network_interface')
+def build_asset(asset, scope):
+    """Convert one SWQL result row into an ImportAsset, or None to skip it."""
+    if type(asset) != "dict":
+        return None
+    raw_id = asset.get('NodeID') or asset.get('DNS') or asset.get('IPAddress')
+    if not raw_id:
+        return None
+    # Namespaced by the SWIS server: see _scope for why an unscoped NodeID
+    # cannot be an identity.
+    asset_id = "{}:{}:node:{}".format(VENDOR, scope, raw_id)
 
-def build_assets(assets, scope):
-    assets_import = []
-    # A node with none of the three identity fields cannot be imported.
-    # Counted rather than logged per record: a query that selects the wrong
-    # columns would otherwise print a line for every node in the estate.
-    skipped = 0
-    for asset in assets:
-        raw_id = asset.get('NodeId') or asset.get('Fqdn') or asset.get('IpAddress')
-        if not raw_id:
-            skipped += 1
-            continue
-        # Namespaced by the SWIS server: see _scope for why an unscoped
-        # NodeId cannot be an identity.
-        asset_id = "{}:{}:node:{}".format(VENDOR, scope, raw_id)
-        hostname = asset.get('Fqdn', '')
-        os = asset.get('OsVersion', '')
-        vendor = asset.get('Vendor', '')
+    # DNS is whatever the poller resolved, SysName is the SNMP sysName, and
+    # Caption is a free-text display name. Any of them can hold a bare IP or a
+    # placeholder, so all three go through the hostname scrubber rather than
+    # straight onto the asset.
+    names = clean_hostnames([asset.get('DNS'), asset.get('SysName'), asset.get('Caption')])
 
-        # create the network interfaces
-        interfaces = []
-        addresses = asset.get('IpAddress', [])
-        interface = network_interface(ips=[addresses], mac=None)
-        # network_interface returns None when nothing usable survives;
-        # appending it aborts the whole run at ImportAsset.
-        if interface:
-            interfaces.append(interface)
+    # create the network interface
+    interfaces = []
+    interface = network_interface(ips=[asset.get('IPAddress')], mac=None)
+    # network_interface returns None when nothing usable survives;
+    # appending it aborts the whole run at ImportAsset.
+    if interface:
+        interfaces.append(interface)
 
-        # Retrieve and map custom attributes
-        custom_attributes = to_custom_attributes({
-            'percentCpuUtilization':    asset.get('CpuPercentUtilization'),
-            'discoveryProfileId':       asset.get('DiscoveryProfileId'),
-            'percentMemoryUtilization': asset.get('PercentMemoryUsed'),
-            'memoryUtilized':           asset.get('MemoryUsed'),
-            'pollers':                  asset.get('Pollers'),
-            'responseTime':             asset.get('ResponseTime'),
-            'snmp.port':                asset.get('SnmpPort'),
-            'snmp.version':             asset.get('SnmpVersion'),
-            'status':                   asset.get('Status'),
-            'sysObjectId':              asset.get('SysObjectId'),
-            'uptime':                   asset.get('Uptime'),
-        })
+    custom_attributes = to_custom_attributes({
+        'caption':           asset.get('Caption'),
+        'dns':               asset.get('DNS'),
+        'sysName':           asset.get('SysName'),
+        'machineType':       asset.get('MachineType'),
+        'nodeDescription':   asset.get('NodeDescription'),
+        'cpuLoad':           asset.get('CPULoad'),
+        'percentMemoryUsed': asset.get('PercentMemoryUsed'),
+        'memoryUsed':        asset.get('MemoryUsed'),
+        'responseTime':      asset.get('ResponseTime'),
+        'status':            asset.get('Status'),
+        'statusDescription': asset.get('StatusDescription'),
+        'sysObjectId':       asset.get('SysObjectID'),
+        'systemUpTime':      asset.get('SystemUpTime'),
+    })
 
-        # Build assets for import
-        assets_import.append(
-            ImportAsset(
-                id=asset_id,
-                hostnames=[hostname],
-                os=os,
-                manufacturer=vendor,
-                networkInterfaces=interfaces,
-                customAttributes=custom_attributes,
-            )
-        )
-    if skipped > 0:
-        print("swis: skipped {} nodes with no NodeId/Fqdn/IpAddress".format(skipped))
-    return assets_import
+    return ImportAsset(
+        id=asset_id,
+        hostnames=names,
+        # IOSVersion is a bare software/OS version string; Orion.Nodes has no
+        # OS-name property, so `os` is left to runZero fingerprinting.
+        osVersion=asset.get('IOSVersion'),
+        manufacturer=asset.get('Vendor'),
+        networkInterfaces=interfaces,
+        customAttributes=custom_attributes,
+    )
 
-def get_assets(base_url, creds, config_kwargs, query):
 
-    url = base_url + '/SolarWinds/InformationService/v3/Json/Query?'
+def fetch_results(base_url, creds, config_kwargs, query):
+    """Run the SWQL query and return the raw response body, or None on failure.
+
+    The body is returned undecoded so the caller can stream the results array
+    with iter_array: SWIS has no paging, so a large estate arrives as one
+    response and this avoids materializing every parsed row at once.
+    """
+    url = base_url + '/SolarWinds/InformationService/v3/Json/Query'
     headers = {'Accept': 'application/json',
-                'Authorization': 'Basic ' + creds}
+               'Authorization': 'Basic ' + creds}
     http_options = get_http_options(config_kwargs, headers=headers)
-    # Populate the SWQL query to return desired assets and attributes in the params query value e.g. 
-    # params = {'query': 'SELECT N.NodeID, N.OsVersion, N.Fqdn, N.Vendor, N.IPAddress, N.CpuPercentUtilization, N.DiscoveryProfileId, N.PercentMemoryUsed, N.MemoryUsed, N.Pollers, N.responseTime, N.snmp.port, N.snmp.version, N.status, N.sysObjectId, N.Uptime FROM Orion.Nodes'}
-    params = {'query': query}
-    data, err = get_json(url, params=params, **http_options)
-    if err:
-        print('swis: failed to retrieve assets: {}'.format(err))
-        return []
-    assets = (data or {}).get('results', [])
+    response = http_get(url, params={'query': query}, **http_options)
+    if not response:
+        print('swis: failed to retrieve assets: no response from the Information Service')
+        return None
+    if response.status_code != 200:
+        print('swis: failed to retrieve assets: status {}: {}'.format(
+            response.status_code, str(response.body)[:200]))
+        return None
+    body = response.body
+    # A 200 from a proxy can carry an HTML body, and decoding that aborts the
+    # whole run; a SWIS answer is always a JSON object.
+    if not body or body[0:1] != '{':
+        print('swis: failed to retrieve assets: the response body was not JSON')
+        return None
+    return body
 
-    return assets
 
 def main(*args, **kwargs):
     base_url = get_url_base(kwargs, default='https://localhost:17774')
@@ -154,10 +164,23 @@ def main(*args, **kwargs):
     if not query:
         print('swis: no SWQL query configured; nothing to ask for')
         return None
-    assets = get_assets(base_url, b64_creds, kwargs, query)
-    
-    # Build and stream asset import via report_assets instead of returning a list
-    reported = report_assets(build_assets(assets, _scope(base_url)))
+
+    body = fetch_results(base_url, b64_creds, kwargs, query)
+    scope = _scope(base_url)
+    reported = 0
+    # A node with none of the three identity fields cannot be imported.
+    # Counted rather than logged per record: a query that selects the wrong
+    # columns would otherwise print a line for every node in the estate.
+    skipped = 0
+    if body:
+        for row in iter_array(body, path='results'):
+            asset = build_asset(row, scope)
+            if asset:
+                reported += report_asset(asset)
+            else:
+                skipped += 1
+    if skipped > 0:
+        print("swis: skipped {} nodes with no NodeID/DNS/IPAddress".format(skipped))
     print('swis: reported {} assets'.format(reported))
 
     return None

@@ -29,17 +29,16 @@ connected flag are logged but not currently mapped onto the interface.
 
 Three calls total, regardless of estate size — there is no per-VM request and no paging.
 
-### Two script globals
+### One script global
 
 ```python
 INSECURE_ALLOWED = False   # fallback only; tls_disable_validation on the credential wins
-DEBUG = True               # verbose debug_print() output — ships ON
 ```
 
-`DEBUG` ships as `True`, which is useful for a first run and worth turning off before
-scheduling a production task. `INSECURE_ALLOWED` is only the fallback used when
-`tls_disable_validation` is not set on the credential; the credential option is the supported
-route.
+`INSECURE_ALLOWED` is only the fallback used when `tls_disable_validation` is not set on the
+credential; the credential option is the supported route. (An earlier revision documented a
+`DEBUG` flag and a `debug_print()` helper; neither exists in the script — progress is reported
+through the ordinary `print` lines that land in the task log.)
 
 ---
 
@@ -146,7 +145,7 @@ New deployments should use the named parameters.
 1. **Associate** this custom script with an integration task in runZero.
 2. **Select** the credential you created.
 3. **Run** the task.
-4. **Review** the discovered VMs — with network, OS, and metadata — in your runZero inventory. Assets are streamed with `report_assets` and `main` returns `None`, so the task reports its count in the log rather than returning a list.
+4. **Review** the discovered VMs — with network, OS, and metadata — in your runZero inventory. Assets are streamed one at a time with `report_asset` and `main` returns `None`, so the task reports its count in the log rather than returning a list.
 5. **Find them** with the runZero search `custom_integration:scale-computing`. The slug is the script's `CONFIG` id (`runzero-scale-computing`) with the `runzero-` prefix removed, not the display name you type. The task itself appears on the [tasks](https://console.runzero.com/tasks) page like any other integration.
 
 ### From the command line
@@ -168,10 +167,9 @@ runzero script --filename scale-computing/scale-computing.star \
 directory from a previous run — the scanner refuses an `--output` directory that
 already exists otherwise. Omit `--output` to see only the log lines.
 
-**This script is chatty by default.** `DEBUG = True` is set at the top of
-`scale-computing.star`, so a command-line run already prints its URLs, status
-codes, and session headers without `--verbose`. That is useful here and worth
-turning off before scheduling a production task.
+The script prints a short progress line per collection (clusters, VMs, network
+devices read) and a final reported count; there is no debug flag to turn on or
+off. Use `--verbose` on the scanner itself for wire-level detail.
 
 Because HyperCore's certificate is untrusted by default, a first run commonly
 fails on TLS rather than on the credential. Supply the CA rather than reaching
@@ -270,8 +268,10 @@ Two properties of the mapping are worth knowing because they bear on merging:
 
 - **The cluster lookup takes the first record and stops.** `/rest/v1/Cluster` is scoped to the appliance being queried, so it describes that cluster and its first record is the right one. An earlier revision built a map keyed by cluster UUID and looked it up with the VM's `nodeUUID` — a *node* UUID — so the lookup never matched and `clusterName` was never populated. That is fixed; the comment in the script records it.
 - **`nodeUUID` is preserved as a custom attribute and deliberately kept out of the id**, for the same reason `proxmox` keeps the node name out of a guest id: a VM that moves between nodes must not change identity.
-- **VLAN and the connected flag are read and logged but not mapped.** `debug_print` shows them per interface; neither reaches the asset. They would be reasonable custom attributes.
-- The whole run is three requests with no paging, so a very large cluster returns everything in one response per endpoint. `report_assets` streams the finished list, but the raw VM and network-device responses are held in memory together while they are being joined.
+- **VLAN and the connected flag are returned by the API but not mapped**; neither reaches the asset. They would be reasonable custom attributes.
+- **Guest-reported IPv4 lists are filtered through `routable_ips`** before they become an interface: guest tools routinely report link-local (169.254/16) noise, and importing it would cross-correlate unrelated VMs. The MAC still imports even when every address is filtered away.
+- **Auth is Basic first, with a `/rest/v1/login` session fallback.** Whether HyperCore v1 accepts per-request Basic on every route is unverified against a real cluster (Scale's own tooling logs in and carries a session cookie), so a 401 on Basic triggers one login attempt and a retry; either server behavior works.
+- The whole run is three requests with no paging, so a very large cluster returns everything in one response per endpoint. Assets are streamed one at a time with `report_asset` as the join proceeds, but the raw VM and network-device responses are held in memory together while they are being joined.
 - This integration was validated against local fixtures, not a live HyperCore cluster.
 
 ## Future

@@ -2,7 +2,7 @@
   "name": "nothing-to-scan",
   "integration": "runzero-scan-passive-assets",
   "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
-  "description": "Four export rows that all look scannable and none of which are, each covering a shape the runZero export really produces. Row 1 has an in-policy 10/8 address but last_agent_id null -- nulls.UUID marshals to JSON null, not to an empty string, so the guard has to treat None as missing; there is no Explorer to run the scan on. Row 2 is 172.16/12: RFC1918, and the near-miss that matters, because ALLOW_LIST is 10/8 and 192.168/16 only, so anything that widened the check to 'private' would start scanning it. Row 3 is a routable public address, the case where a wrong answer means scanning someone else's network from a customer Explorer. Row 4 is IPv6-only, which reaches ip_address() and must be rejected on version rather than fed to the IPv4-only ip_to_int() -- that path splits on dots and would abort the whole run on a colon-separated address, taking the other Explorers' scans down with it. The run must therefore make exactly ONE request and then stop: no scan, and no bulk delete, because deleting assets that were never scanned destroys the only record that they exist.",
+  "description": "Four export rows that all look scannable and none of which are, each covering a shape the runZero export really produces. Row 1 has an in-policy 10/8 address but last_agent_id null -- nulls.UUID marshals to JSON null, not to an empty string, so the guard has to treat None as missing; there is no Explorer to run the scan on. Row 2 is 100.64/10 CGNAT: the near-miss that matters now that ALLOW_LIST names all three RFC1918 ranges (10/8, 172.16/12, 192.168/16), because anything that widened the check to 'anything private-looking' would start scanning it. Row 3 is a routable public address, the case where a wrong answer means scanning someone else's network from a customer Explorer. Row 4 is IPv6-only, which reaches ip_address() and must be rejected on version rather than fed to the IPv4-only ip_to_int() -- that path splits on dots and would abort the whole run on a colon-separated address, taking the other Explorers' scans down with it. The run must therefore make exactly ONE request and then stop: no scan, and no bulk delete, because deleting assets that were never scanned destroys the only record that they exist.",
 
   "kwargs": {
     "url": "$BASE",
@@ -25,7 +25,7 @@
             },
             {
               "id": "22222222-aaaa-4bbb-8ccc-000000000002",
-              "addresses": ["172.16.4.20"],
+              "addresses": ["100.64.4.20"],
               "last_agent_id": "a0a0a0a0-1111-4222-8333-444444444444"
             },
             {
@@ -57,7 +57,7 @@
       {"method": "POST"}
     ],
     "log_contains": [
-      "Evaluating IP: 172.16.4.20",
+      "Evaluating IP: 100.64.4.20",
       "Evaluating IP: 198.51.100.7",
       "Evaluating IP: 2001:db8::c0ff:ee01"
     ]

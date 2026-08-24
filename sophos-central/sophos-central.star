@@ -68,10 +68,9 @@ CONFIG = {
 }
 
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "network_interface", "ip_in_network")
+load("net", "network_interface", "ip_in_network", "clean_hostname")
 load("http", "get_json", "post_json", "bearer", "url_encode")
-load("time", "now", "parse_time", 'parse_ts')
-load("re", re_match="match")
+load("time", 'parse_ts')
 load("kwargs", "require", "get_string", "get_int", "get_list", "get_url_base", "get_http_options")
 
 load('coerce', 'as_dict', 'as_list')
@@ -126,9 +125,6 @@ EXCLUDED_NETWORKS = [
     "::/128",
     "fe80::/10",
 ]
-
-TIMESTAMP_ZONED_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$"
-
 
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
@@ -269,6 +265,9 @@ def build_asset(tenant_id, record):
         "health_services_not_running": stopped_services,
         "health_services_total": service_count,
         "health_threats": _clean(threats.get("status")),
+        # The raw hostname is preserved because the hostname scrubber below
+        # rejects placeholders and IP-shaped names rather than importing them.
+        "hostname": _clean(record.get("hostname")),
         # The raw lists are preserved because the interfaces above deliberately
         # drop loopback and link-local addresses.
         "ipv4_addresses": as_list(record.get("ipv4Addresses")),
@@ -318,11 +317,16 @@ def build_asset(tenant_id, record):
             label = "{}:{}".format(key, _clean(entry.get("value")))
         tags.append(label)
 
+    # clean_hostname rejects placeholders (localhost, unknown) and names that
+    # are really IP addresses; every such value is a merge hazard. It returns
+    # None for them, which must not reach the hostnames list.
+    host = clean_hostname(record.get("hostname"))
+
     params = {
         # The endpoint UUID is unique within a tenant, and one data region host
         # serves many tenants, so the tenant is part of the identity.
         "id": "sophos-central:{}:{}".format(tenant_id, endpoint_id),
-        "hostnames": [_clean(record.get("hostname"))],
+        "hostnames": [host] if host else [],
         "networkInterfaces": build_network_interfaces(record),
         "tags": tags[:MAX_TAGS],        "customAttributes": to_custom_attributes(attrs, prefix=ATTR_PREFIX,
                                                  separator=ATTR_SEPARATOR),
@@ -388,14 +392,62 @@ def fetch_access_token(auth_url, client_id, client_secret, config_kwargs):
     return token
 
 
-def fetch_whoami(base_url, http_options):
+def build_http_options(config_kwargs, token):
+    """Build the shared request options around the current bearer token."""
+    options = get_http_options(config_kwargs, headers={
+        "Authorization": bearer(token),
+        "Accept": "application/json",
+    })
+    options["retry_backoff"] = RETRY_BACKOFF
+    return options
+
+
+def _request_options(ctx, extra_headers):
+    """Copy the shared options, layering per-call headers on top."""
+    options = {}
+    for key, value in ctx["http_options"].items():
+        options[key] = value
+    headers = {}
+    for key, value in as_dict(ctx["http_options"].get("headers")).items():
+        headers[key] = value
+    for key, value in extra_headers.items():
+        headers[key] = value
+    options["headers"] = headers
+    return options
+
+
+def refresh_token(ctx):
+    """Mint a replacement bearer token and rebuild the shared options.
+
+    Sophos tokens expire after 3600 seconds, and a partner estate whose full
+    walk outlives one would otherwise fail every remaining tenant with 401s."""
+    token = fetch_access_token(ctx["auth_url"], ctx["client_id"],
+                               ctx["client_secret"], ctx["config"])
+    if not token:
+        return False
+    ctx["http_options"] = build_http_options(ctx["config"], token)
+    return True
+
+
+def authed_get(ctx, url, params, extra_headers):
+    """GET with the shared bearer token, re-minting it once on a 401."""
+    params = params or {}
+    data, err = get_json(url, params=params, **_request_options(ctx, extra_headers))
+    if err and err.startswith("status 401"):
+        print("sophos-central: the access token was rejected; minting a new one")
+        if refresh_token(ctx):
+            data, err = get_json(url, params=params, **_request_options(ctx, extra_headers))
+    return data, err
+
+
+def fetch_whoami(ctx, base_url):
     """Identify the credential and discover its API hosts.
 
     Returns (id, id_type, data_region_host, global_host). The data region host
     is the regional base URL every tenant-scoped call must use; it is only
     populated for tenant-level credentials.
     """
-    data, err = get_json(base_url + WHOAMI_PATH, **http_options)
+    data, err = authed_get(ctx, base_url + WHOAMI_PATH, None, {})
     if err:
         print("sophos-central: failed to identify the credential:", err)
         return "", "", "", ""
@@ -406,7 +458,7 @@ def fetch_whoami(base_url, http_options):
             _clean(hosts.get("dataRegion")), _clean(hosts.get("global")))
 
 
-def fetch_tenants(global_url, http_options, id_type, entity_id, wanted):
+def fetch_tenants(ctx, global_url, id_type, entity_id, wanted):
     """List the tenants a partner or organization credential manages.
 
     Each tenant carries its own apiHost, which is the regional base URL that
@@ -416,23 +468,16 @@ def fetch_tenants(global_url, http_options, id_type, entity_id, wanted):
     seen = {}
     # The header name is X-Partner-ID or X-Organization-ID depending on which
     # kind of credential whoami reported.
-    options = {}
-    for key, value in http_options.items():
-        options[key] = value
-    headers = {}
-    for key, value in as_dict(http_options.get("headers")).items():
-        headers[key] = value
-    headers["X-" + id_type.capitalize() + "-ID"] = entity_id
-    options["headers"] = headers
+    extra = {"X-" + id_type.capitalize() + "-ID": entity_id}
 
     path = "/{}/v1/tenants".format(id_type)
     _pager1 = pager("sophos-central-1")
     while _pager1.next():
         page = _pager1.page
-        data, err = get_json(global_url + path,
-                             params={"page": page, "pageSize": TENANT_PAGE_SIZE,
-                                     "pageTotal": "true"},
-                             **options)
+        data, err = authed_get(ctx, global_url + path,
+                               {"page": page, "pageSize": TENANT_PAGE_SIZE,
+                                "pageTotal": "true"},
+                               extra)
         if err:
             print("sophos-central: failed to list {} tenants:".format(id_type), err)
             return tenants
@@ -472,20 +517,13 @@ def fetch_tenants(global_url, http_options, id_type, entity_id, wanted):
     return tenants
 
 
-def fetch_and_report_endpoints(tenant, http_options, page_size):
+def fetch_and_report_endpoints(ctx, tenant, page_size):
     """Fetch and stream one tenant's endpoints a page at a time so the full
     inventory is never held in memory at once."""
     reported = 0
     from_key = ""
 
-    options = {}
-    for key, value in http_options.items():
-        options[key] = value
-    headers = {}
-    for key, value in as_dict(http_options.get("headers")).items():
-        headers[key] = value
-    headers["X-Tenant-ID"] = tenant["id"]
-    options["headers"] = headers
+    extra = {"X-Tenant-ID": tenant["id"]}
 
     _pager2 = pager("sophos-central-2")
 
@@ -496,7 +534,7 @@ def fetch_and_report_endpoints(tenant, http_options, page_size):
             # is a key, not a URL, so params stays intact across pages.
             params["pageFromKey"] = from_key
 
-        data, err = get_json(tenant["api_host"] + ENDPOINTS_PATH, params=params, **options)
+        data, err = authed_get(ctx, tenant["api_host"] + ENDPOINTS_PATH, params, extra)
         if err:
             print("sophos-central: failed to fetch endpoints for tenant {}:".format(tenant["id"]), err)
             return reported
@@ -550,13 +588,17 @@ def main(**kwargs):
     if not token:
         return None
 
-    http_options = get_http_options(kwargs, headers={
-        "Authorization": bearer(token),
-        "Accept": "application/json",
-    })
-    http_options["retry_backoff"] = RETRY_BACKOFF
+    # The context carries the credential alongside the live options so any
+    # request that meets a 401 mid-walk can mint a fresh token and retry.
+    ctx = {
+        "config": kwargs,
+        "auth_url": auth_url,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "http_options": build_http_options(kwargs, token),
+    }
 
-    entity_id, id_type, data_region, global_host = fetch_whoami(base_url, http_options)
+    entity_id, id_type, data_region, global_host = fetch_whoami(ctx, base_url)
     if not entity_id or not id_type:
         return None
 
@@ -569,7 +611,7 @@ def main(**kwargs):
             return None
         tenants.append({"id": entity_id, "api_host": data_region, "name": ""})
     elif id_type == "partner" or id_type == "organization":
-        tenants = fetch_tenants(global_host or base_url, http_options, id_type,
+        tenants = fetch_tenants(ctx, global_host or base_url, id_type,
                                 entity_id, wanted)
         print("sophos-central: {} credential manages {} importable tenants".format(
             id_type, len(tenants)))
@@ -589,7 +631,7 @@ def main(**kwargs):
 
     reported = 0
     for tenant in tenants:
-        reported += fetch_and_report_endpoints(tenant, http_options, page_size)
+        reported += fetch_and_report_endpoints(ctx, tenant, page_size)
 
     print("sophos-central: reported {} endpoints across {} tenants".format(reported, len(tenants)))
     if not reported:

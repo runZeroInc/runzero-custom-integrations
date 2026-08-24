@@ -163,9 +163,9 @@ It is worth being precise about what it does instead, because "sync tasks" under
 the payload it moves is **scan data**, not task metadata. Per task, in order:
 
 1. `GET <src_url>/api/v1.0/org/tasks?_oid=<src_org_id>&search=<filter>` — selects tasks.
-2. `GET <src_url>/api/v1.0/org/tasks/<task_id>/data` — downloads that task's raw scan result.
+2. `GET <src_url>/api/v1.0/org/tasks/<task_id>/data?_oid=<src_org_id>` — downloads that task's raw scan result. The `_oid` matters: with an account-level token, a `/data` call without it resolves against the token's default org and 404s every task.
 3. `PUT <dst_url>/api/v1.0/org/sites/<dst_site_id>/import?_oid=<dst_org_id>` — replays it into the destination console through the same import path a real Explorer uses.
-4. `POST <src_url>/api/v1.0/org/tasks/<task_id>/hide` — optional, only when `hide_tasks_on_sync` is set.
+4. `POST <src_url>/api/v1.0/org/tasks/<task_id>/hide?_oid=<src_org_id>` — optional, only when `hide_tasks_on_sync` is set. A hide that fails is logged, because a silent hide failure re-syncs the same task every run.
 
 So asset identity **is** decided — just on the destination console, by runZero's own scan
 ingestion, exactly as it would be for a scan the destination ran itself. The records in the

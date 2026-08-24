@@ -29,6 +29,14 @@ CONFIG = {
             "required": True,
         },
         {
+            "key": "delete_assets",
+            "label": "Delete passive assets after their scan completes",
+            "type": "bool",
+            "required": False,
+            "default": False,
+            "description": "Off by default because the delete-after-scan design has an unresolved merge question: the active scan of the same IP in the same site may merge onto the very passive asset being tracked (IP-match is the platform default for a record whose only correlator is that IP), in which case the delete would erase the freshly scanned asset. Leave off to queue scans and keep every passive asset; turn on only after confirming in your environment that scanned results land on a separate asset.",
+        },
+        {
             "key": "scan_wait_seconds",
             "label": "Seconds to wait for each scan to finish",
             "type": "int",
@@ -63,8 +71,10 @@ load('time', 'now', 'sleep')
 # -------------------------
 # Global Configuration
 # -------------------------
-DELETE_ASSETS = True
-ALLOW_LIST = ["10.0.0.0/8", "192.168.0.0/16"]
+# The RFC1918 space this integration is willing to scan and clean up. All three
+# private ranges are named: estates on 172.16.0.0/12 were previously never
+# scanned (and never cleaned) because the middle range was missing.
+ALLOW_LIST = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 
 # runZero task statuses, from models/task.go. The platform's own statusToCategory
 # map (actions/tasks.go) is what these follow: `processed` and `completed` are
@@ -177,6 +187,10 @@ def main(*args, **kwargs):
     site_id = kwargs["site_id"]
     org_token = kwargs["org_api_token"]
     insecure_allowed = get_bool(kwargs, "tls_disable_validation", False)
+    # Defaults OFF: see the delete_assets parameter description for the
+    # unresolved question of whether the superseding scan merges onto the very
+    # passive asset this would delete.
+    delete_assets = get_bool(kwargs, "delete_assets", default=False)
 
     session = Session(insecure_skip_verify=insecure_allowed)
     session.headers.set("Authorization", "Bearer {}".format(org_token))
@@ -193,7 +207,16 @@ def main(*args, **kwargs):
         print("Failed to fetch assets")
         return []
 
+    # json_decode aborts the whole run on a body it cannot parse, and a 200
+    # with an HTML proxy body is a real failure mode; the export is always a
+    # JSON array.
+    if not response.body or response.body[0:1] != "[":
+        print("The asset export returned a non-JSON body; nothing to do")
+        return []
     data = json_decode(response.body)
+    if type(data) != "list":
+        print("The asset export returned an unexpected shape; nothing to do")
+        return []
 
     # Step 2: Filter assets and group IPs by agent
     agent_ip_map = {}  # {agent_id: [ip, ip, ...]}
@@ -265,8 +288,8 @@ def main(*args, **kwargs):
     # run yet, and a host that was offline, unreachable, or whose scan errored
     # was simply erased. Waiting is what makes the delete a supersede rather
     # than a gamble.
-    if not DELETE_ASSETS:
-        print("DELETE_ASSETS is off; queued {} scan(s) and keeping every passive asset".format(len(task_agents)))
+    if not delete_assets:
+        print("delete_assets is off; queued {} scan(s) and keeping every passive asset".format(len(task_agents)))
         return []
 
     if not task_agents:

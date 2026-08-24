@@ -35,14 +35,61 @@ CONFIG = {
     },
 }
 load('requests', 'Session')
-load('json', json_decode='decode')
-load('runzero.types', 'ImportAsset', 'NetworkInterface')
+load('json', json_encode='encode', json_decode='decode')
+load('runzero.types', 'ImportAsset')
 load('base64', base64_encode='encode')
+load('coerce', 'dicts')
 load('kwargs', 'get_bool')
+load('net', 'network_interface', 'routable_ips')
 
 INSECURE_ALLOWED = False
 # See the comment at the ImportAsset call below for why this is knowable here.
 VM_DEVICE_TYPE = "Virtual Machine"
+
+
+def try_login(ctx):
+    """Authenticate via POST /rest/v1/login and rely on the session cookie.
+
+    Whether HyperCore's v1 API accepts per-request Basic auth on every route is
+    unverified against a real cluster; Scale's own client tooling logs in and
+    carries a session. Basic stays the first attempt, and this fallback fires
+    once when Basic is answered with a 401 so either behavior works.
+    """
+    resp = ctx["session"].post(
+        ctx["base_url"] + "/rest/v1/login",
+        json={"username": ctx["username"], "password": ctx["password"], "useOIDC": False},
+    )
+    if resp and resp.status_code >= 200 and resp.status_code < 300:
+        print("scale-computing: Basic auth was rejected; continuing with a /rest/v1/login session")
+        return True
+    print("scale-computing: the /rest/v1/login fallback also failed (status {})".format(
+        resp.status_code if resp else "no response"))
+    return False
+
+
+def get_rows(ctx, path, label):
+    """GET one HC3 collection and return (rows, ok).
+
+    A 401 on the first Basic-authenticated request triggers one login-session
+    fallback and a retry. The body is sniffed before decoding: these endpoints
+    answer bare JSON arrays, and json_decode on an HTML proxy error page would
+    abort the whole run.
+    """
+    url = ctx["base_url"] + path
+    resp = ctx["session"].get(url)
+    if resp and resp.status_code == 401 and not ctx["login_attempted"]:
+        ctx["login_attempted"] = True
+        if try_login(ctx):
+            resp = ctx["session"].get(url)
+    if not (resp and resp.status_code == 200):
+        print("scale-computing: could not {} (status {})".format(
+            label, resp.status_code if resp else "no response"))
+        return [], False
+    if not resp.body or resp.body[0:1] != "[":
+        print("scale-computing: could not {}: the response body was not a JSON list".format(label))
+        return [], False
+    return dicts(json_decode(resp.body)), True
+
 
 def main(*args, **kwargs):
     # Prefer structured top-level kwargs (params[] schema). Fall back
@@ -70,6 +117,14 @@ def main(*args, **kwargs):
     if kwargs.get('http_user_agent'):
         session.headers.set('User-Agent', kwargs.get('http_user_agent'))
 
+    ctx = {
+        "session": session,
+        "base_url": base_url,
+        "username": username,
+        "password": password,
+        "login_attempted": False,
+    }
+
     # 1) Fetch the cluster this endpoint belongs to.
     #
     # The previous code built a map keyed by the CLUSTER uuid and then looked it
@@ -80,49 +135,36 @@ def main(*args, **kwargs):
     # endpoint returns and the first record is the one to use.
     cluster_uuid = ""
     cluster_name = ""
-    clu_url = "{}{}/rest/v1/Cluster".format("", base_url)  # avoid f-strings
-    resp = session.get(clu_url)
-    if resp and resp.status_code == 200:
-        cl_data = json_decode(resp.body)
+    cl_data, ok = get_rows(ctx, "/rest/v1/Cluster", "read the cluster record")
+    if ok:
         print("scale-computing: read {} clusters".format(len(cl_data)))
         for c in cl_data:
-            if type(c) != "dict":
-                continue
             cluster_uuid = str(c.get("uuid", "") or "")
             cluster_name = str(c.get("clusterName", "") or "")
             break
     else:
-        print("scale-computing: could not read the cluster record (status {}); VMs will carry no cluster name".format(
-            getattr(resp, 'status_code', None)))
+        print("scale-computing: VMs will carry no cluster name")
 
     # 2) Fetch VMs
-    vm_url = "{}{}/rest/v1/VirDomain".format("", base_url)
-    resp = session.get(vm_url)
-    if not (resp and resp.status_code == 200):
-        print("scale-computing: could not list VMs (status {})".format(
-            getattr(resp, 'status_code', None)))
+    vm_list, ok = get_rows(ctx, "/rest/v1/VirDomain", "list VMs")
+    if not ok:
         return []
-    vm_list = json_decode(resp.body)
     print("scale-computing: read {} VMs".format(len(vm_list)))
 
     # 3) Fetch VM network-devices (for MACs & IPs)
-    netdev_url = "{}{}/rest/v1/VirDomainNetDevice".format("", base_url)
-    resp = session.get(netdev_url)
-    netdevs = []
-    if resp and resp.status_code == 200:
-        netdevs = json_decode(resp.body)
+    netdevs, ok = get_rows(ctx, "/rest/v1/VirDomainNetDevice", "list network devices")
+    if ok:
         print("scale-computing: read {} network devices".format(len(netdevs)))
     else:
-        print("scale-computing: could not list network devices (status {}); VMs will carry no addresses".format(
-            getattr(resp, 'status_code', None)))
+        print("scale-computing: VMs will carry no addresses")
     # Group by VM UUID
     netdevs_by_vm = {}
     for d in netdevs:
         vm_uuid = d.get("virDomainUUID")
         netdevs_by_vm.setdefault(vm_uuid, []).append(d)
 
-    # 4) Build ImportAsset objects
-    assets = []
+    # 4) Build and stream one ImportAsset per VM
+    reported = 0
     skipped = 0
     skipped_name = ""
     for vm in vm_list:
@@ -162,16 +204,19 @@ def main(*args, **kwargs):
         cpus        = vm.get("numVCPU")
         tags        = vm.get("tags", "")
 
-        # Network interfaces with MACs & IPs
+        # Network interfaces with MACs & IPs. The address lists are what the
+        # GUEST TOOLS report, so they routinely include link-local noise;
+        # routable_ips drops the values that would cross-correlate unrelated
+        # VMs while keeping RFC1918 and public addresses.
         interfaces = []
         for nd in netdevs_by_vm.get(vid, []):
             mac = nd.get("macAddress")
-            ips = nd.get("ipv4Addresses", [])
-            iface = NetworkInterface(
-                macAddress=mac,
-                ipv4Addresses=ips
-            )
-            interfaces.append(iface)
+            ips = routable_ips(nd.get("ipv4Addresses") or [])
+            iface = network_interface(mac=mac, ips=ips)
+            # network_interface returns None when neither a MAC nor a usable
+            # address survives; appending it aborts the run at ImportAsset.
+            if iface:
+                interfaces.append(iface)
 
         asset = ImportAsset(
             id                = vid,
@@ -207,13 +252,13 @@ def main(*args, **kwargs):
                 "modifiedAt":        vm.get("modified"),
             },
         )
-        assets.append(asset)
+        # Streamed per VM rather than accumulated: a late abort can then only
+        # lose the record that caused it, not everything already built.
+        reported += report_asset(asset)
 
     if skipped > 0:
         print("scale-computing: skipped {} VMs with no uuid (first name: {})".format(
             skipped, skipped_name))
 
-    # Stream assets to runZero via report_assets instead of returning a list.
-    reported = report_assets(assets)
     print("scale-computing: reported {} assets".format(reported))
     return None

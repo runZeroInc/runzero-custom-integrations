@@ -1,0 +1,140 @@
+{
+  "name": "paged",
+  "integration": "snow-license-manager",
+  "script": "snow-license-manager/snow-license-manager.star",
+  "description": "Two pages of the computers collection, pinning the Meta-driven pagination this integration hangs everything on: page one carries a PageSize meta entry of 2, so the second request must arrive with $skip=2, and page two omits PageSize entirely, which is the walk's only natural terminator -- a third computers request (which would carry $skip=4) must never be made. The applications call per computer answers a Count-only Meta with an empty Body, which must also terminate that inner pager after one request per computer. requests_absent additionally pins that a list row carrying its Hardware block does NOT trigger the per-computer detail fallback.\n\nnamespaced_ids is skipped: the asset id is the bare SLM computer Id with no customer scope, so two Snow customers imported into one runZero account would collide. Pre-existing, not introduced here.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixture-customer",
+    "username": "svc-runzero",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "computers-page-1",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers", "query_contains": "%24skip=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 3},
+              {"Name": "PageSize", "Value": 2}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 9301,
+                  "Name": "syn-snow-page1-a",
+                  "Manufacturer": "Dell Inc.",
+                  "OperatingSystem": "Windows 11 Enterprise",
+                  "BiosSerialNumber": "SNOWSER9301",
+                  "IsPortable": true,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:93:01", "IpAddress": "10.70.3.11"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": {
+                  "Id": 9302,
+                  "Name": "syn-snow-page1-b",
+                  "Manufacturer": "Dell Inc.",
+                  "OperatingSystem": "Windows Server 2022",
+                  "BiosSerialNumber": "SNOWSER9302",
+                  "IsServer": true,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:93:02", "IpAddress": "10.70.3.12"}
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-page-2-last",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers", "query_contains": "%24skip=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 3}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 9303,
+                  "Name": "syn-snow-page2-c",
+                  "Manufacturer": "HP",
+                  "OperatingSystem": "Windows 11 Enterprise",
+                  "BiosSerialNumber": "SNOWSER9303",
+                  "IsPortable": true,
+                  "Hardware": {
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:93:03", "IpAddress": "10.70.3.13"}
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications-empty",
+      "match": {"method": "GET", "path_regex": "/api/customers/fixture-customer/computers/[0-9]+/applications$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 0}
+            ],
+            "Body": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["9301", "9302", "9303"],
+    "assets": [
+      {
+        "id": "9301",
+        "fields": {"hostnames": "syn-snow-page1-a", "macAddresses": "00:11:22:44:93:01", "deviceType": "Laptop"}
+      },
+      {
+        "id": "9303",
+        "fields": {"hostnames": "syn-snow-page2-c", "macAddresses": "00:11:22:44:93:03", "ipAddresses": "10.70.3.13"}
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers", "query_contains": "%24skip=0"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers", "query_contains": "%24skip=2"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9303/applications"}
+    ],
+    "requests_absent": [
+      {"query_contains": "%24skip=4"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9301"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9302"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9303"}
+    ],
+    "log_contains": [
+      "2 computers of 3 returned from API"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

@@ -1,0 +1,172 @@
+{
+  "name": "endpoint-import",
+  "integration": "sophos-central",
+  "description": "The core import path, exercised end to end for a TENANT credential: token, whoami reporting idType tenant, then the pageFromKey cursor walk over /endpoint/v1/endpoints with X-Tenant-ID against the tenant's own apiHost. The tenant's data region host is '$BASE', which the harness expands inside response bodies -- the technique the earlier tenant-discovery scenario believed impossible, and the reason the import path shipped without coverage for so long.\n\nPinned here: build_asset's id scheme (sophos-central:<tenant>:<endpoint>); the no-id endpoint skipped with a log line; a bare string in items skipped; the loopback/link-local address filter (169.254.99.5 arrives alongside the real address and must not reach an interface -- the invariant would fail); the hostname scrubber ('localhost' must not become a hostname while the record still imports on its address); server typing from the endpoint type; and mid-walk token refresh -- page two answers 401 once, a second token is minted at id.sophos.com, and the SAME page is retried and imported rather than the tenant being abandoned.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "client_id": "fixture-client-id",
+    "client_secret": "fixture-client-secret",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v2/oauth2/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "first-fixture-token", "expires_in": 3600, "token_type": "bearer"}},
+        {"status": 200, "json": {"access_token": "second-fixture-token", "expires_in": 3600, "token_type": "bearer"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "whoami",
+      "match": {"method": "GET", "path": "/whoami/v1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "tenant-fixture-0001",
+            "idType": "tenant",
+            "apiHosts": {
+              "global": "$BASE",
+              "dataRegion": "$BASE"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints-page-2",
+      "match": {"method": "GET", "path": "/endpoint/v1/endpoints", "query_contains": "pageFromKey=key-2"},
+      "responses": [
+        {"status": 401, "json": {"error": "Unauthorized", "message": "token expired"}},
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "ep-cccc-0003",
+                "type": "server",
+                "hostname": "fixture-srv-01",
+                "os": {"platform": "linux", "name": "Ubuntu", "majorVersion": 22, "minorVersion": 4, "isServer": true},
+                "ipv4Addresses": ["10.44.0.31"],
+                "macAddresses": ["00:16:3e:44:55:66"],
+                "health": {"overall": "good"},
+                "lastSeenAt": "2026-08-20T11:00:00.000Z",
+                "tamperProtectionEnabled": true
+              },
+              {
+                "id": "ep-dddd-0004",
+                "type": "computer",
+                "hostname": "localhost",
+                "os": {"platform": "windows", "name": "Windows 10 Pro"},
+                "ipv4Addresses": ["10.44.0.41"],
+                "macAddresses": [],
+                "health": {"overall": "suspicious"},
+                "lastSeenAt": "2026-08-19T09:00:00.000Z"
+              }
+            ],
+            "pages": {"maxSize": 500}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints-page-1",
+      "match": {"method": "GET", "path": "/endpoint/v1/endpoints"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "ep-aaaa-0001",
+                "type": "computer",
+                "hostname": "FIXTURE-LAPTOP-01",
+                "os": {"platform": "windows", "name": "Windows 11 Pro", "majorVersion": 10, "minorVersion": 0, "build": 22631, "isServer": false},
+                "ipv4Addresses": ["10.44.0.21", "169.254.99.5"],
+                "ipv6Addresses": [],
+                "macAddresses": ["00:16:3e:11:22:33"],
+                "associatedPerson": {"id": "person-1", "name": "Fixture User", "viaLogin": "CORP\\fixture"},
+                "group": {"id": "group-1", "name": "Laptops"},
+                "health": {
+                  "overall": "good",
+                  "services": {"status": "good", "serviceDetails": [{"name": "Sophos MCS Client", "status": "running"}]},
+                  "threats": {"status": "good"}
+                },
+                "assignedProducts": [{"code": "coreAgent", "version": "2.31.0", "status": "installed"}],
+                "tamperProtectionEnabled": true,
+                "serialNumber": "SN-0001",
+                "lastSeenAt": "2026-08-20T10:00:00.000Z"
+              },
+              {
+                "hostname": "no-id-host",
+                "type": "computer"
+              },
+              "a bare string where an endpoint object is documented"
+            ],
+            "pages": {"nextKey": "key-2", "maxSize": 500}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "sophos-central:tenant-fixture-0001:ep-aaaa-0001",
+      "sophos-central:tenant-fixture-0001:ep-cccc-0003",
+      "sophos-central:tenant-fixture-0001:ep-dddd-0004"
+    ],
+    "assets": [
+      {
+        "id": "sophos-central:tenant-fixture-0001:ep-aaaa-0001",
+        "fields": {
+          "hostnames": "FIXTURE-LAPTOP-01",
+          "macAddresses": "00:16:3e:11:22:33",
+          "ipAddresses": "10.44.0.21",
+          "os": "Windows 11 Pro",
+          "osVersion": "10.0.22631",
+          "sophos_central_serial_number": "SN-0001",
+          "sophos_central_group_name": "Laptops"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "sophos-central:tenant-fixture-0001:ep-cccc-0003",
+        "fields": {
+          "hostnames": "fixture-srv-01",
+          "deviceType": "Server",
+          "ipAddresses": "10.44.0.31"
+        }
+      },
+      {
+        "id": "sophos-central:tenant-fixture-0001:ep-dddd-0004",
+        "comment": "'localhost' is a placeholder every misconfigured agent shares; it must not become a hostname while the record still imports on its address.",
+        "fields": {
+          "ipAddresses": "10.44.0.41"
+        },
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "request_count": 6,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v2/oauth2/token", "body_contains": "scope=token"},
+      {"method": "GET", "path": "/whoami/v1", "header_contains": "Bearer first-fixture-token"},
+      {"method": "GET", "path": "/endpoint/v1/endpoints", "query_contains": "view=full", "header": {"X-Tenant-ID": "tenant-fixture-0001"}},
+      {"method": "GET", "path": "/endpoint/v1/endpoints", "query_contains": "pageFromKey=key-2"},
+      {"method": "GET", "path": "/endpoint/v1/endpoints", "header_contains": "Bearer second-fixture-token"}
+    ],
+    "log_contains": [
+      "sophos-central: skipping endpoint with no id: hostname=no-id-host",
+      "sophos-central: the access token was rejected; minting a new one",
+      "sophos-central: reported 3 endpoints across 1 tenants"
+    ]
+  },
+  "invariants": {"skip": []}
+}

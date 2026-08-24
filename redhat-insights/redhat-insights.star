@@ -386,6 +386,11 @@ def fetch_vulnerabilities(ctx, host_id):
     url = "{}{}/systems/{}/cves".format(ctx["console_url"], VULNERABILITY_PATH, host_id)
     params = {"limit": str(VULN_PAGE_SIZE), "offset": "0", "sort": "-cvss3_score"}
     data, err = get_json(url, params=params, **ctx["http_options"])
+    if err and err.startswith("status 401"):
+        # The 15-minute token can expire mid-enrichment too; without this the
+        # remaining systems silently import with zero findings.
+        if refresh_token(ctx):
+            data, err = get_json(url, params=params, **ctx["http_options"])
     if err:
         if err.startswith("status 404"):
             ctx["vuln_missing"] += 1
@@ -741,15 +746,17 @@ def refresh_token(ctx):
 def fetch_hosts_page(ctx, page):
     """Fetch one page of the host list, returning (records, total, err).
 
-    Two failures are recovered from rather than reported. An expired token comes
-    back as a 401 and is replaced once. A rejected sparse fieldset comes back as
-    a 400 naming the offending field; the request then drops to the reduced
-    field set and, if that is rejected too, to no system profile at all."""
+    Two failures are recovered from rather than reported. An expired token
+    comes back as a 401 and is replaced, retrying the page once with the new
+    token -- per occurrence, not once per run, because the token lives 15
+    minutes and a large import outlives several. A rejected sparse fieldset
+    comes back as a 400 naming the offending field; the request then drops to
+    the reduced field set and, if that is rejected too, to no system profile
+    at all."""
     url = ctx["inventory_url"] + HOSTS_PATH
 
     data, err = get_json(url, params=list_params(ctx, page), **ctx["http_options"])
-    if err and err.startswith("status 401") and not ctx["reauthed"]:
-        ctx["reauthed"] = True
+    if err and err.startswith("status 401"):
         if refresh_token(ctx):
             data, err = get_json(url, params=list_params(ctx, page), **ctx["http_options"])
 
@@ -893,7 +900,6 @@ def main(**kwargs):
         "vuln_skipped": 0,
         "vuln_missing": 0,
         "package_skipped": 0,
-        "reauthed": False,
     }
 
     reported = fetch_and_report_hosts(ctx)
