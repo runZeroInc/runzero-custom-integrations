@@ -288,8 +288,8 @@ load('kwargs', 'require', 'has', 'get_string', 'get_bool', 'get_int',
                'get_list', 'get_http_options')
 load('json', json_encode='encode', json_decode='decode')
 load('net', 'ip_address', 'network_interface', 'normalize_mac', 'mac_key',
-            'routable_ip', 'routable_ips', 'hostname', 'hostnames', 'resolve')
-load('coerce', 'text', 'as_dict', 'as_list', 'dicts', 'as_int', 'as_float',
+            'routable_ip', 'routable_ips', 'clean_hostname', 'clean_hostnames', 'resolve')
+load('coerce', 'as_text', 'as_dict', 'as_list', 'dicts', 'as_int', 'as_float',
                'as_bool', 'dedupe')
 load('http', http_post='post', http_get='get', 'get_json', 'post_json',
              'url_encode', 'bearer', 'basic', 'oauth2_token')
@@ -680,7 +680,7 @@ def main(**kwargs):
     for device in devices:
         assets.append(ImportAsset(
             id=device.get("id"),
-            hostnames=[device.get("hostname")],
+            hostnames=clean_hostnames([device.get("hostname")]),
             os=device.get("os"),
             networkInterfaces=[build_network_interface(device.get("ips", []), device.get("mac"))],
             customAttributes={"serial": device.get("serial")}

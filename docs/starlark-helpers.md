@@ -41,7 +41,7 @@ load("runzero.types", "ImportAsset", "NetworkInterface", "Service",
                        "to_custom_attributes")
 load("net",  "ip_address", "network_interface", "normalize_mac", "mac_key",
              "ip_network", "ip_in_network", "resolve",
-             "routable_ip", "routable_ips", "hostname", "hostnames")
+             "routable_ip", "routable_ips", "clean_hostname", "clean_hostnames")
 load("coerce", "as_text", "as_dict", "as_list", "dicts",
                "as_int", "as_float", "as_bool", "dedupe")
 load("http", http_get="get", http_post="post",
@@ -327,7 +327,7 @@ Pass `exclude=[...]` to replace the default CIDR set, or `exclude=[]` to
 disable exclusion entirely. A malformed CIDR raises, rather than
 silently excluding nothing.
 
-## `net.hostname(value, extra=None)` / `net.hostnames(values, extra=None)`
+## `net.clean_hostname(value, extra=None)` / `net.clean_hostnames(values, extra=None)`
 
 Returns a value fit to import as a hostname, or `None`. Rejects
 placeholder names (`localhost`, `unknown`, `none`, `-`, `n/a`, ...),
@@ -340,11 +340,11 @@ whose reverse lookup failed carries the same one.
 
 `extra=[...]` adds source-specific placeholders — the appliance's own
 alias for itself, a vendor's "New Device" default — matched
-case-insensitively. `hostnames` maps over an iterable and de-duplicates
+case-insensitively. `clean_hostnames` maps over an iterable and de-duplicates
 case-insensitively, keeping the first spelling seen.
 
 ```python
-names = hostnames(raw_names, extra=["pi.hole"])
+names = clean_hostnames(raw_names, extra=["pi.hole"])
 ```
 
 ## `net.ip_address(s)`
@@ -452,10 +452,12 @@ Supported kwargs:
 
 ## ImportAsset notes
 
-- `hostnames`, `tags` and `networkInterfaces` automatically drop
-  empty / `None` entries, so you can write
-  `hostnames=[device.get("hostname")]` without the
-  `[x] if x else []` wrapper. Pass `[]` to keep them empty.
+- `hostnames` and `tags` drop empty-string entries, and
+  `networkInterfaces` drops `None` entries — but a `None` element in
+  `hostnames` is an error ("hostnames must be an iterable of strings"),
+  so `hostnames=[device.get("hostname")]` aborts when the field is
+  absent. Route names through `clean_hostnames([...])`, which also
+  screens placeholders. Pass `[]` to keep the list empty.
 - **The constructor ignores empty arguments** — `None`, a blank or
   whitespace-only string, an empty list or dict. Pass every optional
   field unconditionally instead of building the arguments up through an
