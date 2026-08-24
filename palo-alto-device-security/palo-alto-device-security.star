@@ -18,6 +18,7 @@ CONFIG = {
     # aruba-clearpass and forescout-counteract do with the same identifier
     # class. The id is still emitted so the record has a stable key.
     "matchBehavior": "no-id-match no-id-break",
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -70,7 +71,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
-load('net', 'network_interface')
+load('net', 'network_interface', 'routable_ips', 'ip_address')
 load('http', 'get_json', 'post_json', 'bearer', 'basic', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int')
 load('time', 'now', 'parse_time', 'parse_duration', 'parse_ts')
@@ -99,6 +100,11 @@ CVE_PATTERN = r"^CVE-\d{4}-\d{4,}$"
 
 SEVERITY_RANK = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
 SEVERITY_SCORE = {"CRITICAL": 10.0, "HIGH": 8.0, "MEDIUM": 5.0, "LOW": 2.0}
+
+# Hostnames that identify nothing. Every device whose name the sensor never
+# learned carries the same one, so importing them merges unrelated assets.
+PLACEHOLDER_NAMES = ["localhost", "localhost.localdomain", "unknown", "none",
+                     "null", "-", "n/a", "*"]
 
 # Device attributes copied verbatim into custom attributes. The v2 inventory
 # returns every field published by /iot/pub/v1/device/attributes when no
@@ -176,6 +182,21 @@ def _first(record, keys):
         if value != None and value != "":
             return value
     return ""
+
+
+def _hostname(value):
+    """Return a value fit to import as a hostname, or "".
+
+    IoT Security fills hostname with the device's IP address when it never
+    learned a real name, and an IP-as-hostname is a merge hazard: the same
+    string lands on whichever device holds the address next.
+    """
+    text = str(value or "").strip().rstrip(".")
+    if not text or text.lower() in PLACEHOLDER_NAMES:
+        return ""
+    if ip_address(text) != None:
+        return ""
+    return text
 def _start_time(lookback_days):
     """Build the stime bound; an empty string means no time filter at all."""
     if lookback_days <= 0:
@@ -251,7 +272,10 @@ def build_asset(device, vulns, tsg_id):
     elif raw_ip:
         ips.append(str(raw_ip))
 
-    nic = network_interface(mac=str(_first(device, ["mac_address", "MAC", "mac"])), ips=ips)
+    # routable_ips drops loopback, unspecified, and link-local values: an
+    # APIPA address a device invents when DHCP fails identifies nothing and
+    # would correlate unrelated hosts to each other.
+    nic = network_interface(mac=str(_first(device, ["mac_address", "MAC", "mac"])), ips=routable_ips(ips))
     netifs = [nic] if nic else []
 
     tags = []
@@ -282,7 +306,9 @@ def build_asset(device, vulns, tsg_id):
 
     params = {
         "id": "palo-alto-device-security:{}:{}".format(tsg_id, device_id),
-        "hostnames": [str(device.get("hostname", ""))],
+        # _hostname rejects placeholder names and values that are really IP
+        # addresses, which this API reports for devices with no real name.
+        "hostnames": [_hostname(device.get("hostname"))],
         "networkInterfaces": netifs,
         "tags": tags,
         "vulnerabilities": vulns[:MAX_VULNS_PER_ASSET],
@@ -351,14 +377,48 @@ def fetch_access_token(auth_url, tsg_id, client_id, client_secret, config_kwargs
     return token
 
 
-def fetch_vulnerability_index(base_url, http_options, stime):
+def _api_options(config_kwargs, token):
+    """Collect the HTTP options used for every API call under a given token."""
+    options = get_http_options(config_kwargs, headers={
+        "Authorization": bearer(token),
+        "Accept": "application/json",
+    })
+    options["retries"] = RETRIES
+    return options
+
+
+def fetch_json(ctx, url, params):
+    """GET one API page, re-minting the access token once on a 401.
+
+    Strata Cloud Manager access tokens expire after roughly 15 minutes and
+    both endpoints are capped at 60 requests per minute, so a large tenant's
+    run outlives its first token. A 401 mid-run therefore means the token
+    aged out rather than that the credential is wrong: one refresh and one
+    retry of the failed request keeps the walk going."""
+    for attempt in range(2):
+        data, err = get_json(url, params=params, **ctx["http_options"])
+        if not err:
+            return data, None
+        if err.startswith("status 401") and attempt == 0:
+            print("palo-alto-device-security: access token rejected mid-run, requesting a new one")
+            token = fetch_access_token(ctx["auth_url"], ctx["tsg_id"], ctx["client_id"],
+                                       ctx["client_secret"], ctx["kwargs"])
+            if token:
+                ctx["http_options"] = _api_options(ctx["kwargs"], token)
+                continue
+        return None, err
+    return None, "unreachable"
+
+
+def fetch_vulnerability_index(ctx, stime):
     """Index confirmed vulnerability instances by device id, keeping only the
     findings and the device context needed to attach them to an asset."""
     index = {}
     kept = 0
     offset = 0
 
-    for _page in range(1, 100001):
+    p = pager("vulnerabilities")
+    while p.next():
         params = {
             "type": "vulnerability",
             "status": "Confirmed",
@@ -369,7 +429,7 @@ def fetch_vulnerability_index(base_url, http_options, stime):
         if stime:
             params["stime"] = stime
 
-        data, err = get_json(base_url + VULNERABILITY_PATH, params=params, **http_options)
+        data, err = fetch_json(ctx, ctx["base_url"] + VULNERABILITY_PATH, params)
         if err:
             print("palo-alto-device-security: failed to fetch vulnerabilities:", err)
             return index
@@ -405,18 +465,19 @@ def fetch_vulnerability_index(base_url, http_options, stime):
     return index
 
 
-def fetch_and_report_devices(base_url, http_options, stime, tsg_id, vuln_index):
+def fetch_and_report_devices(ctx, stime, vuln_index):
     """Fetch and stream devices one page at a time so the full inventory is
     never held in memory at once."""
     reported = 0
     offset = 0
 
-    for _page in range(1, 100001):
+    p = pager("devices")
+    while p.next():
         params = {"offset": offset, "pagelength": DEVICE_PAGE_SIZE, "sortdirection": "asc"}
         if stime:
             params["stime"] = stime
 
-        data, err = get_json(base_url + DEVICE_PATH, params=params, **http_options)
+        data, err = fetch_json(ctx, ctx["base_url"] + DEVICE_PATH, params)
         if err:
             print("palo-alto-device-security: failed to fetch devices:", err)
             return reported
@@ -426,7 +487,7 @@ def fetch_and_report_devices(base_url, http_options, stime, tsg_id, vuln_index):
         if not devices:
             break
 
-        reported += report_assets(build_assets(devices, vuln_index, tsg_id))
+        reported += report_assets(build_assets(devices, vuln_index, ctx["tsg_id"]))
         if len(devices) < DEVICE_PAGE_SIZE:
             break
         offset += DEVICE_PAGE_SIZE
@@ -461,18 +522,22 @@ def main(**kwargs):
     if not token:
         return None
 
-    http_options = get_http_options(kwargs, headers={
-        "Authorization": bearer(token),
-        "Accept": "application/json",
-    })
-    http_options["retries"] = RETRIES
+    ctx = {
+        "base_url": base_url,
+        "auth_url": auth_url,
+        "tsg_id": tsg_id,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "kwargs": kwargs,
+        "http_options": _api_options(kwargs, token),
+    }
 
     stime = _start_time(lookback_days)
     if not stime:
         print("palo-alto-device-security: lookback disabled, importing the full inventory")
 
-    vuln_index = fetch_vulnerability_index(base_url, http_options, stime)
-    reported = fetch_and_report_devices(base_url, http_options, stime, tsg_id, vuln_index)
+    vuln_index = fetch_vulnerability_index(ctx, stime)
+    reported = fetch_and_report_devices(ctx, stime, vuln_index)
     reported += report_unmatched_vulnerabilities(vuln_index, tsg_id)
 
     if not reported:

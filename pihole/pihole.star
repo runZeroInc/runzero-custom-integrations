@@ -191,6 +191,15 @@ def close_session(ctx):
     limit for the full 30-minute session lifetime."""
     if not ctx["sid"]:
         return
+    # The raw delete() builtin raises on a transport error, and a raise here
+    # would mark the task errored after every asset has already streamed. A
+    # session-status probe with err-tuple semantics runs first, so a transport
+    # that has already died is a printed skip rather than a raise; the seat
+    # then simply ages out server-side.
+    _, probe_err = get_json(ctx["api_url"] + "/auth", retries=0, **ctx["http_options"])
+    if probe_err and probe_err.startswith("transport"):
+        print("pihole: skipping the session release, the endpoint stopped answering:", probe_err)
+        return
     resp = delete(ctx["api_url"] + "/auth", **ctx["http_options"])
     if resp == None or resp.status_code >= 300:
         status = resp.status_code if resp != None else "no response"

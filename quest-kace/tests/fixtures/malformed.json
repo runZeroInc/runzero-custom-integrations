@@ -1,0 +1,115 @@
+{
+  "name": "malformed",
+  "integration": "quest-kace",
+  "description": "Placeholder names and the appliance's zeroed timestamps. Machine 2001's Name is really an IP address and 2002's is 'localhost' - both are merge hazards (the same string lands on whichever record carries it next), so neither may import as a hostname while both assets still import on their MAC and address. Machine 2003 was created but never synced: Created, Last_sync, Last_inventory, and Modified all carry KACE's zeroed never-set MySQL datetime 0000-00-00 00:00:00, as does its one software title's Install_Date - the sentinel must not become a real epoch sighting, so firstSeenTS and lastSeenTS must be absent while the record and its software still import.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "import_software": "true",
+    "import_assets": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ams/shared/api/security/login"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Set-Cookie": "KACE_LAST_ORG_SECURE=FixtureOrg; Path=/; Secure",
+            "set-cookie": "kboxid=fixture-session-2; Path=/; HttpOnly",
+            "X-Dell-Csrf-Token": "csrf-from-header"
+          },
+          "json": {"Result": "Success"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "machines",
+      "match": {"method": "GET", "path": "/api/inventory/machines"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Machines": [
+              {
+                "Id": "2001",
+                "Name": "10.200.9.9",
+                "Ip": "10.200.9.9",
+                "Mac": "AA:BB:CC:99:00:01",
+                "Os_name": "Ubuntu 24.04",
+                "Created": "2025-06-01 09:00:00",
+                "Last_sync": "2026-08-10 07:15:00",
+                "Software": []
+              },
+              {
+                "Id": "2002",
+                "Name": "localhost",
+                "Ip": "10.200.9.10",
+                "Mac": "AA:BB:CC:99:00:02",
+                "Os_name": "Debian 12",
+                "Created": "2025-06-02 09:00:00",
+                "Last_sync": "2026-08-11 07:15:00",
+                "Software": []
+              },
+              {
+                "Id": "2003",
+                "Name": "hq-new-2003",
+                "Ip": "10.200.9.11",
+                "Mac": "AA:BB:CC:99:00:03",
+                "Os_name": "Microsoft Windows 11 Pro",
+                "Created": "0000-00-00 00:00:00",
+                "Last_sync": "0000-00-00 00:00:00",
+                "Last_inventory": "0000-00-00 00:00:00",
+                "Modified": "0000-00-00 00:00:00",
+                "Software": [
+                  {"Id": "601", "Display_Name": "Mozilla Firefox", "Display_Version": "128.0", "Publisher": "Mozilla", "Install_Date": "0000-00-00 00:00:00"}
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "quest-kace:127.0.0.1:fixtureorg:2001",
+      "quest-kace:127.0.0.1:fixtureorg:2002",
+      "quest-kace:127.0.0.1:fixtureorg:2003"
+    ],
+    "assets": [
+      {
+        "id": "quest-kace:127.0.0.1:fixtureorg:2001",
+        "fields": {
+          "ipAddresses": "10.200.9.9"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "quest-kace:127.0.0.1:fixtureorg:2002",
+        "fields": {
+          "ipAddresses": "10.200.9.10"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "quest-kace:127.0.0.1:fixtureorg:2003",
+        "fields": {
+          "hostnames": "hq-new-2003"
+        },
+        "fields_absent": ["firstSeenTS", "lastSeenTS"]
+      }
+    ],
+    "min_software_total": 1,
+    "log_contains": [
+      "quest-kace: reported 3 assets from organization fixtureorg"
+    ]
+  },
+  "check_determinism": true
+}

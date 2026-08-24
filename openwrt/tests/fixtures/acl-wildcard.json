@@ -1,0 +1,168 @@
+{
+  "name": "acl-wildcard",
+  "integration": "openwrt",
+  "description": "A superuser-grant login. rpcd expresses a full grant as a wildcard: a session granted only the superuser ACL group returns acls.ubus of {\"*\": [\"*\"]}, with no explicit object keys at all, and a per-object grant can likewise list \"*\" in its method list. Proves permitted() honors both wildcard forms: the guarded getHostHints and getDHCPLeases calls ARE issued (asserted at the request level) instead of being skipped as 'ACL does not grant', and the run imports the router plus the observed host. This is the regression lock for a bug where permitted() only recognized explicit object-and-method grants, so a fully privileged superuser session collected nothing but the router. no_mac_in_id is skipped: an observed host has no identifier but its MAC, and the id is deliberately paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-root",
+    "password": "fixture-password",
+    "collect_wireless": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"session\",\"login\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [0, {
+              "ubus_rpc_session": "5f00aa11bb22cc33dd44ee55ff667788",
+              "timeout": 900,
+              "expires": 900,
+              "acls": {
+                "access-group": {"superuser": ["read", "write"]},
+                "ubus": {"*": ["*"]}
+              },
+              "data": {"username": "fixture-root"}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "system-board",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"board\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": [0, {
+              "kernel": "6.6.93",
+              "hostname": "wildcard-rtr",
+              "system": "ARMv8 Processor rev 4",
+              "model": "Banana Pi BPI-R3",
+              "board_name": "bananapi,bpi-r3",
+              "release": {
+                "distribution": "OpenWrt",
+                "version": "24.10.8",
+                "revision": "r29233-443ec4032a",
+                "target": "mediatek/filogic",
+                "description": "OpenWrt 24.10.8 r29233-443ec4032a",
+                "builddate": "1784877710"
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-info",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"info\""},
+      "responses": [
+        {"status": 200, "json": {"jsonrpc": "2.0", "id": 3, "result": [0, {"uptime": 51234, "localtime": 1786856432, "memory": {"total": 2147483648, "free": 1610612736}}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-devices",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getNetworkDevices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": [0, {
+              "br-lan": {
+                "name": "br-lan",
+                "wireless": false,
+                "up": true,
+                "mtu": 1500,
+                "devtype": "bridge",
+                "mac": "AA:BB:CC:77:88:01",
+                "ipaddrs": [{"address": "10.11.12.1", "netmask": "255.255.255.0", "broadcast": "10.11.12.255"}],
+                "ip6addrs": [],
+                "type": 1,
+                "ifindex": 7,
+                "flags": {"up": true, "broadcast": true, "promisc": false, "loopback": false, "noarp": false, "multicast": true, "pointtopoint": false}
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-hints",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getHostHints"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": [0, {
+              "50:EB:F6:11:22:33": {
+                "ipaddrs": ["10.11.12.50"],
+                "ip6addrs": [],
+                "name": "wildcard-host"
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getDHCPLeases"},
+      "responses": [
+        {"status": 200, "json": {"jsonrpc": "2.0", "id": 6, "result": [0, {"dhcp_leases": [], "dhcp6_leases": []}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"jsonrpc": "2.0", "id": 99, "error": {"code": -32000, "message": "Object not found"}}
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "openwrt:$HOST:router",
+      "openwrt:$HOST:host:50:eb:f6:11:22:33"
+    ],
+    "assets": [
+      {
+        "id": "openwrt:$HOST:host:50:eb:f6:11:22:33",
+        "fields": {
+          "hostnames": "wildcard-host",
+          "openwrt_observed_by": "host-hints"
+        }
+      }
+    ],
+    "requests_include": [
+      {"body_contains": "getNetworkDevices"},
+      {"body_contains": "getHostHints"},
+      {"body_contains": "getDHCPLeases"}
+    ],
+    "log_contains": [
+      "host hints contributed 1 entries",
+      "DHCP leases contributed 0 entries",
+      "reported 1 router and 1 observed hosts"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  },
+  "check_determinism": true
+}

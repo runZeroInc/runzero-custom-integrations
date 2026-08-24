@@ -286,6 +286,11 @@ missing one group — into a message that says which line to add, instead of a
 run that quietly imports less than it should. If the login reply carries no ACL
 data at all, every call is attempted rather than refused.
 
+`rpcd` wildcard grants are honored in both of their forms: a `"*"` object key
+covers every object (a login granted only the `superuser` ACL group returns
+exactly `{"*": ["*"]}`), and a `"*"` entry in an object's method list covers
+every method on that object.
+
 ### Error handling
 
 `ubus` over HTTP returns **HTTP 200 for everything**, and encodes the outcome
@@ -325,7 +330,10 @@ correlate unrelated devices. `br-lan` and its bridge members are deliberately
 ### Lease expiry is not a timestamp
 
 `getDHCPLeases` returns `expires` as **seconds remaining**, not an absolute
-time. It is preserved as `openwrt_lease_expires_seconds` and is never converted
+time. It is preserved per address family as
+`openwrt_lease_ipv4_expires_seconds` / `openwrt_lease_ipv6_expires_seconds`
+(so a dual-stack client holding both a DHCPv4 and a DHCPv6 lease keeps both)
+and is never converted
 into a timestamp, because `now + expires` is by definition in the future and the
 platform rejects the **entire asset record** on a future timestamp — not the
 field, the record. No `firstSeenTS` or `lastSeenTS` is set by this integration,

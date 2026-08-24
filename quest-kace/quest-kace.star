@@ -116,7 +116,12 @@ MAX_ASSET_INDEX = 50000
 HTTP_RETRIES = 3
 
 DIGITS = "0123456789"
+# The zeroed MySQL datetime KACE writes for a value it never recorded.
 NULL_TIMESTAMP = "0000-00-00 00:00:00"
+
+# Hostnames that identify nothing; a shared placeholder merges unrelated assets.
+PLACEHOLDER_NAMES = ["localhost", "localhost.localdomain", "unknown", "none",
+                     "null", "-", "n/a", "*"]
 # Chassis_Type carries the SMBIOS chassis description. Only the values with a
 # faithful runZero equivalent are mapped; anything else survives as the
 # quest_kace_chassis_type custom attribute.
@@ -209,6 +214,27 @@ def _first(fields, names):
     return ""
 
 
+def _ts(value):
+    """parse_ts with KACE's zeroed never-set MySQL datetime filtered first."""
+    if as_text(value, join=",").strip() == NULL_TIMESTAMP:
+        return None
+    return parse_ts(value)
+
+
+def _hostname(value):
+    """Return a value fit to import as a hostname, or "".
+
+    A machine name that is a placeholder or really an IP address is a merge
+    hazard: every record carrying the same one would correlate to each other.
+    """
+    text = as_text(value, join=",").strip().rstrip(".")
+    if not text or text.lower() in PLACEHOLDER_NAMES:
+        return ""
+    if ip_address(text) != None:
+        return ""
+    return text
+
+
 def _sub_records(value):
     """Coerce a sub-entity field documented as a list of objects into one,
     dropping any element that is not a dict so a scalar cannot abort the run."""
@@ -266,7 +292,7 @@ def parse_cookies(headers):
     return names, values
 
 
-def build_software(scope, machine_id, address, entries, ceiling):
+def build_software(scope, machine_id, address, entries):
     """Convert the software sub-entity of one machine into Software records.
 
     The appliance publishes no CPE for an inventoried title, so cpe23 is left
@@ -274,8 +300,8 @@ def build_software(scope, machine_id, address, entries, ceiling):
     application URI binding and a wrong guess fails the whole record.
 
     A Software record that fails validation fails the asset carrying it, so the
-    install time is clamped to ceiling for the same reason the asset's own
-    timestamps are.
+    install time goes through _ts: the zeroed never-set sentinel is dropped and
+    a future value is clamped by parse_ts.
     """
     software = []
     seen = {}
@@ -302,7 +328,7 @@ def build_software(scope, machine_id, address, entries, ceiling):
         publisher = _string(fields, "publisher")
         if publisher:
             params["vendor"] = publisher
-        installed_at = parse_ts(fields.get("install_date"))
+        installed_at = _ts(fields.get("install_date"))
         if installed_at:
             params["installedAt"] = installed_at
         params["customAttributes"] = to_custom_attributes({
@@ -332,7 +358,7 @@ def build_asset(ctx, record):
     software = []
     if ctx["import_software"]:
         titles = _sub_records(fields.get("software")) + _sub_records(fields.get("softwares"))
-        software = build_software(ctx["scope"], machine_id, address, titles, ctx["now"])
+        software = build_software(ctx["scope"], machine_id, address, titles)
 
     serial = _string(fields, "bios_serial_number")
     virtual = _string(fields, "virtual")
@@ -359,7 +385,8 @@ def build_asset(ctx, record):
 
     params = {
         "id": "{}:{}:{}".format(VENDOR, ctx["scope"], machine_id),
-        "hostnames": [_string(fields, "name")],
+        # _hostname drops placeholder names and values that are really IPs.
+        "hostnames": [_hostname(fields.get("name"))],
         "networkInterfaces": netifs,
         "software": software[:MAX_CHILDREN],
         "tags": tags,    }
@@ -383,7 +410,7 @@ def build_asset(ctx, record):
     if device_type:
         params["deviceType"] = device_type
 
-    first_seen = parse_ts(fields.get("created"))
+    first_seen = _ts(fields.get("created"))
     if first_seen:
         params["firstSeenTS"] = first_seen
 
@@ -396,9 +423,8 @@ def build_asset(ctx, record):
     # moves when a full inventory upload succeeds, and Modified also moves when
     # an administrator edits the record, so it would overstate presence.
     # lastSeenTS is settable as an attribute but is not a constructor keyword.
-    last_seen = (parse_ts(fields.get("last_sync")) or parse_ts(fields.get("last_inventory")) or
-                 parse_ts(fields.get("modified")))
-    last_seen = last_seen
+    last_seen = (_ts(fields.get("last_sync")) or _ts(fields.get("last_inventory")) or
+                 _ts(fields.get("modified")))
     if last_seen != None:
         asset.lastSeenTS = last_seen
     return asset
@@ -479,8 +505,8 @@ def login(ctx):
 
     http_options = dict(ctx["base_options"])
     http_options["headers"] = session
-    # get_json knows which statuses are retryable but defaults to zero extra
-    # attempts, so it has to be given an attempt budget explicitly.
+    # get_json already retries transient statuses by default; the budget is
+    # pinned here so the walk's retry behavior does not drift with the helper.
     http_options["retries"] = HTTP_RETRIES
     ctx["http_options"] = http_options
 
@@ -635,7 +661,6 @@ def main(**kwargs):
         "base_options": get_http_options(kwargs, headers={"Accept": "application/json"}),
         "base_url": base_url,
         "host": host,
-        "now": now(),
         "username": get_string(kwargs, "username"),
         "password": get_string(kwargs, "password"),
         "organization": get_string(kwargs, "organization", default="").strip(),

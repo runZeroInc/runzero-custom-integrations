@@ -34,9 +34,14 @@ that fails degrades that part of the asset rather than being retried against a d
 | Endpoint | What it supplies | If it fails |
 |---|---|---|
 | `GET /api/v2/system/hostname` | `hostname`, `domain` | asset gets an empty hostname |
-| `GET /api/v2/system/version` | `os` (platform), `osVersion` | falls back to `pfSense` / `unknown` |
+| `GET /api/v2/system/version` | `os` (platform), `osVersion` | `os` falls back to `pfSense`; `osVersion` is omitted rather than stamped `unknown` |
 | `GET /api/v2/status/interfaces` | network interfaces | asset gets no interfaces |
 | `GET /api/v2/status/system` | **the asset id** (`netgate_id`), model, serial, build | the id falls back to the base URL — see [Asset identity](#asset-identity) |
+
+If **every** endpoint fails, no asset is emitted at all: a run with zero successful
+responses prints a diagnostic (a dedicated one when all failures were 401/403 credential
+refusals) and reports 0 assets, instead of minting an uncorrelatable placeholder
+identified by the sanitized URL.
 
 Each response is unwrapped one level when it carries a top-level `data` object, and each field
 is read from a list of candidate spellings rather than a fixed key, so a package version that
@@ -142,9 +147,10 @@ only the log lines, and add `--verbose` for the request-by-request log.
 
 The script prints `INFO: <url>` before every request and
 `INFO: no usable response from <path>: <status>` for each one that fails, so a run tells you
-exactly which of the four endpoints answered without needing `--verbose`. **A run that
-"succeeds" with an unreachable API still imports an asset** — every field degrades to a
-default and the id falls back to the base URL — so read those lines rather than trusting the
+exactly which of the four endpoints answered without needing `--verbose`. A run in which
+**every** endpoint fails reports 0 assets with a diagnostic. A partially degraded run still
+imports the asset with the fields that could be read, and the id falls back to the base URL
+when `status/system` was among the failures — so read those lines rather than trusting the
 asset count.
 
 There is no page size, cap, or filter parameter. One appliance produces one asset and four
@@ -224,10 +230,10 @@ The `no-mac-break no-ip-break no-name-break` preset would be actively wrong here
 
 ### Notes
 
-- **`trust_os`, `trust_os_version`, and `trust_device_type` are all set.** The appliance reports its own platform, version, and role authoritatively, so the script overrides runZero's fingerprinting rather than deferring to it. `deviceType` is hardcoded to `Firewall`.
-- **The interface list is not filtered.** Every entry `GET /api/v2/status/interfaces` returns with a `macaddr`, `ipaddr`, or `ipaddrv6` becomes a `NetworkInterface`, including bridges, VLAN children, and tunnel interfaces. On a firewall that is usually what you want — those really are its addresses — but it does mean an OpenVPN or WireGuard interface address is imported as an address of the appliance.
+- **`trust_os` and `trust_device_type` are always set; `trust_os_version` only when the API supplied a version.** The appliance reports its own platform, version, and role authoritatively, so the script overrides runZero's fingerprinting rather than deferring to it — but when the version endpoint failed, `osVersion` is omitted entirely rather than stamping the fallback string `unknown` as trusted. `deviceType` is hardcoded to `Firewall`.
+- **The interface list keeps every interface but filters non-identifying addresses.** Every entry `GET /api/v2/status/interfaces` returns with a `macaddr`, `ipaddr`, or `ipaddrv6` becomes a `NetworkInterface`, including bridges, VLAN children, and tunnel interfaces — so an OpenVPN or WireGuard interface address is imported as an address of the appliance. Loopback, unspecified, and link-local values are dropped per address: pfrest reports `fe80::` for an interface without a global address, and a link-local address identifies nothing.
 - **Fields are read from candidate lists, not fixed keys.** `model` comes from the first of `product_name`, `name`, `platform` that is set; `serial` from `serial` or `serial_number`; `build` from `build_time`, `builddate`, or `build`. This is deliberate: the REST API package renames fields between versions, and degrading to a default is better than aborting.
-- **Every request failure is non-fatal by design.** `get()` returns a `(None, path)` pair rather than falling off the end, because a bare `None` return aborted the script on the tuple unpack. The consequence is the one recorded under **Asset identity**: a completely unreachable API still produces an asset.
+- **Every request failure is non-fatal by design.** `get()` returns a `(None, path)` pair rather than falling off the end, because a bare `None` return aborted the script on the tuple unpack. A run in which every endpoint fails reports 0 assets with a diagnostic; a partially degraded run still imports the asset, with the identity caveat recorded under **Asset identity**.
 - Rate limiting is not documented for the pfSense REST API. The shared HTTP helper retries 408/425/429 and 5xx with exponential backoff and honors `Retry-After`, three additional attempts by default.
 - This integration was validated against local fixtures, not a live pfSense appliance.
 

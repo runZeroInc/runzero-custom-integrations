@@ -403,6 +403,24 @@ def _compose_key(labels):
     return "{}/{}/{}".format(project, service, number)
 
 
+def _container_health(container):
+    """Return the container's health check state, or None when it has none.
+
+    The Docker list API carries no Health field: health is embedded in the
+    Status string ("Up 3 weeks (healthy)", "Up 10 seconds (health: starting)").
+    An inspect-shaped Health object is still read as a fallback for proxies
+    that inline it.
+    """
+    status = _clean(container.get("Status"))
+    if "(healthy)" in status:
+        return "healthy"
+    if "(unhealthy)" in status:
+        return "unhealthy"
+    if "(health: starting)" in status:
+        return "starting"
+    return as_dict(container.get("Health")).get("Status")
+
+
 def _container_name(container):
     """Return the container's primary name without Docker's leading slash."""
     for raw in as_list(container.get("Names")):
@@ -527,6 +545,7 @@ def _container_asset(ctx, container, drivers, extra_routable, namespace, endpoin
         return None
 
     state = _clean(container.get("State")).lower()
+    health = _container_health(container)
     attrs = {
         "docker.container_id": _clean(container.get("Id")),
         "docker.container_name": name,
@@ -538,7 +557,7 @@ def _container_asset(ctx, container, drivers, extra_routable, namespace, endpoin
         "docker.status": container.get("Status"),
         "docker.network_mode": as_dict(container.get("HostConfig")).get("NetworkMode"),
         "docker.networks": ", ".join(networks),
-        "docker.health": as_dict(container.get("Health")).get("Status"),
+        "docker.health": health,
         "docker.compose_project": labels.get(LABEL_COMPOSE_PROJECT),
         "docker.compose_service": labels.get(LABEL_COMPOSE_SERVICE),
         "docker.compose_container_number": labels.get(LABEL_COMPOSE_NUMBER),

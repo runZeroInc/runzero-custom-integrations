@@ -149,17 +149,26 @@ Two globals near the top of `proxmox.star` are worth knowing about. Neither is a
 parameter, so changing either means editing the script:
 
 ```python
-DEBUG = False             # per-request "DEBUG: …" prints
-INSECURE_ALLOWED = False  # fallback only, when tls_disable_validation is unset
+RETRIES = 2   # extra attempts for transient failures (5xx, resets)
+DEBUG = False # per-request "DEBUG: …" prints
 ```
 
-`INSECURE_ALLOWED` is genuinely only a fallback: `tls_disable_validation` on the credential
-takes precedence whenever it is set, so the supported way to deal with a self-signed
-certificate is the credential option, not this global.
+TLS validation is controlled by `tls_disable_validation` on the credential (the `tls_`
+option set), which is the supported way to deal with a self-signed certificate.
 
-Assets are streamed to runZero with `report_assets` and `main` returns `None`; the parameters
-arrive as three separate kwargs, with the JSON-stuffed `api_token_secret` recognized only as a
-back-compat path.
+Every request goes through the shared `get_json` helper, so each call carries a status
+check, transient-failure retries, and err-tuple transport handling: a refused token stops
+the run immediately with a credential diagnostic (401/403 name the PVEAPIToken form and the
+missing `PVEAuditor` grant respectively), while a timeout or reset mid-walk is a printed
+per-guest skip rather than an abort. Guest-agent calls opt out of retries, because a guest
+without the agent answers 500 every time and retrying that on every VM would stall the walk.
+The PVE error envelope `{"data": null}` — a present-but-null payload — degrades to an empty
+payload wherever it appears instead of aborting the record.
+
+Each asset is streamed with `report_asset` as it is built — node, then that node's VMs and
+containers — so a failure late in the walk cannot lose what was already collected; `main`
+returns `None`. The parameters arrive as three separate kwargs, with the JSON-stuffed
+`api_token_secret` recognized only as a back-compat path.
 
 ---
 
@@ -304,7 +313,7 @@ parameter that overrides the scope.
 - Reuse behavior: **VMIDs are recycled, and this is the real weakness.** Proxmox frees a VMID when the guest is destroyed and offers the lowest free number to the next create, so destroying VM 101 and creating a new one immediately hands the new guest the old identity — and runZero merges the new machine onto the destroyed one's asset. There is no property on the VM record that would disambiguate this; Proxmox exposes no per-guest UUID through the endpoints this integration reads. Treat a rebuilt-from-scratch estate as the case to watch.
 - Presence: `vmid` is present on every guest record.
 - Final runZero ID: `<cluster_name>-vm-<vmid>`.
-- Missing-ID behavior: not guarded. A record with no `vmid` would produce an id ending in `-vm-None`.
+- Missing-ID behavior: skip. A guest record with no `vmid` is logged and dropped rather than minting an id ending in `-vm-None`.
 - Match behavior: **left at the platform default** — all eight flags on.
 - Verdict: authoritative within a named cluster, subject to VMID recycling.
 
@@ -337,17 +346,18 @@ since a foreign-ID match is never disqualified by a conflicting MAC, address, or
 that both VM and container ids are recyclable, keeping the breaks on is also the remaining
 safety net when a recycled VMID is about to pull a new guest onto an old asset.
 
-One asymmetry to note: **VMs are imported with an empty `hostnames` list.** The Proxmox `name`
-on a QEMU guest is an administrative label rather than the guest's own hostname, so it is
-deliberately not asserted as a name. Containers do get a hostname, because an LXC container's
-config carries a real `hostname` field.
+One asymmetry to note: **a VM's hostname is the Proxmox `name` label.** The `name` on a QEMU
+guest is an administrative label rather than the guest's own hostname, but Proxmox constrains
+it to a DNS-name shape and it is the only correlator a stopped VM with no `net0` MAC has, so
+it is imported as a hostname. Containers get the real thing, because an LXC container's
+config carries an actual `hostname` field.
 
 ## Future
 
 - **The rest of `/cluster/resources`.** One call already returns storage, pools, and SDN objects alongside nodes and guests, so widening the existing `type=node` request is close to free. Storage is the interesting one: a Ceph pool, an NFS export, or an iSCSI target is a real network service on a real address, and importing them as services would describe infrastructure that no guest-level scan reaches.
 - **Full node NIC detail.** `GET /nodes/{node}/status/network` (and `/nodes/{node}/network`) returns every physical NIC, bridge, bond, and VLAN on a host with its addresses — including MACs, which the node asset currently has none of. That single gap is why a node correlates on one management address and a name today, and closing it would make hypervisor hosts merge onto scanned assets far more reliably than any `matchBehavior` change could.
 - **Proxmox tags and pool membership as runZero tags.** Guests carry a `tags` field and belong to pools; both are how a Proxmox operator expresses environment, owner, and criticality. Mapping them onto runZero tags would carry that structure across for free — the tag data is already in the guest record this integration reads.
-- **Guest-agent enrichment beyond addresses.** The integration already calls `/agent/network-get-interfaces` and `/agent/get-osinfo`. The same privilege covers `/agent/get-host-name`, which would give VMs the real in-guest hostname they currently lack, and the file-system and user endpoints. This is the cheapest large improvement available: one extra call per running VM, against an endpoint the token is already authorized for.
+- **Guest-agent enrichment beyond addresses.** The integration already calls `/agent/network-get-interfaces` and `/agent/get-osinfo`. The same privilege covers `/agent/get-host-name`, which would give VMs the real in-guest hostname rather than the administrative `name` label imported today, and the file-system and user endpoints. This is the cheapest large improvement available: one extra call per running VM, against an endpoint the token is already authorized for.
 - **Backup and replication state as posture data.** `GET /cluster/backup` and the per-guest backup and replication status endpoints report which guests are protected and when they were last backed up. "Which VMs have never been backed up" is a question an inventory should be able to answer and currently cannot.
 - **Certificate and subscription status.** `GET /nodes/{node}/certificates/info` lists the certificates the node serves, with expiry. Infrastructure certificate expiry is a routine blind spot and nothing else in a runZero estate reports it.
 - **Outbound: runZero data as Proxmox guest tags or notes.** Proxmox accepts writes to a guest's `tags` and `description` through `PUT /nodes/{node}/qemu/{vmid}/config`, so a runZero verdict — exposed service, missing agent, unexpected segment — could be written onto the guest where a Proxmox operator would actually see it. Two constraints: this needs `VM.Config.Options` rather than the read-only privileges this integration asks for, which is a materially broader grant, and it writes live guest configuration, so it needs a much tighter confirmation model than a scheduled read.

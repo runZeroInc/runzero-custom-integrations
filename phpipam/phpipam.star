@@ -268,7 +268,10 @@ def fetch(ctx, path):
     url = "{}/api/{}{}".format(ctx["base_url"], ctx["app_id"], path)
     data, err = get_json(url, **ctx["http_options"])
     if err:
-        if "404" in err:
+        # Only a real 404 status is an empty collection; matching "404"
+        # anywhere in the error would also swallow a 5xx whose body happens
+        # to mention 404.
+        if err.startswith("status 404"):
             return []
         print("phpipam: {} failed: {}".format(path, err))
         return None
@@ -434,9 +437,13 @@ def build_address_asset(ctx, record, subnet):
     }
 
     asset = ImportAsset(**params)
-    last_seen = parse_ts(record.get("lastSeen"))
-    if last_seen != None:
-        asset.lastSeenTS = last_seen
+    # NEVER_SEEN is a datetime string, so parse_ts would read it as a real
+    # epoch+1s sighting (the non-positive-epoch rule applies only to numeric
+    # input). The raw value is still preserved in last_seen_raw.
+    if as_text(record.get("lastSeen"), join=",").strip() != NEVER_SEEN:
+        last_seen = parse_ts(record.get("lastSeen"))
+        if last_seen != None:
+            asset.lastSeenTS = last_seen
     return asset
 
 

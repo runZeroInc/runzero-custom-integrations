@@ -91,6 +91,7 @@
    - **Additional fact names** (`extra_facts`): optional; comma-separated top-level Facter fact names to import alongside the built-in set, for example `role,datacenter`.
    - **Nodes per page** (`page_size`): optional; nodes requested per page (default: 500).
    - **Fact rows per page** (`fact_page_size`): optional; fact rows requested per page (default: 2000).
+   - **Maximum fact rows to index** (`max_fact_rows`): optional; cap on the (node, fact) rows the whole-estate fact pre-index holds in memory (default: 0, uncapped). On a very large estate the index can otherwise approach the sandbox's memory limit before the first node is reported; nodes past the cap still import, without fact enrichment.
    - **Client certificate (PEM)** (`tls_client_cert`) and **Client key (PEM)** (`tls_client_key`): the mutual-TLS credential. These come from the shared TLS option set; the form requires the key whenever a certificate is supplied.
    - **CA certificate (PEM)** (`tls_ca_cert`): the Puppet CA certificate, so the Explorer trusts PuppetDB's own certificate.
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).

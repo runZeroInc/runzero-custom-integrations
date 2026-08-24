@@ -1,0 +1,54 @@
+{
+  "name": "empty",
+  "integration": "proxmox",
+  "description": "A token that authenticates but sees no nodes - a fresh install, or a token whose ACL path covers nothing. All four bootstrap calls answer 200, and /cluster/resources?type=node returns an empty data array. Proves the run ends cleanly with zero assets and a printed 'no nodes are visible to this token' notice, so an over-scoped-down token reads as a permissions problem rather than as a healthy empty import.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "runzero@pam!inventory",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "version",
+      "match": {"method": "GET", "path": "/api2/json/version"},
+      "responses": [
+        {"status": 200, "json": {"data": {"release": "8.4", "version": "8.4.1", "repoid": "abc123"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-status",
+      "match": {"method": "GET", "path": "/api2/json/cluster/status"},
+      "responses": [
+        {"status": 200, "json": {"data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-config",
+      "match": {"method": "GET", "path": "/api2/json/cluster/config/nodes"},
+      "responses": [
+        {"status": 200, "json": {"data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-resources",
+      "match": {"method": "GET", "path": "/api2/json/cluster/resources"},
+      "responses": [
+        {"status": 200, "json": {"data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"data": null}},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 4,
+    "log_contains": [
+      "the API answered but no nodes are visible to this token",
+      "reported 0 assets"
+    ]
+  },
+  "check_determinism": true
+}

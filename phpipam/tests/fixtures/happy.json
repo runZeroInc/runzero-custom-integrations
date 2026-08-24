@@ -162,17 +162,21 @@
           "phpipam_vlan_name": "LAB-USERS",
           "phpipam_location": "Lab Rack A",
           "phpipam_device_hostname": "sw01.lab.example",
-          "phpipam_last_seen_raw": "2026-08-15 09:12:00"
+          "phpipam_last_seen_raw": "2026-08-15 09:12:00",
+          "lastSeenTS": "1786785120"
         }
       },
       {
         "id": "phpipam:$HOST:address:102",
-        "comment": "lastSeen is phpIPAM's 1970 never-seen sentinel; it must not become a real sighting.",
+        "comment": "lastSeen is phpIPAM's 1970 never-seen sentinel; it must not become a real sighting - lastSeenTS must be absent while the raw value survives as an attribute.",
         "fields": {
           "_attrType": "address",
           "phpipam_tag": "Used",
           "phpipam_last_seen_raw": "1970-01-01 00:00:01"
-        }
+        },
+        "fields_absent": [
+          "lastSeenTS"
+        ]
       },
       {
         "id": "phpipam:$HOST:device:50",

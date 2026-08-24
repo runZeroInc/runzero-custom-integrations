@@ -98,11 +98,6 @@ VENDOR = "opnsense"
 ATTR_PREFIX = "opnsense"
 ATTR_SEPARATOR = "_"
 
-# One asset per REPORT_BATCH discovered hosts is handed to report_assets, so the
-# peak ImportAsset allocation is bounded by the batch rather than by the size of
-# the firewall's neighbor tables.
-REPORT_BATCH = 500
-
 HEXDIGITS = "0123456789abcdef"
 
 # Hostnames that name no host. dnsmasq writes a literal "*" into its lease file
@@ -477,7 +472,7 @@ def build_host_asset(ctx, record):
 
 
 def report_hosts(ctx, index, order):
-    """Stream the merged host records to runZero in bounded batches."""
+    """Stream the merged host records to runZero, one asset per call."""
     limit = ctx["max_hosts"]
     reported = 0
     skipped = 0

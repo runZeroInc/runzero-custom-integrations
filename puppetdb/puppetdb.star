@@ -75,6 +75,15 @@ CONFIG = {
             "max": 25000,
             "description": "Fact rows requested per page. PuppetDB pages this endpoint by individual fact row, not by node, so a larger page covers more nodes per request.",
         },
+        {
+            "key": "max_fact_rows",
+            "label": "Maximum fact rows to index",
+            "type": "int",
+            "required": False,
+            "default": 0,
+            "min": 0,
+            "description": "Cap on the (node, fact) rows the fact pre-index holds in memory. The whole-estate index includes full structured networking/dmi/os values, so a very large estate can otherwise exhaust the sandbox's memory before the first node is reported. 0 removes the cap. Nodes past the cap still import, without fact enrichment.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -340,8 +349,12 @@ def build_software(ctx, certname, address, packages):
         params = {
             "id": "{}:{}:{}:package:{}".format(VENDOR, ctx["scope"], certname, key)[:255],
             "product": product[:255],
-            "serviceAddress": address or "127.0.0.1",
         }
+        # A node with no routable address gets no serviceAddress at all: the
+        # platform filters loopback, so a 127.0.0.1 placeholder would only
+        # vanish silently anyway.
+        if address:
+            params["serviceAddress"] = address
         if version:
             params["version"] = version[:255]
         if provider:
@@ -677,6 +690,7 @@ def fetch_facts(ctx, state, facts):
 
     rows = 0
     offset = 0
+    capped = False
     _pager1 = pager("puppetdb-1")
     while _pager1.next():
         page, err = query_pdb(ctx, FACTS_PATH, query, order_by, ctx["fact_page_size"], offset)
@@ -688,6 +702,14 @@ def fetch_facts(ctx, state, facts):
         for row in page:
             if type(row) != "dict":
                 continue
+            # The index bound: structured fact values are large, and the
+            # index covers the whole estate before the first node is
+            # reported, so an uncapped walk on a huge estate can hit the
+            # sandbox's memory ceiling. Nodes past the cap still import,
+            # without fact enrichment.
+            if ctx["max_fact_rows"] and ctx["fact_rows_indexed"] >= ctx["max_fact_rows"]:
+                capped = True
+                break
             certname = _text(row.get("certname")).strip()
             name = _text(row.get("name")).strip()
             if not certname or not name:
@@ -697,8 +719,13 @@ def fetch_facts(ctx, state, facts):
                 entry = {}
                 facts[certname] = entry
             entry[name] = row.get("value")
+            ctx["fact_rows_indexed"] += 1
         rows += len(page)
         offset += len(page)
+        if capped:
+            print("puppetdb: fact index truncated at {} rows (max_fact_rows); remaining nodes import without fact enrichment".format(
+                ctx["max_fact_rows"]))
+            break
         if len(page) < ctx["fact_page_size"]:
             break
 
@@ -854,6 +881,8 @@ def main(**kwargs):
         "environment": get_string(kwargs, "environment", default="").strip(),
         "page_size": get_int(kwargs, "page_size", default=500),
         "fact_page_size": get_int(kwargs, "fact_page_size", default=2000),
+        "max_fact_rows": get_int(kwargs, "max_fact_rows", default=0),
+        "fact_rows_indexed": 0,
         "packages": get_bool(kwargs, "include_packages", default=False),
         "extra_facts": extra_facts,
         "fact_names": STRUCTURED_FACTS + SCALAR_FACTS + LEGACY_FACTS + extra_facts,

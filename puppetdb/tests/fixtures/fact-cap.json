@@ -1,0 +1,89 @@
+{
+  "name": "fact-cap",
+  "integration": "puppetdb",
+  "description": "The fact pre-index memory bound. The whole-estate fact index holds full structured networking/dmi/os values in memory before the first node is reported, so max_fact_rows exists as the operator-visible ceiling for estates large enough to threaten the sandbox's memory limit. With max_fact_rows=2 and fact_page_size=2, the first facts page (alpha's two rows) is indexed, the cap trips on the first row of the second page, the walk stops WITHOUT requesting offset=4, and the truncation is printed. All three nodes must still import - alpha with the MAC and address its indexed networking fact supplies, beta and gamma without fact enrichment but still identified by certname - because the cap degrades enrichment, never the inventory.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_token": "fixture-rbac-token",
+    "fact_page_size": "2",
+    "max_fact_rows": "2"
+  },
+  "routes": [
+    {
+      "name": "facts-offset-0",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "alpha.corp.example.com", "name": "networking", "value": {"fqdn": "alpha.corp.example.com", "hostname": "alpha", "domain": "corp.example.com", "ip": "10.82.0.1", "mac": "00:50:56:bb:00:01", "interfaces": {"eth0": {"mac": "00:50:56:bb:00:01", "bindings": [{"address": "10.82.0.1"}]}}}},
+            {"certname": "alpha.corp.example.com", "name": "os", "value": {"name": "Ubuntu", "family": "Debian", "release": {"full": "24.04", "major": "24"}}}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "facts-offset-2",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "beta.corp.example.com", "name": "networking", "value": {"fqdn": "beta.corp.example.com", "hostname": "beta", "domain": "corp.example.com", "ip": "10.82.0.2", "mac": "00:50:56:bb:00:02", "interfaces": {"eth0": {"mac": "00:50:56:bb:00:02", "bindings": [{"address": "10.82.0.2"}]}}}},
+            {"certname": "beta.corp.example.com", "name": "os", "value": {"name": "Ubuntu", "family": "Debian", "release": {"full": "24.04", "major": "24"}}}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "nodes",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "alpha.corp.example.com", "facts_environment": "production", "report_timestamp": "2026-02-02T10:00:00.000Z"},
+            {"certname": "beta.corp.example.com", "facts_environment": "production", "report_timestamp": "2026-02-02T10:01:00.000Z"},
+            {"certname": "gamma.corp.example.com", "facts_environment": "production", "report_timestamp": "2026-02-02T10:02:00.000Z"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "puppetdb:$HOST:alpha.corp.example.com",
+      "puppetdb:$HOST:beta.corp.example.com",
+      "puppetdb:$HOST:gamma.corp.example.com"
+    ],
+    "assets": [
+      {
+        "id": "puppetdb:$HOST:alpha.corp.example.com",
+        "fields": {
+          "macAddresses": "00:50:56:bb:00:01",
+          "ipAddresses": "10.82.0.1"
+        }
+      },
+      {
+        "id": "puppetdb:$HOST:beta.corp.example.com",
+        "fields_absent": ["macAddresses", "ipAddresses"]
+      }
+    ],
+    "log_contains": [
+      "fact index truncated at 2 rows (max_fact_rows); remaining nodes import without fact enrichment",
+      "reported 3 active nodes"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=2"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=4"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

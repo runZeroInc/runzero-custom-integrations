@@ -1,0 +1,57 @@
+{
+  "name": "empty",
+  "integration": "quest-kace",
+  "description": "An appliance with no inventoried machines and no CMDB assets. Login succeeds, both collections answer 200 with empty arrays. Proves the run ends cleanly at zero assets with the 'no assets retrieved' notice rather than failing, and that the empty CMDB pass does not disturb the machine walk.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "import_software": "true",
+    "import_assets": "true"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ams/shared/api/security/login"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Set-Cookie": "KACE_LAST_ORG_SECURE=FixtureOrg; Path=/; Secure",
+            "set-cookie": "kboxid=fixture-session-1; Path=/; HttpOnly",
+            "X-Dell-Csrf-Token": "csrf-from-header"
+          },
+          "json": {"Result": "Success"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cmdb-assets",
+      "match": {"method": "GET", "path": "/api/asset/assets"},
+      "responses": [
+        {"status": 200, "json": {"Assets": []}}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "machines",
+      "match": {"method": "GET", "path": "/api/inventory/machines"},
+      "responses": [
+        {"status": 200, "json": {"Machines": []}}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "log_contains": [
+      "quest-kace: indexed 0 CMDB assets mapped to inventory machines",
+      "quest-kace: reported 0 assets from organization fixtureorg",
+      "quest-kace: no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

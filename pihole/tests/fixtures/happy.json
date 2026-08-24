@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "pihole",
-  "description": "Pi-hole's own network table, joined with its DHCP leases. Proves the session is opened, carried in X-FTL-SID rather than the sid query parameter, and deleted at the end so the API seat is released; that max_devices is always sent, because the API silently defaults it to 10; that FTL's synthetic ip-<address> hardware address is never read as a MAC; that a name which is really a bare address does not become a hostname; that link-local and loopback are filtered before they reach an interface; and that a device with a future timestamp is clamped rather than dropped.",
+  "description": "Pi-hole's own network table, joined with its DHCP leases. Proves the session is opened, carried in X-FTL-SID rather than the sid query parameter, and deleted at the end so the API seat is released - preceded by the GET /api/auth status probe that shields the raw (raising) DELETE from a dead transport; that max_devices is always sent, because the API silently defaults it to 10; that FTL's synthetic ip-<address> hardware address is never read as a MAC; that a name which is really a bare address does not become a hostname; that link-local and loopback are filtered before they reach an interface; and that a device with a future timestamp is clamped rather than dropped.",
   "kwargs": {
     "url": "$BASE",
     "password": "fixture-password",
@@ -9,6 +9,29 @@
     "max_devices": "5000"
   },
   "routes": [
+    {
+      "name": "auth-status-probe",
+      "match": {
+        "method": "GET",
+        "path": "/api/auth"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "session": {
+              "valid": true,
+              "totp": false,
+              "sid": "vFA+EP4MQ5JJvJg+3Q2Jnw=",
+              "validity": 300,
+              "message": "correct password"
+            },
+            "took": 0.001
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
     {
       "name": "auth",
       "match": {
@@ -345,6 +368,10 @@
       {
         "method": "GET",
         "path": "/api/dhcp/leases"
+      },
+      {
+        "method": "GET",
+        "path": "/api/auth"
       },
       {
         "method": "DELETE",

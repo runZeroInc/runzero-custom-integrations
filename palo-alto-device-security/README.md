@@ -61,7 +61,9 @@ the IoT public API.
 
    Access tokens are short-lived — Palo Alto documents a 15-minute lifetime — so expect
    to re-request one while testing. The device list endpoint is rate-limited to 60
-   requests per minute.
+   requests per minute. The integration handles this itself: a 401 mid-run re-mints
+   the token and retries the failed request once, so a walk longer than one token
+   lifetime still completes.
 
 ### runZero configuration
 

@@ -297,16 +297,24 @@ def login(ctx, username, password, timeout):
 def permitted(ctx, obj, method):
     """Report whether the session's ACLs list this object and method.
 
+    rpcd expresses wildcard grants two ways, and both must be honored: a "*"
+    object key covers every object (a login granted only the superuser ACL
+    group returns exactly {"*": ["*"]}), and a "*" entry in a method list
+    covers every method on that object.
+
     Absent ACL data this returns True, so an unusual rpcd configuration degrades
     to trying the call rather than refusing to.
     """
     granted = ctx.get("granted")
     if type(granted) != "dict" or not granted:
         return True
-    methods = granted.get(obj)
-    if type(methods) != "list":
-        return False
-    return method in methods
+    for key in [obj, "*"]:
+        methods = granted.get(key)
+        if type(methods) != "list":
+            continue
+        if "*" in methods or method in methods:
+            return True
+    return False
 
 
 def call_guarded(ctx, obj, method, params, why):
@@ -430,12 +438,19 @@ def collect_leases(ctx, index, order):
             # expires is SECONDS REMAINING, not a timestamp. It is kept as an
             # attribute and never converted to a time: now + expires is in the
             # future, and a future timestamp makes the platform reject the
-            # entire asset record rather than just the field.
-            record["lease"] = {
-                "expires_seconds": lease.get("expires"),
-                "duid": lease.get("duid"),
-                "family": "ipv6" if key == "dhcp6_leases" else "ipv4",
-            }
+            # entire asset record rather than just the field. Lease detail is
+            # keyed per family so a dual-stack client holding both a DHCPv4
+            # and a DHCPv6 lease keeps both.
+            family = "ipv6" if key == "dhcp6_leases" else "ipv4"
+            detail = record["lease"]
+            families = detail.get("family")
+            if type(families) != "list":
+                families = []
+            if family not in families:
+                families.append(family)
+            detail["family"] = families
+            detail[family + "_expires_seconds"] = lease.get("expires")
+            detail[family + "_duid"] = lease.get("duid")
             added += 1
     return added
 

@@ -1,0 +1,275 @@
+{
+  "name": "data-null",
+  "integration": "proxmox",
+  "description": "The PVE error envelope. When a per-guest call fails server-side, Proxmox answers 200 with the JSON body {\"data\": null} - the key is PRESENT, so .get('data', []) returns None rather than the default, and the old code then iterated or .get()'d None and ABORTED the whole run, losing everything already collected. Here VM 100's config, container 200's config, and container 200's interfaces all answer {\"data\": null}. Proves every null envelope degrades to an empty payload: the node and BOTH guests still import (streamed as built), the VM keeps its name as a hostname so a stopped VM with no net0 MAC still carries a correlator, and the container falls back to its list-entry name for a hostname. namespaced_ids is skipped for the same reason as the other proxmox scenarios: the cluster name IS the scope, which the invariant heuristic cannot recognize.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "runzero@pam!inventory",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "version",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/version"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "release": "8.4",
+              "version": "8.4.1",
+              "repoid": "abc123"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-status",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/status"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "type": "cluster",
+                "name": "lab-cluster",
+                "id": "cluster",
+                "nodes": 1,
+                "quorate": 1,
+                "version": 1
+              },
+              {
+                "type": "node",
+                "name": "pve1",
+                "id": "node/pve1",
+                "online": 1,
+                "local": 1,
+                "nodeid": 1,
+                "ip": "10.77.0.2",
+                "level": ""
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-config",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/config/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "node": "pve1",
+                "ring0_addr": "10.77.0.2",
+                "nodeid": 1,
+                "quorum_votes": 1
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-resources",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/resources"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "type": "node",
+                "node": "pve1",
+                "id": "node/pve1",
+                "status": "online",
+                "uptime": 421000,
+                "maxmem": 68719476736,
+                "maxcpu": 16
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "qemu-list",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "vmid": 100,
+                "name": "db01",
+                "status": "stopped",
+                "maxmem": 8589934592,
+                "maxdisk": 68719476736,
+                "cpus": 4
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vm-config-null",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu/100/config"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "lxc-list",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "vmid": 200,
+                "name": "web01",
+                "status": "running",
+                "maxmem": 2147483648,
+                "cpus": 2,
+                "type": "lxc"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ct-config-null",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/200/config"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ct-interfaces-null",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/200/interfaces"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "data": null
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "lab-cluster-node-pve1",
+      "lab-cluster-vm-100",
+      "lab-cluster-ct-200"
+    ],
+    "assets": [
+      {
+        "id": "lab-cluster-vm-100",
+        "fields": {
+          "hostnames": "db01",
+          "proxmox_status": "stopped"
+        },
+        "fields_absent": [
+          "macAddresses",
+          "ipAddresses"
+        ]
+      },
+      {
+        "id": "lab-cluster-ct-200",
+        "fields": {
+          "hostnames": "web01",
+          "proxmox_status": "running"
+        },
+        "fields_absent": [
+          "macAddresses",
+          "ipAddresses"
+        ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu/100/config"
+      },
+      {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/200/config"
+      },
+      {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/200/interfaces"
+      }
+    ],
+    "log_contains": [
+      "reported 3 assets"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}
