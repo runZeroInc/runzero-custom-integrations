@@ -9,6 +9,11 @@ CONFIG = {
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
     "matchBehavior": "no-id-match no-id-break",
+    # A hard bound on either cursor walk. Bitsight pages 100 rows at a time, so
+    # this is well past any real company's asset or finding count, and it means
+    # a cursor that never resolves raises a clear error instead of spinning
+    # until the task deadline.
+    "maxPages": 1000,
     "params": [
         {
             "key": "url",
@@ -31,187 +36,178 @@ CONFIG = {
             "type": "secret",
             "required": True,
         },
+        {
+            "key": "findings_limit",
+            "label": "Findings enrichment limit",
+            "type": "int",
+            "required": False,
+            "default": 0,
+            "min": 0,
+            "description": "Maximum number of assets to enrich with findings. Each asset costs one paginated findings walk per IP address, so a large portfolio can spend the whole API rate budget here. Assets past the limit are imported without vulnerabilities and the skip is logged. 0 enriches every asset.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
         "http_": OPTIONS_HTTP,
     },
 }
-load('base64', base64_encode='encode', base64_decode='decode')
-load('http', 'get_json', 'basic')
-load('kwargs', 'get_http_options')
+load('base64', base64_encode='encode')
+load('coerce', 'as_dict', 'as_float', 'as_int', 'as_list', 'dicts', text='as_text')
+load('http', 'get_json')
+load('kwargs', 'get_http_options', 'get_int')
 load('net', 'network_interface')
-load('re', re_match='match')
 load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
-load('time', 'parse_time')
+load('time', 'parse_ts')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or non-production deployment can be reached
 # without editing the script.
 DEFAULT_BITSIGHT_URL = 'https://api.bitsighttech.com'
 
-# parse_time ABORTS the script on a value it cannot parse rather than returning
-# an error, and Starlark has no exception handling -- so a timestamp is screened
-# against this before the call. Testing the result instead does not work:
-# parse_time never returns, so a `!= None` check after it is dead code.
-RFC3339_RE = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$"
+def build_asset(asset, base_url, company_id, http_options, ctx):
+    """Convert one Bitsight asset row into an ImportAsset, enriched with the
+    findings behind each of its addresses. Returns None when the row carries no
+    asset name, which is the record's whole identity here."""
+    ip_addresses = [text(ip) for ip in as_list(asset.get('ip_addresses')) if text(ip)]
+    tags = [text(tag).strip().replace(' ', '_') for tag in as_list(asset.get('tags')) if text(tag).strip()]
+    asset_name = text(asset.get('asset'))
+    asset_type = text(asset.get('asset_type'))
+    if not asset_name:
+        return None
+    asset_id = "bitsight:{}:{}".format(asset_type or "unknown", asset_name)
+    app_grade = str(asset.get('app_grade', ''))
+    country_code = str(asset.get('country_code', ''))
+    country = str(asset.get('country') or '')
+    hosted_by = as_dict(asset.get('hosted_by'))
+    hosted_by_guid = hosted_by.get('guid', '')
+    hosted_by_name = hosted_by.get('name', '')
+    importance = str(asset.get('importance', ''))
+    importance_category = asset.get('importance_category', '')
+    long = str(asset.get('longitude', ''))
+    lat = str(asset.get('latitude', ''))
+    origin_sub = as_dict(asset.get('origin_subsidiary'))
+    origin_sub_guid = origin_sub.get('guid', '')
+    origin_sub_name = origin_sub.get('name', '')
+    is_monitored = str(asset.get('is_monitored', ''))
+    grace_period_end_date = str(asset.get('grace_period_end_date', ''))
+    is_in_grace_period = str(asset.get('is_in_grace_period', ''))
+    guest_network_end_date = str(asset.get('guest_network_end_date', ''))
+    is_in_guest_network = str(asset.get('is_in_guest_network', ''))
+    cloud_context = as_dict(asset.get('cloud_context'))
+    provider = as_dict(cloud_context.get('provider'))
+    slug = provider.get('slug', '')
+    cloud_name = provider.get('name', '')
+    region = provider.get('region', '')
+    service = provider.get('service', '')
+    findings = as_dict(asset.get('findings'))
+    findings_counts = as_dict(findings.get('counts_by_severity'))
+    findings_count_total = str(findings.get('total_count', 0))
+    findings_count_severe = str(findings_counts.get('severe', 0))
+    findings_count_material = str(findings_counts.get('material', 0))
+    findings_count_moderate = str(findings_counts.get('moderate', 0))
+    findings_count_minor = str(findings_counts.get('minor', 0))
+    threats = as_dict(asset.get('threats'))
+    threat_ids = as_list(threats.get('rolledup_observation_ids'))
+    evidence_keys = as_list(threats.get('evidence_keys'))
 
-# A hard bound on either cursor walk. Bitsight pages 100 rows at a time, so this
-# is well past any real company's asset or finding count, and it means a cursor
-# that never resolves cannot spin forever.
-MAX_PAGES = 1001
+    custom_attributes = {
+                         'asset': asset_name,
+                         'assetType': asset_type,
+                         'appGrade': app_grade,
+                         'countryCode': country_code,
+                         'country': country,
+                         'hostedBy.guid': hosted_by_guid,
+                         'hostedBy.name': hosted_by_name,
+                         'importance': importance,
+                         'importanceCategory': importance_category,
+                         'longitude': long,
+                         'latitude': lat,
+                         'originSubsidiary.guid': origin_sub_guid,
+                         'originSubsidiary.name': origin_sub_name,
+                         'isMonitored': is_monitored,
+                         'gracePeriodEndDate': grace_period_end_date,
+                         'isInGracePeriod': is_in_grace_period,
+                         'guestNetworkEndDate': guest_network_end_date,
+                         'isInGuestNetwork': is_in_guest_network,
+                         'cloudContext.slug': slug,
+                         'cloudContext.name': cloud_name,
+                         'cloudContext.region': region,
+                         'cloudContext.service': service,
+                         'findingsCount.total': findings_count_total,
+                         'findingsCount.severe': findings_count_severe,
+                         'findingsCount.material': findings_count_material,
+                         'findingsCount.moderate': findings_count_moderate,
+                         'findingsCount.minor': findings_count_minor,
+                         'threats.rolledUpObservationIds': threat_ids[:1023],
+                         'threats.evidenceKeys': evidence_keys[:1023]
+                         }
 
-def build_assets(assets, base_url, company_id, http_options):
-    assets_import = []
-    # `asset` is the record's whole identity here, so a row without one cannot
-    # be imported. Counted rather than logged per record: a bad export would
-    # otherwise be one line per row across the whole company.
-    skipped = 0
-    for asset in assets:
-        ip_addresses = asset.get('ip_addresses', [])
-        bitsight_tags = asset.get('tags') or []
-        tags = [tag.strip().replace(' ', '_') for tag in bitsight_tags]
-        asset_name = asset.get('asset', '')
-        asset_type = asset.get('asset_type', '')
-        if not asset_name:
-            skipped += 1
-            continue
-        asset_id = "bitsight:{}:{}".format(asset_type or "unknown", asset_name)
-        app_grade = str(asset.get('app_grade', ''))
-        country_code = str(asset.get('country_code', ''))
-        country = str(asset.get('country') or '')
-        hosted_by = asset.get('hosted_by') or {}
-        hosted_by_guid = hosted_by.get('guid', '')
-        hosted_by_name = hosted_by.get('name', '')
-        importance = str(asset.get('importance', ''))
-        importance_category = asset.get('importance_category', '')
-        long = str(asset.get('longitude', ''))
-        lat = str(asset.get('latitude', ''))
-        origin_sub = asset.get('origin_subsidiary') or {}
-        origin_sub_guid = origin_sub.get('guid', '')
-        origin_sub_name = origin_sub.get('name', '')
-        is_monitored = str(asset.get('is_monitored', ''))
-        grace_period_end_date = str(asset.get('grace_period_end_date', ''))
-        is_in_grace_period = str(asset.get('is_in_grace_period', ''))
-        guest_network_end_date = str(asset.get('guest_network_end_date', ''))
-        is_in_guest_network = str(asset.get('is_in_guest_network', ''))
-        cloud_context = asset.get('cloud_context') or {}
-        provider = cloud_context.get('provider') or {}
-        slug = provider.get('slug', '')
-        cloud_name = provider.get('name', '')
-        region = provider.get('region', '')
-        service = provider.get('service', '')
-        findings = asset.get('findings') or {}
-        findings_count_total = str(findings.get('total_count', 0))
-        findings_count_severe = str(findings.get('counts_by_severity', {}).get('severe', 0))
-        findings_count_material = str(findings.get('counts_by_severity', {}).get('material', 0))
-        findings_count_moderate = str(findings.get('counts_by_severity', {}).get('moderate', 0))
-        findings_count_minor = str(findings.get('counts_by_severity', {}).get('minor', 0))
-        threats = asset.get('threats') or {}
-        threat_ids = threats.get('rolledup_observation_ids', [])
-        evidence_keys = threats.get('evidence_keys', [])
+    for index, product in enumerate(dicts(asset.get('products'))):
+        for k, v in product.items():
+            custom_attributes['product' + str(index) + k] = v
 
-        custom_attributes = {
-                             'asset': asset_name,
-                             'assetType': asset_type,
-                             'appGrade': app_grade,
-                             'countryCode': country_code,
-                             'country': country,
-                             'hostedBy.guid': hosted_by_guid,
-                             'hostedBy.name': hosted_by_name,
-                             'importance': importance,
-                             'importanceCategory': importance_category,
-                             'longitude': long,
-                             'latitude': lat,
-                             'originSubsidiary.guid': origin_sub_guid,
-                             'originSubsidiary.name': origin_sub_name,
-                             'isMonitored': is_monitored,
-                             'gracePeriodEndDate': grace_period_end_date,
-                             'isInGracePeriod': is_in_grace_period,
-                             'guestNetworkEndDate': guest_network_end_date,
-                             'isInGuestNetwork': is_in_guest_network,
-                             'cloudContext.slug': slug,
-                             'cloudContext.name': cloud_name,
-                             'cloudContext.region': region,
-                             'cloudContext.service': service,
-                             'findingsCount.total': findings_count_total,
-                             'findingsCount.severe': findings_count_severe,
-                             'findingsCount.material': findings_count_material,
-                             'findingsCount.moderate': findings_count_moderate,
-                             'findingsCount.minor': findings_count_minor,
-                             'threats.rolledUpObservationIds': threat_ids[:1023],
-                             'threats.evidenceKeys': evidence_keys[:1023]
-                             }
-        
-        products = asset.get('products', [])
-        for product in products:
-            for k, v in product.items():
-                custom_attributes['product' + str(products.index(product)) + k] = v
+    # One paginated findings walk per address is the expensive half of this
+    # integration, so it is bounded by the findings_limit parameter: an asset
+    # past the cap still imports, without vulnerabilities.
+    vulns = []
+    if ctx["findings_limit"] and ctx["findings_used"] >= ctx["findings_limit"]:
+        ctx["findings_capped"] += 1
+    else:
+        ctx["findings_used"] += 1
+        lookups = ip_addresses if ip_addresses else [asset_name]
+        for address in lookups:
+            for finding in dicts(get_findings(address, base_url, company_id, http_options)):
+                vulns.append(build_vuln(finding))
 
-        vulns = []
-        if ip_addresses:
-            for address in ip_addresses:
-                findings = get_findings(address, base_url, company_id, http_options)
-                for finding in findings:
-                    vuln = build_vuln(finding)
-                    vulns.append(vuln)
-        elif not ip_addresses and asset_name:
-            findings = get_findings(asset_name, base_url, company_id, http_options)
-            for finding in findings:
-                vuln = build_vuln(finding)
-                vulns.append(vuln)
-        
-        # create the network interfaces
-        # network_interface returns None when no address survives -- a domain or
-        # CIDR asset has none, and Bitsight returns those whenever the is_ip
-        # filter is relaxed. Passing [None] to ImportAsset aborts the entire
-        # run, so such an asset gets no interface and correlates on its name.
-        interface = network_interface(ips=ip_addresses, mac=None)
-        interfaces = [interface] if interface else []
+    # create the network interfaces
+    # network_interface returns None when no address survives -- a domain or
+    # CIDR asset has none, and Bitsight returns those whenever the is_ip
+    # filter is relaxed. Passing [None] to ImportAsset aborts the entire
+    # run, so such an asset gets no interface and correlates on its name.
+    interface = network_interface(ips=ip_addresses, mac=None)
+    interfaces = [interface] if interface else []
 
-        # Build assets for import
-        assets_import.append(
-            ImportAsset(
-                id=asset_id,
-                hostnames=[asset_name],
-                tags=tags,
-                networkInterfaces=interfaces,
-                customAttributes=to_custom_attributes(custom_attributes),
-                vulnerabilities=vulns,
-            )
-        )
-    if skipped > 0:
-        print("bitsight: skipped {} records with no asset field".format(skipped))
-    return assets_import
+    return ImportAsset(
+        id=asset_id,
+        hostnames=[asset_name],
+        tags=tags,
+        networkInterfaces=interfaces,
+        customAttributes=to_custom_attributes(custom_attributes),
+        vulnerabilities=vulns,
+    )
 
 def build_vuln(vuln):
-    details = vuln.get('details') or {}
-    observed_ips = details.get('observed_ips') or []
-    diligence_annotations = details.get('diligence_annotations') or {}
-    identifier = diligence_annotations.get('message', '')
+    details = as_dict(vuln.get('details'))
+    observed_ips = [text(ip) for ip in as_list(details.get('observed_ips')) if text(ip)]
+    diligence_annotations = as_dict(details.get('diligence_annotations'))
+    identifier = text(diligence_annotations.get('message'))
     name = identifier
-    description = diligence_annotations.get('Title', '')
-    description = description[:1023] if description else ''
+    description = text(diligence_annotations.get('Title'))[:1023]
     service_address = observed_ips[0] if len(observed_ips) > 0 else ''
     if '[' in service_address:
         resolved_ip = service_address.split('[')[1]
         service_address = resolved_ip.split(']')[0]
     else:
         service_address = service_address.split(':')[0]
-    service_port = int(details.get('dest_port', 0))
-    service_transport = diligence_annotations.get('transport', '')
-    # Bitsight reports first_seen as a bare date, so it is padded out to RFC 3339
-    # before parsing. The value is then screened rather than parsed on trust:
-    # parse_time aborts the script on anything it cannot handle, so a finding
-    # with no first_seen -- or one carrying a shape Bitsight has never
-    # documented -- used to take the whole import down along with every finding
-    # and asset already built.
+    # dest_port arrives null on findings without a socket -- a diligence
+    # finding on a domain, for example -- and int(None) aborts the script, so
+    # the value is coerced instead.
+    service_port = as_int(details.get('dest_port'), default=0)
+    service_transport = text(diligence_annotations.get('transport'))
+    # Bitsight reports first_seen as a bare date, so a date-only value is
+    # padded to RFC 3339 when the direct parse declines it. parse_ts returns
+    # None on anything it cannot handle instead of aborting the script, and
+    # clamps future values so a fast clock cannot drop the record.
     first_seen = vuln.get('first_seen')
-    if type(first_seen) == "string" and 'T' not in first_seen:
-        first_seen = first_seen + 'T00:00:00Z'
-    cvss2_base_score = details.get('cvss', {}).get('base', [])
-    cvss2_base_score = float(cvss2_base_score[0]) if cvss2_base_score else 0
-    severity_score = float(vuln.get('severity') or 0)
+    first_detected = parse_ts(first_seen)
+    if first_detected == None and type(first_seen) == "string" and 'T' not in first_seen:
+        first_detected = parse_ts(first_seen + 'T00:00:00Z')
+    # cvss arrives as an object holding a list, but a finding without a score
+    # carries an explicit null, and the base value has been observed as a bare
+    # number too, so every layer is coerced.
+    cvss_values = as_list(as_dict(details.get('cvss')).get('base'))
+    cvss2_base_score = as_float(cvss_values[0]) if cvss_values else 0
+    severity_score = as_float(vuln.get('severity'))
     if severity_score >= 0.1 and severity_score <=3.9:
         risk_rank = 1
     elif severity_score >= 4.0 and severity_score <=6.9:
@@ -222,8 +218,10 @@ def build_vuln(vuln):
         risk_rank = 4
     else:
         risk_rank = 0
-    remediation = details.get('remediation', [])
-    solutions = [r.get('message', '') + ': ' + r.get('help_text', '') for r in remediation]
+    # remediation rows and their message fields arrive null often enough that
+    # each layer is coerced; a null message used to abort the run in the string
+    # concatenation here.
+    solutions = [text(r.get('message')) + ': ' + text(r.get('help_text')) for r in dicts(details.get('remediation'))]
     solution = '\n'.join(solutions)[:1023]
 
     # Map custom attributes
@@ -236,7 +234,9 @@ def build_vuln(vuln):
     risk_vector = vuln.get('risk_vector', '')
     risk_vector_label = vuln.get('risk_vector_label', '')
     severity_category = vuln.get('severity_category', '')
-    threat_groups_list = vuln.get('threat_groups', [])
+    # A threat group has been observed as a bare string and as an object; text()
+    # keeps the strings and drops the rest rather than aborting the join.
+    threat_groups_list = [text(t) for t in as_list(vuln.get('threat_groups')) if text(t)]
     threat_groups = '\n'.join(threat_groups_list) if threat_groups_list else ''
     threat_activity_score_label = vuln.get('threat_activity_score_label', '')
 
@@ -253,7 +253,7 @@ def build_vuln(vuln):
                     'threatGroups': threat_groups,
                     'threatActivityScoreLabel': threat_activity_score_label
                     }
-    
+
     vuln_args = {
                 'id': identifier,
                 'name': name,
@@ -268,10 +268,10 @@ def build_vuln(vuln):
                 'customAttributes': to_custom_attributes(custom_attributes)
                 }
 
-    # Omitted rather than set from an unscreened value, so a finding with an
-    # unusable first_seen still becomes a vulnerability instead of ending the run.
-    if type(first_seen) == "string" and re_match(RFC3339_RE, first_seen):
-        vuln_args['firstDetectedTS'] = parse_time(first_seen)
+    # Omitted rather than set from an unusable value, so a finding with no
+    # parseable first_seen still becomes a vulnerability.
+    if first_detected != None:
+        vuln_args['firstDetectedTS'] = first_detected
 
     return Vulnerability(**vuln_args)
 
@@ -290,26 +290,42 @@ def get_page(url, http_options, params):
         options['params'] = params
     return get_json(url, **options)
 
-def get_assets(base_url, company_id, http_options):
-    assets_all = []
+def import_assets(base_url, company_id, http_options, ctx):
+    """Walk the company's assets, building and reporting each one as it is
+    parsed so nothing is buffered for the length of the run -- an abort or an
+    error partway keeps everything already reported. Returns the count."""
+    reported = 0
+    skipped = 0
+    rows_seen = 0
     total_count = None
     url = base_url + '/ratings/v1/companies/' + company_id + '/assets'
     params = {'is_ip': 'true'}
     # The default operation is to return only IP-based assets (i.e. filter out domains and CIDRs) comment the above params variable and uncomment the following params variable if you wish to import all asset types.
     # params = {}
 
-    for _page in range(1, MAX_PAGES):
+    p = pager("assets")
+    while p.next():
         data, err = get_page(url, http_options, params)
         if err:
             print('bitsight: failed to retrieve assets: {}'.format(err))
             break
         if not data:
             break
-        assets_all.extend(data.get('results', []))
+        rows = as_list(data.get('results'), wrap=False)
+        rows_seen += len(rows)
+        for row in dicts(rows):
+            # `asset` is the record's whole identity here, so a row without one
+            # cannot be imported. Counted rather than logged per record: a bad
+            # export would otherwise be one line per row across the company.
+            asset = build_asset(row, base_url, company_id, http_options, ctx)
+            if asset == None:
+                skipped += 1
+                continue
+            reported += report_asset(asset)
 
         # `count` is a backstop rather than the loop driver. The walk used to be
-        # bounded by len(assets_all) < count - 1, which stops one row short of
-        # the reported total and so drops the last page; an absent count made it
+        # bounded by len(assets) < count - 1, which stops one row short of the
+        # reported total and so drops the last page; an absent count made it
         # one instead, ending the walk after a single page.
         count = data.get('count')
         if type(count) == "int":
@@ -319,10 +335,15 @@ def get_assets(base_url, company_id, http_options):
         if not url:
             break
         params = {}
-        if total_count != None and len(assets_all) >= total_count:
+        if total_count != None and rows_seen >= total_count:
             break
 
-    return assets_all
+    if skipped > 0:
+        print("bitsight: skipped {} records with no asset field".format(skipped))
+    if ctx["findings_capped"] > 0:
+        print("bitsight: findings limit of {} reached; {} assets were imported without findings".format(
+            ctx["findings_limit"], ctx["findings_capped"]))
+    return reported
 
 def get_findings(asset, base_url, company_id, http_options):
     vulns_all = []
@@ -330,14 +351,15 @@ def get_findings(asset, base_url, company_id, http_options):
     url = base_url + '/ratings/v1/companies/' + company_id + '/findings'
     params = {'assets.asset': asset}
 
-    for _page in range(1, MAX_PAGES):
+    p = pager("findings")
+    while p.next():
         data, err = get_page(url, http_options, params)
         if err:
             print('bitsight: failed to retrieve findings: {}'.format(err))
             break
         if not data:
             break
-        vulns_all.extend(data.get('results', []))
+        vulns_all.extend(as_list(data.get('results'), wrap=False))
 
         count = data.get('count')
         if type(count) == "int":
@@ -361,10 +383,15 @@ def main(*args, **kwargs):
     base_url = (kwargs.get('url') or DEFAULT_BITSIGHT_URL).rstrip('/')
     b64_creds = base64_encode(token + ':')
     http_options = get_http_options(kwargs, headers={'Accept': 'application/json', 'Authorization': 'Basic ' + b64_creds})
-    assets = get_assets(base_url, company_id, http_options)
 
-    # Build and stream asset import via report_assets instead of returning a list
-    reported = report_assets(build_assets(assets, base_url, company_id, http_options))
+    ctx = {
+        "findings_limit": get_int(kwargs, "findings_limit", default=0),
+        "findings_used": 0,
+        "findings_capped": 0,
+    }
+
+    # Assets are streamed one at a time via report_asset inside import_assets.
+    reported = import_assets(base_url, company_id, http_options, ctx)
     print('bitsight: reported {} assets'.format(reported))
 
     return None

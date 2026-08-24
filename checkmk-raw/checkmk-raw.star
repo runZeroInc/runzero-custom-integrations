@@ -75,7 +75,7 @@ load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', http_get='get', 'url_parse', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'from_timestamp', 'now', 'parse_ts')
+load('time', 'parse_time', 'from_timestamp', 'now', 'parse_ts', 'sleep')
 load('re', re_match='match', re_search='search')
 load('jsonstream', 'iter_array')
 
@@ -209,9 +209,19 @@ def stream_values(ctx, url, label):
     is streamed instead and only one entry is live at a time.
 
     Returns (iterator, err). The raw http builtin is used rather than get_json
-    because the body is needed as text; it accepts no retries kwarg and so gets
-    one attempt per call."""
-    resp = http_get(url, **ctx["http_options"])
+    because the body is needed as text, and it accepts no retries kwarg -- so a
+    narrow retry lives here instead: each collection is fetched in ONE request,
+    which means a single transient 500/503 on an unpaginated API used to cost
+    the whole run."""
+    resp = None
+    for attempt in range(3):
+        resp = http_get(url, **ctx["http_options"])
+        if resp != None and resp.status_code not in [408, 425, 429, 500, 502, 503, 504]:
+            break
+        if attempt < 2:
+            print("checkmk: transient failure reading the {} collection ({}), retrying".format(
+                label, "no response" if resp == None else "status " + str(resp.status_code)))
+            sleep("2s")
     if resp == None:
         return None, "no response"
     if resp.status_code != 200:
@@ -661,6 +671,14 @@ def collect(ctx, config_index):
     pages, and each asset is reported as it is built, which keeps peak memory
     at one record rather than the whole estate."""
     stream, err = stream_values(ctx, status_url(ctx), "host status")
+    if err and ctx["inventory"] and not (err.startswith("status 401") or err.startswith("status 403")):
+        # Sites older than 2.2.0p21 (2.1.0p39, 2.3.0b1) reject the whole query
+        # rather than the one column they do not know, so the query is retried
+        # once without mk_inventory instead of failing the run and making the
+        # operator toggle collect_inventory off by hand.
+        print("checkmk: the monitoring query failed with the mk_inventory column; retrying without HW/SW inventory:", err)
+        ctx["inventory"] = False
+        stream, err = stream_values(ctx, status_url(ctx), "host status")
     if err:
         if err.startswith("status 401") or err.startswith("status 403"):
             print("checkmk: authentication to the Checkmk site failed:", err)

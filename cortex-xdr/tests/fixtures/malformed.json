@@ -1,0 +1,93 @@
+{
+  "name": "malformed",
+  "integration": "cortex-xdr",
+  "description": "REGRESSION LOCK on the .get-default-vs-null class in build_assets. cx-null-fields carries tags, group_name, and users as explicit nulls -- routine for a server no one is logged into -- which used to abort the page in None.get and ';'.join(None), and its last_seen is a non-numeric string that used to die in int(). cx-null-ip has ip present but null, which used to abort in None + []. The bare non-object row locks the row-shape guard. cx-multi-mac proves an endpoint with two adapters keeps its second MAC: the addresses ride on the first MAC and the extra MAC is carried on its own interface rather than dropped.\n\nnamespaced_ids is skipped because the foreign id is the bare Cortex agent_id, the defect the happy scenario records.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key_id": "42",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "get-endpoint",
+      "match": {"method": "POST", "path": "/public_api/v1/endpoints/get_endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "reply": {
+              "total_count": 3,
+              "result_count": 3,
+              "endpoints": [
+                {
+                  "agent_id": "cx-null-fields",
+                  "endpoint_name": "cx-null-01",
+                  "host_name": "cx-null-01.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_SERVER",
+                  "ip": ["10.100.9.1"],
+                  "mac_address": ["00:11:22:bb:00:01"],
+                  "operating_system": "Windows Server 2022",
+                  "tags": null,
+                  "group_name": null,
+                  "users": null,
+                  "last_seen": "garbage",
+                  "first_seen": null
+                },
+                {
+                  "agent_id": "cx-multi-mac",
+                  "endpoint_name": "cx-multi-01",
+                  "host_name": "cx-multi-01.corp.example.com",
+                  "ip": ["10.100.9.2"],
+                  "mac_address": ["00:11:22:bb:00:02", "00:11:22:bb:00:03"],
+                  "users": ["CORP\\ops", null, 42],
+                  "group_name": ["Servers", null],
+                  "last_seen": 1786000000000,
+                  "first_seen": 1750000000
+                },
+                "a-row-the-api-degraded-into-a-string",
+                {
+                  "agent_id": "cx-null-ip",
+                  "endpoint_name": "cx-nullip-01",
+                  "host_name": "cx-nullip-01.corp.example.com",
+                  "ip": null,
+                  "mac_address": ["00:11:22:bb:00:04"]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["cx-null-fields", "cx-multi-mac", "cx-null-ip"],
+    "assets": [
+      {
+        "id": "cx-null-fields",
+        "fields": {"ipAddresses": "10.100.9.1", "macAddresses": "00:11:22:bb:00:01"},
+        "fields_absent": ["last_seen", "first_seen", "users", "groups"]
+      },
+      {
+        "id": "cx-multi-mac",
+        "fields": {
+          "macAddresses": "00:11:22:bb:00:02\t00:11:22:bb:00:03",
+          "users": "CORP\\ops;42",
+          "groups": "Servers"
+        }
+      },
+      {
+        "id": "cx-null-ip",
+        "fields": {"macAddresses": "00:11:22:bb:00:04"},
+        "fields_absent": ["ipAddresses"]
+      }
+    ],
+    "request_count": 1,
+    "log_contains": [
+      "cortex-xdr: skipping a non-object endpoint row",
+      "Loaded 3 endpoints"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

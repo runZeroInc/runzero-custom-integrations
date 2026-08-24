@@ -120,7 +120,9 @@ python3 tests/run.py cyberark-epm
   tenant `ManagerURL` and a session token; every data call goes to the manager
   host with the documented header `Authorization: basic <token>` — the token
   is passed verbatim, it is not an HTTP Basic credential. Session lifetime is
-  the tenant's inactive-session timeout.
+  the tenant's inactive-session timeout; a session that expires mid-run
+  answers 401, and the script logs on again once and retries the rejected
+  request rather than abandoning the remaining sets.
 - Endpoint listing: `POST {manager}/EPM/API/Sets/{id}/Endpoints/search` with
   `offset`/`limit` in the query string (limit max 1000) and the filter in the
   body. An empty body is tried first; a tenant that rejects it gets the
@@ -143,7 +145,14 @@ python3 tests/run.py cyberark-epm
   link-local filtered), vendor, model, serial number, domain, and the DNS
   FQDN. The API budget is **1000 calls per 5 minutes, 5 per second, and
   300,000 results per 24 hours**, which is why the cap exists; 429s are
-  retried with backoff by the shared HTTP helper.
+  retried with backoff by the shared HTTP helper. The cap counts details
+  actually retrieved, and three consecutive detail failures drop the
+  enrichment for the rest of the run, so a broken detail endpoint neither
+  burns the cap on failures nor pays one rejected request per endpoint.
+- The `inventoryType` detail filter grammar could not be corroborated, so both
+  plausible spellings are kept: all four types inside one quoted string is
+  sent first, and a tenant that rejects it with a 400 is retried once with
+  per-value quoting, which then sticks for the rest of the run.
 - Rate limits on the listing APIs are the same 1000 calls / 5 minutes; at one
   call per 1000 endpoints the walk is far below them.
 - Unverified assumptions: validated against recorded fixtures, not a live

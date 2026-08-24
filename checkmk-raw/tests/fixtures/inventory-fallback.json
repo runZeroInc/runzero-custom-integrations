@@ -1,0 +1,132 @@
+{
+  "name": "inventory-fallback",
+  "integration": "checkmk-raw",
+  "description": "Two degraded-site behaviors in one run. First, the configuration collection answers a transient 503 once and then succeeds: the raw one-shot GET now carries a narrow retry, so a single transient error no longer costs the whole run. Second, the site is older than 2.2.0p21 and rejects the mk_inventory column by failing the WHOLE monitoring query with a 400: the query must be retried once without the inventory column instead of importing nothing and making the operator toggle collect_inventory off by hand. The route that matches columns=mk_inventory serves only the 400, so the asset can only exist if the retry actually dropped the column.",
+  "kwargs": {
+    "url": "$BASE",
+    "site": "mysite",
+    "username": "automation",
+    "password": "fixture-automation-secret",
+    "collect_inventory": "true"
+  },
+  "routes": [
+    {
+      "name": "host_config",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host_config/collections/all"},
+      "responses": [
+        {"status": 503, "text": "temporarily unavailable"},
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host_config",
+            "links": [],
+            "extensions": {},
+            "value": [
+              {
+                "domainType": "host_config",
+                "id": "old01",
+                "title": "old01",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "folder": "/legacy",
+                  "attributes": {"ipaddress": "192.0.2.41", "tag_criticality": "prod"},
+                  "effective_attributes": {"ipaddress": "192.0.2.41", "tag_criticality": "prod", "labels": {}, "parents": []},
+                  "is_cluster": false,
+                  "is_offline": false,
+                  "cluster_nodes": null
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host_status_with_inventory_rejected",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all", "query_contains": "columns=mk_inventory"},
+      "responses": [
+        {"status": 400, "json": {"title": "Bad Request", "status": 400, "detail": "These fields have problems: columns", "fields": {"columns": ["Unknown default column: mk_inventory"]}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host_status_without_inventory",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host",
+            "links": [],
+            "extensions": {},
+            "value": [
+              {
+                "domainType": "host",
+                "id": "old01",
+                "title": "old01",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "name": "old01",
+                  "address": "192.0.2.41",
+                  "alias": "old01",
+                  "state": 0,
+                  "state_type": 1,
+                  "hard_state": 0,
+                  "has_been_checked": 1,
+                  "last_check": 1755300000,
+                  "last_state_change": 1755200000,
+                  "last_time_up": 1755300000,
+                  "check_command": "check-mk-host-ping",
+                  "filename": "/wato/legacy/hosts.mk",
+                  "groups": ["linux"],
+                  "labels": {},
+                  "tags": {"criticality": "prod"},
+                  "num_services": 5,
+                  "num_services_ok": 5,
+                  "num_services_crit": 0,
+                  "num_services_warn": 0,
+                  "num_services_unknown": 0
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "request_count": 4,
+    "ids": ["checkmk:$HOST:mysite:old01"],
+    "assets": [
+      {
+        "id": "checkmk:$HOST:mysite:old01",
+        "fields": {
+          "hostnames": "old01",
+          "ipAddresses": "192.0.2.41",
+          "checkmk_monitored": "true",
+          "checkmk_state": "up"
+        },
+        "fields_absent": ["macAddresses", "os"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all", "query_contains": "columns=mk_inventory"},
+      {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all", "query_contains": "columns=name"}
+    ],
+    "log_contains": [
+      "checkmk: transient failure reading the host configuration collection (status 503), retrying",
+      "checkmk: the monitoring query failed with the mk_inventory column; retrying without HW/SW inventory:",
+      "checkmk: reported 1 hosts"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

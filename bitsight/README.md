@@ -111,12 +111,13 @@ directory from a previous run — the scanner refuses an `--output` directory th
 already exists otherwise. Add `--verbose` for the request-by-request log. Omit
 `--output` to see only the log lines.
 
-There are only three parameters here, so this integration has no cheap "small
-first run" switch — no page size, no cap, no lookback. **The cost is in the
-findings.** After collecting the asset list, the script issues one findings
-request *per asset*, so a company with a large external footprint produces a
-long run and there is no parameter to limit it. Budget accordingly, and prefer
-running the first test against a subsidiary GUID if you have one.
+**The cost is in the findings.** The script issues one paginated findings walk
+*per address of every asset* as it streams the inventory, so a company with a
+large external footprint produces a long run. The `findings_limit` parameter is
+the budget for that: set it to enrich only the first N assets with findings —
+the rest still import, without vulnerabilities, and the skip is logged. It
+defaults to 0 (every asset enriched), so budget accordingly, and prefer running
+the first test against a subsidiary GUID with a small `findings_limit`.
 
 This is also the place to settle the **user token versus company token**
 question described above. Run it with a user token; if the assets request comes
@@ -205,7 +206,7 @@ One consequence to expect when reading the results: on the default `is_ip=true` 
 Three behaviors have been corrected. They are recorded because each changed what a run produced, and because the first two were invisible in the log — a run affected by either looked successful.
 
 - **Both paging loops re-sent their filter parameters on the cursor URL.** `get_assets` and `get_findings` followed Bitsight's `links.next` absolute URL but also passed `params=` on every request. The HTTP helper's `params` argument *replaces* a URL's query string rather than merging with it, so the cursor's own offset was discarded and each iteration re-fetched the first page. It still terminated, by counting rows against `count`, but it did so by accumulating the same page repeatedly — duplicated assets and duplicated findings, reported as a clean run. The cursor is now followed verbatim with no parameters, and `count` is a backstop rather than the loop driver. That last part also fixes a quieter bug in the same condition: the bound was `len(...) < count - 1`, which stopped one row short of the reported total and dropped the final page.
-- **A finding with an unusable `first_seen` value ended the run.** `build_vuln` called `parse_time(first_seen)` unconditionally after its reformatting step, and `parse_time` has no recoverable failure mode in Starlark — it aborts the script rather than returning an error, taking every asset and finding already built with it. An absent or null `first_seen` reached it as `None`; a value that is not a date at all, or a space-separated timestamp, survived the reformatting step and reached it as nonsense. The value is now screened against an RFC 3339 pattern, and a finding that fails the screen is imported without a `firstDetectedTS` rather than ending the run.
+- **A finding with an unusable `first_seen` value ended the run.** `build_vuln` called `parse_time(first_seen)` unconditionally after its reformatting step, and `parse_time` has no recoverable failure mode in Starlark — it aborts the script rather than returning an error, taking every asset and finding already built with it. An absent or null `first_seen` reached it as `None`; a value that is not a date at all, or a space-separated timestamp, survived the reformatting step and reached it as nonsense. The value is now parsed with `time.parse_ts`, which returns nothing on an unusable value instead of aborting, so such a finding is imported without a `firstDetectedTS` rather than ending the run.
 - **The `country` custom attribute was always empty.** It was read from `asset.get('coutry')`, a misspelling, so the value never arrived even though Bitsight returns it on every asset. `countryCode` was read correctly and was unaffected.
 
 All three are covered offline: `paged` walks a two-page asset cursor with a two-page findings cursor behind it and asserts the exact request count, `unparseable-first-seen` feeds five findings of which four used to abort the run, and `happy` asserts the `country` attribute now arrives.

@@ -8,6 +8,13 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # A BACKSTOP, not the primary guard: the repeated-page check in the walk
+    # catches a Cortex that ignores the search window after two requests. The
+    # number is derived from a record target rather than hand-picked --
+    # 100,000 pages x 100 records = 10,000,000 endpoints, past any real
+    # deployment -- and reaching it raises a clear error naming the loop, so a
+    # truncated import cannot look complete.
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -40,6 +47,7 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'post_json')
 load('kwargs', 'get_url_base', 'get_http_options')
+load('coerce', 'as_dict', 'as_int', 'as_list', text='as_text')
 
 # Cortex XDR classes every agent it manages, and reports that class as
 # endpoint_type on the endpoint record. The documented values carry an
@@ -61,22 +69,6 @@ DEVICE_TYPES = {
 AGENT_TYPE_PREFIX = "AGENT_TYPE_"
 
 PAGE_SIZE = 100
-
-# A BACKSTOP, not the primary guard. get_endpoint answers at most 100 records
-# per call and the walk's only exit is a page shorter than that, so a Cortex
-# that ignores the search_from/search_to window and keeps answering with a full
-# page never ends it. That case is caught by the repeated-page check in the walk
-# below, after two requests. A page ceiling is a poor first line of defence: it
-# lets a stuck tenant be hammered for the whole ceiling before anything stops
-# it.
-#
-# The number is derived from a record target rather than hand-picked, so it
-# scales with the page size instead of encoding a guess about tenant size:
-# 100,000 pages x 100 records = 10,000,000 endpoints, past any real Cortex XDR
-# deployment. With the repeated-page check in front of it this should never be
-# reached; reaching it anyway is logged, because a silently truncated import
-# looks exactly like a complete one.
-MAX_PAGES = 100000
 
 
 def retrieved_of(retrieved, total):
@@ -145,19 +137,20 @@ def stream_endpoints(base_url, api_key, api_key_id, config_kwargs):
     cortex_filter = {"request_data": {"search_from": 0, "search_to": PAGE_SIZE}}
     reported = 0
     page_size = PAGE_SIZE
-    capped = True
     last_signature = ""
     # Cortex reports the size of the whole result set alongside every page. It
     # is captured so a truncated run can say what fraction of the estate it got,
     # rather than a bare count the reader cannot judge.
     total_count = None
 
-    for _page in range(0, MAX_PAGES):
+    # The CONFIG maxPages bound backstops the repeated-page guard below; the
+    # pager raises at the ceiling rather than truncating in silence.
+    p = pager("endpoints")
+    while p.next():
         result = do_cortex_api_call(base_url, api_key, api_key_id, "endpoints/get_endpoint", cortex_filter, config_kwargs)
 
         if not result or "reply" not in result:
             print("Error retrieving endpoints")
-            capped = False
             break
 
         reply = result["reply"]
@@ -179,24 +172,18 @@ def stream_endpoints(base_url, api_key, api_key_id, config_kwargs):
         # ceiling would take 100,000.
         signature = page_signature(fetched_endpoints)
         if fetched_endpoints and signature == last_signature:
-            capped = False
             print("cortex-xdr: paging stopped after {} pages: the API returned the same page twice. {}".format(
-                _page + 1, retrieved_of(reported, total_count)))
+                p.page, retrieved_of(reported, total_count)))
             break
         last_signature = signature
 
         reported += report_assets(build_assets(fetched_endpoints))
 
         if len(fetched_endpoints) < page_size:
-            capped = False
             break  # Stop when fewer than page_size results are returned
 
         cortex_filter["request_data"]["search_from"] += page_size
         cortex_filter["request_data"]["search_to"] += page_size
-
-    if capped:
-        print("cortex-xdr: page limit of {} hit (integration safety limit). {}".format(
-            MAX_PAGES, retrieved_of(reported, total_count)))
 
     print("Loaded", reported, "endpoints")
     return reported
@@ -206,32 +193,47 @@ def build_assets(all_endpoints):
     assets = []
 
     for endpoint in all_endpoints:
+        # A page can carry a row the API degraded into something other than an
+        # object; calling .get on it would abort the page.
+        if type(endpoint) != "dict":
+            print("cortex-xdr: skipping a non-object endpoint row")
+            continue
         endpoint_id = endpoint.get("agent_id") or endpoint.get("endpoint_id")
         if not endpoint_id:
             print("cortex-xdr: skipping endpoint with no agent_id/endpoint_id: name=" + str(endpoint.get("endpoint_name", "")))
             continue
-        endpoint_tags = endpoint.get("tags", {}).get("endpoint_tags", [])
-        server_tags = endpoint.get("tags", {}).get("server_tags", [])
-        group_names = endpoint.get("group_name", endpoint_tags + server_tags)
+        # .get's default only covers an ABSENT key. Cortex reports tags,
+        # group_name, and users as explicit nulls -- users is null on any
+        # server no one is logged into -- and None.get / join(None) aborts the
+        # page, so every layer is coerced instead.
+        tags_block = as_dict(endpoint.get("tags"))
+        endpoint_tags = as_list(tags_block.get("endpoint_tags"))
+        server_tags = as_list(tags_block.get("server_tags"))
+        group_names = endpoint.get("group_name")
+        if group_names == None:
+            group_names = endpoint_tags + server_tags
+        groups = ";".join([text(g) for g in as_list(group_names) if text(g)])
+        users = ";".join([text(u) for u in as_list(endpoint.get("users")) if text(u)])
 
         last_seen_raw = endpoint.get("last_seen")
         first_seen_raw = endpoint.get("first_seen")
 
+        # Epochs arrive in milliseconds or seconds depending on tenant, and a
+        # malformed value used to abort the run in int(); as_int folds it to
+        # the -1 sentinel, which leaves the attribute empty.
         last_seen = ""
-        if last_seen_raw != None and str(last_seen_raw) != "":
-            last_seen_int = int(last_seen_raw)
-            if last_seen_int > 9999999999:
-                last_seen = str(int(last_seen_int / 1000))
-            else:
-                last_seen = str(last_seen_int)
+        last_seen_int = as_int(last_seen_raw, default=-1)
+        if last_seen_int > 9999999999:
+            last_seen = str(last_seen_int // 1000)
+        elif last_seen_int > 0:
+            last_seen = str(last_seen_int)
 
         first_seen = ""
-        if first_seen_raw != None and str(first_seen_raw) != "":
-            first_seen_int = int(first_seen_raw)
-            if first_seen_int > 9999999999:
-                first_seen = str(int(first_seen_int / 1000))
-            else:
-                first_seen = str(first_seen_int)
+        first_seen_int = as_int(first_seen_raw, default=-1)
+        if first_seen_int > 9999999999:
+            first_seen = str(first_seen_int // 1000)
+        elif first_seen_int > 0:
+            first_seen = str(first_seen_int)
 
         custom_attrs = {
             "operational_status": endpoint.get("operational_status", ""),
@@ -239,22 +241,32 @@ def build_assets(all_endpoints):
             "agent_type": endpoint.get("agent_type", endpoint.get("endpoint_type", "")),
             "last_seen": last_seen,
             "first_seen": first_seen,
-            "groups": ";".join(group_names),
-            "users": ";".join(endpoint.get("users", [])),
+            "groups": groups,
+            "users": users,
             "assigned_prevention_policy": endpoint.get("assigned_prevention_policy", ""),
             "assigned_extensions_policy": endpoint.get("assigned_extensions_policy", ""),
             "endpoint_version": endpoint.get("endpoint_version", "")
         }
 
-        mac_address = endpoint.get("mac_address", [""])[0] if endpoint.get("mac_address") else ""
+        # Cortex does not say which address belongs to which adapter, so the
+        # addresses ride on the first MAC and the remaining MACs are carried on
+        # their own interfaces rather than dropped.
+        macs = [text(m) for m in as_list(endpoint.get("mac_address")) if text(m)]
 
         # network_interface returns None when nothing usable survives -- an
         # agent that has registered but not yet reported its adapters has no ip,
         # no ipv6 and no mac_address. Passing [None] to ImportAsset aborts the
         # entire run, losing every endpoint already parsed, so such an endpoint
         # gets no interface and correlates on its hostname instead.
-        network = network_interface(ips=endpoint.get("ip", []) + endpoint.get("ipv6", []), mac=mac_address)
-        interfaces = [network] if network else []
+        ips = as_list(endpoint.get("ip")) + as_list(endpoint.get("ipv6"))
+        interfaces = []
+        network = network_interface(ips=ips, mac=macs[0] if macs else "")
+        if network:
+            interfaces.append(network)
+        for mac in macs[1:]:
+            extra = network_interface(ips=[], mac=mac)
+            if extra:
+                interfaces.append(extra)
 
         params = {
             "id": str(endpoint_id),

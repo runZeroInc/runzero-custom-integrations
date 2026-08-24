@@ -4,7 +4,7 @@ CONFIG = {
     "id": "runzero-cisco-ise",
     "name": "Cisco ISE",
     "type": "inbound",
-    "description": "Imports endpoints from Cisco Identity Services Engine.",
+    "description": "Imports actively authenticated endpoints from Cisco ISE's live session list. Endpoints with no active session at task time are not seen.",
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
@@ -62,6 +62,12 @@ def get_endpoints(endpoints_api_url, auth_b64, config_kwargs):
 
     response = http_get(endpoints_api_url, **get_http_options(config_kwargs, headers=headers))
 
+    # The raw http builtin hands back None on a transport-level failure, and
+    # reading .status_code off that aborts the script before anything is parsed.
+    if response == None:
+        print("cisco-ise: no response from {}".format(SESSION_PATH))
+        return []
+
     if response.status_code != 200:
         # The body is the full ActiveList session XML: usernames, MAC addresses
         # and endpoint IPs. The status and the path say what failed and why
@@ -77,19 +83,33 @@ def get_endpoints(endpoints_api_url, auth_b64, config_kwargs):
 
     return sessions
 
-def build_assets(sessions):
-    """Convert Cisco ISE session data into runZero assets."""
-    assets = []
-    # A one-element list so the loop below can increment it; Starlark has no
+def report_sessions(sessions):
+    """Convert Cisco ISE session data into runZero assets, reporting each one
+    as it is built so one bad record late in a large ActiveList cannot cost the
+    sessions already parsed. Returns the number of assets reported."""
+    reported = 0
+    # One-element lists so the loop below can increment them; Starlark has no
     # nonlocal, and a bare int rebinding inside the loop is fine but this keeps
-    # the count next to its report at the end.
+    # each count next to its report at the end.
     skipped_no_interface = [0]
     skipped_no_addressing = [0]
+    skipped_no_id = [0]
 
     for session in sessions:
         mac = session.get("calling_station_id")
         ip = session.get("device_ip_address") or session.get("framed_ip_address")
         user_name = session.get("user_name")
+
+        # audit_session_id is the foreign id, and a truncated <activeSession>
+        # block leaves it None -- ImportAsset(id=None) fails validation and
+        # used to abort the task. The record is skipped instead; only the
+        # first is named, the rest are counted.
+        audit_session_id = session.get("audit_session_id")
+        if not audit_session_id:
+            if skipped_no_id[0] == 0:
+                print("cisco-ise: skipping session with no audit_session_id: acct_session_id=" + str(session.get("acct_session_id") or ""))
+            skipped_no_id[0] += 1
+            continue
 
         if not mac and not ip:
             # An ISE session carries no device identifier beyond its addressing:
@@ -140,14 +160,18 @@ def build_assets(sessions):
             "user_name": user_name,
         }
 
-        assets.append(
+        reported += report_asset(
             ImportAsset(
-                id=session.get("audit_session_id"),
+                id=audit_session_id,
                 hostnames=hostnames,
                 networkInterfaces=[network],
                 customAttributes=to_custom_attributes(custom_attrs),
             )
         )
+
+    if skipped_no_id[0]:
+        print("cisco-ise: skipped {} session(s) with no audit_session_id".format(
+            skipped_no_id[0]))
 
     if skipped_no_addressing[0]:
         print("cisco-ise: skipped {} session(s) with no calling_station_id/ip".format(
@@ -157,7 +181,7 @@ def build_assets(sessions):
         print("cisco-ise: skipped {} session(s) with no usable MAC or IP address".format(
             skipped_no_interface[0]))
 
-    return assets
+    return reported
 
 def main(*args, **kwargs):
     """Main function for Cisco ISE integration."""
@@ -175,8 +199,8 @@ def main(*args, **kwargs):
         print("No sessions found.")
         return None
 
-    # Stream assets to runZero via report_assets instead of returning a list.
-    if not report_assets(build_assets(sessions)):
+    # Assets are streamed one at a time via report_asset inside report_sessions.
+    if not report_sessions(sessions):
         print("No assets created.")
 
     return None

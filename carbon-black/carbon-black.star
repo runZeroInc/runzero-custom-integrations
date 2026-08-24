@@ -8,6 +8,11 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # A backstop on both cursor walks: the device scroll (1000 rows a page) and
+    # the per-device vulnerability search (100 rows a page). Hitting it raises
+    # a clear error naming the loop instead of spinning on a scroll_id that
+    # never drains until the task's wall-clock deadline.
+    "maxPages": 10000,
     "params": [
         {
             "key": "url",
@@ -37,6 +42,23 @@ CONFIG = {
             "required": True,
             "description": "The API Secret Key, displayed once when the API key is created.",
         },
+        {
+            "key": "include_vulnerabilities",
+            "label": "Import vulnerabilities",
+            "type": "bool",
+            "required": False,
+            "default": True,
+            "description": "Fetch the Vulnerability Assessment findings for every device. This is one extra search per device, so a large org multiplies its runtime, and an org without the Vulnerability Assessment entitlement logs one error per device; disable it to import the device inventory only.",
+        },
+        {
+            "key": "vulnerability_limit",
+            "label": "Vulnerabilities per device",
+            "type": "int",
+            "required": False,
+            "default": 0,
+            "min": 0,
+            "description": "Maximum vulnerabilities to fetch per device, highest risk score first. 0 fetches all of them.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -46,13 +68,18 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'post_json')
-load('kwargs', 'get_url_base', 'get_http_options')
+load('kwargs', 'get_url_base', 'get_http_options', 'get_bool', 'get_int')
+load('re', re_match='match')
+load('coerce', 'as_float', text='as_text')
 
 SCROLL_API_URL = "{}/appservices/v6/orgs/{}/devices/_scroll"
 VULNERABILITY_API_URL = "{}/vulnerability/assessment/api/v1/orgs/{}/devices/{}/vulnerabilities/_search?dataForExport=true"
 PAGE_SIZE = 1000  # Max devices per request
 VULN_PAGE_SIZE = 100  # Max vulnerabilities per API call
-MAX_VULNS = None  # Set to None for all, or an integer for a limit (e.g., 50)
+
+# Vulnerability.cve is validated against this pattern by the platform and a
+# value that misses it fails the whole record, so candidates are screened.
+CVE_RE = r"^CVE-[0-9]{4}-[0-9]{4,19}$"
 
 # deployment_type is Carbon Black's own device class, documented on the Devices
 # API with the values ENDPOINT, WORKLOAD, VDI, AWS, AZURE, and GCP. WORKLOAD is
@@ -82,7 +109,7 @@ def auth_headers(api_key, api_id):
         "Content-Type": "application/json",
     }
 
-def fetch_and_report_devices(base_url, org_key, api_key, api_id, config_kwargs):
+def fetch_and_report_devices(base_url, org_key, api_key, api_id, config_kwargs, vuln_opts):
     """Scroll through all devices, building and reporting assets one page at a
     time so the full device + vulnerability dataset is never held in memory."""
     http_options = get_http_options(config_kwargs, headers=auth_headers(api_key, api_id))
@@ -99,7 +126,11 @@ def fetch_and_report_devices(base_url, org_key, api_key, api_id, config_kwargs):
         "rows": PAGE_SIZE
     }
 
-    while True:
+    # An API that re-serves a non-empty page against a live scroll_id would
+    # otherwise loop until the task deadline; the pager raises at the CONFIG
+    # maxPages bound instead, naming the loop that failed to terminate.
+    p = pager("devices")
+    while p.next():
         response_json, err = post_json(url, json=payload, **http_options)
         if err:
             print("carbon-black: failed to retrieve devices: {}".format(err))
@@ -114,7 +145,7 @@ def fetch_and_report_devices(base_url, org_key, api_key, api_id, config_kwargs):
 
         # Build and report this page's assets immediately, then drop the
         # references so memory usage stays bounded by a single page.
-        assets = build_assets(base_url, org_key, api_key, api_id, batch, config_kwargs, skipped)
+        assets = build_assets(base_url, org_key, api_key, api_id, batch, config_kwargs, skipped, vuln_opts)
         if assets:
             report_assets(assets)
             total += len(assets)
@@ -131,17 +162,21 @@ def fetch_and_report_devices(base_url, org_key, api_key, api_id, config_kwargs):
         print("carbon-black: skipped {} devices with no id".format(skipped["no_id"]))
     return total
 
-def get_device_vulnerabilities(base_url, org_key, api_key, api_id, device_id, MAX_VULNS, config_kwargs):
+def get_device_vulnerabilities(base_url, org_key, api_key, api_id, device_id, max_vulns, config_kwargs):
     """Retrieve vulnerabilities for a specific device, with optional max limit"""
     http_options = get_http_options(config_kwargs, headers=auth_headers(api_key, api_id))
 
     vulnerabilities = []
     start = 0
 
-    while MAX_VULNS == None or len(vulnerabilities) < MAX_VULNS:
+    # Each device gets its own guard: the label says which walk failed to
+    # terminate, and the CONFIG maxPages bound stops a start offset the API
+    # keeps answering with full pages for.
+    p = pager("device-vulnerabilities")
+    while (max_vulns == None or len(vulnerabilities) < max_vulns) and p.next():
         remaining = VULN_PAGE_SIZE
-        if MAX_VULNS != None:
-            remaining = min(MAX_VULNS - len(vulnerabilities), VULN_PAGE_SIZE)
+        if max_vulns != None:
+            remaining = min(max_vulns - len(vulnerabilities), VULN_PAGE_SIZE)
 
         payload = {
             "query": "",
@@ -167,8 +202,8 @@ def get_device_vulnerabilities(base_url, org_key, api_key, api_id, device_id, MA
         vulnerabilities.extend(batch)
         start += VULN_PAGE_SIZE
 
-    if MAX_VULNS != None:
-        return vulnerabilities[:MAX_VULNS]
+    if max_vulns != None:
+        return vulnerabilities[:max_vulns]
     return vulnerabilities
 
 def build_vulnerabilities(vuln_data):
@@ -181,41 +216,54 @@ def build_vulnerabilities(vuln_data):
         # for a vulnerability it has not scored yet, and float(None) aborts the
         # script -- one unscored CVE on one endpoint used to take down the whole
         # import. severity and vuln_info reach the same abort the same way, via
-        # .upper() and .get() on None.
+        # .upper() and .get() on None, and a re-typed severity or score is
+        # coerced rather than trusted for the same reason.
+        if type(vuln) != "dict":
+            continue
         vuln_info = vuln.get("vuln_info") or {}
-        cve_id = vuln_info.get("cve_id", "")
-        description = vuln_info.get("cve_description", "")
-        severity = (vuln_info.get("severity") or "LOW").upper()
-        risk_meter_score = vuln_info.get("risk_meter_score") or 0
+        if type(vuln_info) != "dict":
+            vuln_info = {}
+        cve_id = text(vuln_info.get("cve_id"))
+        description = text(vuln_info.get("cve_description"))
+        severity = (text(vuln_info.get("severity")) or "LOW").upper()
+        risk_meter_score = as_float(vuln_info.get("risk_meter_score"))
 
         # Map severity to numeric risk rank
         severity_map = {"CRITICAL": 4, "HIGH": 3, "MODERATE": 2, "LOW": 1}
         risk_rank = severity_map.get(severity, 0)
 
-        vulnerabilities.append(
-            Vulnerability(
-                id=cve_id,
-                name=cve_id,
-                description=description,
-                cve=cve_id,
-                riskScore=float(risk_meter_score),
-                riskRank=risk_rank,
-                severityScore=float(risk_meter_score),
-                severityRank=risk_rank,
-                solution=vuln_info.get("solution", ""),
-                customAttributes=to_custom_attributes({
-                    "fixed_by": vuln_info.get("fixed_by"),
-                    "created_at": vuln_info.get("created_at"),
-                    "nvd_link": vuln_info.get("nvd_link"),
-                    "cvss_score": vuln_info.get("cvss_score"),
-                    "cvss_v3_score": vuln_info.get("cvss_v3_score"),
-                })
-            )
-        )
+        params = {
+            "id": cve_id,
+            "name": cve_id,
+            "description": description,
+            "riskScore": risk_meter_score,
+            "riskRank": risk_rank,
+            "severityScore": risk_meter_score,
+            "severityRank": risk_rank,
+            "solution": text(vuln_info.get("solution")),
+            "customAttributes": to_custom_attributes({
+                "vendor_vuln_id": cve_id,
+                "fixed_by": vuln_info.get("fixed_by"),
+                "created_at": vuln_info.get("created_at"),
+                "nvd_link": vuln_info.get("nvd_link"),
+                "cvss_score": vuln_info.get("cvss_score"),
+                "cvss_v3_score": vuln_info.get("cvss_v3_score"),
+            }),
+        }
+
+        # The platform validates cve against a strict pattern and rejects the
+        # whole ImportAsset on a miss, so the value is screened first. A vendor
+        # advisory id (RHSA-..., GHSA-...) still imports as the finding's name
+        # and vendor_vuln_id attribute; only the cve field is withheld.
+        cve_norm = cve_id.upper()
+        if re_match(CVE_RE, cve_norm):
+            params["cve"] = cve_norm
+
+        vulnerabilities.append(Vulnerability(**params))
 
     return vulnerabilities
 
-def build_assets(base_url, org_key, api_key, api_id, devices, config_kwargs, skipped):
+def build_assets(base_url, org_key, api_key, api_id, devices, config_kwargs, skipped, vuln_opts):
     """Convert Carbon Black devices into runZero assets with vulnerability data"""
     assets = []
     
@@ -244,9 +292,12 @@ def build_assets(base_url, org_key, api_key, api_id, devices, config_kwargs, ski
         ip = device.get("last_internal_ip_address", "")
         mac = device.get("mac_address", "")
 
-        # Fetch vulnerabilities for the device
-        vuln_data = get_device_vulnerabilities(base_url, org_key, api_key, api_id, device_id, MAX_VULNS, config_kwargs)
-        vulnerabilities = build_vulnerabilities(vuln_data)
+        # Fetch vulnerabilities for the device, unless the operator turned the
+        # per-device enrichment off.
+        vulnerabilities = []
+        if vuln_opts["enabled"]:
+            vuln_data = get_device_vulnerabilities(base_url, org_key, api_key, api_id, device_id, vuln_opts["limit"], config_kwargs)
+            vulnerabilities = build_vulnerabilities(vuln_data)
 
         # Build network interfaces. network_interface returns None when nothing
         # usable survives -- a sensor that has registered but not yet reported
@@ -302,9 +353,15 @@ def main(**kwargs):
     api_id = kwargs['api_id']
     api_key = kwargs['api_key']
 
+    vuln_limit = get_int(kwargs, "vulnerability_limit", default=0)
+    vuln_opts = {
+        "enabled": get_bool(kwargs, "include_vulnerabilities", default=True),
+        "limit": vuln_limit if vuln_limit > 0 else None,
+    }
+
     # Devices are streamed to runZero page-by-page via report_assets() inside
     # fetch_and_report_devices, so nothing is returned from main().
-    total = fetch_and_report_devices(base_url, org_key, api_key, api_id, kwargs)
+    total = fetch_and_report_devices(base_url, org_key, api_key, api_id, kwargs, vuln_opts)
 
     print("carbon-black: reported {} assets".format(total))
 

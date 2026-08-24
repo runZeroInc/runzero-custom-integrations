@@ -1,0 +1,36 @@
+{
+  "name": "malformed",
+  "integration": "cisco-ise",
+  "description": "REGRESSION LOCK on the missing-id guard. A truncated <activeSession> block leaves audit_session_id as None, and ImportAsset(id=None) fails validation -- before the guard, one such block in a large ActiveList aborted the task and (under the old buffered report) lost every session already parsed. The middle session here carries a usable MAC and IP but no audit_session_id and must be skipped with a log line while the sessions around it import. The last block is truncated down to a bare user_name and is also skipped rather than aborting.\n\nnamespaced_ids is skipped for the reason the happy scenario records: ISE session ids are ephemeral and excluded from matching by matchBehavior.",
+  "kwargs": {
+    "url": "$BASE",
+    "basic_auth_credential": "Zml4dHVyZS11c2VyOmZpeHR1cmUtcGFzcw=="
+  },
+  "routes": [
+    {
+      "name": "active-session-list",
+      "match": {"method": "GET", "path": "/admin/API/mnt/Session/ActiveList"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/xml"},
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<sessionParameters>\n<noOfActiveSession>3</noOfActiveSession>\n<activeSession>\n<user_name>alice</user_name>\n<calling_station_id>00:11:22:33:55:01</calling_station_id>\n<nas_ip_address>10.30.0.1</nas_ip_address>\n<acct_session_id>0000B1A1/00:11:22:33:55:01/2201</acct_session_id>\n<audit_session_id>0A1E000100000021BF4C1D01</audit_session_id>\n<server>ise-psn-01</server>\n<framed_ip_address>10.30.4.11</framed_ip_address>\n<device_ip_address>10.30.4.11</device_ip_address>\n</activeSession>\n<activeSession>\n<user_name>bob</user_name>\n<calling_station_id>00:11:22:33:55:02</calling_station_id>\n<nas_ip_address>10.30.0.1</nas_ip_address>\n<acct_session_id>0000B1A2/00:11:22:33:55:02/2202</acct_session_id>\n<server>ise-psn-01</server>\n<framed_ip_address>10.30.4.12</framed_ip_address>\n<device_ip_address>10.30.4.12</device_ip_address>\n</activeSession>\n<activeSession>\n<user_name>carol</user_name>\n</activeSession>\n</sessionParameters>\n"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["0A1E000100000021BF4C1D01"],
+    "request_count": 1,
+    "log_contains": [
+      "Total number of sessions: 3",
+      "cisco-ise: skipping session with no audit_session_id: acct_session_id=0000B1A2/00:11:22:33:55:02/2202",
+      "cisco-ise: skipped 2 session(s) with no audit_session_id"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

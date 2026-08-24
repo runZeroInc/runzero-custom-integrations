@@ -24,7 +24,7 @@ script works against the commercial editions, which serve the same endpoints.
 
 ## Checkmk requirements
 
-- **Checkmk 2.1 or newer** for the REST API in the shape this integration uses. The `mk_inventory` Livestatus column, which is where every hardware fact comes from, requires **2.2.0p21, 2.3.0b1, or 2.1.0p39 or later** — before those patch levels the column exists but the REST endpoint does not decode it. Turn `collect_inventory` off against an older site.
+- **Checkmk 2.1 or newer** for the REST API in the shape this integration uses. The `mk_inventory` Livestatus column, which is where every hardware fact comes from, requires **2.2.0p21, 2.3.0b1, or 2.1.0p39 or later** — before those patch levels the column exists but the REST endpoint does not decode it. A site that rejects the column fails the whole query, so the script retries once without it and imports non-inventory data; turn `collect_inventory` off against an older site to skip the wasted request.
 - An **automation user** and its **automation secret**. This is not a normal password: Checkmk distinguishes interactive users from machine accounts, and only a machine account authenticates cleanly against the REST API without a login session.
 - The **site name**, which is a mandatory path segment of every API URL and is the single most common first-attempt failure.
 - Checkmk sites are frequently fronted by an internal-CA or self-signed certificate, so `OPTIONS_TLS` is exposed. Nothing is skipped by default.
@@ -325,11 +325,14 @@ handles, tens of megabytes on a large install.
 Two consequences shaped the code. First, the response is **streamed**: the raw
 body is walked with `jsonstream.iter_array(body, path="value")` so only one
 entry is live at a time, rather than decoding the whole document into Starlark
-values at several times the wire size. Assets are flushed to runZero every
-`batch_size` records, so peak memory is one batch rather than the whole estate.
-Dropping to the raw `http.get` builtin to obtain the body as text costs the
-retry budget — it accepts no `retries` kwarg — so each of the two calls gets a
-single attempt.
+values at several times the wire size. Each asset is reported to runZero as it
+is built, so peak memory is one record rather than the whole estate. Dropping
+to the raw `http.get` builtin to obtain the body as text costs the shared
+retry budget — it accepts no `retries` kwarg — so the script carries its own
+narrow retry: each collection request gets up to three attempts on transient
+statuses (408/425/429/5xx) or a missing response, and a monitoring query that
+fails *with* the `mk_inventory` column is retried once more without it, so an
+older site degrades to a non-inventory import instead of a zero-asset run.
 
 Second, `iter_array` **aborts the entire script** when its path is missing, and
 Starlark has no exceptions to catch that with. An error page, an HTML login

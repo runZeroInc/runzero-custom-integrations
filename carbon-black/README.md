@@ -92,7 +92,10 @@ output`. Add `--overwrite` to re-run into a directory that already exists. Omit 
 to see only the log lines, and add `--verbose` for the request-by-request log.
 
 The device scroll pulls the whole organization in pages of 1000 and then makes one
-vulnerability request per device, so a first run against a large tenant is not quick. Watch
+vulnerability request per device, so a first run against a large tenant is not quick. Set
+`include_vulnerabilities=false` for a fast inventory-only run (or on an org without the
+Vulnerability Assessment entitlement, which otherwise logs one error per device), and
+`vulnerability_limit` to cap how many findings are fetched per device. Watch
 the log rather than waiting on `--output` if you only want to confirm the credential works.
 
 To check the `CONFIG` block and the HTTP and TLS wiring without a live tenant:
@@ -158,7 +161,7 @@ On the re-registration case specifically: the result is a second runZero asset, 
 - The integration automatically retrieves **all device attributes** available in Carbon Black Cloud.
 - Data such as **sensor version, status, policy, network details, and security attributes** are included in `customAttributes`.
 - Use the **runZero search queries** to filter assets by key attributes.
-- Vulnerabilities are fetched **one request per device**, paged 100 at a time with no cap (`MAX_VULNS` is `None`), and sorted by `risk_meter_score`. On a large tenant this dominates the run. There is no credential parameter to turn it off; the constant at the top of the script is the switch.
+- Vulnerabilities are fetched **one request per device**, paged 100 at a time and sorted by `risk_meter_score`. On a large tenant this dominates the run. The `include_vulnerabilities` parameter turns the enrichment off, and `vulnerability_limit` caps how many findings are fetched per device (0 = all).
 - A vulnerability whose `risk_meter_score` or `severity` is present but null is handled rather than fatal — `.get`'s default only applies to an absent key, and `float(None)` would abort the whole script.
 
 ## Future

@@ -203,7 +203,7 @@ one comma-separated string — genuinely, and with no single-`=` exemption. Here
   identity.
 - All attributes from Cortex XDR are stored in `customAttributes`.
 - The task **can be scheduled** to sync endpoint data regularly.
-- Only the **first** entry of the endpoint's `mac_address` list becomes a network interface, so a multi-homed endpoint contributes one MAC. The `ip` and `ipv6` lists are merged and all of their addresses are used.
+- Every entry of the endpoint's `mac_address` list is imported. Cortex does not say which address belongs to which adapter, so the merged `ip`/`ipv6` addresses ride on the first MAC's interface and each additional MAC is carried on its own address-less interface rather than dropped.
 - `first_seen` and `last_seen` are normalized from epoch milliseconds to seconds and stored as custom attributes, but they are **not** assigned to the asset's `firstSeenTS` / `lastSeenTS` fields, so runZero's own first- and last-seen values are unaffected by this import.
 
 ## Asset identity

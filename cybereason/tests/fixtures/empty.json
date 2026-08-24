@@ -1,0 +1,44 @@
+{
+  "name": "empty",
+  "integration": "cybereason",
+  "description": "A tenant with no sensors. The login succeeds, the first sensors page answers an empty list with totalResults 0 and hasMoreResults false, and the run must end cleanly after exactly two requests with zero assets and the no-assets notice -- not a failure, and not a second page request against an empty estate.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "form-login",
+      "match": {"method": "POST", "path": "/login.html", "body_contains": "username=svc-runzero"},
+      "responses": [{
+        "status": 200,
+        "headers": {"Set-Cookie": "JSESSIONID=FIXTURESESSION02; Path=/; HttpOnly", "Content-Type": "text/html"},
+        "text": "<html><body>redirecting</body></html>"
+      }],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "sensors-empty",
+      "match": {"method": "POST", "path": "/rest/sensors/query"},
+      "responses": [{
+        "status": 200,
+        "json": {"sensors": [], "totalResults": 0, "hasMoreResults": false}
+      }],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/rest/sensors/query", "header_contains": "JSESSIONID=FIXTURESESSION02"}
+    ],
+    "log_contains": [
+      "cybereason: reported 0 sensors from",
+      "cybereason: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []}
+}

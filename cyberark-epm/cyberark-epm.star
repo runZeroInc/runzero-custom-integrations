@@ -101,7 +101,18 @@ SETS_PAGE = 100
 # this fallback, which is why the empty body is tried first.
 PLATFORM_FILTER = "platform IN \"Windows\", \"MacOS\", \"Linux\""
 
+# The inventoryType filter grammar could not be corroborated, so both plausible
+# spellings are kept: the primary quotes all four types inside one string, and
+# a tenant that rejects it with a 400 is retried once with per-value quoting
+# (the grammar PLATFORM_FILTER uses), which then sticks for the rest of the
+# run.
 DETAIL_FILTER = "inventoryType IN \"OsInfo, Hardware, Network, DomainInfo\""
+DETAIL_FILTER_PER_VALUE = "inventoryType IN \"OsInfo\", \"Hardware\", \"Network\", \"DomainInfo\""
+
+# Consecutive detail-search failures allowed before the enrichment is dropped
+# for the rest of the run. Without it, a tenant whose detail endpoint always
+# fails pays one failing request per endpoint for the whole estate.
+DETAIL_FAILURE_BUDGET = 3
 
 # EPM platformType values map one-to-one onto runZero device types.
 DEVICE_TYPES = {
@@ -151,15 +162,59 @@ def auth_options(config, token):
     })
 
 
-def fetch_sets(manager, options):
+def _auth_failure(err):
+    """Report whether a request error means the session token is no longer good."""
+    return err != None and (err.startswith("status 401") or err.startswith("status 403"))
+
+
+def relogon(ctx):
+    """Log on again after the session token aged out mid-run."""
+    print("cyberark-epm: session rejected, logging on again")
+    manager, token = logon(ctx["dispatcher"], ctx["username"], ctx["password"],
+                           ctx["application_id"], ctx["config"])
+    if not token:
+        return False
+    if manager:
+        ctx["manager"] = manager
+    ctx["options"] = auth_options(ctx["config"], token)
+    return True
+
+
+def api_get(ctx, url, params=None):
+    """GET with one reactive re-logon. EPM sessions time out on their own
+    schedule, so a 401/403 mid-run is retried once with a fresh token rather
+    than abandoning the remaining sets."""
+    for attempt in range(2):
+        if params != None:
+            data, err = get_json(url, params=params, **ctx["options"])
+        else:
+            data, err = get_json(url, **ctx["options"])
+        if not _auth_failure(err) or attempt == 1:
+            return data, err
+        if not relogon(ctx):
+            return data, err
+    return None, "request failed"
+
+
+def api_post(ctx, url, body):
+    """POST with one reactive re-logon; see api_get."""
+    for attempt in range(2):
+        data, err = post_json(url, json=body, **ctx["options"])
+        if not _auth_failure(err) or attempt == 1:
+            return data, err
+        if not relogon(ctx):
+            return data, err
+    return None, "request failed"
+
+
+def fetch_sets(ctx):
     """Return every set as a list of {Id, Name} dicts."""
     sets = []
     offset = 0
     p = pager("epm-sets")
     while p.next():
-        data, err = get_json(manager + "/EPM/API/Sets",
-                             params={"Offset": str(offset), "Limit": str(SETS_PAGE)},
-                             **options)
+        data, err = api_get(ctx, ctx["manager"] + "/EPM/API/Sets",
+                            params={"Offset": str(offset), "Limit": str(SETS_PAGE)})
         if err:
             print("cyberark-epm: failed to list sets:", err)
             return sets
@@ -175,15 +230,15 @@ def fetch_sets(manager, options):
     return sets
 
 
-def search_endpoints_page(manager, options, set_id, offset, limit, body):
+def search_endpoints_page(ctx, set_id, offset, limit, body):
     """Fetch one page from the endpoints search API.
 
     Returns (endpoints, err). The offset/limit ride in the query string and the
     filter in the body, per the API contract.
     """
     url = "{}/EPM/API/Sets/{}/Endpoints/search?offset={}&limit={}&sortBy=Name&sortDir=asc".format(
-        manager, set_id, offset, limit)
-    data, err = post_json(url, json=body, **options)
+        ctx["manager"], set_id, offset, limit)
+    data, err = api_post(ctx, url, body)
     if err:
         return [], err
     if type(data) != "dict":
@@ -194,10 +249,19 @@ def search_endpoints_page(manager, options, set_id, offset, limit, body):
     return endpoints, None
 
 
-def fetch_endpoint_details(manager, options, set_id, endpoint_id):
-    """Fetch one endpoint's inventory detail, or None."""
-    url = "{}/EPM/API/Sets/{}/Endpoints/{}/search".format(manager, set_id, endpoint_id)
-    data, err = post_json(url, json={"filter": DETAIL_FILTER}, **options)
+def fetch_endpoint_details(ctx, set_id, endpoint_id):
+    """Fetch one endpoint's inventory detail, or None.
+
+    A tenant that rejects the primary inventoryType filter grammar with a 400
+    is retried once with the per-value quoting, which then sticks for the rest
+    of the run rather than paying a rejected request per endpoint.
+    """
+    url = "{}/EPM/API/Sets/{}/Endpoints/{}/search".format(ctx["manager"], set_id, endpoint_id)
+    data, err = api_post(ctx, url, {"filter": ctx["detail_filter"]})
+    if err and err.startswith("status 400") and ctx["detail_filter"] == DETAIL_FILTER:
+        ctx["detail_filter"] = DETAIL_FILTER_PER_VALUE
+        print("cyberark-epm: detail filter rejected; retrying with per-value quoting")
+        data, err = api_post(ctx, url, {"filter": ctx["detail_filter"]})
     if err:
         print("cyberark-epm: detail fetch failed for endpoint {}: {}".format(endpoint_id, err))
         return None
@@ -372,7 +436,7 @@ def legacy_record(computer):
     }
 
 
-def import_set_legacy(manager, options, set_entry, namespace, page_size):
+def import_set_legacy(ctx, set_entry, namespace, page_size):
     """Walk one set with the deprecated computers API. Returns assets reported."""
     set_id = str(set_entry.get("Id"))
     set_name = str(set_entry.get("Name", "") or "")
@@ -381,9 +445,8 @@ def import_set_legacy(manager, options, set_entry, namespace, page_size):
     reported = 0
     p = pager("epm-computers")
     while p.next():
-        data, err = get_json("{}/EPM/API/Sets/{}/Computers".format(manager, set_id),
-                             params={"offset": str(offset), "limit": str(limit)},
-                             **options)
+        data, err = api_get(ctx, "{}/EPM/API/Sets/{}/Computers".format(ctx["manager"], set_id),
+                            params={"offset": str(offset), "limit": str(limit)})
         if err:
             print("cyberark-epm: computers fetch failed for set {}: {}".format(set_name, err))
             break
@@ -400,8 +463,7 @@ def import_set_legacy(manager, options, set_entry, namespace, page_size):
     return reported
 
 
-def import_set(manager, options, set_entry, namespace, page_size,
-               want_details, detail_budget):
+def import_set(ctx, set_entry, namespace, page_size, want_details, detail_budget):
     """Walk one set's endpoints. Returns (reported, detail_budget, use_legacy)."""
     set_id = str(set_entry.get("Id"))
     set_name = str(set_entry.get("Name", "") or "")
@@ -411,7 +473,7 @@ def import_set(manager, options, set_entry, namespace, page_size,
     detail_skipped = 0
     p = pager("epm-endpoints")
     while p.next():
-        endpoints, err = search_endpoints_page(manager, options, set_id, offset, page_size, body)
+        endpoints, err = search_endpoints_page(ctx, set_id, offset, page_size, body)
         if err and err.startswith("status 400") and body == {}:
             # Some tenants reject an empty search body; retry with the
             # documented platform filter.
@@ -422,7 +484,7 @@ def import_set(manager, options, set_entry, namespace, page_size,
             # The endpoints API is absent on this tenant; use the deprecated
             # computers API instead.
             print("cyberark-epm: endpoints API unavailable; falling back to the computers API")
-            return import_set_legacy(manager, options, set_entry, namespace, page_size), detail_budget, True
+            return import_set_legacy(ctx, set_entry, namespace, page_size), detail_budget, True
         if err:
             print("cyberark-epm: endpoint search failed for set {}: {}".format(set_name, err))
             break
@@ -431,11 +493,22 @@ def import_set(manager, options, set_entry, namespace, page_size,
             if type(record) != "dict":
                 continue
             detail = None
-            if want_details:
+            if want_details and ctx["detail_failures"] < DETAIL_FAILURE_BUDGET:
                 real_id = str(record.get("id", "") or "")
                 if real_id and detail_budget > 0:
-                    detail_budget -= 1
-                    detail = fetch_endpoint_details(manager, options, set_id, real_id)
+                    detail = fetch_endpoint_details(ctx, set_id, real_id)
+                    if detail == None:
+                        ctx["detail_failures"] += 1
+                        if ctx["detail_failures"] >= DETAIL_FAILURE_BUDGET:
+                            print("cyberark-epm: the detail search failed {} times in a row; the remaining endpoints are imported without detail".format(
+                                ctx["detail_failures"]))
+                    else:
+                        ctx["detail_failures"] = 0
+                        # The budget counts details actually retrieved, so a
+                        # tenant whose detail endpoint fails does not burn the
+                        # cap on failures and then log a misleading "cap
+                        # reached" skip.
+                        detail_budget -= 1
                 elif real_id:
                     detail_skipped += 1
             reported += report_asset(build_asset(record, namespace, set_name, detail))
@@ -473,8 +546,21 @@ def main(**kwargs):
     namespace = manager.split("://")[-1].split("/")[0].split(":")[0].lower()
     print("cyberark-epm: authenticated; manager is", namespace)
 
-    options = auth_options(kwargs, token)
-    sets = fetch_sets(manager, options)
+    # Everything a data call needs to run -- and to log on again when the
+    # session times out mid-run -- travels in one mutable context.
+    ctx = {
+        "config": kwargs,
+        "dispatcher": dispatcher,
+        "username": username,
+        "password": password,
+        "application_id": application_id,
+        "manager": manager,
+        "options": auth_options(kwargs, token),
+        "detail_filter": DETAIL_FILTER,
+        "detail_failures": 0,
+    }
+
+    sets = fetch_sets(ctx)
     if only_set:
         sets = [s for s in sets if str(s.get("Name", "")) == only_set]
         if not sets:
@@ -489,11 +575,10 @@ def main(**kwargs):
     use_legacy = False
     for i, set_entry in enumerate(sets):
         if use_legacy:
-            count = import_set_legacy(manager, options, set_entry, namespace, page_size)
+            count = import_set_legacy(ctx, set_entry, namespace, page_size)
         else:
             count, detail_budget, use_legacy = import_set(
-                manager, options, set_entry, namespace, page_size,
-                want_details, detail_budget)
+                ctx, set_entry, namespace, page_size, want_details, detail_budget)
         reported += count
         progress_report((i + 1) * 100 // len(sets),
                         "imported {} endpoints from {} set(s)".format(reported, i + 1))

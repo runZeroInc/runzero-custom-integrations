@@ -80,7 +80,7 @@ load('runzero.types', 'ImportAsset', 'Service', 'Software', 'to_custom_attribute
 load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
 load('http', 'post_json', 'bearer', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_duration', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 
 load('coerce', 'as_text', 'dedupe', 'dicts')
 VENDOR = "bmc-discovery"
@@ -247,14 +247,20 @@ def _list(value):
     if type(value) == "list":
         return value
     return [value]
-def _clamp(seconds):
-    """Turn a Unix second count into a time value that is never in the future. A
-    future timestamp fails validation for the whole asset record rather than for
-    the field, so an appliance clock running ahead would silently drop assets."""
-    current = now()
-    if seconds > current.unix:
-        return current
-    return current + parse_duration("-{}s".format(current.unix - seconds))
+def _last_seen_ts(value):
+    """Parse the Host last_update_success attribute. BMC stores a date as
+    100-nanosecond ticks since the epoch, but the REST layer is not documented
+    to serialize it that way, so both shapes are handled: a number too large to
+    be a Unix epoch is converted from ticks, and everything else -- an epoch in
+    seconds or a text stamp -- is parsed as-is. parse_ts clamps a future value
+    to now, so a fast appliance clock cannot drop the record."""
+    if type(value) == "float":
+        value = int(value)
+    if type(value) == "int" and value > MIN_PLAUSIBLE_UNIX * TICKS_PER_SECOND:
+        return parse_ts(value // TICKS_PER_SECOND)
+    return parse_ts(value)
+
+
 def _node_id(value):
     """Return a datastore node id that is safe to interpolate into a query, or an
     empty string. Node ids are hex, so anything else is rejected outright rather
@@ -674,7 +680,7 @@ def build_asset(ctx, record, foreign_id, id_source):
     if domain and ip_address(domain) == None:
         params["domain"] = domain
 
-    last_ts = parse_ts(record.get("last_update_success"))
+    last_ts = _last_seen_ts(record.get("last_update_success"))
 
     params["customAttributes"] = to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     asset = ImportAsset(**params)
