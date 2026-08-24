@@ -266,7 +266,27 @@ def _error_messages(payload):
     return messages
 
 
-def graphql(ctx, query, label, required):
+def _is_unknown_field(messages):
+    """True when a GraphQL error list is a schema-validation refusal.
+
+    graphql-js (which unraid-api's Apollo server is built on) phrases it
+    'Cannot query field "x" on type "Y"'; other engines say 'Unknown field' or
+    "doesn't exist on type". Any of them means the document named a field this
+    server's schema does not have, which is retryable with a smaller query --
+    unlike an auth refusal or the api-offline masquerade.
+    """
+    for message in messages:
+        lowered = as_text(message, join=",").lower()
+        if "cannot query field" in lowered:
+            return True
+        if "unknown field" in lowered:
+            return True
+        if "doesn't exist on type" in lowered:
+            return True
+    return False
+
+
+def graphql(ctx, query, label, required, errors_out=None):
     """Run one GraphQL query and return its data object, or None.
 
     The endpoint answers HTTP 200 for everything, including errors, so the body
@@ -274,6 +294,10 @@ def graphql(ctx, query, label, required):
     than combined into one document: a field this server's schema does not have
     fails the whole document at validation time, and one unknown field should
     not cost every other collection.
+
+    errors_out, when given, is a list the GraphQL error messages are appended
+    to, so a caller can tell a schema-validation failure apart from the rest
+    and retry with a smaller query.
     """
     payload, err = post_json(ctx["endpoint"], json={"query": query}, **ctx["http_options"])
     if err:
@@ -289,6 +313,9 @@ def graphql(ctx, query, label, required):
         return None
 
     messages = _error_messages(payload)
+    if errors_out != None:
+        for message in messages:
+            errors_out.append(message)
     for message in messages:
         if "graphql is offline" in message.lower():
             print("unraid: the Unraid API service is not running. nginx answers /graphql with " +
@@ -332,6 +359,13 @@ QUERY_VARS = """query RunZeroUnraidVars {
   metrics { memory { total used free available percentTotal } }
 }"""
 
+# The container query, in two tiers. The full tier names every field this
+# integration can use, but GraphQL fails the whole document at validation time
+# on ONE unknown field, and unraid-api releases add and remove container fields
+# quickly. When the full tier is rejected by the schema, the walk drops to the
+# core tier -- the fields the asset is actually built from -- rather than
+# importing zero containers. Every read downstream is a .get, so a container
+# from the core tier simply lacks the enrichment attributes.
 QUERY_DOCKER = """query RunZeroUnraidDocker {
   docker {
     containers {
@@ -342,6 +376,17 @@ QUERY_DOCKER = """query RunZeroUnraidDocker {
       hostConfig { networkMode }
       networkSettings
       templatePath projectUrl webUiUrl
+    }
+  }
+}"""
+
+QUERY_DOCKER_CORE = """query RunZeroUnraidDocker {
+  docker {
+    containers {
+      id names image state status
+      ports { ip privatePort publicPort type }
+      hostConfig { networkMode }
+      networkSettings
     }
   }
 }"""
@@ -628,7 +673,14 @@ def collect_containers(ctx):
     anything and would be a permanent orphan. Those are recorded on the server
     asset instead of being invented as devices.
     """
-    data = graphql(ctx, QUERY_DOCKER, "docker containers", False)
+    errors = []
+    data = graphql(ctx, QUERY_DOCKER, "docker containers", False, errors)
+    if data == None and _is_unknown_field(errors):
+        # This server's schema lacks one of the optional fields. Retry with the
+        # core field set instead of version-gating the whole container import.
+        print("unraid: this API release does not carry every optional container field; " +
+              "retrying with the core field set")
+        data = graphql(ctx, QUERY_DOCKER_CORE, "docker containers (core fields)", False)
     if data == None:
         return 0, [], []
     containers = dicts(as_dict(data.get("docker")).get("containers"))

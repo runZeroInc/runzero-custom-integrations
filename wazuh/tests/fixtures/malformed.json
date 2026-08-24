@@ -1,0 +1,175 @@
+{
+  "name": "malformed",
+  "integration": "wazuh",
+  "description": "The abort-prone record shapes a real manager can serve. Agent 101 carries ip:'any' -- the registration literal Wazuh stores for an agent enrolled with 'any' as its address -- which is not an IP and previously reached ip_address().version unguarded. Agent 102's syscollector data mixes a null mac (previously None.split()), a non-object row, a junk address string, and link-local fe80::/APIPA 169.254 addresses that must be screened off the interface. The agent list itself holds a null element, a bare string, and an active agent with no id. Every one of those must cost the field or the record, never the run: exactly two assets import, agent 101 by MAC and hostname alone, agent 102 with only its one routable address.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "requests_per_minute": 0
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/security/user/authenticate"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"token": "fixture-wazuh-jwt"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-1",
+      "match": {"method": "GET", "path": "/agents", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 4,
+              "affected_items": [
+                null,
+                "not-an-agent",
+                {
+                  "id": "101",
+                  "name": "reg-any-host",
+                  "status": "active",
+                  "ip": "any",
+                  "dateAdd": "2026-05-01T10:00:00Z",
+                  "lastKeepAlive": "2026-08-20T12:00:00Z",
+                  "os": null
+                },
+                {
+                  "id": "102",
+                  "name": "mac-null-host",
+                  "status": "active",
+                  "ip": "10.44.0.12",
+                  "dateAdd": "2026-05-01T11:00:00Z",
+                  "lastKeepAlive": "2026-08-20T12:00:00Z",
+                  "os": {"name": "Ubuntu", "platform": "ubuntu", "version": "22.04"}
+                },
+                {
+                  "name": "agent-with-no-id",
+                  "status": "active",
+                  "ip": "10.44.0.13",
+                  "dateAdd": "2026-05-01T12:00:00Z"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-2",
+      "match": {"method": "GET", "path": "/agents", "query_contains": "offset=500"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"total_affected_items": 4, "affected_items": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netiface-101",
+      "match": {"method": "GET", "path": "/syscollector/101/netiface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {"name": "eth0", "mac": null},
+                "not-an-interface",
+                {"name": "eth1", "mac": "00:0c:29:aa:bb:01"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netaddr-101",
+      "match": {"method": "GET", "path": "/syscollector/101/netaddr"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"affected_items": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netiface-102",
+      "match": {"method": "GET", "path": "/syscollector/102/netiface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {"name": "eth0", "mac": null},
+                {"name": "eth1", "mac": "00:0c:29:aa:bb:02"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netaddr-102",
+      "match": {"method": "GET", "path": "/syscollector/102/netaddr"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                null,
+                {"iface": "eth1", "address": "not-an-ip"},
+                {"iface": "eth1", "address": "fe80::20c:29ff:feaa:bb02%eth1"},
+                {"iface": "eth1", "address": "169.254.7.7"},
+                {"iface": "eth1", "address": "10.44.0.12"},
+                {"iface": null, "address": "10.9.9.9"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": 1, "message": "no fixture route"}},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "wazuh:$HOST:agent:101:20260501100000",
+      "wazuh:$HOST:agent:102:20260501110000"
+    ],
+    "assets": [
+      {
+        "id": "wazuh:$HOST:agent:101:20260501100000",
+        "fields": {
+          "hostnames": "reg-any-host",
+          "macAddresses": "00:0c:29:aa:bb:01"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "wazuh:$HOST:agent:102:20260501110000",
+        "fields": {
+          "hostnames": "mac-null-host",
+          "macAddresses": "00:0c:29:aa:bb:02",
+          "ipAddresses": "10.44.0.12"
+        }
+      }
+    ],
+    "log_contains": [
+      "wazuh: skipping agent record that is not an object",
+      "wazuh: skipping agent with no id: name=agent-with-no-id",
+      "Successfully processed 2 Wazuh agents into RunZero assets"
+    ]
+  },
+  "check_determinism": true
+}

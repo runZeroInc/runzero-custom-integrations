@@ -100,8 +100,7 @@ load("runzero.types", "ImportAsset", "to_custom_attributes")
 load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
 load("http", "get_json", "url_encode", "url_parse")
 load("kwargs", "require", "get_http_options", "get_string", "get_bool", "get_int")
-load("time", "now", "parse_time")
-load("re", re_match="match")
+load("time", "parse_ts")
 
 load('coerce', 'as_dict', 'as_list')
 VENDOR = "unifi-site-manager"
@@ -113,12 +112,6 @@ DEFAULT_BASE_URL = "https://api.ui.com"
 HOSTS_PATH = "/v1/hosts"
 SITES_PATH = "/v1/sites"
 DEVICES_PATH = "/v1/devices"
-
-# parse_time aborts the whole script on anything it cannot read, and this API
-# emits an EMPTY STRING for a date-time it does not have -- registrationTime and
-# latestBackupTime both appear as "" in Ubiquiti's own examples -- so every
-# timestamp is screened before it is parsed.
-TIMESTAMP_RE = r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:?\d{2})$"
 
 # Device families, matched against the shortname the API reports. Only families
 # whose type is unambiguous are mapped; anything else is left unset rather than
@@ -184,19 +177,20 @@ def _hostname(value):
     return text
 
 
-def _timestamp(value, ceiling):
+def _timestamp(value):
     """Return a parsed timestamp clamped to now, or None.
 
-    A future timestamp does not fail the field, it fails the entire ImportAsset,
-    so an unclamped value from a device with a bad clock would drop the asset.
+    parse_ts never raises: this API emits an EMPTY STRING for a date-time it
+    does not have -- registrationTime and latestBackupTime both appear as "" in
+    Ubiquiti's own examples -- and a malformed value must cost the field, not
+    the run. The default clamp matters too: a future timestamp does not fail
+    the field, it fails the entire ImportAsset, so an unclamped value from a
+    device with a bad clock would drop the asset.
     """
     text = _clean(value)
-    if not text or not re_match(TIMESTAMP_RE, text):
+    if not text:
         return None
-    parsed = parse_time(text)
-    if parsed.unix > ceiling.unix:
-        return ceiling
-    return parsed
+    return parse_ts(text)
 
 
 def _device_type(shortname, product_line):
@@ -252,7 +246,8 @@ def index_hosts(ctx):
     """
     hosts = {}
     cursor = ""
-    for _ in range(ctx["max_pages"]):
+    p = pager("hosts", limit=ctx["max_pages"])
+    while p.next():
         rows, cursor = fetch_page(ctx, HOSTS_PATH, cursor, "hosts")
         if rows == None:
             break
@@ -314,7 +309,8 @@ def index_sites(ctx):
     """Return the site records for each console, keyed by host id."""
     sites = {}
     cursor = ""
-    for _ in range(ctx["max_pages"]):
+    p = pager("sites", limit=ctx["max_pages"])
+    while p.next():
         rows, cursor = fetch_page(ctx, SITES_PATH, cursor, "sites")
         if rows == None:
             break
@@ -441,7 +437,7 @@ def build_device(ctx, device, host_id, host_name, updated_at):
     # device the same refresh reported online; for an offline device the value
     # says when the cloud last looked, which is not the same thing.
     if _clean(device.get("status")).lower() == "online":
-        seen = _timestamp(updated_at, ctx["ceiling"])
+        seen = _timestamp(updated_at)
         if seen != None:
             asset.lastSeenTS = seen
 
@@ -554,7 +550,7 @@ def build_orphan_hosts(ctx):
             assetType=asset_type,
         )
 
-        last_change = _timestamp(host["last_state_change"], ctx["ceiling"])
+        last_change = _timestamp(host["last_state_change"])
         if last_change != None and host["state"].lower() == "connected":
             asset.lastSeenTS = last_change
 
@@ -582,7 +578,6 @@ def main(*args, **kwargs):
         "page_size": get_int(kwargs, "page_size", default=100),
         "max_pages": get_int(kwargs, "max_pages", default=200),
         "http_options": get_http_options(kwargs, "http_", "tls_", headers),
-        "ceiling": now(),
         "hosts": {},
         "sites": {},
         "seen": {},
@@ -600,7 +595,11 @@ def main(*args, **kwargs):
     reported = 0
     if extract_devices:
         cursor = ""
-        for _ in range(ctx["max_pages"]):
+        # pager raises when the bound is hit with a cursor still pending, so an
+        # incomplete import is reported as an error instead of silently
+        # truncated. Same for the hosts and sites walks above.
+        p = pager("devices", limit=ctx["max_pages"])
+        while p.next():
             groups, cursor = fetch_page(ctx, DEVICES_PATH, cursor, "devices")
             if groups == None:
                 break

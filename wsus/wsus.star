@@ -132,7 +132,7 @@ CONFIG = {
             "min": 1,
             "max": 2000,
             "default": 100,
-            "description": "How many computers each remote PowerShell invocation collects. Lower this if a call times out or its output is truncated.",
+            "description": "How many computers each remote PowerShell invocation collects. Lower this if a call times out or its output is truncated. Each invocation is a fresh process that re-reads the full computer list on the server before slicing its page, so on a very large WSUS prefer the largest value that stays under the timeout to keep the invocation count down.",
         },
         {
             "key": "timeout",

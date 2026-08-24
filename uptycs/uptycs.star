@@ -245,10 +245,16 @@ def _run_query(query_url, http_options, sql):
 
 
 def _collect_rows(query_url, http_options, label, select_sql, order_sql):
-    """Page one data lake table with LIMIT/OFFSET and return (rows, err)."""
+    """Page one data lake table with LIMIT/OFFSET and return (rows, err).
+
+    The pager label is the table being walked, so a bound failure names the
+    collection that did not terminate. MAX_TABLE_ROWS exits the walk long
+    before the CONFIG page bound in practice.
+    """
     rows = []
     offset = 0
-    for _page in range(1, 100001):
+    p = pager(label)
+    while p.next():
         sql = "{} ORDER BY {} LIMIT {} OFFSET {}".format(select_sql, order_sql, ROW_PAGE_SIZE, offset)
         items, err = _run_query(query_url, http_options, sql)
         if err:
@@ -748,7 +754,8 @@ def fetch_and_report_assets(query_url, config_kwargs, api_key, api_secret, custo
     never held in memory at once."""
     reported = 0
     offset = 0
-    for _page in range(1, 100001):
+    p = pager("uptycs-assets")
+    while p.next():
         http_options = get_http_options(config_kwargs, headers=_auth_headers(api_key, api_secret))
         sql = "SELECT * FROM upt_assets ORDER BY id LIMIT {} OFFSET {}".format(ASSET_PAGE_SIZE, offset)
         items, err = _run_query(query_url, http_options, sql)

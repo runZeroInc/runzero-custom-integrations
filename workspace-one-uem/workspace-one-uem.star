@@ -90,7 +90,7 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface', 'normalize_mac')
 load('http', 'get_json', 'basic')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 
@@ -124,10 +124,11 @@ HTTP_RETRY_MAX_BACKOFF = 60.0
 CHILD_LIMIT = 99
 MAX_OS_UPDATES_LISTED = 20
 
-# Workspace ONE UEM writes this sentinel instead of null when a timestamp has
-# never been set, and it also emits local timestamps with no zone designator.
-NEVER_TIMESTAMP_PREFIX = "0001-01-01"
-TIMESTAMP_HAS_ZONE_RE = r"(Z|[+-]\d{2}:?\d{2})$"
+# Workspace ONE UEM writes the sentinel 0001-01-01T00:00:00 instead of null
+# when a timestamp has never been set, and it also emits local timestamps with
+# no zone designator. Both go straight through parse_ts: the sentinel's
+# non-positive epoch yields None, zone-less values are read as UTC, and a
+# future value is clamped to now rather than costing the record.
 
 # Version strings arrive either bare ("10.0.18363") or prefixed with a product
 # name ("iOS 14.6"), so the name and version are separated at the first digit.
@@ -587,7 +588,13 @@ def fetch_and_report_devices(base_url, tenant_host, devices_options, apps_option
             "sortorder": DEVICE_SORT_ORDER,
         }
         if organization_group_id:
+            # lgid is the documented organization-group filter on the v1
+            # search schema; whether the version-2 Accept schema honors the
+            # same spelling is unconfirmed, so the OG UUID-era alias is sent
+            # alongside it. Servers ignore the query parameter they do not
+            # know, so sending both is safe and one of them filters.
             params["lgid"] = organization_group_id
+            params["organizationgroupid"] = organization_group_id
 
         data, err = get_json(url, params=params, **devices_options)
         if err:

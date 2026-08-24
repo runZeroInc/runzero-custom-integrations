@@ -1,0 +1,119 @@
+{
+  "name": "auth-refresh",
+  "integration": "wazuh",
+  "description": "A JWT that expires mid-run. Wazuh tokens default to 900 seconds, so on a large estate the enrichment loop outlives the first token. The netiface call answers 401 once; the script must re-authenticate, retry the SAME agent's request with the fresh token, and finish the import with the interface data intact.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "requests_per_minute": 0
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/security/user/authenticate"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"token": "fixture-jwt-first"}}},
+        {"status": 200, "json": {"error": 0, "data": {"token": "fixture-jwt-second"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-1",
+      "match": {"method": "GET", "path": "/agents", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 1,
+              "affected_items": [
+                {
+                  "id": "201",
+                  "name": "long-run-host",
+                  "status": "active",
+                  "ip": "10.55.0.21",
+                  "dateAdd": "2026-04-10T08:00:00Z",
+                  "lastKeepAlive": "2026-08-20T12:00:00Z",
+                  "os": {"name": "Ubuntu", "platform": "ubuntu", "version": "22.04"}
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-2",
+      "match": {"method": "GET", "path": "/agents", "query_contains": "offset=500"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"total_affected_items": 1, "affected_items": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netiface-expired-then-fresh",
+      "match": {"method": "GET", "path": "/syscollector/201/netiface"},
+      "responses": [
+        {"status": 401, "json": {"title": "Unauthorized", "detail": "Token expired"}},
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {"name": "eth0", "mac": "00:0c:29:cc:dd:21"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netaddr",
+      "match": {"method": "GET", "path": "/syscollector/201/netaddr"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {"iface": "eth0", "address": "10.55.0.21"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": 1, "message": "no fixture route"}},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["wazuh:$HOST:agent:201:20260410080000"],
+    "assets": [
+      {
+        "id": "wazuh:$HOST:agent:201:20260410080000",
+        "fields": {
+          "hostnames": "long-run-host",
+          "macAddresses": "00:0c:29:cc:dd:21",
+          "ipAddresses": "10.55.0.21"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/syscollector/201/netiface", "header_contains": "fixture-jwt-first"},
+      {"method": "GET", "path": "/syscollector/201/netiface", "header_contains": "fixture-jwt-second"},
+      {"method": "GET", "path": "/syscollector/201/netaddr", "header_contains": "fixture-jwt-second"}
+    ],
+    "log_contains": [
+      "Token expired, re-authenticating...",
+      "Successfully processed 1 Wazuh agents into RunZero assets"
+    ]
+  },
+  "check_determinism": true
+}

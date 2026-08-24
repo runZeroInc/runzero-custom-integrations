@@ -15,12 +15,35 @@ CONFIG = {
         {"key": "nt_hash", "label": "NTLM hash (hex)", "type": "string", "required": False},
         {"key": "domain", "label": "Domain (optional)", "type": "string", "required": False, "default": ""},
         {"key": "timeout", "label": "Connection timeout (seconds)", "type": "int", "required": False, "default": 30, "min": 1, "max": 600},
+        {
+            "key": "mount_shares",
+            "label": "Mount shares and list their roots",
+            "type": "bool",
+            "required": False,
+            "default": True,
+            "description": "Mount each non-hidden share and record its first top-level entries. Turn this OFF on an Explorer release where a refused tree connect still aborts the whole run (see the README): the host then always imports with the advertised share list, just without per-share entry detail.",
+        },
     ],
 }
 
 load("runzero.types", "ImportAsset")
 load("runzero.smb", smb_dial="dial")
-load("kwargs", "require", "get_string", "get_int")
+load("kwargs", "require", "get_string", "get_int", "get_bool")
+
+
+def mount_or_none(session, name):
+    """Mount one share, answering None for a share this account cannot open.
+
+    On current runtime source, mount() itself answers None on a permission
+    refusal (STATUS_ACCESS_DENIED), so this is a plain call there. On every
+    released Explorer as of this writing the refusal is instead a raised Go
+    error, which Starlark cannot catch, and the raise aborts the entire run --
+    nothing a wrapper can close. The operator-facing escape hatch for those
+    releases is the mount_shares parameter, which skips mounting entirely so
+    the host still imports. See README.md, "A refused share depends on the
+    runtime".
+    """
+    return session.mount(share=name)
 
 
 def main(*args, **kwargs):
@@ -32,6 +55,7 @@ def main(*args, **kwargs):
     nt_hash = get_string(kwargs, "nt_hash", default="")
     domain = get_string(kwargs, "domain", default="")
     timeout = get_int(kwargs, "timeout", default=30)
+    mount_shares = get_bool(kwargs, "mount_shares", default=True)
 
     if not password and not nt_hash:
         print("either password or nt_hash is required")
@@ -58,24 +82,21 @@ def main(*args, **kwargs):
         # so there is nothing to report even where the account could reach them.
         if name.endswith("$") and name != "ADMIN$":
             continue
+        if not mount_shares:
+            continue
 
         # Everything below tolerates a refusal. Entitlement does not follow
         # naming: any share can be denied to the polling account, and the skip
         # above is a guess about intent rather than a check of access. Where the
         # runtime supports it, mount() and list() answer None when the server
         # refuses on permissions, so a share this account cannot read costs us
-        # that share and nothing else.
-        #
-        # These checks are what a script can do; they are not sufficient on
-        # their own. On a runtime that still raises on a refused tree connect --
-        # every released Explorer as of this writing -- there is no return value
-        # to test and the whole run is lost with the first denied share, because
-        # Starlark has no exception handling and the only way to discover the
-        # refusal is to attempt the mount. See README.md, "A refused share
-        # depends on the runtime".
-        share = session.mount(share=name)
+        # that share and nothing else -- and on the older runtimes where the
+        # refusal is instead an uncatchable raise, the mount_shares parameter
+        # skips this block entirely. See mount_or_none and the README.
+        share = mount_or_none(session, name)
         if share == None:
             share_attrs["share.{}".format(name)] = "denied"
+            print("windows-smb-shares: share {} refused the tree connect; recorded as denied".format(name))
             continue
 
         # A successful mount does not imply a readable root: Windows commonly
@@ -84,11 +105,19 @@ def main(*args, **kwargs):
         share.unmount()
         if result == None:
             share_attrs["share.{}".format(name)] = "denied"
+            print("windows-smb-shares: share {} refused the root listing; recorded as denied".format(name))
             continue
 
         entries = []
         for e in result:
-            entries.append(e["name"])
+            # A listing row is expected to carry a name; tolerate one that
+            # does not rather than aborting the run on e["name"].
+            if type(e) == "dict":
+                entry_name = e.get("name")
+            else:
+                entry_name = getattr(e, "name", None)
+            if entry_name:
+                entries.append(str(entry_name))
         if len(entries) > 0:
             visible_count += 1
             share_attrs["share.{}.entries".format(name)] = ", ".join(entries[:20])
@@ -99,6 +128,9 @@ def main(*args, **kwargs):
         "smb.share_count": "{}".format(len(shares)),
         "smb.accessible_share_count": "{}".format(visible_count),
     }
+    if not mount_shares:
+        # Distinguishes "nothing was readable" from "nothing was attempted".
+        attrs["smb.share_mounts"] = "disabled"
     attrs.update(share_attrs)
 
     asset = ImportAsset(

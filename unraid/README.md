@@ -242,6 +242,16 @@ shows a root `dockerContainers` query, which does not exist in the schema. The
 field names used here come from the generated SDL in the `unraid/api` source
 tree, not from the docs.
 
+The container query goes one step further, because `unraid-api` releases add
+and remove `DockerContainer` fields quickly and one unknown field would
+otherwise version-gate the whole container import to zero. It is tiered: the
+full field set is tried first, and when the server's schema rejects it with a
+`Cannot query field` validation error, the same collection is retried with the
+core fields the asset is actually built from. A container imported through the
+core tier simply lacks the enrichment attributes (`template_path`,
+`auto_start`, labels, and the like). The `schema-drift` fixture locks this
+behavior.
+
 ### Partial results are normal
 
 Unraid's exception filter sends **HTTP 200 for GraphQL errors**, and a key that

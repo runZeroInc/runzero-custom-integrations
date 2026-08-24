@@ -139,6 +139,13 @@ server with a small `page_size` first.
   computer on the WSUS side. On a large estate, lower `page_size` to keep each
   WinRM call inside the 600-second ceiling, or disable
   `import_missing_updates` for a fast inventory-only run.
+- Each WinRM invocation is a fresh PowerShell process, and the WSUS
+  administration API has no server-side paging, so every page call re-runs
+  `GetComputerTargets` over the whole SUSDB and sorts it before slicing its
+  offset window — O(total) work per page. That fixed cost is why `page_size`
+  cuts both ways: smaller pages bound the per-call time but multiply the
+  full-list re-reads, so on a 20k+ computer WSUS prefer the largest page the
+  timeout tolerates rather than the smallest that works.
 - Timestamps rendered as `0001-01-01...` (never reported) are dropped before
   they can poison `firstSeen`/`lastSeen`.
 

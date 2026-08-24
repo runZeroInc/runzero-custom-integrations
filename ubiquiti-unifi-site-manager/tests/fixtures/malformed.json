@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "ubiquiti-unifi-site-manager",
-  "description": "The shapes Ubiquiti's own spec permits and its own guidance warns about: null array elements (the spec marks data items nullable on both /v1/sites and /v1/devices, and the nested devices list too), an empty-string registrationTime where a date-time is declared, reportedState set to null, a host with no id, a device with no id, and a device group whose devices key is null. Nothing here may abort the run, and the one good device must still be imported. Ubiquiti's own words: design the integration to handle unfamiliar properties, null values, and missing attributes.",
+  "description": "The shapes Ubiquiti's own spec permits and its own guidance warns about: null array elements (the spec marks data items nullable on both /v1/sites and /v1/devices, and the nested devices list too), an empty-string registrationTime where a date-time is declared, reportedState set to null, a host with no id, a device with no id, and a device group whose devices key is null. The good device group's updatedAt is an IMPOSSIBLE date (month 13, day 39) that is digit-shaped enough to fool a naive regex screen; it must cost the lastSeen field only, never the run. Nothing here may abort the run, and the one good device must still be imported. Ubiquiti's own words: design the integration to handle unfamiliar properties, null values, and missing attributes.",
 
   "kwargs": {
     "url": "$BASE",
@@ -90,7 +90,7 @@
                   {"id": "AABBCC000005", "mac": "AABBCC000005", "name": "skewed.example.com", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "192.0.2.50", "productLine": "network", "status": "online", "version": "4.1.13", "firmwareStatus": "upToDate", "isConsole": true, "isManaged": true},
                   {"id": "AABBCC000005", "mac": "AABBCC000005", "name": "Duplicate-Row", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "192.0.2.50", "productLine": "network", "status": "online", "isConsole": true}
                 ],
-                "updatedAt": "2026-06-23T07:21:27Z"
+                "updatedAt": "2026-13-39T25:61:61Z"
               }
             ],
             "httpStatusCode": 200,

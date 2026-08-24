@@ -107,6 +107,7 @@ the credential is configured. This integration does not speak Kerberos.
    - **NTLM hash (hex)** (`nt_hash`): optional alternative to the password.
    - **Domain (optional)** (`domain`): only needed when the username has no `DOMAIN\` prefix.
    - **Connection timeout (seconds)** (`timeout`): optional; default `30`.
+   - **Mount shares and list their roots** (`mount_shares`): optional; default on. Turn it **off** on an Explorer release where a refused tree connect still aborts the whole run — see "A refused share depends on the runtime" below. With it off the host always imports with the advertised share list, `smb.share_mounts = disabled`, and no per-share entry detail.
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
    - Select the Credential and Custom Integration created in steps 1 and 2.
    - Update the task schedule to recur at the desired timeframes.
@@ -192,7 +193,10 @@ with custom attributes:
 - `smb.share_count` — total advertised share count
 - `smb.accessible_share_count` — shares whose root we listed
   successfully
-- `share.<name>` — `listed` flag per advertised share
+- `smb.share_mounts` — `disabled` when the `mount_shares` parameter is off,
+  so a zero accessible count reads as "not attempted" rather than "denied"
+- `share.<name>` — `listed` flag per advertised share (`denied` when the
+  runtime reports a refused mount or root listing)
 - `share.<name>.entries` — first 20 top-level entries (when readable)
 
 Admin shares ending in `$` (other than `ADMIN$`) are not enumerated by
@@ -238,7 +242,7 @@ The practical consequence: **use an FQDN or a hostname, not an IP, in the `host`
 - **Every advertised share becomes an attribute; only some are listed.** `share.<name>` is written for every share `list_shares()` returns. Shares ending in `$` other than `ADMIN$` are then skipped before the mount, so `share.C$` exists as a `listed` flag with no `share.C$.entries` beside it. That is deliberate — home-directory shares are `$`-suffixed and enumerating them would walk user data.
 - **`smb.share_count` versus `smb.accessible_share_count` is the diagnostic that matters.** The first is what the server advertised; the second is how many the account could actually open. A large gap is an NTFS-permission problem, not an authentication problem, and nothing else in the output distinguishes the two.
 - **Only the first 20 top-level entries per share are recorded**, joined into one attribute value. This is a fingerprint of what a share holds, not an inventory of it.
-- **A refused share depends on the runtime, and today it still loses the run.** The script checks `mount()` and `list()` for `None` and records a refused share as `share.<name> = "denied"` before carrying on. That check only does anything on a runtime where those calls *return* something on a refusal. Starlark has no exception handling, so on every currently released Explorer a refused tree connect is a Go error and it aborts the whole script: the scanner logs `failed to call main function: mount: permission denied` and exports **zero** assets — not the share, the run, including every share that *was* readable. Reproduced against real Samba (`tests/docker/`) both ways: a scanner built before the runtime change emits 0 assets on that stack, one built after reports `finance` as `denied` and reports the host. Nothing in the script can close this gap on its own — you cannot learn that a share will be refused without attempting the mount, and the attempt is what aborts — so until the change ships, **a single unreadable non-`$` share on a host means that host does not import at all**. If a host imports on some runs and not others, this is the first thing to suspect, and the workaround is an account entitled to every advertised share, or a target that has none it is refused.
+- **A refused share depends on the runtime, and on released Explorers it still loses the run unless mounting is turned off.** The script routes every mount through a `mount_or_none` wrapper that checks `mount()` and `list()` for `None`, records a refused share as `share.<name> = "denied"` with a log line, and carries on. That check only does anything on a runtime where those calls *return* something on a refusal. Starlark has no exception handling, so on every currently released Explorer a refused tree connect is a Go error and it aborts the whole script: the scanner logs `failed to call main function: mount: permission denied` and exports **zero** assets — not the share, the run, including every share that *was* readable. Reproduced against real Samba (`tests/docker/`) both ways: a scanner built before the runtime change emits 0 assets on that stack, one built after reports `finance` as `denied` and reports the host. No wrapper can close this gap on its own — you cannot learn that a share will be refused without attempting the mount, and the attempt is what aborts — which is exactly what the **`mount_shares` parameter** is for: turn it off on those releases and the host always imports with its share list (`smb.share_mounts = disabled`), trading per-share entry detail for a guaranteed import. If a host imports on some runs and not others, a denied share is the first thing to suspect; the alternatives are an account entitled to every advertised share, or a target that has none it is refused.
 - **The credential is privileged discovery configuration.** This module executes on the selected Explorer and can reach internal addresses, and it authenticates with a domain account. Scope both the Explorer and the account to the intended host.
 
 ## Future

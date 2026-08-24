@@ -249,7 +249,10 @@ query string is assembled onto the URL with `url_encode` rather than passed as
 string instead of merging with it, so passing it alongside a cursor silently
 wipes the cursor and restarts pagination from page one. That is an infinite loop
 rather than an error, which is why `max_pages` exists as a backstop and why the
-`paged` scenario asserts that `pageSize` and `nextToken` arrive together.
+`paged` scenario asserts that `pageSize` and `nextToken` arrive together. Each
+walk is guarded by `pager()`, so exhausting `max_pages` with a cursor still
+pending fails the task with a message naming the exhausted collection rather
+than silently importing a truncated set.
 
 The **Page size** parameter is bounded at 500 by the script. Whether the API
 itself caps `pageSize` at that number was **not established from vendor

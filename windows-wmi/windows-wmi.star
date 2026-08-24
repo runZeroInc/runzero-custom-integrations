@@ -83,14 +83,19 @@ load("runzero.winrm", winrm_dial="dial")
 load("runzero.wmi", wmi_dial="dial")
 load("kwargs", "require", "get_string", "get_int", "get_bool")
 load("net", "ip_address")
+load("json", json_decode="decode")
 
 # Queries kept short so the WQL stays well under the 4 KiB limit.
 Q_OS = "SELECT Caption, Version, BuildNumber, OSArchitecture, CSName, InstallDate FROM Win32_OperatingSystem"
-Q_CS = "SELECT Manufacturer, Model, Domain, SystemType, PCSystemType, TotalPhysicalMemory FROM Win32_ComputerSystem"
+Q_CS = "SELECT Name, Manufacturer, Model, Domain, SystemType, PCSystemType, TotalPhysicalMemory FROM Win32_ComputerSystem"
 Q_NIC = "SELECT Description, MACAddress, IPAddress, DHCPEnabled, IPEnabled FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled=true"
 Q_SVC = "SELECT Name, DisplayName, State, StartMode, PathName FROM Win32_Service"
 Q_PROD = "SELECT Name, Version, Vendor, InstallDate FROM Win32_Product"
 Q_ENC = "SELECT ChassisTypes FROM Win32_SystemEnclosure"
+
+# The platform caps child collections at 99 per asset, and Win32_Product
+# routinely returns more rows than that on a package-heavy host.
+MAX_SOFTWARE = 99
 
 # SMBIOS System Enclosure type (DMTF SMBIOS 3.x, Type 3 field 05h), which is
 # what Win32_SystemEnclosure.ChassisTypes reports. Only the values that name a
@@ -207,9 +212,15 @@ def _build_nics(nic_rows):
 
 def _build_software(prod_rows):
     out = []
+    skipped = 0
     for r in prod_rows:
+        if type(r) != "dict":
+            continue
         name = r.get("Name") or ""
         if not name:
+            continue
+        if len(out) >= MAX_SOFTWARE:
+            skipped += 1
             continue
         out.append(Software(
             id=name[:255],
@@ -217,7 +228,66 @@ def _build_software(prod_rows):
             vendor=(r.get("Vendor") or "")[:255],
             version=(r.get("Version") or "")[:255],
         ))
+    if skipped:
+        print("windows-wmi: software list capped at {}; {} additional Win32_Product rows were not imported".format(
+            MAX_SOFTWARE, skipped))
     return out
+
+
+def _winrm_namespace(namespace):
+    """Reduce a WMI-style namespace to the root/cimv2 form Get-CimInstance
+    expects.
+
+    //./root/cimv2 -> root/cimv2, //HOST/root/cimv2 -> root/cimv2, and
+    /root/cimv2 -> root/cimv2; a value already in root/cimv2 form passes
+    through. A chained .lstrip("/").lstrip(".") is NOT equivalent: it turns
+    the default //./root/cimv2 into /root/cimv2, leaving the slash it claimed
+    to strip.
+    """
+    ns = namespace.strip()
+    if ns.startswith("//"):
+        rest = ns[2:]
+        idx = rest.find("/")
+        ns = rest[idx + 1:] if idx >= 0 else ""
+    ns = ns.lstrip("/")
+    return ns or "root/cimv2"
+
+
+def _winrm_wql(session, query, namespace, label):
+    """Run one WQL query over WinRM, tolerating a failed query.
+
+    session.wql() raises on any remote failure, and a raise from a builtin
+    aborts the whole script - so one broken or slow class (Win32_Product
+    blowing the timeout is the common case) would cost every row already
+    collected. The same Get-CimInstance pipeline the wql helper uses is issued
+    through run_powershell instead, wrapped in a PowerShell try/catch so the
+    failure comes back as data. Returns (rows, err); err is None on success.
+    """
+    ps_query = query.replace("'", "''")
+    ps_ns = namespace.replace("'", "''")
+    script = ("$ErrorActionPreference='Stop'; try { " +
+              "$rz_rows = @(Get-CimInstance -Namespace '" + ps_ns + "' -Query '" + ps_query + "' | " +
+              "Select-Object -Property * -ExcludeProperty CimClass,CimInstanceProperties,CimSystemProperties,PSComputerName); " +
+              "ConvertTo-Json -InputObject $rz_rows -Depth 3 -Compress " +
+              "} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 199 }")
+    stdout, stderr, exit_code = session.run_powershell(script)
+    if exit_code != 0:
+        return [], "{}: exit {}: {}".format(label, exit_code, str(stderr).strip()[:300])
+    text = str(stdout).strip()
+    if not text:
+        return [], None
+    # json_decode is given a default so a body the 16 MiB WinRM output cap
+    # truncated mid-document costs this query, not the run.
+    decoded = json_decode(text, None)
+    if type(decoded) == "dict":
+        decoded = [decoded]
+    if type(decoded) != "list":
+        return [], "{}: response was not JSON".format(label)
+    rows = []
+    for row in decoded:
+        if type(row) == "dict":
+            rows.append(row)
+    return rows, None
 
 
 def _collect_winrm(host, username, password, transport, port, insecure, ca, auth, namespace, timeout):
@@ -233,17 +303,26 @@ def _collect_winrm(host, username, password, transport, port, insecure, ca, auth
         auth=auth,
         timeout=timeout,
     )
-    os_rows = s.wql(Q_OS, namespace=namespace)
-    cs_rows = s.wql(Q_CS, namespace=namespace)
-    enc_rows = s.wql(Q_ENC, namespace=namespace)
-    nic_rows = s.wql(Q_NIC, namespace=namespace)
-    svc_rows = s.wql(Q_SVC, namespace=namespace)
-    prod_rows = s.wql(Q_PROD, namespace=namespace)
+    # Each query is independently tolerant: one failure prints, contributes an
+    # empty collection, and the asset is reported with whatever was collected.
+    results = {}
+    for key, query in [("os", Q_OS), ("cs", Q_CS), ("enc", Q_ENC),
+                       ("nic", Q_NIC), ("svc", Q_SVC), ("prod", Q_PROD)]:
+        rows, err = _winrm_wql(s, query, namespace, query.split(" FROM ")[-1])
+        if err:
+            print("windows-wmi: query failed and its fields are skipped: " + err)
+        results[key] = rows
     s.close()
-    return os_rows, cs_rows, enc_rows, nic_rows, svc_rows, prod_rows
+    return (results["os"], results["cs"], results["enc"],
+            results["nic"], results["svc"], results["prod"])
 
 
 def _collect_wmi(host, username, password, transport, namespace, timeout):
+    # Unlike the WinRM path there is no PowerShell layer to catch a failure
+    # in: session.query() raises straight through and Starlark cannot catch
+    # it, so a single failed class still aborts this transport. Win32_Product
+    # is capped at the child limit so the slowest, most failure-prone query
+    # fetches as little as possible.
     s = wmi_dial(
         host=host,
         username=username,
@@ -257,7 +336,7 @@ def _collect_wmi(host, username, password, transport, namespace, timeout):
     enc_rows = s.query(Q_ENC)
     nic_rows = s.query(Q_NIC)
     svc_rows = s.query(Q_SVC)
-    prod_rows = s.query(Q_PROD)
+    prod_rows = s.query(Q_PROD, limit=MAX_SOFTWARE)
     s.close()
     return os_rows, cs_rows, enc_rows, nic_rows, svc_rows, prod_rows
 
@@ -278,8 +357,8 @@ def main(*args, **kwargs):
         auth = get_string(kwargs, "winrm_auth", default="ntlm")
         os_rows, cs_rows, enc_rows, nic_rows, svc_rows, prod_rows = _collect_winrm(
             host, username, password, transport, port, insecure, ca, auth,
-            # WinRM helper expects WMI namespace as "root/cimv2" style.
-            namespace.lstrip("/").lstrip("."),
+            # WinRM expects the WMI namespace in "root/cimv2" form.
+            _winrm_namespace(namespace),
             timeout,
         )
     else:

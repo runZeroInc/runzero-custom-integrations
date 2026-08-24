@@ -90,6 +90,15 @@ CONFIG = {
             "min": 1,
             "description": "Safety ceiling on the paging walk. Raise it if a run reports hitting the limit.",
         },
+        {
+            "key": "requests_per_minute",
+            "label": "Syscollector requests per minute",
+            "type": "int",
+            "required": False,
+            "default": 240,
+            "min": 0,
+            "description": "Budget for the per-agent netiface/netaddr enrichment requests (two per active agent). The Wazuh API enforces max_request_per_minute (default 300) and answers 429 above it, which silently costs those agents their interface data. 0 disables the throttle.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -99,10 +108,10 @@ CONFIG = {
 
 load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software')
 load('json', json_decode='decode')
-load('net', 'ip_address')
+load('net', 'ip_address', 'routable_ip')
 load('http', http_post='post', http_get='get', 'url_parse')
 load('base64', base64_encode='encode')
-load('time', 'parse_time')
+load('time', 'sleep')
 load('re', re_sub='sub')
 load('kwargs', 'require', 'get_string', 'get_int', 'get_http_options')
 
@@ -237,24 +246,25 @@ def authenticate_wazuh(host, username, password, config):
     print("Successfully authenticated with Wazuh API")
     return token
 
-def get_wazuh_agents(host, token, config, max_pages):
+def get_wazuh_agents(host, ctx, max_pages, handle_agents):
     """
-    Retrieve agents from Wazuh using pagination.
+    Retrieve agents from Wazuh using pagination, streaming each page to the
+    handler as it arrives so the full agent list is never buffered.
 
     Args:
         host: Wazuh host URL
-        token: JWT authentication token
+        ctx: shared run state carrying the JWT (which mid-run re-auth may
+             replace) and the CONFIG kwargs
+        max_pages: page ceiling
+        handle_agents: called with each page's agent list; whatever it does
+             (enrich, build, report) happens before the next page is fetched
 
     Returns:
-        List of agent dictionaries
+        Count of agents fetched across every page.
     """
     agents_url = "{}/agents".format(host)
-    headers = {
-        'Authorization': 'Bearer {}'.format(token),
-        'Content-Type': 'application/json'
-    }
 
-    all_agents = []
+    fetched = 0
     offset = 0
     pages = 0
     total = None
@@ -267,8 +277,14 @@ def get_wazuh_agents(host, token, config, max_pages):
             'offset': offset,
             'limit': PAGE_SIZE
         }
+        # Headers are rebuilt per page because the enrichment handler can
+        # re-authenticate mid-run and swap the token in ctx.
+        headers = {
+            'Authorization': 'Bearer {}'.format(ctx['token']),
+            'Content-Type': 'application/json'
+        }
 
-        response = http_get(agents_url, params=params, timeout=600, **get_http_options(config, headers=headers))
+        response = http_get(agents_url, params=params, timeout=600, **get_http_options(ctx['config'], headers=headers))
 
         if response.status_code != 200:
             print("Failed to fetch agents from Wazuh. Status:", response.status_code)
@@ -296,26 +312,27 @@ def get_wazuh_agents(host, token, config, max_pages):
         # manager ignored `offset` or replayed a cached response. The walk's
         # only exit is an empty page, so a repeat produces no exit at all and
         # the same 500 agents would be re-read to the ceiling. Stop on the
-        # first repeat, and stop BEFORE extending, so the replayed page is not
-        # collected twice.
+        # first repeat, and stop BEFORE handling, so the replayed page is not
+        # imported twice.
         signature = page_signature(agents_batch)
         if signature == last_signature:
             print('wazuh: paging stopped after {} pages (API returned the same page twice, {})'.format(
-                pages, retrieved_of(len(all_agents), total)))
+                pages, retrieved_of(fetched, total)))
             capped = False
             break
         last_signature = signature
 
-        all_agents.extend(agents_batch)
+        fetched += len(agents_batch)
+        handle_agents(agents_batch)
 
         offset += PAGE_SIZE
 
     if capped:
         print('wazuh: page limit of {} hit (integration safety limit, {}) - raise the max_pages parameter to import the rest'.format(
-            max_pages, retrieved_of(len(all_agents), total)))
+            max_pages, retrieved_of(fetched, total)))
 
-    print("Retrieved {} agents from Wazuh".format(len(all_agents)))
-    return all_agents
+    print("Retrieved {} agents from Wazuh".format(fetched))
+    return fetched
 
 # NEW FUNCTION: get network interfaces with MAC addresses
 def get_agent_network_interfaces(host, token, agent_id, config):
@@ -490,17 +507,24 @@ def build_network_interface(network_interfaces_data, network_addresses_data, pri
     """
     interfaces = []
 
-    # Build a mapping of interface name to IP addresses
-    # Skip Kubernetes-related interfaces to avoid adding virtual IPs
+    # Build a mapping of interface name to IP addresses.
+    # Skip Kubernetes-related interfaces to avoid adding virtual IPs.
+    # routable_ip normalizes each value and returns None for loopback,
+    # link-local (fe80::/10 and Windows APIPA 169.254/16, which syscollector
+    # reports per interface), unspecified, multicast, broadcast, and anything
+    # that is not an address at all -- so a junk value costs the field, never
+    # the run, and non-identifying addresses never reach an interface.
     iface_to_ips = {}
     for addr_data in network_addresses_data:
-        iface_name = addr_data.get('iface', '')
-        ip_addr_str = addr_data.get('address', '')
-       
+        if type(addr_data) != 'dict':
+            continue
+        iface_name = str(addr_data.get('iface', '') or '')
+        ip_addr_str = routable_ip(addr_data.get('address'))
+
         # Skip Kubernetes interfaces (kube-ipvs0, cali*, nodelocaldns, etc.)
         if is_kubernetes_interface(iface_name):
             continue
-       
+
         if iface_name and ip_addr_str:
             if iface_name not in iface_to_ips:
                 iface_to_ips[iface_name] = []
@@ -508,14 +532,20 @@ def build_network_interface(network_interfaces_data, network_addresses_data, pri
 
     # Process interfaces from syscollector data
     for interface_data in network_interfaces_data:
-        iface_name = interface_data.get('name', '')
-       
+        if type(interface_data) != 'dict':
+            continue
+        iface_name = str(interface_data.get('name', '') or '')
+
         # Skip Kubernetes interfaces (kube-ipvs0, cali*, nodelocaldns, etc.)
         if is_kubernetes_interface(iface_name):
             continue
-       
-        mac_address_string = interface_data.get('mac', "")
-       
+
+        # The API sends `mac: null` on interfaces without one; only a string
+        # can be split into candidate MACs.
+        mac_address_string = interface_data.get('mac')
+        if type(mac_address_string) != 'string':
+            continue
+
         # Split by space to handle multiple MACs
         macs = mac_address_string.split()
 
@@ -524,23 +554,33 @@ def build_network_interface(network_interfaces_data, network_addresses_data, pri
             if is_valid_mac(mac_address):
                 ip4s = []
                 ip6s = []
-               
+
                 # Get IPs for this interface from netaddr data
                 ip_addresses = iface_to_ips.get(iface_name, [])
-               
-                # If no IPs found for this interface, use primary IP as fallback
+
+                # If no IPs found for this interface, use primary IP as
+                # fallback. It goes through the same screen: agent.ip can hold
+                # the registration literal "any" or a hostname, neither of
+                # which is an address.
                 if not ip_addresses and primary_ip_str:
-                    ip_addresses = [primary_ip_str]
-               
-                # Parse and categorize IPs
+                    primary = routable_ip(primary_ip_str)
+                    ip_addresses = [primary] if primary else []
+
+                # Parse and categorize IPs. ip_address returns None on input
+                # it cannot parse, and .version on None aborts the run, so the
+                # result is checked even though routable_ip already screened
+                # these values.
                 for ip_addr_str in ip_addresses:
-                    if ip_addr_str:
-                        ip_addr = ip_address(ip_addr_str)
-                        if ip_addr.version == 4:
-                            ip4s.append(ip_addr)
-                        elif ip_addr.version == 6:
-                            ip6s.append(ip_addr)
-               
+                    if not ip_addr_str:
+                        continue
+                    ip_addr = ip_address(ip_addr_str)
+                    if ip_addr == None:
+                        continue
+                    if ip_addr.version == 4:
+                        ip4s.append(ip_addr)
+                    elif ip_addr.version == 6:
+                        ip6s.append(ip_addr)
+
                 interfaces.append(NetworkInterface(
                     macAddress=mac_address,
                     ipv4Addresses=ip4s,
@@ -620,121 +660,110 @@ def parse_os_info(os_data):
    
     return full_os_name, os_version
 
-# REVISED FUNCTION: build_assets to use the new network interface data
-def build_assets(agents, agent_net_interfaces, agent_net_addresses, namespace):
+def build_agent_asset(agent, net_interfaces_data, net_addresses_data, namespace):
     """
-    Convert Wazuh agent data into RunZero ImportAsset objects.
+    Convert one Wazuh agent record into a runZero ImportAsset, or None.
 
     Args:
-        agents: List of agent dictionaries from Wazuh API
-        agent_net_interfaces: A dictionary mapping agent ID to a list of its network interfaces.
-        agent_net_addresses: A dictionary mapping agent ID to a list of its network addresses.
+        agent: One agent dictionary from the Wazuh API
+        net_interfaces_data: The agent's netiface rows, possibly empty.
+        net_addresses_data: The agent's netaddr rows, possibly empty.
         namespace: The manager hostname, used to scope every foreign id.
-
-    Returns:
-        List of ImportAsset objects
     """
-    assets = []
-   
-    for agent in agents:
-        # print(agent)  # Uncomment for debugging
-        agent_id = agent.get('id', "")
-        if not agent_id:
-            print("wazuh: skipping agent with no id: name=" + str(agent.get('name', '')))
-            continue
-        agent_name = agent.get('name', "")
-        node_name = agent.get('node_name', '')
-       
-        # Get the primary IP from the main agent data
-        agent_ip = agent.get('ip', "")
-        agent_status = agent.get('status', "")
-       
-        # Parse OS information
-        os_data = agent.get('os', {})
-        os_name, os_version = parse_os_info(os_data)
-       
-        # Build network interface from the detailed network data
-        net_interfaces_data = agent_net_interfaces.get(agent_id, [])
-        net_addresses_data = agent_net_addresses.get(agent_id, [])
-        network_interfaces = build_network_interface(net_interfaces_data, net_addresses_data, agent_ip)
-       
-        # Parse timestamps
-        first_seen_ts = agent.get('dateAdd', '')
-        last_seen_ts = agent.get('lastKeepAlive', '')
-       
-        # Build hostnames list with length validation
-        hostnames = []
-        if agent_name and agent_name != 'unknown-agent':
-            hostname = agent_name
-            if hostname:
-                hostnames.append(hostname)
-       
-        # Prepare custom attributes with all available Wazuh data
-        custom_attrs = {
-            'wazuh_agent_id': str(agent_id),
-            'wazuh_agent_status': agent_status,
-            'wazuh_agent_version': agent.get('version', ''),
-            'wazuh_agent_manager': agent.get('manager', ''),
-            'wazuh_node_name': node_name,
-            'wazuh_date_add': agent.get('dateAdd', ''),
-            'wazuh_last_keep_alive': agent.get('lastKeepAlive', ''),
-            'wazuh_group_config_status': agent.get('group_config_status', ''),
-            'wazuh_groups': str(agent.get('group', [])),
-            'wazuh_merged_sum': agent.get('mergedSum', ''),
-            'wazuh_config_sum': agent.get('configSum', ''),
-        }
-       
-        if first_seen_ts:
-            custom_attrs['first_seen_timestamp'] = first_seen_ts
-        if last_seen_ts:
-            custom_attrs['last_seen_timestamp'] = last_seen_ts
-       
-        if os_data:
-            custom_attrs.update({
-                'os_arch': os_data.get('arch', ''),
-                'os_codename': os_data.get('codename', ''),
-                'os_major': os_data.get('major', ''),
-                'os_minor': os_data.get('minor', ''),
-                'os_platform': os_data.get('platform', ''),
-                'os_uname': os_data.get('uname', ''),
-            })
-       
-        date_add = agent.get('dateAdd', '')
+    agent_id = agent.get('id', "")
+    if not agent_id:
+        print("wazuh: skipping agent with no id: name=" + str(agent.get('name', '')))
+        return None
+    agent_name = agent.get('name', "")
+    node_name = agent.get('node_name', '')
 
-        asset_params = {
-            'id': build_asset_id(namespace, agent_id, date_add),
-            'networkInterfaces': network_interfaces,
-            'hostnames': hostnames,
-            'os': os_name,
-            'osVersion': os_version,
-            'customAttributes': custom_attrs,
-        }
+    # Get the primary IP from the main agent data
+    agent_ip = agent.get('ip', "")
+    agent_status = agent.get('status', "")
 
-        # Omitted rather than set to '' when the os block names no role: an
-        # empty deviceType is still a value and displaces the type runZero would
-        # otherwise derive for itself.
-        device_type = device_type_for_os(os_data)
-        if device_type:
-            asset_params['deviceType'] = device_type
+    # Parse OS information. The os block is documented as an object but is
+    # normalized here so a null or string value costs the fields, not the run.
+    os_data = agent.get('os', {})
+    if type(os_data) != 'dict':
+        os_data = {}
+    os_name, os_version = parse_os_info(os_data)
 
-        # The runtime condition selects the asset type, which is what selects
-        # the merge policy; CONFIG["assetTypeBehavior"] holds the reasoning for
-        # both grades.
-        if registration_key(date_add):
-            asset_params['assetType'] = 'agent'
-        else:
-            asset_params['assetType'] = 'agent-unpinned'
-            print("wazuh: agent {} reports no dateAdd; keeping default match behavior, since its ordinal could be reused".format(agent_id))
-       
-        asset = ImportAsset(**asset_params)
-        if agent_status == "active":
-            assets.append(asset)
-   
-    return assets
+    # Build network interface from the detailed network data
+    network_interfaces = build_network_interface(net_interfaces_data, net_addresses_data, agent_ip)
+
+    # Parse timestamps
+    first_seen_ts = agent.get('dateAdd', '')
+    last_seen_ts = agent.get('lastKeepAlive', '')
+
+    # Build hostnames list with length validation
+    hostnames = []
+    if agent_name and agent_name != 'unknown-agent':
+        hostname = agent_name
+        if hostname:
+            hostnames.append(hostname)
+
+    # Prepare custom attributes with all available Wazuh data
+    custom_attrs = {
+        'wazuh_agent_id': str(agent_id),
+        'wazuh_agent_status': agent_status,
+        'wazuh_agent_version': agent.get('version', ''),
+        'wazuh_agent_manager': agent.get('manager', ''),
+        'wazuh_node_name': node_name,
+        'wazuh_date_add': agent.get('dateAdd', ''),
+        'wazuh_last_keep_alive': agent.get('lastKeepAlive', ''),
+        'wazuh_group_config_status': agent.get('group_config_status', ''),
+        'wazuh_groups': str(agent.get('group', [])),
+        'wazuh_merged_sum': agent.get('mergedSum', ''),
+        'wazuh_config_sum': agent.get('configSum', ''),
+    }
+
+    if first_seen_ts:
+        custom_attrs['first_seen_timestamp'] = first_seen_ts
+    if last_seen_ts:
+        custom_attrs['last_seen_timestamp'] = last_seen_ts
+
+    if os_data:
+        custom_attrs.update({
+            'os_arch': os_data.get('arch', ''),
+            'os_codename': os_data.get('codename', ''),
+            'os_major': os_data.get('major', ''),
+            'os_minor': os_data.get('minor', ''),
+            'os_platform': os_data.get('platform', ''),
+            'os_uname': os_data.get('uname', ''),
+        })
+
+    date_add = agent.get('dateAdd', '')
+
+    asset_params = {
+        'id': build_asset_id(namespace, agent_id, date_add),
+        'networkInterfaces': network_interfaces,
+        'hostnames': hostnames,
+        'os': os_name,
+        'osVersion': os_version,
+        'customAttributes': custom_attrs,
+    }
+
+    # Omitted rather than set to '' when the os block names no role: an
+    # empty deviceType is still a value and displaces the type runZero would
+    # otherwise derive for itself.
+    device_type = device_type_for_os(os_data)
+    if device_type:
+        asset_params['deviceType'] = device_type
+
+    # The runtime condition selects the asset type, which is what selects
+    # the merge policy; CONFIG["assetTypeBehavior"] holds the reasoning for
+    # both grades.
+    if registration_key(date_add):
+        asset_params['assetType'] = 'agent'
+    else:
+        asset_params['assetType'] = 'agent-unpinned'
+        print("wazuh: agent {} reports no dateAdd; keeping default match behavior, since its ordinal could be reused".format(agent_id))
+
+    return ImportAsset(**asset_params)
 
 def main(**kwargs):
     """
-    Main function to retrieve and return Wazuh asset data.
+    Main function to retrieve and stream Wazuh asset data.
 
     Expected kwargs:
         hostname: Wazuh manager hostname or IP address (e.g., wazuh-manager or 10.1.2.3)
@@ -742,8 +771,8 @@ def main(**kwargs):
         username: Wazuh username
         password: Wazuh password
 
-    Returns:
-        List of ImportAsset objects
+    Agents are enriched and reported one page at a time; nothing is buffered
+    across pages and nothing is returned from main.
     """
     require(kwargs, "username", "password")
     wazuh_hostname = get_string(kwargs, "hostname", default="")
@@ -751,10 +780,16 @@ def main(**kwargs):
     username = get_string(kwargs, "username")
     password = get_string(kwargs, "password")
     # CONFIG defaults are applied by the Console, not by the plain script
-    # --kwargs path, so the default is repeated here.
+    # --kwargs path, so the defaults are repeated here.
     max_pages = get_int(kwargs, "max_pages", default=MAX_PAGES)
     if max_pages < 1:
         max_pages = MAX_PAGES
+    rpm = get_int(kwargs, "requests_per_minute", default=240)
+    # Milliseconds slept before each syscollector request. The Wazuh API
+    # enforces max_request_per_minute (default 300) and answers 429 above it;
+    # the raw http_get here does not retry, so without pacing every agent past
+    # the budget imports with no interface data.
+    throttle_ms = (60000 // rpm) if rpm > 0 else 0
 
     # The API base was compiled in as https://<hostname>:<port>, which cannot
     # reach a manager behind a reverse proxy, on a path prefix, or on plain
@@ -771,76 +806,74 @@ def main(**kwargs):
 
     namespace = manager_namespace(wazuh_host)
     print("Connecting to Wazuh at:", wazuh_host)
-   
+
     # Authenticate with Wazuh
     token = authenticate_wazuh(wazuh_host, username, password, kwargs)
     if not token:
         print("Authentication to Wazuh failed; no token returned")
         return []
 
-    # Retrieve agents
-    agents = get_wazuh_agents(wazuh_host, token, kwargs, max_pages)
-    if not agents:
+    # Shared run state. The page walk and the enrichment both read the token
+    # from here, so a mid-run re-authentication (Wazuh JWTs default to 900
+    # seconds) replaces it for both.
+    ctx = {
+        "token": token,
+        "config": kwargs,
+        "reported": 0,
+        "auth_ok": True,
+    }
+
+    def throttle():
+        if throttle_ms > 0:
+            sleep("{}ms".format(throttle_ms))
+
+    def reauth():
+        print("Token expired, re-authenticating...")
+        fresh = authenticate_wazuh(wazuh_host, username, password, kwargs)
+        if not fresh:
+            print("Re-authentication failed, stopping network data collection")
+            ctx["auth_ok"] = False
+            return False
+        ctx["token"] = fresh
+        return True
+
+    def handle_agents(agents_batch):
+        """Enrich and report one page of agents before the next page is
+        fetched, so the full agent list is never held in memory."""
+        for agent in agents_batch:
+            if type(agent) != 'dict':
+                print("wazuh: skipping agent record that is not an object")
+                continue
+            if agent.get('status') != "active":
+                continue
+
+            interfaces = []
+            addresses = []
+            agent_id = agent.get('id')
+            if agent_id and ctx["auth_ok"]:
+                # Get network interfaces
+                throttle()
+                interfaces, status_code = get_agent_network_interfaces(wazuh_host, ctx["token"], agent_id, kwargs)
+                # Check if token expired (401), re-authenticate and retry
+                if status_code == 401 and reauth():
+                    interfaces, status_code = get_agent_network_interfaces(wazuh_host, ctx["token"], agent_id, kwargs)
+
+            if agent_id and ctx["auth_ok"]:
+                # Get network addresses
+                throttle()
+                addresses, status_code = get_agent_network_addresses(wazuh_host, ctx["token"], agent_id, kwargs)
+                if status_code == 401 and reauth():
+                    addresses, status_code = get_agent_network_addresses(wazuh_host, ctx["token"], agent_id, kwargs)
+
+            # report_asset(None) is a no-op returning 0, so a declined record
+            # (no id) is counted correctly.
+            ctx["reported"] += report_asset(build_agent_asset(agent, interfaces, addresses, namespace))
+
+    print("Retrieving detailed network information for each agent...")
+    fetched = get_wazuh_agents(wazuh_host, ctx, max_pages, handle_agents)
+    if not fetched:
         print("No agents retrieved from Wazuh")
         return []
-   
-    agent_net_interfaces = {}
-    agent_net_addresses = {}
-    print("Retrieving detailed network information for each agent...")
 
-    # Enrich active agents with per-agent network data and stream them to
-    # runZero in batches via report_assets so the full asset set is never held
-    # in memory.
-    reported = 0
-    batch_size = 200
-    batch = []
-
-    for agent in agents:
-        if agent.get('status') != "active":
-            continue
-        agent_id = agent.get('id')
-        if agent_id:
-            # Get network interfaces
-            interfaces, status_code = get_agent_network_interfaces(wazuh_host, token, agent_id, kwargs)
-           
-            # Check if token expired (401), re-authenticate and retry
-            if status_code == 401:
-                print("Token expired, re-authenticating...")
-                token = authenticate_wazuh(wazuh_host, username, password, kwargs)
-                if not token:
-                    print("Re-authentication failed, stopping network data collection")
-                    break
-                # Retry with new token
-                interfaces, status_code = get_agent_network_interfaces(wazuh_host, token, agent_id, kwargs)
-           
-            if interfaces:
-                agent_net_interfaces[agent_id] = interfaces
-           
-            # Get network addresses
-            addresses, status_code = get_agent_network_addresses(wazuh_host, token, agent_id, kwargs)
-           
-            # Check if token expired (401), re-authenticate and retry
-            if status_code == 401:
-                print("Token expired, re-authenticating...")
-                token = authenticate_wazuh(wazuh_host, username, password, kwargs)
-                if not token:
-                    print("Re-authentication failed, stopping network data collection")
-                    break
-                # Retry with new token
-                addresses, status_code = get_agent_network_addresses(wazuh_host, token, agent_id, kwargs)
-           
-            if addresses:
-                agent_net_addresses[agent_id] = addresses
-
-        batch.append(agent)
-        if len(batch) >= batch_size:
-            reported += report_assets(build_assets(batch, agent_net_interfaces, agent_net_addresses, namespace))
-            batch = []
-            agent_net_interfaces = {}
-            agent_net_addresses = {}
-
-    if batch:
-        reported += report_assets(build_assets(batch, agent_net_interfaces, agent_net_addresses, namespace))
-
-    print("Successfully processed {} Wazuh agents into RunZero assets".format(reported))
+    print("Successfully processed {} Wazuh agents into RunZero assets".format(ctx["reported"]))
     return None

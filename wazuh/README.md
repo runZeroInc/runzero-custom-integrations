@@ -169,6 +169,7 @@ does not depend on which 4.x you run.
    - **Username** (`username`): required; your Wazuh API username.
    - **Password** (`password`): required; secret. That user's password.
    - **Maximum pages to retrieve** (`max_pages`): optional; defaults to `20000`. Safety ceiling on the `/agents` paging walk. The default is the repo-wide ten-million-record target divided by the 500-agent page Wazuh caps `limit` at, so it does not truncate any real deployment. Raise it only if a run logs `page limit of 20000 hit (integration safety limit, ...)`; that line is the only signal an import was cut short. Note that the 500-agent page size is the vendor's — a larger `limit` is refused with error 1405 — so only the page count is adjustable.
+   - **Syscollector requests per minute** (`requests_per_minute`): optional; defaults to `240`. Paces the two per-agent enrichment requests under Wazuh's `max_request_per_minute` budget (default 300), which otherwise answers 429 and silently costs those agents their interface data. Raise it only if the manager's budget was raised; `0` disables the pacing entirely.
    - **TLS options** (`tls_*`): set `tls_ca_cert` or `tls_disable_validation` for the self-signed certificate case.
 
    Note that `url` and `hostname` are both declared optional, so a credential that sets
@@ -230,11 +231,11 @@ role trap described above is invisible in the asset count — agents import fine
 and simply arrive with no network interfaces. The 403s on
 `/syscollector/{id}/netiface` in the verbose log are the only direct evidence.
 
-There are no cap or page-size parameters here, and the integration makes **two
-extra requests per agent** for interfaces and addresses. Against a manager with
-several thousand agents that is several thousand requests into a 300-per-minute
-rate limit, so expect a command-line run to take a while and do not run several
-at once.
+The integration makes **two extra requests per agent** for interfaces and
+addresses. Against a manager with several thousand agents that is several
+thousand requests into a 300-per-minute rate limit, which is why they are paced
+by the `requests_per_minute` parameter (default 240) — expect a command-line
+run against a large estate to take a while, and do not run several at once.
 
 `--kwargs` takes its value verbatim as long as the whole argument holds a single
 `=`, so a comma on its own is harmless — `--kwargs 'password=a,b'` arrives as
@@ -350,11 +351,13 @@ The earlier revision of this document argued for keeping `mac-break` and `ip-bre
 
 ### Notes
 
-- **Only active agents are imported.** `if agent_status == "active"` gates the append, so an agent that is disconnected at poll time vanishes from the import rather than being refreshed. On an estate with laptops that is most of the fleet at any given moment.
-- **Two extra requests per agent.** `GET /syscollector/{id}/netiface` and `GET /syscollector/{id}/netaddr` are issued for every active agent. Against a manager with several thousand agents that is several thousand requests into a documented 300-per-minute rate limit, which is why the command-line section warns not to run several at once.
-- **Token expiry is handled mid-run.** The JWT is valid for 900 seconds and a long run outlives it, so a `401` on a syscollector call triggers re-authentication and a retry rather than losing the rest of the agents.
+- **Only active agents are imported.** An agent that is disconnected at poll time vanishes from the import rather than being refreshed. On an estate with laptops that is most of the fleet at any given moment.
+- **Agents stream page by page.** Each 500-agent page is enriched and reported before the next page is fetched, so the full agent list is never buffered and a failure partway through a large estate keeps everything already reported.
+- **Two extra requests per agent, paced.** `GET /syscollector/{id}/netiface` and `GET /syscollector/{id}/netaddr` are issued for every active agent. Against a manager with several thousand agents that is several thousand requests into a documented 300-per-minute rate limit, so they are paced by `requests_per_minute` (default 240); above the manager's budget the API answers 429 and those agents silently import with no interface data.
+- **Token expiry is handled mid-run.** The JWT is valid for 900 seconds and a long run outlives it, so a `401` on a syscollector call triggers re-authentication and a retry rather than losing the rest of the agents. The `auth-refresh` scenario locks this path.
+- **Addresses are screened before they reach an interface.** syscollector reports link-local `fe80::/10` and Windows APIPA `169.254/16` per interface, and `agent.ip` can hold the registration literal `any` — none of which identifies a host. Only routable addresses survive, junk values cost the field rather than the run, and a `mac: null` interface contributes no NIC. The `malformed` scenario locks all of it.
 - **`agent.name` becomes the hostname**, except for the literal `unknown-agent`, which is filtered. The Wazuh agent name is set at enrollment and is usually the host's real name, so this is sound.
-- There are no fixtures for this integration; a command-line run against a real manager is the only test.
+- Fixture scenarios cover the happy path, paging truncation and stuck cursors, malformed records, an empty manager, identity stability, device typing, and mid-run re-authentication (`tests/fixtures/`); a command-line run against a real manager remains the only live test.
 
 ## Future
 

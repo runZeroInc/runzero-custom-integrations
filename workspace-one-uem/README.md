@@ -45,7 +45,9 @@ answer on its own: which devices on the network are *not* enrolled.
    - **API password** (`password`): that account's password, sent as HTTP Basic auth.
    - **API key (tenant code)** (`api_key`): the REST API key, sent as the `aw-tenant-code` header.
    - **Organization group ID** (`organization_group_id`): optional; numeric organization group ID to limit the
-     search to. Defaults to the API user's own organization group.
+     search to. Defaults to the API user's own organization group. It is sent as both `lgid` (the v1 search
+     spelling) and `organizationgroupid`, because whether the version-2 schema honors `lgid` is unconfirmed;
+     unknown query parameters are ignored, so whichever the server understands filters.
    - **Import pending OS updates** (`include_os_updates`): optional; default off. Adds one request per device.
    - **Import installed applications** (`include_software`): optional; default off. Adds at least one request per device.
    - **Per-device detail limit** (`detail_device_limit`): optional; default 250. Caps how many devices are queried

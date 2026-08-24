@@ -249,6 +249,13 @@ def preflight(ctx):
 
     One request gives reachability, credential validation, and the version
     gate. It is the same call Home Assistant uses to validate a Protect key.
+
+    Returns (version, proceed). Only the two DEFINITIVE failures stop the run:
+    a 404 means the Integration API does not exist on this console, and a
+    401/403 means the key is bad, so every collection request would fail the
+    same way. Anything else - a transient error, or a 200 whose body carries no
+    applicationVersion - costs the version string, not the run: the collection
+    endpoints may still answer, so they are attempted.
     """
     url = ctx["base_url"] + API_PATH + "/meta/info"
     data, err = get_json(url, **ctx["http_options"])
@@ -257,25 +264,26 @@ def preflight(ctx):
             print("unifi-protect: /meta/info returned 404. The official Protect Integration API " +
                   "was added in Protect 5.3; older consoles have no such path. It also 404s when " +
                   "Protect is not installed on this console.")
-        elif "401" in err or "403" in err:
+            return "", False
+        if "401" in err or "403" in err:
             print("unifi-protect: /meta/info was rejected: {}. The API key is wrong, revoked, or ".format(err) +
                   "was created on a different console.")
-        else:
-            print("unifi-protect: /meta/info failed:", err)
-        return ""
+            return "", False
+        print("unifi-protect: /meta/info failed: {}. Attempting collection anyway.".format(err))
+        return "", True
     if type(data) != "dict":
-        print("unifi-protect: /meta/info returned an unexpected body")
-        return ""
+        print("unifi-protect: /meta/info returned an unexpected body. Attempting collection anyway.")
+        return "", True
     version = as_text(data.get("applicationVersion"), join=",").strip()
     if not version:
-        print("unifi-protect: /meta/info returned no applicationVersion")
-        return ""
+        print("unifi-protect: /meta/info returned no applicationVersion. Attempting collection anyway.")
+        return "", True
     major = _to_int(version.split(".")[0])
     if major > 0 and major < 7:
         print(("unifi-protect: Protect {} predates 7.0. The Integration API is present but thinner " +
                "there: devices carry no `type` (model name) and no `guid`, and the NVR record has " +
                "no MAC before 7.1, so the NVR cannot be imported.").format(version))
-    return version
+    return version, True
 
 
 def build_asset(ctx, record, model_key, device_type):
@@ -446,11 +454,12 @@ def main(**kwargs):
         }),
     }
 
-    version = preflight(ctx)
-    if not version:
+    version, proceed = preflight(ctx)
+    if not proceed:
         return None
     ctx["version"] = version
-    print("unifi-protect: Protect {} on {}".format(version, scope))
+    if version:
+        print("unifi-protect: Protect {} on {}".format(version, scope))
 
     total = 0
 
