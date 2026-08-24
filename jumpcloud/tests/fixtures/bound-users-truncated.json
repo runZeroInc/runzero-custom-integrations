@@ -1,0 +1,671 @@
+{
+  "name": "bound-users-truncated",
+  "integration": "jumpcloud",
+  "description": "A host bound to a whole directory. The graph listing for the one system returns 51 bound users in a single page, one past the MAX_BOUND_USERS_LISTED cap of 50. The walk must stop at the cap AND mark the result as a floor: jumpcloud_bound_user_count reads 50+ and jumpcloud_bound_users_truncated is set, instead of the count silently reporting exactly 50 as if it were a total. The user directory is empty, so usernames fall back to the bound ObjectIDs.\n\nnamespaced_ids passes: ids are scoped by org.",
+  "kwargs": {
+    "url": "$BASE",
+    "org_id": "fixture-org",
+    "api_key": "fixture-api-key",
+    "include_bound_users": "true",
+    "include_software": "false",
+    "include_mac_addresses": "false",
+    "page_size": "100"
+  },
+  "routes": [
+    {
+      "name": "user-directory",
+      "match": {
+        "method": "GET",
+        "path": "/api/systemusers"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 0,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "systems",
+      "match": {
+        "method": "GET",
+        "path": "/api/systems"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 1,
+            "results": [
+              {
+                "_id": "6600000000000000000000c1",
+                "hostname": "shared-lab-01",
+                "displayName": "shared-lab-01",
+                "os": "Ubuntu",
+                "version": "22.04",
+                "active": true,
+                "created": "2026-01-10T08:00:00Z",
+                "lastContact": "2026-08-15T01:00:00Z",
+                "systemInsights": {
+                  "state": "deferred"
+                },
+                "networkInterfaces": [
+                  {
+                    "name": "eth0",
+                    "address": "10.60.0.50",
+                    "family": "ipv4",
+                    "internal": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "bound-users-51",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/systems/6600000000000000000000c1/users"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "770000000000000000000001",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000002",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000003",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000004",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000005",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000006",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000007",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000008",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000009",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000010",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000011",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000012",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000013",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000014",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000015",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000016",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000017",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000018",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000019",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000020",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000021",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000022",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000023",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000024",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000025",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000026",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000027",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000028",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000029",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000030",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000031",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000032",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000033",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000034",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000035",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000036",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000037",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000038",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000039",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000040",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000041",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000042",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000043",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000044",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000045",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000046",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000047",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000048",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000049",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000050",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            },
+            {
+              "id": "770000000000000000000051",
+              "paths": [
+                [
+                  {
+                    "type": "system",
+                    "id": "6600000000000000000000c1"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "jumpcloud:fixture-org:6600000000000000000000c1"
+    ],
+    "assets": [
+      {
+        "id": "jumpcloud:fixture-org:6600000000000000000000c1",
+        "fields": {
+          "jumpcloud_bound_user_count": "50+",
+          "jumpcloud_bound_users_truncated": "true"
+        }
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

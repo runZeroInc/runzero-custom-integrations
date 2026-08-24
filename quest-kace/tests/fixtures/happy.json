@@ -1,0 +1,137 @@
+{
+  "name": "happy",
+  "integration": "quest-kace",
+  "description": "Login, CMDB index, and one page of machines. Proves the namespace is derived from the KACE_LAST_ORG_SECURE session cookie the appliance sets at login (FixtureOrg, folded to lower case) rather than from the configured organization name, and that every cookie in the login response is replayed on later requests. Proves 'shaping=machine all,software all' is requested explicitly, since the appliance's default STANDARD shaping omits the MAC address and the BIOS serial. Proves the appliance's inconsistent key casing (Id, Os_name, Bios_Serial_Number, Machines) is folded before mapping, that a CMDB record is only attached when it is a Device with a mapped_id, that a machine whose only address is 127.0.0.1 yields an asset with no interface, and that a future software install date is clamped instead of failing the asset that carries it.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "organization": "ConfiguredOrgThatMustLose",
+    "import_software": "true",
+    "import_assets": "true"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ams/shared/api/security/login"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Set-Cookie": "KACE_LAST_ORG_SECURE=FixtureOrg; Path=/; Secure",
+            "set-cookie": "kboxid=fixture-session-1; Path=/; HttpOnly",
+            "SET-COOKIE": "KACE_CSRF_TOKEN=csrf-from-cookie; Path=/",
+            "X-Dell-Csrf-Token": "csrf-from-header"
+          },
+          "json": {"Result": "Success"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cmdb-assets",
+      "match": {"method": "GET", "path": "/api/asset/assets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Assets": [
+              {"Id": "9001", "Name": "HQ-LAP-1001", "mapped_id": 1001, "asset_type_name": "Device", "asset_status_name": "In Use", "owner_name": "Jane Doe", "location_name": "HQ Floor 3", "asset_type_id": 5, "archive": "0"},
+              {"Id": "9002", "Name": "Office Suite Licence", "mapped_id": 1002, "asset_type_name": "License", "asset_status_name": "Active"},
+              {"Id": "9003", "Name": "Unmapped record", "asset_type_name": "Device"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "machines",
+      "match": {"method": "GET", "path": "/api/inventory/machines"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Machines": [
+              {
+                "Id": "1001",
+                "Name": "hq-lap-1001",
+                "Ip": "10.200.1.11",
+                "Ipv6": "2001:db8:200::11",
+                "Mac": "AA:BB:CC:11:22:33",
+                "Bios_Serial_Number": "KACE-SN-1001",
+                "Cs_Manufacturer": "Lenovo",
+                "Cs_Model": "ThinkPad T14",
+                "Cs_Domain": "corp.example.net",
+                "Chassis_Type": "Notebook",
+                "Os_name": "Microsoft Windows 11 Pro",
+                "Os_number": "10.0.22631",
+                "Os_family": "Windows",
+                "Virtual": "0",
+                "User_name": "jdoe",
+                "Created": "2025-03-01 09:00:00",
+                "Last_sync": "2026-08-14 07:15:00",
+                "Last_inventory": "2026-08-13 03:00:00",
+                "Software": [
+                  {"Id": "501", "Display_Name": "Google Chrome", "Display_Version": "127.0.6533.99", "Publisher": "Google LLC", "Install_Date": "2026-01-15 10:00:00", "Is_Patch": "0"},
+                  {"Id": "502", "Display_Name": "7-Zip", "Display_Version": "23.01", "Publisher": "Igor Pavlov", "Install_Date": "2099-01-01 00:00:00"},
+                  {"Id": "503", "Display_Name": "", "Display_Version": "1.0"},
+                  {"Id": "501", "Display_Name": "Google Chrome", "Display_Version": "127.0.6533.99", "Publisher": "Google LLC"}
+                ]
+              },
+              {
+                "Id": "1002",
+                "Name": "hq-srv-1002",
+                "Ip": "127.0.0.1",
+                "Mac": "",
+                "Bios_Serial_Number": "KACE-SN-1002",
+                "Cs_Manufacturer": "Dell Inc.",
+                "Cs_Model": "PowerEdge R750",
+                "Chassis_Type": "Rack Mount Chassis",
+                "Os_name": "Microsoft Windows Server 2022 Standard",
+                "Virtual": "0",
+                "Created": "2025-04-01 09:00:00",
+                "Last_sync": "2026-08-14 06:00:00",
+                "Software": []
+              },
+              {
+                "Id": "",
+                "Name": "never-inventoried",
+                "Ip": "10.200.1.99"
+              },
+              "a bare string where a machine object is documented"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "quest-kace:127.0.0.1:fixtureorg:1001",
+      "quest-kace:127.0.0.1:fixtureorg:1002"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/ams/shared/api/security/login", "body_contains": "\"organizationName\":\"ConfiguredOrgThatMustLose\""},
+      {"method": "GET", "path": "/api/asset/assets", "query_contains": "shaping=asset%20all"},
+      {"method": "GET", "path": "/api/inventory/machines", "query_contains": "shaping=machine%20all"},
+      {"method": "GET", "path": "/api/inventory/machines", "query_contains": "paging=offset%200%20limit%20100"},
+      {"method": "GET", "query_contains": "use_count=false"},
+      {"header_contains": "KACE_LAST_ORG_SECURE=FixtureOrg"},
+      {"header_contains": "kboxid=fixture-session-1"}
+    ],
+    "min_software_total": 2,
+    "log_contains": [
+      "quest-kace: indexed 1 CMDB assets mapped to inventory machines",
+      "quest-kace: skipping machine with no id: name=never-inventoried",
+      "quest-kace: skipping non-object machine record",
+      "quest-kace: reported 2 assets from organization fixtureorg"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

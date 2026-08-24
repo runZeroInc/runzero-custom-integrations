@@ -1,0 +1,89 @@
+{
+  "name": "happy",
+  "integration": "cortex-xdr",
+  "description": "One page of endpoints/get_endpoint in the documented reply.endpoints shape. Covers the agent_id/endpoint_id fallback, the id-less record that must be skipped, and the epoch normalization: last_seen arrives in milliseconds and first_seen in seconds, and both must end up as seconds.\n\nnamespaced_ids is skipped because this integration uses the bare Cortex agent_id as the foreign id with no tenant scope at all. That is reported as a defect rather than accepted - see the report.\n\nIt also pins endpoint_type through to deviceType: AGENT_TYPE_WORKSTATION becomes Desktop and AGENT_TYPE_SERVER becomes Server. Both are values runZero accepts, so the console keeps them rather than dropping a near-miss spelling, and both are asserted on the emitted asset rather than on what the script passed.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key_id": "42",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "get-endpoint",
+      "match": {"method": "POST", "path": "/public_api/v1/endpoints/get_endpoint"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "reply": {
+              "total_count": 3,
+              "result_count": 3,
+              "endpoints": [
+                {
+                  "agent_id": "cx-agent-0001",
+                  "endpoint_id": "cx-agent-0001",
+                  "endpoint_name": "cx-host-01",
+                  "host_name": "cx-host-01.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "operational_status": "PROTECTED",
+                  "ip": ["10.100.0.1"],
+                  "ipv6": ["2001:db8:100::1"],
+                  "mac_address": ["00:11:22:aa:00:01"],
+                  "operating_system": "Windows 10 Pro",
+                  "os_version": "10.0.19045",
+                  "users": ["CORP\\jdoe"],
+                  "group_name": ["Workstations", "PCI"],
+                  "assigned_prevention_policy": "Standard Workstation",
+                  "assigned_extensions_policy": "Standard Extensions",
+                  "endpoint_version": "8.4.0.123456",
+                  "last_seen": 1786000000000,
+                  "first_seen": 1750000000
+                },
+                {
+                  "endpoint_id": "cx-endpoint-0002",
+                  "endpoint_name": "cx-server-02.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_SERVER",
+                  "endpoint_status": "DISCONNECTED",
+                  "operational_status": "PARTIALLY_PROTECTED",
+                  "ip": ["10.100.0.2"],
+                  "mac_address": ["00:11:22:aa:00:02"],
+                  "operating_system": "Windows Server 2022",
+                  "os_version": "10.0.20348",
+                  "tags": {"endpoint_tags": ["datacenter"], "server_tags": ["sql"]},
+                  "last_seen": 1785900000000,
+                  "first_seen": 1750000000000
+                },
+                {
+                  "endpoint_name": "noid-host",
+                  "ip": ["10.100.0.3"],
+                  "mac_address": ["00:11:22:aa:00:03"]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["cx-agent-0001", "cx-endpoint-0002"],
+    "ids_absent": ["noid-host"],
+    "assets": [
+      {"id": "cx-agent-0001", "fields": {"deviceType": "Desktop"}},
+      {"id": "cx-endpoint-0002", "fields": {"deviceType": "Server"}}
+    ],
+    "request_count": 1,
+    "requests_include": [
+      {"method": "POST", "path": "/public_api/v1/endpoints/get_endpoint", "body_contains": "\"search_from\":0"},
+      {"header_contains": "fixture-api-key"}
+    ],
+    "log_contains": [
+      "cortex-xdr: skipping endpoint with no agent_id/endpoint_id: name=noid-host",
+      "Loaded 2 endpoints"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

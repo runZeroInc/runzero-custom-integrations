@@ -1,0 +1,202 @@
+{
+  "name": "happy",
+  "integration": "exe-dev",
+  "description": "A full run over the four commands the integration issues against the single exec endpoint: 'ls -l' for the VM inventory, then 'domain ls -a', 'share show <vm>' per VM, and 'integrations list' for enrichment. Proves each command is dispatched, that a custom domain becomes an extra hostname, that a share and an attached integration reach the asset as attributes and tags, and that a VM with no vm_name is skipped rather than emitted with an empty id.\n\nIt also pins deviceType. Every record this integration imports is an exe.dev virtual machine -- there is no other kind of record in the collection -- so the role is carried by the resource itself rather than guessed from a name or a tag, and both assets must carry Server. That is one of the values runZero accepts, so the console keeps it rather than discarding a near-miss spelling.\n\nnamespaced_ids is skipped because the id is 'exedev-<vm_name>', scoped to nothing but the VM name. Two exe.dev accounts imported into one runZero account collide on any shared VM name. Reported here rather than fixed, because changing it would move every existing asset's identity. The vm_name-less record is dropped, and the drop is now LOGGED: vm_name is the whole identity here -- the id is built from it and every enrichment map is keyed on it -- so there is no fallback field, which is exactly why the skip has to be visible.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "exe1.fixture-token"
+  },
+  "routes": [
+    {
+      "name": "ls-l",
+      "match": {
+        "method": "POST",
+        "body_contains": "ls -l"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "vms": [
+              {
+                "vm_name": "syn-build-01",
+                "status": "running",
+                "region": "us-east",
+                "region_display": "US East",
+                "https_url": "https://syn-build-01.exe.dev/",
+                "ssh_dest": "syn-build-01.ssh.exe.dev",
+                "comment": "nightly build runner",
+                "tags": [
+                  "ci",
+                  "prod"
+                ]
+              },
+              {
+                "vm_name": "syn-scratch-02",
+                "status": "stopped",
+                "region": "eu-west",
+                "region_display": "EU West",
+                "https_url": "https://syn-scratch-02.exe.dev/",
+                "ssh_dest": "syn-scratch-02.ssh.exe.dev",
+                "tags": []
+              },
+              {
+                "status": "running",
+                "comment": "a record with no vm_name is not an asset"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "domain-ls",
+      "match": {
+        "method": "POST",
+        "body_contains": "domain ls"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "domains": [
+              {
+                "vm_name": "syn-build-01",
+                "domain": "https://builds.example.com/artifacts"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "share-show-build",
+      "match": {
+        "method": "POST",
+        "body_contains": "share show syn-build-01"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "public": true,
+            "email_enabled": false,
+            "port": 8080
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "share-show-scratch",
+      "match": {
+        "method": "POST",
+        "body_contains": "share show syn-scratch-02"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "public": false,
+            "email_enabled": false,
+            "port": 0
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "integrations-list",
+      "match": {
+        "method": "POST",
+        "body_contains": "integrations list"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "integrations": [
+              {
+                "name": "syn-repo-sync",
+                "type": "github",
+                "repository": "example/syn-service",
+                "attached": [
+                  "vm:syn-build-01"
+                ]
+              },
+              {
+                "name": "syn-shelley",
+                "type": "shelley",
+                "attached": [
+                  "auto:all"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "exedev-syn-build-01",
+      "exedev-syn-scratch-02"
+    ],
+    "assets": [
+      {
+        "id": "exedev-syn-build-01",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Linux",
+          "exe_dev_region": "us-east",
+          "exe_dev_status": "running",
+          "exe_dev_proxy_public": "True"
+        }
+      },
+      {
+        "id": "exedev-syn-scratch-02",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Linux",
+          "exe_dev_status": "stopped"
+        }
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "body_contains": "ls -l",
+        "header_contains": "exe1.fixture-token"
+      },
+      {
+        "method": "POST",
+        "body_contains": "domain ls -a"
+      },
+      {
+        "method": "POST",
+        "body_contains": "share show syn-scratch-02"
+      },
+      {
+        "method": "POST",
+        "body_contains": "integrations list"
+      }
+    ],
+    "log_contains": [
+      "exe-dev: skipped 1 VMs with no vm_name (first status: running)",
+      "exe-dev: reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

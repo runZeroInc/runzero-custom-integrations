@@ -1,0 +1,65 @@
+{
+  "name": "nothing-to-scan",
+  "integration": "runzero-scan-passive-assets",
+  "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
+  "description": "Four export rows that all look scannable and none of which are, each covering a shape the runZero export really produces. Row 1 has an in-policy 10/8 address but last_agent_id null -- nulls.UUID marshals to JSON null, not to an empty string, so the guard has to treat None as missing; there is no Explorer to run the scan on. Row 2 is 100.64/10 CGNAT: the near-miss that matters now that ALLOW_LIST names all three RFC1918 ranges (10/8, 172.16/12, 192.168/16), because anything that widened the check to 'anything private-looking' would start scanning it. Row 3 is a routable public address, the case where a wrong answer means scanning someone else's network from a customer Explorer. Row 4 is IPv6-only, which reaches ip_address() and must be rejected on version rather than fed to the IPv4-only ip_to_int() -- that path splits on dots and would abort the whole run on a colon-separated address, taking the other Explorers' scans down with it. The run must therefore make exactly ONE request and then stop: no scan, and no bulk delete, because deleting assets that were never scanned destroys the only record that they exist.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "site_id": "77777777-6666-5555-4444-333333333333",
+    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+  },
+
+  "routes": [
+    {
+      "name": "passive asset export, nothing in policy",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "22222222-aaaa-4bbb-8ccc-000000000001",
+              "addresses": ["10.42.0.99"],
+              "last_agent_id": null
+            },
+            {
+              "id": "22222222-aaaa-4bbb-8ccc-000000000002",
+              "addresses": ["100.64.4.20"],
+              "last_agent_id": "a0a0a0a0-1111-4222-8333-444444444444"
+            },
+            {
+              "id": "22222222-aaaa-4bbb-8ccc-000000000003",
+              "addresses": ["198.51.100.7"],
+              "last_agent_id": "a0a0a0a0-1111-4222-8333-444444444444"
+            },
+            {
+              "id": "22222222-aaaa-4bbb-8ccc-000000000004",
+              "addresses": ["2001:db8::c0ff:ee01"],
+              "last_agent_id": "b1b1b1b1-5555-4666-8777-888888888888"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/export/org/assets.json"}
+    ],
+    "requests_absent": [
+      {"method": "PUT"},
+      {"method": "POST"}
+    ],
+    "log_contains": [
+      "Evaluating IP: 100.64.4.20",
+      "Evaluating IP: 198.51.100.7",
+      "Evaluating IP: 2001:db8::c0ff:ee01"
+    ]
+  }
+}

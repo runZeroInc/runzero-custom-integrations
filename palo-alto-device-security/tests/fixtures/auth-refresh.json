@@ -1,0 +1,82 @@
+{
+  "name": "auth-refresh",
+  "integration": "palo-alto-device-security",
+  "description": "A 401 mid-run. Strata Cloud Manager access tokens expire after roughly 15 minutes and both endpoints are capped at 60 requests per minute, so a large tenant's walk outlives its first token. Here the token service issues token-one, the vulnerability pass succeeds under it, and the first device-list call answers 401 - the fixture's stand-in for the token aging out. Proves the integration re-mints the token (the second token-service response issues token-two), retries the failed request exactly once under the new token, and the run completes with the full inventory instead of returning a silently partial import. no_mac_in_id is skipped because IoT Security documents deviceid AS the device MAC, and the id is paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "tsg_id": "tsg-refresh",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "lookback_days": "30"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/oauth2/access_token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "token-one", "token_type": "Bearer", "expires_in": 899}},
+        {"status": 200, "json": {"access_token": "token-two", "token_type": "Bearer", "expires_in": 899}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/iot/pub/v1/vulnerability/list"},
+      "responses": [
+        {"status": 200, "json": {"ver": "v4.0", "api": "/pub/v4.0/vulnerability/list", "items": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/iot/pub/v2/device/list"},
+      "responses": [
+        {"status": 401, "json": {"code": 401, "msg": "Invalid or expired token"}},
+        {"status": 200, "json": {
+          "ver": "v4.0",
+          "api": "/pub/v4.0/device/list",
+          "total": 1,
+          "devices": [
+            {
+              "deviceid": "00:50:56:aa:bb:01",
+              "hostname": "refresh-camera-01",
+              "mac_address": "00:50:56:aa:bb:01",
+              "ip_address": "10.60.4.21",
+              "profile": "Axis Camera",
+              "category": "Camera",
+              "vendor": "Axis Communications",
+              "model": "P3245",
+              "risk_level": "Low",
+              "risk_score": 10,
+              "last_activity": "2026-08-20T11:04:05Z"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "palo-alto-device-security:tsg-refresh:00:50:56:aa:bb:01"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/oauth2/access_token", "body_contains": "tsg-refresh"},
+      {"method": "GET", "path": "/iot/pub/v1/vulnerability/list", "header_contains": "token-one"},
+      {"method": "GET", "path": "/iot/pub/v2/device/list", "header_contains": "token-one"},
+      {"method": "GET", "path": "/iot/pub/v2/device/list", "header_contains": "token-two"}
+    ],
+    "log_contains": [
+      "access token rejected mid-run, requesting a new one"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  },
+  "check_determinism": true
+}

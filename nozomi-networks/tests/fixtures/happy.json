@@ -1,0 +1,273 @@
+{
+  "name": "happy",
+  "integration": "nozomi-networks",
+  "description": "Full Open API walk: sign_in returns the bearer token in the Authorization response header, the asset_cves table is probed and then indexed, and the assets query is parsed into assets with firmware software and CVE findings. Covers the scalar-instead-of-array collapse a projected query produces, the '-' not-determined placeholder, an assets row whose name is an address (which must not become a hostname), a resolved CVE (which must not be imported), and a row with no id. Asset 0002 proves two mappings at once: its name is an address so it must carry no hostname, and its vendor and product are the '-' placeholder so no manufacturer or model may be asserted. The a8:bb: MACs are the aa:bb: values with the locally administered bit cleared, which normalize_mac does deliberately.",
+  "kwargs": {
+    "url": "$BASE",
+    "key_name": "fixture-key-name",
+    "key_token": "fixture-key-token",
+    "include_cves": "true"
+  },
+  "routes": [
+    {
+      "name": "sign-in",
+      "match": {
+        "method": "POST",
+        "path": "/api/open/sign_in"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "authenticated": true
+          },
+          "headers": {
+            "Authorization": "Bearer nozomi-fixture-token"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cve-probe",
+      "match": {
+        "method": "GET",
+        "path": "/api/open/query/do",
+        "query_contains": "count=1&"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "cve-row-1"
+              }
+            ],
+            "total": 4,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "asset-cves",
+      "match": {
+        "method": "GET",
+        "path": "/api/open/query/do",
+        "query_contains": "query=asset_cves"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "cve-row-1",
+                "asset_id": "fixture-asset-0001",
+                "cve": "CVE-2024-30001",
+                "name": "Fixture stack overflow",
+                "summary": "A synthetic overflow in fixture firmware.",
+                "score": 9.8,
+                "resolved": false,
+                "is_kev": true,
+                "latest_hotfix": "4.2.9",
+                "minimum_hotfix": "4.2.7",
+                "matching_cpes": [
+                  "cpe:2.3:o:fixture:controller_firmware:4.2.1:*:*:*:*:*:*:*"
+                ],
+                "creation_time": 1710000000000,
+                "time": 1750000000000,
+                "update_time": 1755000000000,
+                "epss_score": 0.42,
+                "cwe_id": "CWE-121"
+              },
+              {
+                "id": "cve-row-2",
+                "asset_id": "fixture-asset-0002",
+                "cve": "CVE-2023-30002",
+                "score": "5.4",
+                "resolved": "false",
+                "is_kev": false
+              },
+              {
+                "id": "cve-row-3",
+                "asset_id": "fixture-asset-0001",
+                "cve": "CVE-2022-30003",
+                "score": 7.1,
+                "resolved": true
+              },
+              {
+                "id": "cve-row-4",
+                "cve": "CVE-2021-30004",
+                "score": 2.0,
+                "resolved": false
+              }
+            ],
+            "total": 4,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/api/open/query/do",
+        "query_contains": "query=assets%20"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "fixture-asset-0001",
+                "name": "plc-line-3",
+                "ip": [
+                  "10.100.0.10",
+                  "10.100.0.11"
+                ],
+                "mac_address": [
+                  "aa:bb:cc:00:00:01",
+                  "aa:bb:cc:00:00:02"
+                ],
+                "type": "PLC",
+                "os": "Fixture RTOS 4.2",
+                "os_or_firmware": "4.2.1",
+                "vendor": "Fixture Automation",
+                "product_name": "FX-9000",
+                "firmware_version": "4.2.1",
+                "serial_number": "FIXTURE-SN-0001",
+                "level": "1",
+                "zones": [
+                  "cell-3"
+                ],
+                "roles": [
+                  "controller"
+                ],
+                "protocols": [
+                  "modbus",
+                  "s7comm"
+                ],
+                "vlan_id": 30,
+                "mac_vendor": "Fixture Automation",
+                "vendor:info": {
+                  "source": "passive"
+                },
+                "firmware_version:info": {
+                  "source": "active"
+                }
+              },
+              {
+                "id": "fixture-asset-0002",
+                "name": "10.100.0.20",
+                "ip": "10.100.0.20",
+                "mac_address": "aa:bb:cc:00:00:20",
+                "type": "HMI",
+                "vendor": "-",
+                "product_name": "-",
+                "firmware_version": "-",
+                "level": "2",
+                "zones": "cell-4",
+                "protocols": [
+                  "ethernetip"
+                ]
+              },
+              {
+                "id": "fixture-asset-0003",
+                "name": "engineering-ws",
+                "ip": [
+                  "10.100.0.30"
+                ],
+                "mac_address": [],
+                "type": "Computer",
+                "os": "Fixture Workstation OS"
+              },
+              {
+                "name": "a row the appliance never assigned an id",
+                "ip": [
+                  "10.100.0.99"
+                ]
+              },
+              "a bare string where an object is documented"
+            ],
+            "total": 5,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "nozomi-networks:$HOST:fixture-asset-0001",
+      "nozomi-networks:$HOST:fixture-asset-0002",
+      "nozomi-networks:$HOST:fixture-asset-0003"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/open/sign_in",
+        "body_contains": "fixture-key-token"
+      },
+      {
+        "method": "GET",
+        "path": "/api/open/query/do",
+        "query_contains": "count=1&page=1&query=asset_cves"
+      },
+      {
+        "method": "GET",
+        "path": "/api/open/query/do",
+        "query_contains": "count=500&page=1&query=assets%20%7C%20sort%20id"
+      },
+      {
+        "header_contains": "Bearer nozomi-fixture-token"
+      }
+    ],
+    "log_contains": [
+      "nozomi-networks: indexed 2 unresolved CVE findings across 2 assets",
+      "nozomi-networks: skipping asset with no id: name=a row the appliance never assigned an id",
+      "nozomi-networks: reported 3 assets"
+    ],
+    "min_software_total": 1,
+    "assets": [
+      {
+        "id": "nozomi-networks:$HOST:fixture-asset-0001",
+        "fields": {
+          "hostnames": "plc-line-3",
+          "ipAddresses": "10.100.0.10\t10.100.0.11",
+          "macAddresses": "a8:bb:cc:00:00:01\ta8:bb:cc:00:00:02",
+          "deviceType": "PLC",
+          "manufacturer": "Fixture Automation",
+          "model": "FX-9000",
+          "nozomi_vendor_source": "passive",
+          "nozomi_firmware_version_source": "active"
+        }
+      },
+      {
+        "id": "nozomi-networks:$HOST:fixture-asset-0002",
+        "fields": {
+          "deviceType": "HMI",
+          "ipAddresses": "10.100.0.20",
+          "macAddresses": "a8:bb:cc:00:00:20"
+        },
+        "fields_absent": [
+          "hostnames",
+          "manufacturer",
+          "model"
+        ]
+      }
+    ],
+    "min_vulnerabilities_total": 2
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "name": "mac-recovery",
+  "integration": "cybereason",
+  "description": "Six pylumId layouts against the MAC recovered from the trailing token. Cybereason publishes no MAC field, so the address is read out of PYLUMCLIENT_<realm>_<machine name>_<12 hex digits> only after the field before the last one is re-confirmed to be this record's own name. Verified by dumping the emitted assets: 'matching' yields 08:00:27:3a:dc:2f; 'ec2-laa' yields 10:3c:c9:9c:a7:e5, because network_interface clears the locally administered bit that AWS sets on 12:3c:c9:9c:a7:e5 -- the verbatim value survives as the cybereason_pylum_mac attribute; 'fqdn-match' matches on the qualified name and yields 08:00:27:11:22:aa; and 'mismatched', 'multicast' and 'all-zero' yield NO MAC at all. All six are still imported, because a MAC that cannot be recovered is not a reason to drop an endpoint.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/login.html"},
+      "responses": [{
+        "status": 200,
+        "headers": {"Set-Cookie": "JSESSIONID=FIXTURESESSION02; Path=/", "Content-Type": "text/html"},
+        "text": "<html>ok</html>"
+      }],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "POST", "path": "/rest/sensors/query"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {
+              "sensorId": "mac-01-matching",
+              "pylumId": "PYLUMCLIENT_FIXTURE_DESKTOP-VG9KE2U_0800273ADC2F",
+              "machineName": "DESKTOP-VG9KE2U",
+              "fqdn": "DESKTOP-VG9KE2U",
+              "internalIpAddress": "10.60.1.10",
+              "osType": "WINDOWS",
+              "osVersionType": "Windows_11",
+              "status": "ONLINE"
+            },
+            {
+              "sensorId": "mac-02-ec2-laa",
+              "pylumId": "PYLUMCLIENT_FIXTURE_EC2AMAZ-4CTUN1V_123CC99CA7E5",
+              "machineName": "EC2AMAZ-4CTUN1V",
+              "fqdn": "EC2AMAZ-4CTUN1V",
+              "internalIpAddress": "10.60.1.11",
+              "osType": "WINDOWS",
+              "osVersionType": "Windows_Server_2019",
+              "status": "ONLINE"
+            },
+            {
+              "sensorId": "mac-03-fqdn-match",
+              "pylumId": "PYLUMCLIENT_FIXTURE_app-node_0800271122AA",
+              "machineName": "app-node",
+              "fqdn": "app-node.corp.example.com",
+              "internalIpAddress": "10.60.1.12",
+              "osType": "LINUX",
+              "status": "ONLINE"
+            },
+            {
+              "sensorId": "mac-04-mismatched",
+              "pylumId": "PYLUMCLIENT_FIXTURE_SOMEOTHERHOST_00155D1A2B3C",
+              "machineName": "FINANCE-LT-08",
+              "fqdn": "finance-lt-08.corp.example.com",
+              "internalIpAddress": "10.60.1.13",
+              "osType": "WINDOWS",
+              "osVersionType": "Windows_10",
+              "status": "ONLINE"
+            },
+            {
+              "sensorId": "mac-05-multicast",
+              "pylumId": "PYLUMCLIENT_FIXTURE_LAB-PRINTER-01_01005E001234",
+              "machineName": "LAB-PRINTER-01",
+              "fqdn": "LAB-PRINTER-01",
+              "internalIpAddress": "10.60.1.14",
+              "osType": "LINUX",
+              "status": "OFFLINE"
+            },
+            {
+              "sensorId": "mac-06-all-zero",
+              "pylumId": "PYLUMCLIENT_FIXTURE_SPARE-VM-02_000000000000",
+              "machineName": "SPARE-VM-02",
+              "fqdn": "SPARE-VM-02",
+              "internalIpAddress": "10.60.1.15",
+              "osType": "LINUX",
+              "status": "OFFLINE"
+            }
+          ],
+          "totalResults": 6,
+          "hasMoreResults": false
+        }
+      }],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "assets": [
+      {"id": "cybereason:$HOST:mac-01-matching",
+       "fields": {"macAddresses": "08:00:27:3a:dc:2f", "cybereason_pylum_mac": "08:00:27:3a:dc:2f"}},
+      {"id": "cybereason:$HOST:mac-02-ec2-laa",
+       "fields": {"macAddresses": "10:3c:c9:9c:a7:e5", "cybereason_pylum_mac": "12:3c:c9:9c:a7:e5"}},
+      {"id": "cybereason:$HOST:mac-03-fqdn-match",
+       "fields": {"macAddresses": "08:00:27:11:22:aa"}},
+      {"id": "cybereason:$HOST:mac-04-mismatched",
+       "fields": {"ipAddresses": "10.60.1.13"},
+       "fields_absent": ["macAddresses", "cybereason_pylum_mac"]},
+      {"id": "cybereason:$HOST:mac-05-multicast",
+       "fields": {"ipAddresses": "10.60.1.14"},
+       "fields_absent": ["macAddresses", "cybereason_pylum_mac"]},
+      {"id": "cybereason:$HOST:mac-06-all-zero",
+       "fields": {"ipAddresses": "10.60.1.15"},
+       "fields_absent": ["macAddresses", "cybereason_pylum_mac"]}
+    ],
+    "asset_count": 6,
+    "ids": [
+      "cybereason:127.0.0.1:mac-01-matching",
+      "cybereason:127.0.0.1:mac-02-ec2-laa",
+      "cybereason:127.0.0.1:mac-03-fqdn-match",
+      "cybereason:127.0.0.1:mac-04-mismatched",
+      "cybereason:127.0.0.1:mac-05-multicast",
+      "cybereason:127.0.0.1:mac-06-all-zero"
+    ],
+    "request_count": 2
+  },
+  "invariants": {
+    "skip": []
+  }
+}

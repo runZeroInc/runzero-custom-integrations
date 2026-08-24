@@ -1,0 +1,165 @@
+{
+  "name": "orphan-host",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "Two consoles the device list does not cover: an offline UniFi OS console, and a self-hosted Network server whose reportedState uses the entirely different snake_case shape. Proves neither is lost, and -- the point of the scenario -- that the offline console is given the identifier the device list WOULD give it, its hardware MAC in the vendor's uppercase colonless form, so the same appliance keeps one identity whichever collection reports it next run. A network-server has no hardware MAC and cannot appear in the device list, so it keeps its host id. The identity-stability half is proved by the third console, which appears in both collections and must be emitted once, from the device list.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key",
+    "extract_sites": "false"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "OFFLINECONSOLE:333333333",
+                "hardwareId": "c1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "203.0.113.30",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "",
+                "latestBackupTime": "",
+                "lastConnectionStateChange": "2026-02-11T08:00:00Z",
+                "reportedState": {
+                  "hardware": {"mac": "AABBCC000003", "name": "UniFi Cloud Key Gen2 Plus", "serialno": "aabbcc000003", "shortname": "UCKP", "firmwareVersion": "3.1.15"},
+                  "hostname": "shed.example.com",
+                  "ip": "192.0.2.90",
+                  "ipAddrs": ["192.0.2.90", "fe80::abcd"],
+                  "state": "disconnected",
+                  "timezone": "Europe/Riga",
+                  "version": "3.1.15"
+                }
+              },
+              {
+                "id": "1d9cf3ee-0c0f-466e-933c-9af829f09b50",
+                "hardwareId": "b000b21e-0000-1111-add9-c1eed3897602",
+                "type": "network-server",
+                "ipAddress": "192.0.2.124",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "2026-02-07T10:25:21.981Z",
+                "lastConnectionStateChange": "2026-06-10T07:52:23.382Z",
+                "latestBackupTime": "",
+                "userData": null,
+                "reportedState": {
+                  "controller_uuid": "b000b21e-0000-1111-add9-c1eed3897602",
+                  "deviceId": "1d9cf3ee-0c0f-466e-933c-9af829f09b50",
+                  "firmware_version": null,
+                  "hardware_id": "b000b21e-0000-1111-add9-c1eed3897602",
+                  "host_type": 0,
+                  "hostname": "unifi-server.example.com",
+                  "inform_port": 8080,
+                  "ipAddrs": ["192.0.2.124"],
+                  "mgmt_port": 8443,
+                  "name": "Self-Hosted Site",
+                  "override_inform_host": false,
+                  "release_channel": "release",
+                  "state": "connected",
+                  "version": "8.3.11"
+                }
+              },
+              {
+                "id": "COVEREDCONSOLE:444444444",
+                "hardwareId": "d1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "203.0.113.40",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "2026-03-01T00:00:00Z",
+                "lastConnectionStateChange": "2026-06-22T08:00:00Z",
+                "reportedState": {
+                  "hardware": {"mac": "AABBCC000004", "name": "UniFi Dream Machine SE", "serialno": "aabbcc000004", "shortname": "UDMPROSE", "firmwareVersion": "4.0.6"},
+                  "hostname": "hq.example.com",
+                  "ip": "198.51.100.5",
+                  "ipAddrs": ["198.51.100.5"],
+                  "state": "connected",
+                  "timezone": "Europe/Riga",
+                  "version": "4.0.180"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-hosts"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hostId": "COVEREDCONSOLE:444444444",
+                "hostName": "hq.example.com",
+                "devices": [
+                  {"id": "AABBCC000004", "mac": "AABBCC000004", "name": "hq.example.com", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "198.51.100.5", "productLine": "network", "status": "online", "version": "4.1.13", "firmwareStatus": "upToDate", "isConsole": true, "isManaged": true}
+                ],
+                "updatedAt": "2026-06-23T07:21:27Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-devices"
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"code": "not_found", "httpStatusCode": 404, "message": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "unifi-site-manager:$HOST:device:AABBCC000004",
+      "unifi-site-manager:$HOST:device:AABBCC000003",
+      "unifi-site-manager:$HOST:host:1d9cf3ee-0c0f-466e-933c-9af829f09b50"
+    ],
+    "ids_absent": [
+      "unifi-site-manager:$HOST:host:OFFLINECONSOLE:333333333",
+      "unifi-site-manager:$HOST:host:COVEREDCONSOLE:444444444"
+    ],
+    "assets": [
+      {
+        "id": "unifi-site-manager:$HOST:device:AABBCC000003",
+        "fields": {
+          "hostnames": "shed.example.com",
+          "model": "UniFi Cloud Key Gen2 Plus",
+          "osVersion": "3.1.15",
+          "deviceType": "Server",
+          "unifi_state": "disconnected",
+          "unifi_covered_by_device_list": "false",
+          "unifi_console_cloud_address": "203.0.113.30"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:host:1d9cf3ee-0c0f-466e-933c-9af829f09b50",
+        "fields": {
+          "hostnames": "unifi-server.example.com",
+          "osVersion": "8.3.11",
+          "unifi_host_type": "network-server"
+        },
+        "fields_absent": ["macAddresses", "deviceType"]
+      },
+      {
+        "id": "unifi-site-manager:$HOST:device:AABBCC000004",
+        "fields": {
+          "hostnames": "hq.example.com",
+          "unifi_console_serial": "aabbcc000004",
+          "unifi_is_console": "true"
+        }
+      }
+    ]
+  },
+
+  "check_determinism": true
+}

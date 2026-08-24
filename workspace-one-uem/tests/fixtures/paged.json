@@ -1,0 +1,95 @@
+{
+  "name": "paged",
+  "integration": "workspace-one-uem",
+  "description": "Two-page walk with page_size=1 and an organization group filter. The device search pages over an unstable default ordering, so the script pins orderby=deviceid&sortorder=ASC; this asserts both are present on every call, that the second call carries page=1, that lgid is forwarded, and that the walk stops once (page+1)*page_size reaches Total rather than requesting a third page. check_determinism is off because the id is scoped by the tenant host, which under the fixture server carries an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-admin",
+    "password": "fixture-password",
+    "api_key": "fixture-tenant-code",
+    "organization_group_id": "570",
+    "page_size": "1"
+  },
+  "routes": [
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/mdm/devices/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Total": 2,
+            "Page": 0,
+            "PageSize": 1,
+            "Devices": [
+              {
+                "Id": {"Value": 5001},
+                "Uuid": "2a1b0000-0000-4000-8000-000000000001",
+                "SerialNumber": "PAGEDFIXTURE01",
+                "MacAddress": "00:16:3E:00:01:01",
+                "Platform": "AndroidAmazon",
+                "Model": "Galaxy Tab S9",
+                "OperatingSystem": "Android 14",
+                "HostName": "tab-page-01",
+                "Ownership": "C",
+                "EnrollmentStatus": "Enrolled",
+                "LastSeen": "2026-08-10T00:00:00Z",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "00:16:3E:00:01:01", "IPAddress": "10.110.1.1"}
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "Total": 2,
+            "Page": 1,
+            "PageSize": 1,
+            "Devices": [
+              {
+                "Id": {"Value": 5002},
+                "Uuid": "2a1b0000-0000-4000-8000-000000000002",
+                "SerialNumber": "PAGEDFIXTURE02",
+                "MacAddress": "00:16:3E:00:01:02",
+                "Platform": "WindowsPc",
+                "Model": "OptiPlex 7010",
+                "OperatingSystem": "10.0.19045.3803",
+                "HostName": "desk-page-02",
+                "Ownership": "C",
+                "EnrollmentStatus": "Enrolled",
+                "LastSeen": "2026-08-11T00:00:00Z",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "00:16:3E:00:01:02", "IPAddress": "10.110.1.2"}
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=0"},
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=1"},
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "lgid=570"},
+      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "orderby=deviceid"}
+    ],
+    "requests_absent": [
+      {"path": "/api/mdm/devices/search", "query_contains": "page=2"}
+    ],
+    "log_contains": [
+      "workspace-one-uem: reported 1 of 2 devices",
+      "workspace-one-uem: reported 2 of 2 devices"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

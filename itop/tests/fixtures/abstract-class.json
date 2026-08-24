@@ -1,0 +1,173 @@
+{
+  "name": "abstract-class",
+  "integration": "itop",
+  "description": "A single query against the abstract PhysicalDevice class. iTop instantiates each row as its concrete leaf class and reports that class per object, so one request collects Servers, Printers, and PCs at once - and the foreign id must be built from the concrete class, so that switching between querying PhysicalDevice and querying Server does not re-key every asset.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "include_interfaces": "false",
+    "classes": "PhysicalDevice"
+  },
+  "routes": [
+    {
+      "name": "physdev",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22PhysicalDevice%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::11": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 11,
+                "fields": {
+                  "id": "11",
+                  "name": "srv-db-01.example.com",
+                  "description": "Primary database node",
+                  "organization_name": "Demo",
+                  "business_criticity": "high",
+                  "move2production": "2024-03-11",
+                  "serialnumber": "SN-11-ABC",
+                  "location_name": "Paris DC",
+                  "status": "production",
+                  "brand_name": "Dell",
+                  "model_name": "PowerEdge R750",
+                  "asset_number": "AST-0011",
+                  "purchase_date": "2024-01-05",
+                  "end_of_warranty": "2027-01-05",
+                  "managementip": "10.10.0.11",
+                  "rack_name": "R14",
+                  "enclosure_name": "",
+                  "nb_u": "2",
+                  "osfamily_name": "Linux",
+                  "osversion_name": "RHEL 9",
+                  "oslicence_name": "",
+                  "cpu": "2 x Xeon Gold 6338",
+                  "ram": "256"
+                }
+              },
+              "Printer::51": {
+                "code": 0,
+                "message": "",
+                "class": "Printer",
+                "key": 51,
+                "fields": {
+                  "id": "51",
+                  "name": "prn-floor2",
+                  "organization_name": "Demo",
+                  "status": "production",
+                  "serialnumber": "PRN-51",
+                  "brand_name": "Brother",
+                  "model_name": "HL-L2350DW",
+                  "location_name": "Lyon"
+                }
+              },
+              "PC::41": {
+                "code": 0,
+                "message": "",
+                "class": "PC",
+                "key": 41,
+                "fields": {
+                  "id": "41",
+                  "name": "LT-4411",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "low",
+                  "move2production": "2026-11-30",
+                  "serialnumber": "5CD1234XYZ",
+                  "location_name": "Lyon",
+                  "status": "production",
+                  "brand_name": "HP",
+                  "model_name": "EliteBook 840",
+                  "asset_number": "AST-4411",
+                  "purchase_date": "2026-11-01",
+                  "end_of_warranty": "2029-11-01",
+                  "osfamily_name": "Windows",
+                  "osversion_name": "Windows 11",
+                  "cpu": "i7",
+                  "ram": "32",
+                  "type": "laptop"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 3"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "itop:$HOST:Server:11",
+      "itop:$HOST:Printer:51",
+      "itop:$HOST:PC:41"
+    ],
+    "ids_absent": [
+      "itop:$HOST:PhysicalDevice:11",
+      "itop:$HOST:PhysicalDevice:51",
+      "itop:$HOST:PhysicalDevice:41"
+    ],
+    "assets": [
+      {
+        "id": "itop:$HOST:Server:11",
+        "fields": {
+          "deviceType": "Server",
+          "itop_class": "Server"
+        }
+      },
+      {
+        "id": "itop:$HOST:Printer:51",
+        "fields": {
+          "deviceType": "Printer",
+          "itop_class": "Printer",
+          "hostnames": "prn-floor2",
+          "itop_serialnumber": "PRN-51"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "itop:$HOST:PC:41",
+        "fields": {
+          "deviceType": "Laptop",
+          "itop_class": "PC"
+        }
+      }
+    ],
+    "log_contains": [
+      "itop: reported 3 assets from PhysicalDevice"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

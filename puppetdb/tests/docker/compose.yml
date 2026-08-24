@@ -1,0 +1,54 @@
+# A real PuppetDB backed by a real PostgreSQL, serving the same
+# /pdb/query/v4 API a production Puppet installation serves.
+#
+# Both tags are pinned. PuppetDB's query API is versioned but its fact
+# *representation* is not -- Facter changed `networking.interfaces` shape
+# between major versions -- so an unpinned image would change the data under
+# the test without changing the test.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: puppetdb
+      POSTGRES_PASSWORD: puppetdb
+      POSTGRES_DB: puppetdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U puppetdb"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  puppetdb:
+    image: puppet/puppetdb:7.10.0
+    # The published image is amd64 only; on arm64 hosts this runs emulated.
+    platform: linux/amd64
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Without a puppetserver to issue certificates, PuppetDB serves the
+      # cleartext listener on 0.0.0.0:8080 -- which is what the integration's
+      # `url` parameter points at here. A production deployment uses the TLS
+      # listener on 8081 with a client certificate; that path is covered by the
+      # fixture scenarios, since it is a transport concern rather than a
+      # response-parsing one.
+      USE_PUPPETSERVER: "false"
+      PUPPETDB_POSTGRES_HOSTNAME: postgres
+      PUPPETDB_USER: puppetdb
+      PUPPETDB_PASSWORD: puppetdb
+      PUPPETDB_DATABASE_NAME: puppetdb
+      # Never let the garbage collector deactivate the seeded nodes mid-run.
+      PUPPETDB_NODE_TTL: 0s
+      PUPPETDB_NODE_PURGE_TTL: 0s
+      PUPPETDB_JAVA_ARGS: "-Xms256m -Xmx768m"
+    volumes:
+      # The image's 20-configure-ssl.sh ends with an unconditional
+      # `chown -R ... $SSLDIR`, which fails and kills the container when
+      # USE_PUPPETSERVER=false leaves that directory uncreated. An empty volume
+      # is the least invasive way to make the path exist.
+      - puppetdb-certs:/opt/puppetlabs/server/data/puppetdb/certs
+    ports:
+      - "${RZ_HOST_PORT}:8080"
+
+volumes:
+  puppetdb-certs:

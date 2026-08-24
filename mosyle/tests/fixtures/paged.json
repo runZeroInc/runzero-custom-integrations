@@ -1,0 +1,158 @@
+{
+  "name": "paged",
+  "integration": "mosyle",
+  "description": "Three pages of ios devices followed by an empty page. Proves the page counter advances (page=0,1,2,3) and that the walk terminates on the empty page rather than on a count, and that each page is reported as it is read rather than accumulated. The remaining three platform families are asked for once each and answer empty.\n\nnamespaced_ids is skipped: the id is the bare Mosyle deviceudid with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-access-token",
+    "email": "fixture@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Authorization": "Bearer fixture-jwt-token"
+          },
+          "json": {
+            "status": "OK"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-ios",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices",
+        "body_contains": "\"os\":\"ios\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-PAGE0",
+                  "device_name": "fixture page zero",
+                  "os": "iOS",
+                  "osversion": "17.5",
+                  "wifi_mac_address": "00:11:22:bb:00:01",
+                  "last_ip_beat": "10.61.0.1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-PAGE1",
+                  "device_name": "fixture page one",
+                  "os": "iOS",
+                  "osversion": "17.5",
+                  "wifi_mac_address": "00:11:22:bb:00:02",
+                  "last_ip_beat": "10.61.0.2"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-PAGE2",
+                  "device_name": "fixture page two",
+                  "os": "iOS",
+                  "osversion": "17.5",
+                  "wifi_mac_address": "00:11:22:bb:00:03",
+                  "last_ip_beat": "10.61.0.3"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-drained",
+      "match": {
+        "method": "POST",
+        "path": "/listdevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "FIXTURE-UDID-PAGE0",
+      "FIXTURE-UDID-PAGE1",
+      "FIXTURE-UDID-PAGE2"
+    ],
+    "request_count": 8,
+    "requests_include": [
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":0"
+      },
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":1"
+      },
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":2"
+      },
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":3"
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "\"os\":\"ios\",\"page\":4"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

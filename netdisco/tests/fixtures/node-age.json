@@ -1,0 +1,161 @@
+{
+  "name": "node-age",
+  "integration": "netdisco",
+  "description": "Netdisco keeps departed nodes indefinitely, so an import with no age filter drags in years of devices that left the building. The node object endpoint accepts only active_only - Netdisco's daterange and age_invert parameters belong to the search endpoints, not this one - so the age filter has to be applied by this script against each row's time_last. This scenario proves it, and does so WITHOUT depending on when the fixture was written. The node that must survive carries a time_last far in the future; _parse_ts clamps any future timestamp to now, which makes its computed age exactly zero on every run, forever. That clamp is not a convenience here, it is required: the platform rejects the ENTIRE asset record on a future timestamp rather than just the field, so an unclamped value would drop the asset outright. The node that must be dropped carries a fixed date in 2019, which only gets older. max_age_days is 30. Also asserts active_only=false reaches the server when the parameter is turned off. A third node carries the 0001-01-01 never-sentinel Netdisco writes for a node it has no reading for. That parses to nothing, so its age is UNKNOWN - which is not the same as old - and it is kept rather than silently discarded. parse_time would abort the whole script on that value, so it is screened before the call.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "max_age_days": "30",
+    "active_only": "false",
+    "collect_device_ips": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api_key": "1234567890abcdef1234567890abcdef"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-search",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/search/device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "ip": "198.51.100.41",
+              "dns": "sw-age01.example.com",
+              "name": "sw-age01",
+              "model": "C9200-48P",
+              "os": "iosxe",
+              "os_ver": "17.9.4",
+              "vendor": "cisco",
+              "serial": "FDO4141AAAA",
+              "layers": "00000110",
+              "mac": "00:11:22:44:00:01",
+              "creation": "2024-01-01 00:00:00",
+              "last_discover": "2026-08-15 01:00:00",
+              "module_serials": [
+                "FDO4141AAAA"
+              ]
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "nodes",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/object/device/198.51.100.41/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "mac": "00:1c:42:aa:00:01",
+              "switch": "198.51.100.41",
+              "port": "Gi1/0/1",
+              "active": true,
+              "time_first": "2019-03-04 10:00:00",
+              "time_recent": "2099-06-01 12:00:00",
+              "time_last": "2099-06-01 12:00:00",
+              "vlan": "10"
+            },
+            {
+              "mac": "00:1c:42:aa:00:02",
+              "switch": "198.51.100.41",
+              "port": "Gi1/0/2",
+              "active": false,
+              "time_first": "2019-03-04 10:00:00",
+              "time_recent": "2019-04-01 09:00:00",
+              "time_last": "2019-04-01 09:00:00",
+              "vlan": "10"
+            },
+            {
+              "mac": "00:1c:42:aa:00:03",
+              "switch": "198.51.100.41",
+              "port": "Gi1/0/3",
+              "active": false,
+              "time_first": "2018-01-01 00:00:00",
+              "time_recent": "2018-01-01 00:00:00",
+              "time_last": "0001-01-01 00:00:00",
+              "vlan": "10"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "error": "no fixture route"
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "netdisco:$HOST:device:198.51.100.41",
+      "netdisco:$HOST:node:00:1c:42:aa:00:01",
+      "netdisco:$HOST:node:00:1c:42:aa:00:03"
+    ],
+    "ids_absent": [
+      "netdisco:$HOST:node:00:1c:42:aa:00:02"
+    ],
+    "assets": [
+      {
+        "id": "netdisco:$HOST:node:00:1c:42:aa:00:01",
+        "fields": {
+          "netdisco_time_last_raw": "2099-06-01 12:00:00",
+          "netdisco_port": "Gi1/0/1"
+        }
+      },
+      {
+        "id": "netdisco:$HOST:node:00:1c:42:aa:00:03",
+        "fields": {
+          "netdisco_time_last_raw": "0001-01-01 00:00:00"
+        }
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path_contains": "/nodes",
+        "query_contains": "active_only=false"
+      }
+    ],
+    "log_contains": [
+      "reported 2 located nodes",
+      "node sightings older than 30 days were dropped"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  },
+  "check_determinism": true
+}

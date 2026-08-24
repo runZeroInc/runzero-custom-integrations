@@ -1,0 +1,166 @@
+{
+  "name": "happy",
+  "integration": "maze-security",
+  "description": "One page of investigations exercising both id spaces the grouping code can produce: the asset_id segment of scanner_finding_hash, and the asset_name of a related scanner finding. Proves two investigations sharing one scanner_finding_hash asset collapse onto a single asset carrying both vulnerabilities, that a single investigation fans out to one asset per related finding, that OS name and version are lifted out of vulnerability_root_cause_analysis, and that finding metadata (asset_type, cloud_platform, region, account_id, scanner) is carried onto the asset.\n\nThe fourth investigation carries an empty scanner_finding_hash and no related findings, so it names no asset. It used to become an asset keyed on its own investigation id -- one asset per finding, since an investigation is one CVE against one thing -- and is now skipped and logged.\n\nnamespaced_ids is skipped: Maze ids are bare scanner-supplied names with no tenant scope. Under no-id-match they no longer drive matching, so the collision hazard the invariant guards is not reachable through this integration.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "days_back": "7"
+  },
+  "routes": [
+    {
+      "name": "investigations-search",
+      "match": {"method": "POST", "path": "/v1/investigations/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "next_cursor": null,
+            "data": [
+              {
+                "id": "inv-0001",
+                "cve_id": "CVE-2024-11111",
+                "maze_severity": "HIGH",
+                "exploitability": "exploitable",
+                "exploitability_reason": "The vulnerable path is reachable from the public listener.",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-11111::web-01.corp.example.com",
+                "updated_at": "2026-08-01T10:00:00Z",
+                "likelihood": "high",
+                "impact": "high",
+                "remediation": "Upgrade the affected package to 2.4.59.",
+                "severity_details": {"reasoning": "Internet facing and unauthenticated."},
+                "snapshot": {
+                  "status": "open",
+                  "cve": {
+                    "description": "Synthetic fixture description for a request smuggling defect.",
+                    "potential_impact": "Remote code execution"
+                  },
+                  "cvss": {
+                    "base_score": 7.5,
+                    "version": "3.1",
+                    "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                    "source": "fixture-nvd"
+                  }
+                },
+                "vulnerability_root_cause_analysis": [
+                  {"title": "Operating system", "status": "confirmed", "reasoning": "Read from the package database.", "actual_value": "Ubuntu"},
+                  {"title": "Kernel version", "status": "confirmed", "reasoning": "Read from uname.", "actual_value": "5.15.0-91-generic"}
+                ]
+              },
+              {
+                "id": "inv-0002",
+                "cve_id": "CVE-2024-22222",
+                "maze_severity": "MEDIUM",
+                "exploitability": "not_exploitable",
+                "exploitability_reason": "The vulnerable function is never called.",
+                "scanner_finding_hash": "fixture-scanner::CVE-2024-22222::web-01.corp.example.com",
+                "updated_at": "2026-08-02T11:00:00Z",
+                "remediation": "No action required.",
+                "snapshot": {
+                  "status": "closed",
+                  "cve": {"description": "Synthetic fixture description for an unreachable parser defect."},
+                  "cvss": {"base_score": 5.4, "version": "2.0", "vector_string": "AV:N/AC:M/Au:N/C:P/I:N/A:N", "source": "fixture-nvd"}
+                },
+                "vulnerability_root_cause_analysis": []
+              },
+              {
+                "id": "inv-0003",
+                "cve_id": "CVE-2023-33333",
+                "maze_severity": "CRITICAL",
+                "exploitability": "exploitable",
+                "scanner_finding_hash": "fixture-scanner::CVE-2023-33333::ignored-when-related-findings-exist",
+                "updated_at": "2026-08-03T12:00:00Z",
+                "remediation": "Apply the vendor hotfix.",
+                "snapshot": {
+                  "status": "open",
+                  "cve": {"description": "Synthetic fixture description for a deserialization defect."},
+                  "cvss": {"base_score": 9.8, "version": "3.1", "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}
+                },
+                "related_scanner_findings": [
+                  {
+                    "asset_name": "db-01.corp.example.com",
+                    "asset_id": "arn:aws:ec2:us-east-1:000000000000:instance/i-0fixturedb01",
+                    "asset_type": "Server",
+                    "cloud_platform": "aws",
+                    "region": "us-east-1",
+                    "account_id": "000000000000",
+                    "scanner": "fixture-scanner"
+                  },
+                  {
+                    "asset_name": "app-01.corp.example.com",
+                    "asset_id": "arn:aws:ec2:us-east-1:000000000000:instance/i-0fixtureapp01",
+                    "asset_type": "Server",
+                    "cloud_platform": "aws",
+                    "region": "us-east-1",
+                    "account_id": "000000000000",
+                    "scanner": "fixture-scanner"
+                  }
+                ],
+                "vulnerability_root_cause_analysis": [
+                  {"title": "Operating system", "status": "confirmed", "reasoning": "Read from the package database.", "actual_value": "Red Hat Enterprise Linux"}
+                ]
+              },
+              {
+                "id": "inv-0004-no-hash",
+                "cve_id": "CVE-2022-44444",
+                "maze_severity": "LOW",
+                "exploitability": "not_exploitable",
+                "scanner_finding_hash": "",
+                "updated_at": "2026-08-04T13:00:00Z",
+                "snapshot": {"cvss": {"base_score": null, "version": "3.1"}}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "web-01.corp.example.com",
+        "fields": {
+          "hostnames": "web-01.corp.example.com",
+          "os": "Ubuntu",
+          "osVersion": "5.15.0-91-generic",
+          "maze_finding_count": "2",
+          "source": "maze"
+        }
+      },
+      {
+        "id": "db-01.corp.example.com",
+        "fields": {
+          "hostnames": "db-01.corp.example.com",
+          "deviceType": "Server",
+          "os": "Red Hat Enterprise Linux",
+          "maze_cloud_platform": "aws",
+          "maze_region": "us-east-1",
+          "maze_account_id": "000000000000",
+          "maze_scanner": "fixture-scanner",
+          "maze_asset_full_id": "arn:aws:ec2:us-east-1:000000000000:instance/i-0fixturedb01"
+        }
+      },
+      {
+        "id": "app-01.corp.example.com",
+        "fields": {"hostnames": "app-01.corp.example.com", "deviceType": "Server"}
+      }
+    ],
+    "ids_absent": ["inv-0004-no-hash"],
+    "min_vulnerabilities_total": 4,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "POST", "path": "/v1/investigations/search", "body_contains": "\"limit\":1000"},
+      {"body_contains": "updated_from"},
+      {"header": {"x-api-key": "fixture-key"}}
+    ],
+    "log_contains": [
+      "Reported 3 assets from 4 investigations",
+      "Skipped 1 investigations that named no asset",
+      "maze: skipping investigation with no asset name or asset segment: id=inv-0004-no-hash"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

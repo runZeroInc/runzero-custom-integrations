@@ -1,0 +1,92 @@
+{
+  "name": "detail-cap",
+  "integration": "illumio-core",
+  "description": "Service enrichment is an N+1: the PCE omits open_service_ports from a collection response, so each workload costs one extra GET. With service_detail_limit=2 and four workloads, only two detail requests may be issued, the remaining two workloads must still import without services, and the skip count must be logged. The second detail request is answered with a 500 to prove one unreadable workload is counted and survives as an asset built from the collection record rather than ending the run.",
+  "kwargs": {
+    "url": "$BASE",
+    "org_id": "7",
+    "api_key_id": "api_fixture0001",
+    "api_secret": "fixture-secret",
+    "import_services": "true",
+    "service_detail_limit": "2"
+  },
+  "routes": [
+    {
+      "name": "label-catalog",
+      "match": {"method": "GET", "path": "/api/v2/orgs/7/labels"},
+      "responses": [{"status": 200, "json": []}]
+    },
+    {
+      "name": "workload-detail-cap-0001",
+      "match": {"method": "GET", "path": "/api/v2/orgs/7/workloads/cap-0001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "href": "/orgs/7/workloads/cap-0001",
+            "hostname": "cap01.corp.example.com",
+            "name": "cap01",
+            "managed": true,
+            "updated_at": "2026-02-06T10:00:00Z",
+            "interfaces": [{"name": "eth0", "address": "10.61.0.1"}],
+            "services": {
+              "open_service_ports": [
+                {"port": 8443, "protocol": 6, "address": "10.61.0.1", "process_name": "java"},
+                {"port": 161, "protocol": 17, "address": "10.61.0.1", "process_name": "snmpd"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "workload-detail-cap-0002-unreadable",
+      "match": {"method": "GET", "path": "/api/v2/orgs/7/workloads/cap-0002"},
+      "responses": [
+        {"status": 500, "json": {"error": "internal"}},
+        {"status": 500, "json": {"error": "internal"}},
+        {"status": 500, "json": {"error": "internal"}},
+        {"status": 500, "json": {"error": "internal"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "workloads-sync",
+      "match": {"method": "GET", "path": "/api/v2/orgs/7/workloads", "query_contains": "max_results=500"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"href": "/orgs/7/workloads/cap-0001", "hostname": "cap01.corp.example.com", "name": "cap01", "managed": true, "interfaces": [{"name": "eth0", "address": "10.61.0.1"}]},
+            {"href": "/orgs/7/workloads/cap-0002", "hostname": "cap02.corp.example.com", "name": "cap02", "managed": true, "interfaces": [{"name": "eth0", "address": "10.61.0.2"}]},
+            {"href": "/orgs/7/workloads/cap-0003", "hostname": "cap03.corp.example.com", "name": "cap03", "managed": true, "interfaces": [{"name": "eth0", "address": "10.61.0.3"}]},
+            {"href": "/orgs/7/workloads/cap-0004", "hostname": "cap04.corp.example.com", "name": "cap04", "managed": true, "interfaces": [{"name": "eth0", "address": "10.61.0.4"}]}
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "illumio-core:$HOST:/orgs/7/workloads/cap-0001",
+      "illumio-core:$HOST:/orgs/7/workloads/cap-0002",
+      "illumio-core:$HOST:/orgs/7/workloads/cap-0003",
+      "illumio-core:$HOST:/orgs/7/workloads/cap-0004"
+    ],
+    "min_services_total": 2,
+    "log_contains": [
+      "could not read services for 1 workloads",
+      "service enrichment limit of 2 reached; services were not imported for 2 workloads"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/orgs/7/workloads/cap-0001"},
+      {"method": "GET", "path": "/api/v2/orgs/7/workloads/cap-0002"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/api/v2/orgs/7/workloads/cap-0003"},
+      {"method": "GET", "path": "/api/v2/orgs/7/workloads/cap-0004"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

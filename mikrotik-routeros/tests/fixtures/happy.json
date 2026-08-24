@@ -1,0 +1,387 @@
+{
+  "name": "happy",
+  "integration": "mikrotik-routeros",
+  "description": "A full collection from a RouterBOARD running RouterOS 7.20. Every value is a JSON STRING, including booleans and numbers, because that is what RouterOS REST emits - 'disabled':'false' is a truthy non-empty string, and a script that tests truthiness inverts every flag. Unset properties are OMITTED rather than sent empty, which is why the incomplete ARP entry has no mac-address key at all and the waiting lease has no active-* keys. Proves: the RouterBOARD serial becomes a real foreign id that IS allowed to drive merges; interfaces are joined to /ip/address on the interface name; wg and vrrp interfaces are excluded by TYPE, so the WireGuard overlay address and the shared VRRP MAC never reach the router asset; an APIPA address on a real interface is dropped while that interface keeps its MAC; the router's own MAC appearing in its own ARP table does not become a second asset; one device seen by ARP, a DHCP lease, and a wireless association folds into ONE asset; a discovery neighbor contributes manufacturer, model, OS version, and a device type derived from its LLDP system-caps; and the relative duration 'last-seen':'19m50s' becomes an absolute lastSeenTS in the PAST rather than a future timestamp that would make the platform reject the whole record. The two registration tables this router does not have answer with RouterOS's real 'no such command or directory' error, which is neither an empty array nor a 404. no_mac_in_id is skipped: an observed device has no identifier but its MAC, and the id is deliberately paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-runzero",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "system-resource",
+      "match": {"method": "GET", "path": "/rest/system/resource"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "architecture-name": "arm64",
+              "board-name": "RB5009UG+S+",
+              "build-time": "2025-11-04 09:12:33",
+              "cpu": "ARM64",
+              "cpu-count": "4",
+              "cpu-frequency": "1400",
+              "cpu-load": "3",
+              "factory-software": "7.1.5",
+              "free-hdd-space": "901120000",
+              "free-memory": "780140544",
+              "platform": "MikroTik",
+              "total-hdd-space": "1073741824",
+              "total-memory": "1073741824",
+              "uptime": "5w2d3h11m4s",
+              "version": "7.20.1 (stable)"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-identity",
+      "match": {"method": "GET", "path": "/rest/system/identity"},
+      "responses": [{"status": 200, "json": [{"name": "core-rtr01"}]}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-routerboard",
+      "match": {"method": "GET", "path": "/rest/system/routerboard"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "board-name": "RB5009UG+S+",
+              "current-firmware": "7.20.1",
+              "factory-firmware": "7.1.5",
+              "firmware-type": "ipq6000L",
+              "model": "RB5009UG+S+",
+              "revision": "r2",
+              "routerboard": "true",
+              "serial-number": "HGT08ABCDEF",
+              "upgrade-firmware": "7.20.1"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interfaces",
+      "match": {"method": "GET", "path": "/rest/interface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "name": "bridge", "type": "bridge", "mac-address": "48:A9:8A:10:00:01", "running": "true", "disabled": "false", "actual-mtu": "1500", "default-name": "bridge"},
+            {".id": "*2", "name": "ether1", "type": "ether", "mac-address": "48:A9:8A:10:00:02", "running": "true", "disabled": "false", "actual-mtu": "1500", "default-name": "ether1", "comment": "uplink"},
+            {".id": "*3", "name": "ether2", "type": "ether", "mac-address": "48:A9:8A:10:00:03", "running": "true", "disabled": "false", "actual-mtu": "1500", "default-name": "ether2"},
+            {".id": "*4", "name": "wifi1", "type": "wifi", "mac-address": "48:A9:8A:10:00:04", "running": "true", "disabled": "false", "actual-mtu": "1500"},
+            {".id": "*5", "name": "wg0", "type": "wg", "running": "true", "disabled": "false", "actual-mtu": "1420"},
+            {".id": "*6", "name": "vrrp1", "type": "vrrp", "mac-address": "00:00:5E:00:01:01", "running": "true", "disabled": "false"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-address",
+      "match": {"method": "GET", "path": "/rest/ip/address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "address": "192.168.88.1/24", "actual-interface": "bridge", "interface": "bridge", "disabled": "false", "dynamic": "false", "invalid": "false", "network": "192.168.88.0"},
+            {".id": "*2", "address": "203.0.113.9/30", "actual-interface": "ether1", "interface": "ether1", "disabled": "false", "dynamic": "true", "invalid": "false", "network": "203.0.113.8"},
+            {".id": "*3", "address": "169.254.5.5/16", "actual-interface": "ether2", "interface": "ether2", "disabled": "false", "dynamic": "true", "invalid": "false", "network": "169.254.0.0"},
+            {".id": "*4", "address": "10.99.0.1/24", "actual-interface": "wg0", "interface": "wg0", "disabled": "false", "dynamic": "false", "invalid": "false", "network": "10.99.0.0"},
+            {".id": "*5", "address": "10.7.7.1/24", "actual-interface": "ether2", "interface": "ether2", "disabled": "true", "dynamic": "false", "invalid": "false", "network": "10.7.7.0"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-arp",
+      "match": {"method": "GET", "path": "/rest/ip/arp"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {".id": "*1", "address": "192.168.88.24", "mac-address": "D8:5E:D3:11:22:33", "interface": "bridge", "complete": "true", "dhcp": "true", "disabled": "false", "dynamic": "true", "invalid": "false", "published": "false", "status": "reachable"},
+            {".id": "*2", "address": "192.168.88.50", "mac-address": "64:D1:54:AA:BB:CC", "interface": "bridge", "complete": "true", "DHCP": "false", "disabled": "false", "dynamic": "true", "invalid": "false", "published": "false", "status": "stale"},
+            {".id": "*3", "address": "192.168.88.99", "interface": "bridge", "complete": "false", "dhcp": "false", "disabled": "false", "dynamic": "true", "invalid": "false", "published": "false", "status": "incomplete"},
+            {".id": "*4", "address": "192.168.88.1", "mac-address": "48:A9:8A:10:00:01", "interface": "bridge", "complete": "true", "disabled": "false", "dynamic": "false", "invalid": "false", "published": "false", "status": "permanent"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases",
+      "match": {"method": "GET", "path": "/rest/ip/dhcp-server/lease"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              ".id": "*A",
+              "active-address": "192.168.88.24",
+              "active-client-id": "1:d8:5e:d3:11:22:33",
+              "active-mac-address": "D8:5E:D3:11:22:33",
+              "active-server": "defconf",
+              "address": "192.168.88.24",
+              "blocked": "false",
+              "class-id": "MSFT 5.0",
+              "client-id": "1:d8:5e:d3:11:22:33",
+              "disabled": "false",
+              "dynamic": "true",
+              "expires-after": "2d23h40m10s",
+              "host-name": "WIN-DESKTOP",
+              "last-seen": "19m50s",
+              "mac-address": "D8:5E:D3:11:22:33",
+              "radius": "false",
+              "server": "defconf",
+              "status": "bound"
+            },
+            {
+              ".id": "*B",
+              "address": "192.168.88.77",
+              "address-lists": "",
+              "blocked": "false",
+              "client-id": "1:3c:22:fb:66:77:88",
+              "comment": "Laptop Earn",
+              "disabled": "false",
+              "dynamic": "false",
+              "host-name": "LAPTOP-2018",
+              "last-seen": "14h4m17s",
+              "mac-address": "3C:22:FB:66:77:88",
+              "radius": "false",
+              "server": "defconf",
+              "status": "waiting"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ip-neighbor",
+      "match": {"method": "GET", "path": "/rest/ip/neighbor"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              ".id": "*1",
+              "address": "192.168.88.2",
+              "address4": "192.168.88.2",
+              "age": "12",
+              "board": "RB4011iGS+",
+              "discovered-by": "mndp,cdp",
+              "identity": "access-sw01",
+              "interface": "bridge",
+              "ipv6": "no",
+              "mac-address": "48:8F:5A:AA:BB:CC",
+              "platform": "MikroTik",
+              "software-id": "ABCD-1234",
+              "system-caps": "bridge,router",
+              "system-caps-enabled": "bridge,router",
+              "unpack": "none",
+              "uptime": "5w2d1h",
+              "version": "7.16.1 (stable)"
+            },
+            {
+              ".id": "*2",
+              "address": "192.168.88.3",
+              "discovered-by": "lldp",
+              "identity": "ap-lobby",
+              "interface": "ether2",
+              "interface-name": "GigabitEthernet0/1",
+              "mac-address": "00:1B:0D:11:22:33",
+              "platform": "cisco",
+              "system-caps": "bridge,wlan-ap",
+              "system-description": "Cisco IOS Software, C1130 Software, Version 15.3(3)JPP"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "wifi-registration-table",
+      "match": {"method": "GET", "path": "/rest/interface/wifi/registration-table"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              ".id": "*1",
+              "authorized": "true",
+              "auth-type": "wpa2-psk",
+              "band": "5ghz-ax",
+              "bytes": "10221,44821",
+              "interface": "wifi1",
+              "last-activity": "1m20s",
+              "mac-address": "3C:22:FB:66:77:88",
+              "rx-rate": "866.7Mbps",
+              "signal": "-54",
+              "ssid": "corp-wifi",
+              "tx-rate": "866.7Mbps",
+              "uptime": "2h14m8s",
+              "vlan-id": "10"
+            },
+            {
+              ".id": "*2",
+              "authorized": "true",
+              "auth-type": "wpa2-psk",
+              "band": "2ghz-n",
+              "interface": "wifi1",
+              "last-activity": "40s",
+              "mac-address": "F0:18:98:11:22:33",
+              "rx-rate": "144.4Mbps",
+              "signal": "-71",
+              "ssid": "guest-wifi",
+              "tx-rate": "144.4Mbps",
+              "uptime": "12m3s"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "legacy-wireless-absent",
+      "match": {"method": "GET", "path": "/rest/interface/wireless/registration-table"},
+      "responses": [
+        {"status": 406, "json": {"error": 406, "message": "Not Acceptable", "detail": "no such command or directory (wireless)"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "capsman-absent",
+      "match": {"method": "GET", "path": "/rest/caps-man/registration-table"},
+      "responses": [
+        {"status": 406, "json": {"error": 406, "message": "Not Acceptable", "detail": "no such command or directory (caps-man)"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {"error": 404, "message": "Not Found"}
+  },
+  "expect": {
+    "asset_count": 7,
+    "ids": [
+      "mikrotik:routerboard:HGT08ABCDEF",
+      "mikrotik:$HOST:host:d8:5e:d3:11:22:33",
+      "mikrotik:$HOST:host:64:d1:54:aa:bb:cc",
+      "mikrotik:$HOST:host:3c:22:fb:66:77:88",
+      "mikrotik:$HOST:host:48:8f:5a:aa:bb:cc",
+      "mikrotik:$HOST:host:00:1b:0d:11:22:33",
+      "mikrotik:$HOST:host:f0:18:98:11:22:33"
+    ],
+    "ids_absent": [
+      "mikrotik:$HOST:host:48:a9:8a:10:00:01",
+      "mikrotik:$HOST:router",
+      "mikrotik:$HOST:host:00:00:5e:00:01:01"
+    ],
+    "assets": [
+      {
+        "id": "mikrotik:routerboard:HGT08ABCDEF",
+        "fields": {
+          "_attrType": "router",
+          "deviceType": "Router",
+          "manufacturer": "MikroTik",
+          "os": "RouterOS",
+          "osVersion": "7.20.1 (stable)",
+          "model": "RB5009UG+S+",
+          "hostnames": "core-rtr01",
+          "mikrotik_serial_number": "HGT08ABCDEF",
+          "mikrotik_architecture": "arm64",
+          "mikrotik_uptime_raw": "5w2d3h11m4s"
+        },
+        "fields_absent": []
+      },
+      {
+        "id": "mikrotik:$HOST:host:d8:5e:d3:11:22:33",
+        "fields": {
+          "_attrType": "host",
+          "hostnames": "WIN-DESKTOP",
+          "ipAddresses": "192.168.88.24",
+          "macAddresses": "d8:5e:d3:11:22:33",
+          "mikrotik_observed_by": "arp,dhcp-lease",
+          "mikrotik_arp_status": "reachable",
+          "mikrotik_lease_status": "bound",
+          "mikrotik_lease_class_id": "MSFT 5.0",
+          "mikrotik_arp_from_dhcp": "true"
+        }
+      },
+      {
+        "id": "mikrotik:$HOST:host:3c:22:fb:66:77:88",
+        "fields": {
+          "_attrType": "host",
+          "hostnames": "LAPTOP-2018",
+          "ipAddresses": "192.168.88.77",
+          "mikrotik_observed_by": "dhcp-lease,wireless",
+          "mikrotik_lease_status": "waiting",
+          "mikrotik_lease_comment": "Laptop Earn",
+          "mikrotik_wifi_ssid": "corp-wifi",
+          "mikrotik_wifi_signal_dbm": "-54",
+          "mikrotik_wifi_flavor": "wifi",
+          "mikrotik_wifi_vlan_id": "10"
+        }
+      },
+      {
+        "id": "mikrotik:$HOST:host:48:8f:5a:aa:bb:cc",
+        "fields": {
+          "deviceType": "Router",
+          "manufacturer": "MikroTik",
+          "model": "RB4011iGS+",
+          "osVersion": "7.16.1 (stable)",
+          "hostnames": "access-sw01",
+          "ipAddresses": "192.168.88.2",
+          "mikrotik_neighbor_discovered_by": "mndp,cdp",
+          "mikrotik_observed_by": "neighbor"
+        }
+      },
+      {
+        "id": "mikrotik:$HOST:host:00:1b:0d:11:22:33",
+        "fields": {
+          "deviceType": "Access Point",
+          "manufacturer": "cisco",
+          "hostnames": "ap-lobby",
+          "mikrotik_neighbor_remote_port": "GigabitEthernet0/1",
+          "mikrotik_neighbor_system_description": "Cisco IOS Software, C1130 Software, Version 15.3(3)JPP"
+        }
+      },
+      {
+        "id": "mikrotik:$HOST:host:64:d1:54:aa:bb:cc",
+        "fields": {
+          "ipAddresses": "192.168.88.50",
+          "mikrotik_observed_by": "arp",
+          "mikrotik_arp_status": "stale",
+          "mikrotik_arp_from_dhcp": "false"
+        },
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/rest/system/resource", "header_contains": "Basic"},
+      {"method": "GET", "path_contains": "/rest/system/routerboard"},
+      {"method": "GET", "path_contains": "/rest/ip/neighbor"},
+      {"method": "GET", "path_contains": "/rest/caps-man/registration-table"}
+    ],
+    "log_contains": [
+      "ARP contributed 2 entries (1 incomplete entries had no MAC and were skipped)",
+      "discovery neighbors contributed 2 entries",
+      "1 of 3 wireless registration tables were present and contributed 2 stations",
+      "reported 1 router and 6 observed devices"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

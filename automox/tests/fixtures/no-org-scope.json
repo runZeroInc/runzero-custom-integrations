@@ -1,0 +1,111 @@
+{
+  "name": "no-org-scope",
+  "description": "The degenerate tenant for the scoped-id scheme: /api/orgs returns nothing, so there is no resolved organization to fall back on and the software read is skipped. Device 8001 carries its own organization_id and must import scoped by it -- automox:9999:8001 -- proving the row's organization_id needs no /api/orgs help. Device 8002 carries no organization_id, and with no resolved organization either there is nothing API-provided to scope a stable id with: it must be SKIPPED WITH A LOG LINE rather than emitted bare (which collides across tenants) or under an invented scope (which would change once org resolution works again, re-identifying the record). Real /api/servers rows always carry organization_id, so the skip is a guard for a shape the API should never produce -- but it must be loud when it happens.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "orgs",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "servers",
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 8001,
+              "organization_id": 9999,
+              "name": "fixture-scoped-01",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:dd:00:01",
+                    "IPS": [
+                      "192.0.2.81"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "id": 8002,
+              "name": "fixture-unscopable-02",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:dd:00:02",
+                    "IPS": [
+                      "192.0.2.82"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "automox:9999:8001"
+    ],
+    "ids_absent": [
+      "8002",
+      "automox::8002",
+      "automox:9999:8002"
+    ],
+    "assets": [
+      {
+        "id": "automox:9999:8001",
+        "fields": {
+          "hostnames": "fixture-scoped-01",
+          "ipAddresses": "192.0.2.81",
+          "macAddresses": "00:11:22:dd:00:01"
+        }
+      }
+    ],
+    "log_contains": [
+      "automox: no organizations returned; software will be skipped and the device listing left unscoped",
+      "automox: skipping device 8002: no organization_id on the record and no resolved organization to scope a stable id"
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/packages"
+      }
+    ]
+  },
+  "check_determinism": true
+}

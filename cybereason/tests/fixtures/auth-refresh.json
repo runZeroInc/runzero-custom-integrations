@@ -1,0 +1,91 @@
+{
+  "name": "auth-refresh",
+  "integration": "cybereason",
+  "description": "The session is rejected mid-walk. Page one succeeds under the first JSESSIONID, the page-two call answers 401, and the run must log in again through the form POST, pick up the second JSESSIONID, replay the same offset and finish. Proves the re-login is a real second form POST rather than a retry with the stale cookie, that the new cookie is what the replayed call carries, and that no sensor is lost or duplicated across the refresh.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "form-login",
+      "match": {"method": "POST", "path": "/login.html"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Set-Cookie": "JSESSIONID=FIXTURESESSION-A; Path=/", "Content-Type": "text/html"},
+          "text": "<html>ok</html>"
+        },
+        {
+          "status": 200,
+          "headers": {"Set-Cookie": "JSESSIONID=FIXTURESESSION-B; Path=/", "Content-Type": "text/html"},
+          "text": "<html>ok</html>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-1",
+      "match": {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":0"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {"sensorId": "reauth-a", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-RA_08002700AA01",
+             "machineName": "HOST-RA", "fqdn": "HOST-RA", "internalIpAddress": "10.80.1.1",
+             "osType": "WINDOWS", "osVersionType": "Windows_10", "status": "ONLINE"},
+            {"sensorId": "reauth-b", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-RB_08002700BB02",
+             "machineName": "HOST-RB", "fqdn": "HOST-RB", "internalIpAddress": "10.80.1.2",
+             "osType": "LINUX", "status": "ONLINE"}
+          ],
+          "totalResults": 3,
+          "hasMoreResults": true
+        }
+      }],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-2-expires-then-succeeds",
+      "match": {"method": "POST", "path": "/rest/sensors/query", "body_contains": "\"offset\":2"},
+      "responses": [
+        {"status": 401, "json": {"failedValues": [], "message": "Unauthorized"}},
+        {
+          "status": 200,
+          "json": {
+            "sensors": [
+              {"sensorId": "reauth-c", "pylumId": "PYLUMCLIENT_FIXTURE_HOST-RC_08002700CC03",
+               "machineName": "HOST-RC", "fqdn": "HOST-RC", "internalIpAddress": "10.80.1.3",
+               "osType": "LINUX", "status": "ONLINE"}
+            ],
+            "totalResults": 3,
+            "hasMoreResults": false
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "cybereason:127.0.0.1:reauth-a",
+      "cybereason:127.0.0.1:reauth-b",
+      "cybereason:127.0.0.1:reauth-c"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/login.html"},
+      {"header_contains": "JSESSIONID=FIXTURESESSION-A"},
+      {"header_contains": "JSESSIONID=FIXTURESESSION-B"}
+    ],
+    "log_contains": [
+      "cybereason: session rejected, logging in again",
+      "cybereason: reported 3 sensors from 127.0.0.1"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

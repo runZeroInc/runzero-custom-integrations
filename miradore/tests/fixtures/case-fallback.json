@@ -1,0 +1,70 @@
+{
+  "name": "case-fallback",
+  "integration": "miradore",
+  "description": "The site segment is case-sensitive: a live site answers 200 to /acme/ and 500 to /Acme/ -- the same answer it gives for a site that does not exist, so the error never says what is wrong. A console site name is not always written the way the URL wants it, so the lower-case form is tried before giving up. Also asserts the asset id is case-folded, so the same site typed two ways cannot produce two sets of ids.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "Acme"
+  },
+  "routes": [
+    {
+      "name": "wrong-case",
+      "match": {
+        "method": "GET",
+        "path": "/Acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 500,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<Content><Error><Description>Internal server error</Description><Code>500</Code></Error></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "lower-case",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"1\"><Device><ID>7</ID><Platform>iOS</Platform><Status>Active</Status><IPAddress>10.40.0.7</IPAddress><MACAddress>00:11:22:CC:00:07</MACAddress><InvDevice><DeviceName>core-only-07</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone15,2</Model></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "miradore:acme:7"
+    ],
+    "log_contains": [
+      "/Acme/API/Device did not answer",
+      "using /acme/API/Device",
+      "reported 1 of 1 devices matched by the query"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/Acme/API/Device"
+      },
+      {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

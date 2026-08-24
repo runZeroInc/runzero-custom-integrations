@@ -1,0 +1,153 @@
+{
+  "name": "malformed",
+  "integration": "ghost",
+  "description": "Every documented shape is violated somewhere: the repos list carries a bare string and a repository whose name is null; the findings list carries a bare string, a finding with a null id, one whose project is null, one whose severity is an object and description is null, and one whose repo_id matches nothing so the repo_url fallback builds the mapping. Each bad record must be skipped with a log line, and the assets already collected must still stream out -- the old single end-of-run report_assets lost the entire import when any of these aborted main.\n\nnamespaced_ids is skipped because the foreign id is the bare repository name with no tenant scope -- a known defect outside the scope of this change.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-ghost-token"
+  },
+  "routes": [
+    {
+      "name": "repos",
+      "match": {
+        "method": "GET",
+        "path": "/v1/repos"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              "a bare string where an object is documented",
+              {
+                "id": "repo-null-name",
+                "name": null,
+                "projects": [
+                  {
+                    "deployments": {
+                      "production": [
+                        "https://nameless.example.com"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "repo-good",
+                "name": "sturdy-service",
+                "projects": [
+                  {
+                    "deployments": {
+                      "production": [
+                        "https://sturdy.example.com"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "repo-null-projects",
+                "name": "null-projects-service",
+                "projects": null
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings",
+      "match": {
+        "method": "GET",
+        "path": "/v1/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              "a bare string where an object is documented",
+              {
+                "id": null,
+                "name": "finding with a null id",
+                "repo_id": "repo-good"
+              },
+              {
+                "id": "finding-good",
+                "name": "SQL injection",
+                "repo_id": "repo-good",
+                "repo_url": "https://git.example.com/example/sturdy",
+                "severity": "critical",
+                "description": "User input reaches the query builder."
+              },
+              {
+                "id": "finding-null-shapes",
+                "name": null,
+                "repo_id": "repo-good",
+                "severity": {
+                  "level": "high"
+                },
+                "description": null,
+                "project": null
+              },
+              {
+                "id": "finding-orphan",
+                "name": "Orphaned finding",
+                "repo_id": "repo-unknown",
+                "repo_url": "https://git.example.com/example/orphan",
+                "severity": "low",
+                "project": {
+                  "deployments": {
+                    "production": [
+                      "https://orphan.example.com"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "sturdy-service",
+      "https://git.example.com/example/orphan"
+    ],
+    "ids_absent": [
+      "null-projects-service"
+    ],
+    "assets": [
+      {
+        "id": "sturdy-service",
+        "fields": {
+          "hostnames": "sturdy.example.com"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "log_contains": [
+      "ghost: skipping malformed repository record (not an object)",
+      "ghost: skipping repository with no name: id=repo-null-name",
+      "ghost: skipping malformed finding record (not an object)",
+      "ghost: skipping finding with no id",
+      "ghost: skipping repository with no deployment hostname: name=null-projects-service",
+      "Completed. Assets created: 2"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

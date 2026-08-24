@@ -1,0 +1,36 @@
+{
+  "name": "export-not-json",
+  "integration": "runzero-scan-passive-assets",
+  "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
+  "description": "The asset export answers 200 with an HTML body -- what a proxy or a captive login in front of the console actually returns. json_decode on that aborts the whole run; the guard must print, stop, and schedule nothing. Exactly one request, no PUT, no POST.",
+  "kwargs": {
+    "url": "$BASE",
+    "site_id": "77777777-6666-5555-4444-333333333333",
+    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+  },
+  "routes": [
+    {
+      "name": "passive asset export answers HTML",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/html"},
+          "text": "<html><body>Sign in to continue</body></html>"
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"method": "PUT"},
+      {"method": "POST"}
+    ],
+    "log_contains": [
+      "The asset export returned a non-JSON body; nothing to do"
+    ]
+  }
+}

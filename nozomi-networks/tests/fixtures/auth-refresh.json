@@ -1,0 +1,73 @@
+{
+  "name": "auth-refresh",
+  "integration": "nozomi-networks",
+  "description": "The bearer token sign_in issues expires after 30 minutes, which a long inventory walk outlives. The assets query is rejected with a 401 once; the run must sign in again, install the new token, replay the same query, and finish.",
+  "kwargs": {
+    "url": "$BASE",
+    "key_name": "fixture-key-name",
+    "key_token": "fixture-key-token",
+    "include_cves": "false"
+  },
+  "routes": [
+    {
+      "name": "sign-in",
+      "match": {"method": "POST", "path": "/api/open/sign_in"},
+      "responses": [
+        {"status": 200, "json": {"authenticated": true}, "headers": {"Authorization": "Bearer first-fixture-token"}},
+        {"status": 200, "json": {"authenticated": true}, "headers": {"Authorization": "Bearer second-fixture-token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=assets%20"},
+      "responses": [
+        {"status": 401, "json": {"error": "token expired"}},
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "reauth-asset-0001",
+                "name": "rtu-north",
+                "ip": ["10.110.0.10"],
+                "mac_address": ["00:11:22:55:00:10"],
+                "type": "RTU",
+                "vendor": "Fixture Automation",
+                "firmware_version": "1.0.4"
+              },
+              {
+                "id": "reauth-asset-0002",
+                "name": "rtu-south",
+                "ip": ["10.110.0.11"],
+                "mac_address": ["00:11:22:55:00:11"],
+                "type": "RTU"
+              }
+            ],
+            "total": 2,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "nozomi-networks:$HOST:reauth-asset-0001",
+      "nozomi-networks:$HOST:reauth-asset-0002"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path": "/api/open/sign_in"},
+      {"header_contains": "Bearer first-fixture-token"},
+      {"header_contains": "Bearer second-fixture-token"}
+    ],
+    "log_contains": [
+      "nozomi-networks: the Open API rejected the bearer token, signing in again",
+      "nozomi-networks: reported 2 assets"
+    ]
+  },
+  "invariants": {"skip": []}
+}

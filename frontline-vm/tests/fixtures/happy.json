@@ -1,0 +1,114 @@
+{
+  "name": "happy",
+  "integration": "frontline-vm",
+  "description": "One page of active-view vulnerabilities followed by one page of active-view hosts. Proves the flat vulnerability list is fetched once and joined locally rather than per host, that the join falls back from IP to hostname (db01 has no IP and is matched case-insensitively against the finding's DB01), that a finding with neither IP nor hostname is dropped instead of being attached to something arbitrary, that a lower-case cve- string in the data blob is upper-cased before it reaches Vulnerability.cve (the type rejects the record otherwise), and that a host whose only address is 127.0.0.1 keeps its asset but gets no interface. Malformed rows -- a null id and a bare string -- are skipped with a logged reason while the page keeps importing. check_determinism is off for every frontline-vm scenario: the tenant scope in the id is base_url.split('://')[-1], which keeps the port, and the fixture server binds a different random port on each run, so the ids legitimately differ between two harness runs of the same scenario. That also makes exact id assertions impossible here; the counts and log lines carry the assertions instead.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 3,
+            "next": null,
+            "results": [
+              {
+                "id": 9001,
+                "title": "OpenSSH permits weak MAC algorithms CVE-2026-11111",
+                "severities": {"ddi": "High"},
+                "ip_address": "10.40.0.10",
+                "hostname": "web01",
+                "active_view_date_created": "2026-08-01T10:00:00Z",
+                "data": "The remote SSH service offers hmac-md5."
+              },
+              {
+                "id": 9002,
+                "title": "TLS 1.0 protocol enabled",
+                "severities": {"ddi": "Medium"},
+                "ip_address": "",
+                "hostname": "DB01",
+                "active_view_date_created": "2026-08-02T10:00:00Z",
+                "data": "See cve-2026-2222 for details."
+              },
+              {
+                "id": 9003,
+                "title": "Scan credential failure",
+                "severities": {"ddi": "Low"},
+                "active_view_date_created": "2026-08-02T11:00:00Z",
+                "data": "No host context on this record."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/scanresults/active/hosts/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 5,
+            "next": null,
+            "results": [
+              {
+                "id": 501,
+                "ip_address": "10.40.0.10",
+                "hostname": "web01",
+                "dns_name": "web01.corp.example.com",
+                "mac_address": "00:11:22:33:77:01",
+                "os": "Ubuntu 22.04.3 LTS",
+                "os_type": "Linux",
+                "date_created": "2026-07-01T12:00:00Z",
+                "active_view_vulnerability_severity_counts": {"weighted": {"ddi": {"counts": {"high": 1, "medium": 0}}}}
+              },
+              {
+                "id": 502,
+                "hostname": "db01",
+                "mac_address": "00:11:22:33:77:02",
+                "os": "Red Hat Enterprise Linux 9",
+                "os_type": "Linux",
+                "date_created": "2026-07-02T12:00:00Z"
+              },
+              {
+                "id": 503,
+                "ip_address": "127.0.0.1",
+                "hostname": "frontline-scanner",
+                "os": "Frontline Virtual Scanner",
+                "date_created": "2026-07-03T12:00:00Z"
+              },
+              {"id": null, "ip_address": "10.40.0.99", "hostname": "no-id-host"},
+              "not-a-host-record"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/"},
+      {"method": "GET", "path": "/api/scanresults/active/hosts/"},
+      {"header_contains": "Token fixture-token"}
+    ],
+    "log_contains": [
+      "frontline-vm: indexed 2 vulnerabilities across 2 hosts",
+      "frontline-vm: dropped 1 vulnerabilities with no IP or hostname to join on",
+      "frontline-vm: skipping host with no id: ip=10.40.0.99",
+      "frontline-vm: skipping malformed host record"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": false
+}

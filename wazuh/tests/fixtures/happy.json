@@ -1,0 +1,299 @@
+{
+  "name": "happy",
+  "integration": "wazuh",
+  "description": "The full path: basic authentication for a JWT, the agent list, and the per-agent syscollector netiface and netaddr calls that build the interfaces.\n\nProves the JWT from /security/user/authenticate is what the agent and syscollector calls carry as a bearer, that only `active` agents become assets, that a Kubernetes interface (cali*) is dropped while the real one survives, that an invalid MAC (00:00:00:00:00:00) is filtered, and that a MAC with no netaddr row falls back to the agent's primary ip.\n\nIdentity is `wazuh:<manager>:agent:<id>:<dateAdd digits>` -- see identity-stability for why.\n\nThe two os shapes are both covered: agent 001's platform duplicates its name so only the name is kept, while agent 002's differs and is appended in parentheses.\n\nThe two imported agents also bracket the device-type hint. The agent record names no chassis and syscollector adds only addressing, so the os block is the only statement of role: agent 002's platform 'rhel' is a server-only distribution and must come out typed Server, while agent 001 runs Ubuntu, which is a workstation as often as a server, and must carry NO deviceType.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "token": "fixture-wazuh-jwt"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=0"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 3,
+              "affected_items": [
+                {
+                  "id": "001",
+                  "name": "web-01",
+                  "status": "active",
+                  "ip": "10.20.0.11",
+                  "registerIP": "10.20.0.11",
+                  "manager": "wazuh3-worker-prod-sc2-03",
+                  "node_name": "wazuh3-worker-prod-sc2-03",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "group": [
+                    "default"
+                  ],
+                  "group_config_status": "synced",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64",
+                    "codename": "Jammy Jellyfish",
+                    "major": "22",
+                    "minor": "04",
+                    "uname": "Linux |web-01 |5.15.0-91-generic"
+                  }
+                },
+                {
+                  "id": "002",
+                  "name": "db-01",
+                  "status": "active",
+                  "ip": "10.20.0.12",
+                  "manager": "node01",
+                  "node_name": "node01",
+                  "dateAdd": "2026-02-20T14:30:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Red Hat Enterprise Linux",
+                    "platform": "rhel",
+                    "version": "9.4"
+                  }
+                },
+                {
+                  "id": "003",
+                  "name": "retired-01",
+                  "status": "disconnected",
+                  "ip": "10.20.0.13",
+                  "node_name": "node01",
+                  "dateAdd": "2025-06-01T08:00:00Z",
+                  "os": {
+                    "name": "Windows Server 2019",
+                    "platform": "windows",
+                    "version": "10.0.17763"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "agents-page-2-empty",
+      "match": {
+        "method": "GET",
+        "path": "/agents"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 3,
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "netiface-001",
+      "match": {
+        "method": "GET",
+        "path": "/syscollector/001/netiface"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {
+                  "name": "eth0",
+                  "mac": "00:11:22:aa:00:01"
+                },
+                {
+                  "name": "cali7f3b2c1d9e0",
+                  "mac": "ee:ee:ee:ee:ee:ee"
+                },
+                {
+                  "name": "lo",
+                  "mac": "00:00:00:00:00:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "netaddr-001",
+      "match": {
+        "method": "GET",
+        "path": "/syscollector/001/netaddr"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {
+                  "iface": "eth0",
+                  "address": "10.20.0.11",
+                  "proto": "ipv4"
+                },
+                {
+                  "iface": "kube-ipvs0",
+                  "address": "10.96.0.1",
+                  "proto": "ipv4"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "netiface-002",
+      "match": {
+        "method": "GET",
+        "path": "/syscollector/002/netiface"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": [
+                {
+                  "name": "ens192",
+                  "mac": "00:11:22:aa:00:02"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "netaddr-002",
+      "match": {
+        "method": "GET",
+        "path": "/syscollector/002/netaddr"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "wazuh:$HOST:agent:001:20260115090000",
+      "wazuh:$HOST:agent:002:20260220143000"
+    ],
+    "assets": [
+      {
+        "id": "wazuh:$HOST:agent:001:20260115090000",
+        "fields": {
+          "_attrType": "agent",
+          "hostnames": "web-01",
+          "ipAddresses": "10.20.0.11",
+          "macAddresses": "00:11:22:aa:00:01",
+          "os": "Ubuntu",
+          "osVersion": "22.04.4 LTS",
+          "wazuh_agent_id": "001",
+          "wazuh_node_name": "wazuh3-worker-prod-sc2-03"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "wazuh:$HOST:agent:002:20260220143000",
+        "fields": {
+          "_attrType": "agent",
+          "hostnames": "db-01",
+          "ipAddresses": "10.20.0.12",
+          "macAddresses": "00:11:22:aa:00:02",
+          "os": "Red Hat Enterprise Linux (rhel)",
+          "osVersion": "9.4",
+          "deviceType": "Server"
+        }
+      }
+    ],
+    "request_count": 7,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "limit=500"
+      },
+      {
+        "method": "GET",
+        "path": "/syscollector/001/netiface",
+        "header_contains": "fixture-wazuh-jwt"
+      },
+      {
+        "method": "GET",
+        "path": "/syscollector/002/netaddr"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/syscollector/003/"
+      }
+    ],
+    "log_contains": [
+      "Successfully authenticated with Wazuh API",
+      "Retrieved 3 agents from Wazuh",
+      "Successfully processed 2 Wazuh agents into RunZero assets"
+    ]
+  }
+}

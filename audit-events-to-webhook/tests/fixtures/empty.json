@@ -1,0 +1,37 @@
+{
+  "name": "empty",
+  "integration": "audit-events-to-webhook",
+  "script": "audit-events-to-webhook/audit-events-to-webhook.star",
+  "description": "A quiet hour: the `created:<1h` search matches nothing. exportEventsJSON streams a literal `[` before the first row and `]` after the last, so zero events is the body `[]`, not an empty body and not an error. This is the most common outcome for an hourly schedule on a small account, so it must not fail -- and it must not POST. An empty delivery is indistinguishable at the receiver from a real batch of nothing, and a receiver that alerts on missing deliveries would be trained by it. requests_absent on every POST is the assertion.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/hooks/runzero-audit",
+    "rz_account_token": "CT7f3a91c4e0b84d26a5c8f1e7d09b3a42"
+  },
+
+  "routes": [
+    {
+      "name": "account event log, no events in the last hour",
+      "match": {"method": "GET", "path": "/api/v1.0/account/events.json"},
+      "responses": [{"status": 200, "json": []}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/account/events.json"}
+    ],
+    "requests_absent": [
+      {"method": "POST"}
+    ],
+    "log_contains": [
+      "Sending 0 events to Webhook",
+      "No events found"
+    ]
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "name": "adguard-home",
+  "integration": "adguard-home",
+  "description": "Imports the appliance plus two static DHCP leases from a real AdGuard Home, and proves the platform clears the locally-administered bit on the appliance's own MAC.",
+  "compose": "compose.yml",
+  "service": "adguard",
+  "port": 3000,
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "install wizard answering",
+      "http": {"path": "/control/install/get_addresses", "status": [200], "body_contains": "interfaces"},
+      "timeout": 180,
+      "interval": 2
+    }
+  ],
+
+  "seed": "seed.py",
+
+  "kwargs": {
+    "url": "$BASE",
+    "username": "admin",
+    "password": "runzero-test-pw-2026",
+    "collect_dhcp": "true",
+    "collect_clients": "false"
+  },
+
+  "_kwargs_reason": "collect_clients is off deliberately. AdGuard's runtime client list is populated from whatever has queried it, including entries it derives from the container's own /etc/hosts, and its length changes as that cache fills -- two runs minutes apart see different counts. The DHCP leases are seeded and therefore exactly known, so that is what this case asserts. See the README for the phantom assets the client list produces; that is a reported finding, not something to bake into an expectation.",
+
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "adguard-home:$HOST:appliance",
+        "fields": {
+          "deviceType": "Server",
+          "os": "AdGuard Home",
+          "ipAddresses": "${seed.appliance_ip}",
+          "macAddresses": "00:42:0a:de:07:02"
+        }
+      },
+      {
+        "id": "adguard-home:$HOST:client:${seed.web01_mac}",
+        "fields": {
+          "hostnames": "web01",
+          "ipAddresses": "${seed.web01_ip}",
+          "macAddresses": "${seed.web01_mac}",
+          "adguard_dhcp_hostname": "web01",
+          "adguard_dhcp_static": "true",
+          "adguard_sources": "dhcp-static",
+          "adguard_mac": "${seed.web01_mac}"
+        }
+      },
+      {
+        "id": "adguard-home:$HOST:client:${seed.db01_mac}",
+        "fields": {
+          "hostnames": "db01",
+          "ipAddresses": "${seed.db01_ip}",
+          "macAddresses": "${seed.db01_mac}",
+          "adguard_dhcp_hostname": "db01",
+          "adguard_dhcp_static": "true",
+          "adguard_sources": "dhcp-static"
+        }
+      }
+    ],
+    "log_contains": [
+      "DHCP leases read: 0 dynamic, 2 static",
+      "reported 1 appliance and 2 clients"
+    ]
+  },
+
+  "_mac_note": "The compose file gives the container 02:42:0a:de:07:02. The asset carries 00:42:0a:de:07:02 because the platform's network_interface() helper clears the locally-administered bit. Asserting the normalised value documents that behaviour; asserting the configured value would fail and look like a seeding bug.",
+
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "_invariants_skip_reason": "Deliberate design choice, and every adguard-home fixture scenario skips it for the same reason. A DHCP lease is the only record in the AdGuard API that carries a MAC, and the MAC is the only durable key it publishes -- there is no device id to use instead. The script offsets the risk by declaring `no-id-match no-id-break`, so the address-derived id never drives or blocks a merge.",
+
+  "check_determinism": true,
+  "startup_timeout": 300,
+  "timeout": 300
+}

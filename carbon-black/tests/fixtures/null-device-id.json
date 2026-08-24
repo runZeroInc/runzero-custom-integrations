@@ -1,0 +1,106 @@
+{
+  "name": "null-device-id",
+  "integration": "carbon-black",
+  "description": "REGRESSION LOCK. Two devices whose id is present but null. str(device.get('id', '')) turned null into the literal string 'None' -- the .get default only applies when the key is ABSENT -- so both records imported as ONE foreign id, and every id-less device in the estate collided onto a single runZero asset carrying the union of their hostnames, addresses and vulnerabilities. That same 'None' was interpolated into the vulnerability URL, so the run issued POST .../devices/None/vulnerabilities/_search against an endpoint that cannot exist. Both records must now be skipped with a log line, no request may be made for device 'None', and the healthy device must still import.\n\nids_absent also pins the scoped form of the failure: no asset may emit as carbon-black:<org_key>:None.",
+  "kwargs": {
+    "url": "$BASE",
+    "organization_key": "SYNORG01",
+    "api_id": "SYNAPIID01",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "scroll-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 3,
+            "results": [
+              {
+                "id": null,
+                "name": "syn-null-id-a",
+                "os": "LINUX",
+                "last_internal_ip_address": "192.0.2.31",
+                "mac_address": "00:50:56:00:72:01"
+              },
+              {
+                "id": null,
+                "name": "syn-null-id-b",
+                "os": "WINDOWS",
+                "last_internal_ip_address": "192.0.2.32",
+                "mac_address": "00:50:56:00:72:02"
+              },
+              {
+                "id": 7203,
+                "name": "syn-healthy-7203",
+                "os": "LINUX",
+                "last_internal_ip_address": "192.0.2.33",
+                "mac_address": "00:50:56:00:72:03"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "num_found": 3,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns",
+      "match": {
+        "method": "POST",
+        "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 0,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "carbon-black:SYNORG01:7203"
+    ],
+    "ids_absent": [
+      "carbon-black:SYNORG01:None",
+      "carbon-black:SYNORG01:",
+      "None",
+      ""
+    ],
+    "assets": [
+      {
+        "id": "carbon-black:SYNORG01:7203",
+        "fields": {
+          "hostnames": "syn-healthy-7203",
+          "ipAddresses": "192.0.2.33",
+          "macAddresses": "00:50:56:00:72:03"
+        }
+      }
+    ],
+    "log_contains": [
+      "carbon-black: skipped 2 devices with no id"
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/devices/None/vulnerabilities/_search"
+      }
+    ]
+  }
+}

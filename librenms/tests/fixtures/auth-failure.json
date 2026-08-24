@@ -1,0 +1,27 @@
+{
+  "name": "auth-failure",
+  "integration": "librenms",
+  "description": "A bad token. LibreNMS auth failures never reach api_error(), so they come back in Laravel's own default shape - {\"message\": \"Unauthenticated.\"} with NO status key - which is a different envelope from every other error the API produces. An integration that only knows the {status, message} shape reports nothing useful here. The run must name the problem, point at the token, and import zero assets without aborting. The ARP call is still attempted and refused the same way, which is correct: one refused endpoint should not be assumed to mean every endpoint is refused.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "wrong-token"
+  },
+  "routes": [
+    {
+      "name": "any",
+      "match": {"method": "GET", "path_prefix": "/api/v0/"},
+      "responses": [{"status": 401, "json": {"message": "Unauthenticated."}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"status": "error", "message": "This API route doesn't exist."}},
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "was refused: Unauthenticated.",
+      "Check the API token",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

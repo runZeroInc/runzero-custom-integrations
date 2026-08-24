@@ -1,0 +1,41 @@
+{
+  "name": "empty",
+  "integration": "wazuh",
+  "description": "A manager with no agents enrolled. The walk must end on the first empty page with zero assets and a clear message, not fail, and no syscollector request may be issued.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/security/user/authenticate"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"token": "fixture-wazuh-jwt"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents",
+      "match": {"method": "GET", "path": "/agents"},
+      "responses": [
+        {"status": 200, "json": {"error": 0, "data": {"total_affected_items": 0, "affected_items": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": 1, "message": "no fixture route"}},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_absent": [
+      {"path_contains": "/syscollector/"}
+    ],
+    "log_contains": [
+      "Retrieved 0 agents from Wazuh",
+      "No agents retrieved from Wazuh"
+    ]
+  },
+  "check_determinism": true
+}

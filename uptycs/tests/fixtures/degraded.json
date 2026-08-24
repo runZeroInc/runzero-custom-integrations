@@ -1,0 +1,146 @@
+{
+  "name": "degraded",
+  "integration": "uptycs",
+  "description": "Three independent partial failures in one run, none of which may end it. interface_details rejects the upt_day partition predicate with a 400 and must be retried without the time bound (upt_day is injected by the Uptycs agent pipeline, not defined by osquery, so not every table accepts it). listening_ports answers 429 once and then relents, proving the shared HTTP helper's default three retries are doing the work rather than a hand-rolled loop. The tenant-specific vulnerability table does not exist and answers 404, which must be logged and skipped rather than aborting. The assets themselves still come out with their interfaces and services.\n\nd1 also covers the second device-type path: 'Red Hat Enterprise Linux' contains no 'server' token, so the hint can only come from os_flavor 'rhel' being a server-only distribution. d2 runs Ubuntu and must carry no deviceType.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixturecust",
+    "api_key": "fixture-key",
+    "api_secret": "fixture-secret",
+    "include_host_details": "true",
+    "include_software": "false",
+    "include_services": "true",
+    "include_vulnerabilities": "true",
+    "vulnerability_table": "upt_missing_table"
+  },
+  "routes": [
+    {
+      "name": "upt-assets",
+      "match": {"method": "POST", "body_contains": "FROM upt_assets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "d1",
+                "host_name": "degraded-d1.corp.example.net",
+                "os": "Red Hat Enterprise Linux",
+                "os_version": "9.4",
+                "os_flavor": "rhel",
+                "hardware_vendor": "Supermicro",
+                "hardware_model": "SYS-1029U",
+                "created_at": "2025-07-01 09:00:00.000",
+                "last_activity_at": "2026-08-14 18:30:00.000"
+              },
+              {
+                "id": "d2",
+                "host_name": "degraded-d2.corp.example.net",
+                "os": "Ubuntu",
+                "os_version": "24.04",
+                "created_at": "2025-07-02 09:00:00.000",
+                "last_activity_at": "2026-08-14 18:35:00.000"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "interface-details",
+      "match": {"method": "POST", "body_contains": "FROM interface_details"},
+      "responses": [
+        {"status": 400, "json": {"error": "column upt_day does not exist on interface_details"}},
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "d1", "interface": "eno1", "mac": "00:25:90:d1:00:01"},
+              {"asset_id": "d2", "interface": "ens192", "mac": "00:50:56:d2:00:02"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "interface-addresses",
+      "match": {"method": "POST", "body_contains": "FROM interface_addresses"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "d1", "interface": "eno1", "address": "10.160.0.11"},
+              {"asset_id": "d2", "interface": "ens192", "address": "10.160.0.12"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "system-info",
+      "match": {"method": "POST", "body_contains": "FROM system_info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "d1", "hardware_serial": "SN-D1", "system_uuid": "dddddddd-1111-1111-1111-111111111111", "computer_name": "degraded-d1"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "listening-ports-rate-limited",
+      "match": {"method": "POST", "body_contains": "FROM listening_ports"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {"asset_id": "d1", "address": "0.0.0.0", "port": 22, "protocol": 6, "pid": 900, "path": "/usr/sbin/sshd"},
+              {"asset_id": "d2", "address": "10.160.0.12", "port": 8443, "protocol": 6, "pid": 901, "path": "/opt/app/server"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "missing-vulnerability-table",
+      "match": {"method": "POST", "body_contains": "FROM upt_missing_table"},
+      "responses": [
+        {"status": 404, "json": {"error": "table upt_missing_table not found"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["uptycs:fixturecust:d1", "uptycs:fixturecust:d2"],
+    "assets": [
+      {"id": "uptycs:fixturecust:d1", "fields": {"deviceType": "Server"}},
+      {"id": "uptycs:fixturecust:d2", "fields_absent": ["deviceType"]}
+    ],
+    "request_count": 8,
+    "requests_include": [
+      {"method": "POST", "body_contains": "FROM interface_details WHERE upt_asset_id IN ('d1','d2') AND upt_day >="},
+      {"method": "POST", "body_contains": "FROM upt_missing_table"}
+    ],
+    "min_services_total": 2,
+    "log_contains": [
+      "uptycs: interface_details rejected the upt_day filter, queried without a time bound",
+      "uptycs: skipping vulnerabilities from upt_missing_table",
+      "uptycs: reported 2 assets so far"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

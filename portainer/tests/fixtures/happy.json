@@ -1,0 +1,313 @@
+{
+  "name": "happy",
+  "integration": "portainer",
+  "description": "A Portainer server managing one Docker environment. Proves the whole default path: /api/endpoints is filtered to Docker-family Type values, /docker/info yields the host asset keyed on the daemon ID, /docker/containers/json?all=1 yields published ports as services on that host, and /docker/networks supplies the driver map that decides which container addresses are routable. The macvlan container becomes its own asset with a real LAN address and MAC; the two bridge containers do not, because 172.17.0.x and its derived 02:42:ac:11:00:x MAC are identical on every Docker host. Container and info bodies follow the examples in moby/moby api/swagger.yaml; endpoint fields follow portainer/api/portainer.go json tags.\n\nThe macvlan MAC in the payload is 02:42:c6:33:64:2a, which is how Docker derives a MAC from an address (02:42 followed by the four address bytes of 198.51.100.42). The asserted value is 00:42:c6:33:64:2a because the shared normalize_mac helper clears the locally administered bit, which every Docker-generated MAC carries. That is the correct treatment for an interface -- the platform normalizes a scanned MAC the same way, so the two still match -- and is why the MAC is never used in the foreign id.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "mode": "portainer",
+    "api_key": "ptr_fixtureAPIKeyValue0000000000000000000000=",
+    "import_containers": "routable-only",
+    "import_published_ports": "true"
+  },
+
+  "routes": [
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoints", "header": {"X-API-Key": ""}},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Id": 1,
+              "Name": "docker-hq",
+              "Type": 2,
+              "ContainerEngine": "docker",
+              "URL": "tcp://192.0.2.40:9001",
+              "PublicURL": "docker-hq.example.com:9001",
+              "GroupId": 1,
+              "TagIds": [1, 2],
+              "Status": 1,
+              "Heartbeat": true,
+              "ComposeSyntaxMaxVersion": "3.8",
+              "TLSConfig": {"TLS": true, "TLSSkipVerify": false},
+              "Snapshots": []
+            },
+            {
+              "Id": 2,
+              "Name": "prod-cluster",
+              "Type": 6,
+              "URL": "https://k8s.example.com:6443",
+              "Status": 1,
+              "Snapshots": []
+            },
+            {
+              "Id": 3,
+              "Name": "azure-aci",
+              "Type": 3,
+              "Status": 1,
+              "Snapshots": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "docker-info",
+      "match": {"method": "GET", "path": "/api/endpoints/1/docker/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ID": "bea7c305-c44d-475b-8c73-6f4215a5c947",
+            "Containers": 3,
+            "ContainersRunning": 2,
+            "ContainersPaused": 0,
+            "ContainersStopped": 1,
+            "Images": 27,
+            "Driver": "overlay2",
+            "DockerRootDir": "/var/lib/docker",
+            "SystemTime": "2026-08-15T20:28:29.06202363Z",
+            "KernelVersion": "6.8.0-31-generic",
+            "OperatingSystem": "Ubuntu 24.04 LTS",
+            "OSVersion": "24.04",
+            "OSType": "linux",
+            "Architecture": "x86_64",
+            "NCPU": 8,
+            "MemTotal": 16768286720,
+            "Name": "docker-hq-01",
+            "Labels": ["storage=ssd", "site=hq"],
+            "ServerVersion": "27.0.1",
+            "CgroupVersion": "2",
+            "DefaultRuntime": "runc",
+            "LiveRestoreEnabled": false,
+            "SecurityOptions": ["name=apparmor", "name=seccomp,profile=builtin"],
+            "Swarm": {
+              "NodeID": "",
+              "NodeAddr": "",
+              "LocalNodeState": "inactive",
+              "ControlAvailable": false,
+              "Error": "",
+              "RemoteManagers": null
+            },
+            "Warnings": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "docker-containers",
+      "match": {"method": "GET", "path": "/api/endpoints/1/docker/containers/json", "query_contains": "all=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Id": "8dfafdbc3a40f6e0b1e6f10a0b7c1e1c4a5f9c1d2e3b4a5968778695a4b3c2d1",
+              "Names": ["/hqstack-web-1"],
+              "Image": "nginx:1.27-alpine",
+              "ImageID": "sha256:d74508fb6632491cea586a1fd7d748dfc5274cd6fdfedee309ecdcbc2bf5cb82",
+              "Command": "nginx -g 'daemon off;'",
+              "Created": 1784000000,
+              "State": "running",
+              "Status": "Up 4 days",
+              "Ports": [
+                {"IP": "0.0.0.0", "PrivatePort": 80, "PublicPort": 8080, "Type": "tcp"},
+                {"PrivatePort": 443, "Type": "tcp"}
+              ],
+              "Labels": {
+                "com.docker.compose.project": "hqstack",
+                "com.docker.compose.service": "web",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.project.working_dir": "/srv/hqstack"
+              },
+              "HostConfig": {"NetworkMode": "hqstack_default"},
+              "NetworkSettings": {
+                "Networks": {
+                  "hqstack_default": {
+                    "NetworkID": "7ea29fc1412292a2d7bba362f9253545fecdfa8ce9a6e37dd10ba8bee7129812",
+                    "EndpointID": "2cdc4edb1ded3631c81f57966563e5c8525b81121bb3706a9a9a3ae102711f3f",
+                    "Gateway": "172.18.0.1",
+                    "IPAddress": "172.18.0.4",
+                    "IPPrefixLen": 16,
+                    "MacAddress": "02:42:ac:12:00:04",
+                    "DNSNames": ["web", "hqstack-web-1"]
+                  }
+                }
+              },
+              "Mounts": []
+            },
+            {
+              "Id": "c2ada9df5af8b6a19d3c0e5f8a7b6c5d4e3f201928374655463728190a1b2c3d",
+              "Names": ["/hqstack-db-1"],
+              "Image": "postgres:16",
+              "ImageID": "sha256:11f7a1e3f0c2b5d8e9a0c1b2d3e4f5061728394a5b6c7d8e9f0a1b2c3d4e5f60",
+              "Command": "docker-entrypoint.sh postgres",
+              "Created": 1784000100,
+              "State": "exited",
+              "Status": "Exited (0) 2 hours ago",
+              "Ports": [],
+              "Labels": {
+                "com.docker.compose.project": "hqstack",
+                "com.docker.compose.service": "db",
+                "com.docker.compose.container-number": "1"
+              },
+              "HostConfig": {"NetworkMode": "hqstack_default"},
+              "NetworkSettings": {
+                "Networks": {
+                  "hqstack_default": {
+                    "NetworkID": "7ea29fc1412292a2d7bba362f9253545fecdfa8ce9a6e37dd10ba8bee7129812",
+                    "Gateway": "172.18.0.1",
+                    "IPAddress": "172.18.0.5",
+                    "IPPrefixLen": 16,
+                    "MacAddress": "02:42:ac:12:00:05"
+                  }
+                }
+              }
+            },
+            {
+              "Id": "f1e2d3c4b5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff00",
+              "Names": ["/homeassistant"],
+              "Image": "ghcr.io/home-assistant/home-assistant:2026.7",
+              "Command": "/init",
+              "Created": 1783000000,
+              "State": "running",
+              "Status": "Up 3 weeks (healthy)",
+              "Ports": [],
+              "Labels": {},
+              "HostConfig": {"NetworkMode": "lan-macvlan"},
+              "NetworkSettings": {
+                "Networks": {
+                  "lan-macvlan": {
+                    "NetworkID": "9a8b7c6d5e4f30211201f2e3d4c5b6a798877665544332211aabbccddeeff001",
+                    "EndpointID": "0b1a2c3d4e5f60718293a4b5c6d7e8f901234567890abcdef1234567890abcdef",
+                    "Gateway": "198.51.100.1",
+                    "IPAddress": "198.51.100.42",
+                    "IPPrefixLen": 24,
+                    "MacAddress": "02:42:c6:33:64:2a",
+                    "DNSNames": ["homeassistant"]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "docker-networks",
+      "match": {"method": "GET", "path": "/api/endpoints/1/docker/networks"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Name": "bridge",
+              "Id": "f2de39df4171b0dc801e8002d1d999b77256983dfc63041c0f34030aa3977566",
+              "Created": "2026-06-19T06:21:00.416543526Z",
+              "Scope": "local",
+              "Driver": "bridge",
+              "EnableIPv6": false,
+              "Internal": false,
+              "Attachable": false,
+              "Ingress": false,
+              "IPAM": {"Driver": "default", "Config": [{"Subnet": "172.17.0.0/16", "Gateway": "172.17.0.1"}]},
+              "Options": {"com.docker.network.bridge.default_bridge": "true"}
+            },
+            {
+              "Name": "hqstack_default",
+              "Id": "7ea29fc1412292a2d7bba362f9253545fecdfa8ce9a6e37dd10ba8bee7129812",
+              "Scope": "local",
+              "Driver": "bridge",
+              "IPAM": {"Driver": "default", "Config": [{"Subnet": "172.18.0.0/16", "Gateway": "172.18.0.1"}]},
+              "Options": {}
+            },
+            {
+              "Name": "lan-macvlan",
+              "Id": "9a8b7c6d5e4f30211201f2e3d4c5b6a798877665544332211aabbccddeeff001",
+              "Scope": "local",
+              "Driver": "macvlan",
+              "IPAM": {"Driver": "default", "Config": [{"Subnet": "198.51.100.0/24", "Gateway": "198.51.100.1"}]},
+              "Options": {"parent": "eth0"}
+            },
+            {
+              "Name": "host",
+              "Id": "13e871235c677e1e5b2c9d1a0f8b7c6d5e4f30211201f2e3d4c5b6a7988776655",
+              "Scope": "local",
+              "Driver": "host",
+              "IPAM": {"Driver": "default", "Config": []},
+              "Options": {}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "docker:$HOST:host:bea7c305-c44d-475b-8c73-6f4215a5c947",
+      "docker:$HOST:bea7c305-c44d-475b-8c73-6f4215a5c947:container:homeassistant"
+    ],
+    "ids_absent": [
+      "docker:$HOST:bea7c305-c44d-475b-8c73-6f4215a5c947:container:hqstack/web/1",
+      "docker:$HOST:bea7c305-c44d-475b-8c73-6f4215a5c947:container:hqstack/db/1"
+    ],
+    "assets": [
+      {
+        "id": "docker:$HOST:host:bea7c305-c44d-475b-8c73-6f4215a5c947",
+        "fields": {
+          "_attrType": "host",
+          "hostnames": "docker-hq-01",
+          "os": "Ubuntu 24.04 LTS",
+          "osVersion": "24.04",
+          "deviceType": "Server",
+          "ipAddresses": "192.0.2.40",
+          "docker.server_version": "27.0.1",
+          "docker.architecture": "x86_64",
+          "docker.swarm_state": "inactive",
+          "portainer.endpoint_type": "docker-agent",
+          "portainer.endpoint_status": "up"
+        }
+      },
+      {
+        "id": "docker:$HOST:bea7c305-c44d-475b-8c73-6f4215a5c947:container:homeassistant",
+        "fields": {
+          "_attrType": "container",
+          "hostnames": "homeassistant",
+          "deviceType": "Container",
+          "ipAddresses": "198.51.100.42",
+          "macAddresses": "00:42:c6:33:64:2a",
+          "docker.state": "running",
+          "docker.image": "ghcr.io/home-assistant/home-assistant:2026.7",
+          "docker.health": "healthy"
+        }
+      }
+    ],
+    "min_services_total": 1,
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/endpoints", "header": {"X-API-Key": "ptr_fixtureAPIKeyValue0000000000000000000000="}},
+      {"method": "GET", "path": "/api/endpoints/1/docker/info"},
+      {"method": "GET", "path": "/api/endpoints/1/docker/containers/json", "query_contains": "all=1"},
+      {"method": "GET", "path": "/api/endpoints/1/docker/networks"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/endpoints/2/"},
+      {"path_contains": "/api/endpoints/3/"}
+    ],
+    "log_contains": [
+      "skipping environment 2 of type 6 (kubernetes-agent)",
+      "skipping environment 3 of type 3 (azure)",
+      "collecting 1 Docker environment(s)",
+      "portainer: reported 2 assets from 1 environment(s)"
+    ]
+  },
+
+  "check_determinism": true
+}

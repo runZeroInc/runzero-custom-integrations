@@ -1,0 +1,156 @@
+{
+  "name": "download-unavailable",
+  "integration": "runzero-task-sync",
+  "script": "runzero-task-sync/runzero-task-sync.star",
+  "description": "A task in the list whose scan data cannot be downloaded. This is ordinary, not exotic: the source search filter selects on name and type, never on status, while APIOrgTaskScanDataGet 404s unless the task is `processed` and of a data-bearing type -- so any task still queued or running when the sync starts is listed and then refuses its data. It must be reported and SKIPPED, and the walk must continue: the assertion that matters is that the healthy task after it is still downloaded, imported, and hidden. A run that gave up on the first 404 would need every task in the source org to be finished at the instant it ran. Note also that the failed task must NOT be hidden -- hiding is gated on a successful sync, and hiding a task whose data never transferred would remove it from the source view of what still needs mirroring, losing it permanently.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "src_org_id": "aaaaaaaa-1111-4222-8333-444444444444",
+    "src_task_search_filter": "type:scan",
+    "dst_url": "$BASE",
+    "dst_org_id": "bbbbbbbb-5555-4666-8777-888888888888",
+    "dst_site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+    "hide_tasks_on_sync": "true",
+    "src_api_token": "OT-source-fixture-token",
+    "dst_api_token": "OT-destination-fixture-token"
+  },
+
+  "routes": [
+    {
+      "name": "source task list",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "d5d5d5d5-3333-4444-8555-666666666666",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processing",
+              "name": "Sweep still running",
+              "created_at": 1755250000,
+              "updated_at": 1755250100,
+              "hidden": false,
+              "recur": false,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "params": {},
+              "stats": {}
+            },
+            {
+              "id": "d6d6d6d6-6666-4777-8888-999999999999",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "name": "Finished sweep",
+              "created_at": 1755260000,
+              "updated_at": 1755263600,
+              "hidden": false,
+              "recur": false,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "params": {},
+              "stats": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unfinished task has no downloadable data",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d5d5d5d5-3333-4444-8555-666666666666/data"},
+      "responses": [{"status": 404, "json": {"error": "task not found"}}]
+    },
+    {
+      "name": "finished task data redirect",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d6d6d6d6-6666-4777-8888-999999999999/data"},
+      "responses": [
+        {
+          "status": 303,
+          "headers": {"Location": "$BASE/scan-bucket/scan_d6d6d6d6_eeeeeeee.json.gz"},
+          "json": {"url": "$BASE/scan-bucket/scan_d6d6d6d6_eeeeeeee.json.gz"}
+        }
+      ]
+    },
+    {
+      "name": "finished task scan data object",
+      "match": {"method": "GET", "path": "/scan-bucket/scan_d6d6d6d6_eeeeeeee.json.gz"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/gzip"},
+          "body_base64": "H4sIAAAAAAAC/02MwQ7CIBBE7/0KsmeX0FrB9uaXGFIwEiyQLjGapv8utBdnLzszebNC/iYLIwOadEAXHhFODLImf3em5kYeh7IIe6UUXotw+FNF3nYhF0NFLlzwTgrVnbmArVlhnx1ZefZJTWQzRt9WzqWbMYstEdWuFbzvCi9lLZ+RctDzUUWPouVTXBK3Hz2nly1mhm1rfvc5T6jGAAAA"
+        }
+      ]
+    },
+    {
+      "name": "destination import",
+      "match": {"method": "PUT", "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "f3f3f3f3-1111-4222-8333-444444444444",
+            "organization_id": "bbbbbbbb-5555-4666-8777-888888888888",
+            "site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+            "type": "import",
+            "status": "new",
+            "name": "Scan Import",
+            "created_at": 1755400000,
+            "updated_at": 1755400000,
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "hide the task that actually synced",
+      "match": {"method": "POST", "path": "/api/v1.0/org/tasks/d6d6d6d6-6666-4777-8888-999999999999/hide"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "d6d6d6d6-6666-4777-8888-999999999999",
+            "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+            "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+            "type": "scan",
+            "status": "processed",
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 6,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/org/tasks/d5d5d5d5-3333-4444-8555-666666666666/data"},
+      {"method": "GET", "path": "/scan-bucket/scan_d6d6d6d6_eeeeeeee.json.gz"},
+      {"method": "PUT", "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import"},
+      {"method": "POST", "path": "/api/v1.0/org/tasks/d6d6d6d6-6666-4777-8888-999999999999/hide"}
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/api/v1.0/org/tasks/d5d5d5d5-3333-4444-8555-666666666666/hide"}
+    ],
+    "log_contains": [
+      "Failed to download task: d5d5d5d5-3333-4444-8555-666666666666",
+      "Sync failed for task: d5d5d5d5-3333-4444-8555-666666666666",
+      "Successfully synced task: d6d6d6d6-6666-4777-8888-999999999999",
+      "Task hidden: d6d6d6d6-6666-4777-8888-999999999999"
+    ]
+  }
+}

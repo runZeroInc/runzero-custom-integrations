@@ -1,0 +1,119 @@
+{
+  "name": "malformed",
+  "integration": "opnsense",
+  "description": "Junk in every payload must be skipped without losing the run. systemInformation returns versions as a bare string where an array is documented; getInterfaceConfig returns a string for one device and a null macaddr for another; the ARP array contains a string element, an entry with a null mac, an entry whose mac is not hex, an entry whose ip is not an address, an entry whose hostname is a bare IP, and an entry whose hostname is the placeholder '*'; getNdp returns an object instead of an array; and the Kea rows array contains a string. Everything parseable still imports: one appliance and two hosts. Proves the hostname filters (bare IP and placeholder are dropped, so no_placeholder_hostnames cannot fire) and that a non-list where a list is documented degrades to empty rather than aborting. no_mac_in_id is skipped for the reason recorded in happy.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "api_secret": "fixture-secret",
+    "collect_leases": "true"
+  },
+  "routes": [
+    {
+      "name": "system-information",
+      "match": {"method": "GET", "path": "/api/diagnostics/system/systemInformation"},
+      "responses": [
+        {"status": 200, "json": {"name": "fw02", "versions": "OPNsense 25.7.1-amd64", "updates": ""}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interface-config",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getInterfaceConfig"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "igb0": "not-an-object",
+            "igb1": {"device": "igb1", "macaddr": null, "ipv4": [{"ipaddr": "198.51.100.20", "subnetbits": 24}], "ipv6": "not-a-list"},
+            "igb2": {"device": "igb2", "macaddr": "00:0d:b9:41:2a:22", "ipv4": [], "ipv6": []}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getArp"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "this row is a string",
+            {"mac": null, "ip": "192.0.2.90", "intf": "igb1", "permanent": false, "expired": false},
+            {"mac": "zz:zz:zz:zz:zz:zz", "ip": "192.0.2.91", "intf": "igb1", "permanent": false, "expired": false},
+            {"mac": "aa:bb:cc:00:22:01", "ip": "not-an-address", "intf": "igb1", "permanent": false, "expired": false, "hostname": "192.0.2.92", "intf_description": "LAN"},
+            {"mac": "aa:bb:cc:00:22:02", "ip": "192.0.2.93", "intf": "igb1", "permanent": false, "expired": false, "hostname": "*", "intf_description": "LAN"}
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ndp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getNdp"},
+      "responses": [
+        {"status": 200, "json": {"unexpected": "object"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "kea4",
+      "match": {"method": "POST", "path": "/api/kea/leases4/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 1,
+            "rowCount": 1,
+            "current": 1,
+            "rows": ["a string where an object is documented"]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "kea6",
+      "match": {"method": "POST", "path": "/api/kea/leases6/search"},
+      "responses": [{"status": 200, "json": {"total": 0, "rowCount": 0, "current": 1, "rows": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dnsmasq",
+      "match": {"method": "POST", "path": "/api/dnsmasq/leases/search"},
+      "responses": [{"status": 200, "json": {"total": 0, "rowCount": 0, "current": 1, "rows": []}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "opnsense:$HOST:appliance",
+      "opnsense:$HOST:host:aa:bb:cc:00:22:01",
+      "opnsense:$HOST:host:aa:bb:cc:00:22:02"
+    ],
+    "assets": [
+      {
+        "id": "opnsense:$HOST:appliance",
+        "fields": {"os": "OPNsense", "osVersion": "25.7.1"},
+        "fields_absent": []
+      },
+      {
+        "id": "opnsense:$HOST:host:aa:bb:cc:00:22:01",
+        "fields_absent": ["ipAddresses", "hostnames"]
+      },
+      {
+        "id": "opnsense:$HOST:host:aa:bb:cc:00:22:02",
+        "fields": {"ipAddresses": "192.0.2.93"},
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "log_contains": ["reported 1 firewall and 2 discovered hosts"]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

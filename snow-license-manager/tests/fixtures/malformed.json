@@ -1,0 +1,190 @@
+{
+  "name": "malformed",
+  "integration": "snow-license-manager",
+  "script": "snow-license-manager/snow-license-manager.star",
+  "description": "One page of computers containing every shape that used to abort the whole import, none of which may cost more than its own record.\n\nTimestamps: computer 9401's LastScanDate already carries a UTC offset, which the old code turned into '...+01:00Z' and fed to parse_time -- a raise, and the whole run lost. It must now import with the epoch as its attribute (1672527600 is 2023-01-01T00:00:00+01:00). Its BiosDate is unparseable and must be carried RAW rather than dropped or raising.\n\nEnvelope: a null Body entry and a bare string in the computers list must each be skipped, not indexed into.\n\nHardware fallback, both directions: 9402 arrives without a Hardware block, so the per-computer detail record is fetched and its adapters become the interfaces; 9403 arrives without Hardware and its detail call is DENIED, so it imports hostname-only rather than failing. Whether the real SLM computers list returns full or summary rows is unconfirmed against a live install -- this additive fallback makes both shapes work.\n\nApplications: a null-Body row and a row with no Id must be skipped with a log line while the good row still becomes Software.\n\nnamespaced_ids is skipped: the asset id is the bare SLM computer Id with no customer scope. Pre-existing, not introduced here.",
+  "kwargs": {
+    "url": "$BASE",
+    "customer_id": "fixture-customer",
+    "username": "svc-runzero",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 5}
+            ],
+            "Body": [
+              {
+                "Body": {
+                  "Id": 9401,
+                  "Name": "syn-snow-offset-ts",
+                  "Manufacturer": "Dell Inc.",
+                  "OperatingSystem": "Windows 11 Enterprise",
+                  "BiosSerialNumber": "SNOWSER9401",
+                  "IsPortable": true,
+                  "LastScanDate": "2023-01-01T00:00:00+01:00",
+                  "Hardware": {
+                    "BiosDate": "not-a-date",
+                    "NetworkAdapters": [
+                      {"MacAddress": "00:11:22:44:94:01", "IpAddress": "10.70.4.11"}
+                    ]
+                  }
+                }
+              },
+              {
+                "Body": null
+              },
+              "a bare string where a computer row is documented",
+              {
+                "Body": {
+                  "Id": 9402,
+                  "Name": "syn-snow-summary-row",
+                  "OperatingSystem": "Windows Server 2022",
+                  "IsServer": true
+                }
+              },
+              {
+                "Body": {
+                  "Id": 9403,
+                  "Name": "syn-snow-detail-denied",
+                  "OperatingSystem": "Windows 11 Enterprise"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "detail-9402",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers/9402"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [],
+            "Body": {
+              "Id": 9402,
+              "Name": "syn-snow-summary-row",
+              "Hardware": {
+                "NetworkAdapters": [
+                  {"MacAddress": "00:11:22:44:94:02", "IpAddress": "10.70.4.12"}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "detail-9403-denied",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers/9403"},
+      "responses": [
+        {"status": 403, "json": {"Message": "The user does not have access to this computer."}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications-9401",
+      "match": {"method": "GET", "path": "/api/customers/fixture-customer/computers/9401/applications"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 3}
+            ],
+            "Body": [
+              {"Body": null},
+              {"Body": {"Name": "App With No Id"}},
+              {
+                "Body": {
+                  "Id": 77003,
+                  "Name": "Acme Viewer 2026",
+                  "ManufacturerName": "Acme Software",
+                  "FamilyName": "Acme Viewer",
+                  "LastUsed": "2026-08-01T10:00:00",
+                  "IsInstalled": true
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "applications-empty",
+      "match": {"method": "GET", "path_regex": "/api/customers/fixture-customer/computers/[0-9]+/applications$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Meta": [
+              {"Name": "Count", "Value": 0}
+            ],
+            "Body": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["9401", "9402", "9403"],
+    "assets": [
+      {
+        "id": "9401",
+        "fields": {
+          "hostnames": "syn-snow-offset-ts",
+          "macAddresses": "00:11:22:44:94:01",
+          "ipAddresses": "10.70.4.11",
+          "deviceType": "Laptop",
+          "lastScanDate": "1672527600",
+          "biosDate": "not-a-date"
+        }
+      },
+      {
+        "id": "9402",
+        "fields": {
+          "hostnames": "syn-snow-summary-row",
+          "macAddresses": "00:11:22:44:94:02",
+          "ipAddresses": "10.70.4.12",
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "9403",
+        "fields": {
+          "hostnames": "syn-snow-detail-denied"
+        },
+        "fields_absent": ["macAddresses", "ipAddresses"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9402"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9403"},
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9401/applications"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/api/customers/fixture-customer/computers/9401"}
+    ],
+    "min_software_total": 1,
+    "log_contains": [
+      "snow: skipping computer with no Id/BiosSerialNumber",
+      "snow: skipping application row with no Id: name=App With No Id",
+      "failed to retrieve computer detail for 9403: status 403"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

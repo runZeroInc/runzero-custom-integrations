@@ -1,0 +1,69 @@
+{
+  "name": "malformed",
+  "integration": "absolute",
+  "description": "A v3 report page whose data array carries a bare string and a null alongside a real device, and whose real device carries present-but-null nested blocks (operatingSystem, bios, geoData, deviceStatus, espInfo) and a non-dict networkAdapters member. One non-dict row in data[] used to abort the entire task mid-import (verified against the real scanner); it must instead be skipped with a log line while the surviving device imports with its null blocks treated as absent.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key"
+  },
+  "routes": [
+    {
+      "name": "jws-validate",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": [
+              "this row is a string, not a device object",
+              null,
+              {
+                "deviceUid": "malformed-device-0001",
+                "deviceName": "FIXTURE-MAL-0001",
+                "serialNumber": "FIXTUREMAL0001",
+                "localIp": "10.170.0.1",
+                "operatingSystem": null,
+                "bios": null,
+                "espInfo": null,
+                "deviceStatus": null,
+                "geoData": null,
+                "networkAdapters": [
+                  "not an adapter object",
+                  {
+                    "name": "Ethernet",
+                    "macAddress": "00:11:22:99:00:01",
+                    "ipV4Address": "10.170.0.1"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["absolute:$HOST:malformed-device-0001"],
+    "request_count": 1,
+    "assets": [
+      {
+        "id": "absolute:$HOST:malformed-device-0001",
+        "fields": {
+          "hostnames": "FIXTURE-MAL-0001",
+          "ipAddresses": "10.170.0.1",
+          "macAddresses": "00:11:22:99:00:01"
+        }
+      }
+    ],
+    "log_contains": [
+      "absolute: skipping non-dict device record: string",
+      "absolute: skipping non-dict device record: NoneType",
+      "absolute: reported 1 devices"
+    ]
+  },
+  "invariants": {"skip": []}
+}

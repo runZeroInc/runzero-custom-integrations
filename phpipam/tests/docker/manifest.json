@@ -1,0 +1,79 @@
+{
+  "name": "phpipam",
+  "integration": "phpipam",
+  "description": "Imports addresses and the device inventory from a real phpIPAM 1.8.1 over real TLS, and proves a bare reservation with no hostname or MAC is dropped rather than merged onto whatever holds that address today.",
+  "compose": "compose.yml",
+  "service": "phpipam-www",
+  "scheme": "https",
+
+  "ready": [
+    {
+      "name": "apache serving phpIPAM",
+      "exec": ["sh", "-c", "nc -z 127.0.0.1 80 && echo rz-web-ready"],
+      "contains": "rz-web-ready",
+      "timeout": 300,
+      "interval": 3
+    },
+    {
+      "name": "TLS front end serving phpIPAM",
+      "service": "tls",
+      "exec": ["sh", "-c", "wget -q --no-check-certificate -O /dev/null https://localhost/ && echo rz-tls-ready"],
+      "contains": "rz-tls-ready",
+      "timeout": 300,
+      "interval": 3
+    }
+  ],
+
+  "_ready_reason": "Both gates are `exec` rather than the harness's HTTP probe, and that is forced by the TLS arrangement rather than chosen. The probe would have to address the published port as https://127.0.0.1:<port>, and an IP literal cannot appear in SNI -- so the terminator, which selects its certificate and its site by SNI, refuses the handshake before any status code exists to check. There is also no manifest token for the allocated port on its own ($BASE and $BASE_HOST both carry 127.0.0.1), so the gate could not spell https://localhost:<port> even if SNI were not the problem. Running wget inside the proxy container reaches the same listener over the same TLS, with `localhost` in SNI, and so tests more of the path than a port check would.",
+
+  "seed": "seed.py",
+  "seed_timeout": 600,
+
+  "kwargs": {
+    "url": "${seed.base}",
+    "app_id": "${seed.app_id}",
+    "username": "${seed.username}",
+    "password": "${seed.password}",
+    "tls_disable_validation": "true",
+    "import_addresses": "true",
+    "import_devices": "true",
+    "require_identity": "true"
+  },
+
+  "_kwargs_url_reason": "https://localhost:<port>, not $BASE. Two reasons, and both are properties of the stack rather than preferences. The integration refuses any URL that is not https, so TLS is not optional here. And the terminator serves a certificate for `localhost` and selects its site from SNI plus Host, so a request addressed to https://127.0.0.1:<port> is refused during the handshake with no useful error. `localhost` resolves to the same place. It does mean the ids are scoped `phpipam:localhost:...`, which is what the operator's own URL would produce.",
+
+  "_kwargs_tls_reason": "The certificate is minted by the proxy's internal CA and trusted by nothing, so validation is disabled. That is a property of a throwaway container, not a recommendation: the point of the TLS here is that the transport is real, because without it the integration stops before its first request.",
+
+  "expect": {
+    "min_assets": 3,
+    "assets": [
+      {
+        "id": "phpipam:localhost:address:${seed.web_id}",
+        "fields": {
+          "hostnames": "rz-web01",
+          "ipAddresses": "10.90.0.21",
+          "macAddresses": "00:11:22:33:44:55"
+        }
+      },
+      {
+        "id": "phpipam:localhost:address:${seed.db_id}",
+        "fields": {
+          "hostnames": "rz-db01",
+          "ipAddresses": "10.90.0.22"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "ids_absent": ["phpipam:localhost:address:${seed.bare_id}"]
+  },
+
+  "_ids_absent_reason": "The strongest assertion in this case. 10.90.0.23 is a real phpIPAM reservation with a description and nothing else -- no hostname, no MAC -- which is what most of a real IPAM consists of. Importing it would attach a bare address to an asset that merges onto whatever holds 10.90.0.23 today. require_identity is what drops it, and this proves it does.",
+
+  "_min_assets_reason": "min_assets rather than asset_count because phpIPAM's SCHEMA.sql ships demo content -- sections, subnets and addresses that any real first install also receives -- and it is imported alongside the seeded rows. Deleting it would be tidier and less honest: it is genuine phpIPAM data, and the integration has to cope with it.",
+
+  "invariants": {"skip": []},
+
+  "check_determinism": true,
+  "startup_timeout": 600,
+  "timeout": 600
+}

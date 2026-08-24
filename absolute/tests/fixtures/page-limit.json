@@ -1,0 +1,96 @@
+{
+  "name": "page-limit",
+  "integration": "absolute",
+  "description": "Proves the max_pages parameter actually drives the loop bound rather than decorating the credential form, and that a run stopped by the ceiling ERRORS rather than truncating silently: the bound is enforced by pager(), whose limit raise names the label and the page count, and the assets streamed before the raise survive. max_pages is set to 2 and the server offers a third page, so a walk that ignored the parameter would fetch it.\n\nThe cursors advance (a run of 'A' then a run of 'B'), so the no-progress guard cannot fire and the only thing that can stop this walk is the ceiling. Absolute hides the query string inside the base64url JOSE header of the signed envelope, so each cursor is a long single-character run: 'A' encodes to the repeated block 'QUFB' and 'B' to 'QkJC' regardless of where the run starts, which is what the routes match on.\n\nThe page-three route is a regression terminator: it ends the walk on a blank cursor one request past the ceiling, so an integration that ignored max_pages fails on request_count and the missing log line rather than by timing out.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1",
+    "max_pages": "2"
+  },
+  "routes": [
+    {
+      "name": "devices-page-3-terminator",
+      "match": {"method": "POST", "path": "/jws/validate", "body_contains": "QkJCQkJCQkJCQkJC"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": [
+              {
+                "deviceUid": "cap-device-0003",
+                "deviceName": "FIXTURE-CAP-C",
+                "serialNumber": "FIXTURECAP0003",
+                "localIp": "10.152.0.3",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {"method": "POST", "path": "/jws/validate", "body_contains": "QUFBQUFBQUFBQUFB"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}},
+            "data": [
+              {
+                "deviceUid": "cap-device-0002",
+                "deviceName": "FIXTURE-CAP-B",
+                "serialNumber": "FIXTURECAP0002",
+                "localIp": "10.152.0.2",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+            "data": [
+              {
+                "deviceUid": "cap-device-0001",
+                "deviceName": "FIXTURE-CAP-A",
+                "serialNumber": "FIXTURECAP0001",
+                "localIp": "10.152.0.1",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "absolute:$HOST:cap-device-0001",
+      "absolute:$HOST:cap-device-0002"
+    ],
+    "ids_absent": ["absolute:$HOST:cap-device-0003"],
+    "request_count": 2,
+    "requests_absent": [
+      {"method": "POST", "path": "/jws/validate", "body_contains": "QkJCQkJCQkJCQkJC"}
+    ],
+    "log_contains": [
+      "pagination limit reached: \"devices\" ran 2 pages without the source reporting a last page"
+    ]
+  },
+  "invariants": {"skip": []}
+}

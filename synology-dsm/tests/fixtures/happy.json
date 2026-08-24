@@ -1,0 +1,458 @@
+{
+  "name": "happy",
+  "integration": "synology-dsm",
+  "description": "A full collection from a DSM 7 NAS with Virtual Machine Manager, Surveillance Station, Active Backup for Business, and the DHCP Server package installed. Proves the whole design rests on API DISCOVERY rather than hardcoding: SYNO.API.Info is queried first, and the CGI path and version range it returns are what every later call uses - which matters because SYNO.API.Auth lives at auth.cgi on DSM 6 and entry.cgi on DSM 7, and because SYNO.DSM.Info and SYNO.DSM.Network are version 2 ONLY. Discovery is also what makes the optional packages safe: a NAS without Surveillance Station is never asked about cameras. Also proves: login is a POST with a form-encoded body so the password never enters a URL, and enable_syno_token is requested so a CSRF-hardened DSM works; the returned synotoken is sent back as X-SYNO-TOKEN on every later call; the chassis serial becomes a real foreign id that IS allowed to drive merges; DSM's dash-separated upper-case MACs are canonicalised; a PPPoE interface with no mac key and an interface holding only APIPA are both handled; VMM guest MACs come from the OFFICIAL SYNO.Virtualization.API.Guest, whose vnics array the internal SYNO.Virtualization.Guest does not have; a camera's address arrives in `host` and may be an IP or a name; and the session is ended with an explicit logout, because DSM allows few concurrent sessions. Camera 1's display name 'Front Door' is an operator label, not a machine name: it carries a space, so it must land in synology_camera_name and NOT in hostnames, where it would be a merge hazard. no_mac_in_id is skipped: a DHCP lease has no identifier but its MAC, deliberately paired with no-id-match no-id-break.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-runzero",
+    "password": "fixture-password",
+    "dhcp_interfaces": "bond0"
+  },
+  "routes": [
+    {
+      "name": "api-info",
+      "match": {"method": "GET", "path": "/webapi/query.cgi"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "SYNO.API.Info": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 1},
+              "SYNO.API.Auth": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 7},
+              "SYNO.DSM.Info": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2, "requestFormat": "JSON"},
+              "SYNO.DSM.Network": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2, "requestFormat": "JSON"},
+              "SYNO.Core.System": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 3, "requestFormat": "JSON"},
+              "SYNO.Virtualization.API.Guest": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 1, "requestFormat": "JSON"},
+              "SYNO.SurveillanceStation.Camera": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 9, "requestFormat": "JSON"},
+              "SYNO.ActiveBackup.Task": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 2, "requestFormat": "JSON"},
+              "SYNO.Network.DHCPServer.ClientList": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 2, "requestFormat": "JSON"}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/webapi/entry.cgi", "body_contains": "method=login"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "sid": "fixture-session-id-abc123",
+              "did": "fixture-device-id",
+              "synotoken": "fixture-syno-token",
+              "is_portal_port": false
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "dsm-info",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "codepage": "enu",
+              "model": "DS1821+",
+              "ram": 32768,
+              "serial": "2140PDN123456",
+              "temperature": 41,
+              "temperature_warn": false,
+              "time": "Sat Aug 15 22:11:04 2026",
+              "uptime": 4551238,
+              "version": "64570",
+              "version_string": "DSM 7.2.1-69057 Update 5"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "core-system",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.Core.System"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "cpu_clock_speed": 2200,
+              "cpu_cores": "4",
+              "cpu_family": "Ryzen",
+              "cpu_series": "V1500B",
+              "cpu_vendor": "AMD",
+              "enabled_ntp": true,
+              "firmware_date": "2024/11/08",
+              "firmware_ver": "DSM 7.2.1-69057 Update 5",
+              "model": "DS1821+",
+              "ntp_server": "time.google.com",
+              "ram_size": 32768,
+              "serial": "2140PDN123456",
+              "sys_temp": 41,
+              "time_zone": "Chicago",
+              "up_time": "52:15:32",
+              "usb_dev": [
+                {"cls": "ups", "producer": "American Power Conversion", "product": "Back-UPS RS 1500", "vid": "051d", "pid": "0002"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dsm-network",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Network"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "dns": ["192.168.20.1"],
+              "gateway": "192.168.20.1",
+              "hostname": "vault-nas",
+              "workgroup": "WORKGROUP",
+              "interfaces": [
+                {
+                  "id": "bond0",
+                  "ip": [{"address": "192.168.20.15", "netmask": "255.255.255.0"}],
+                  "ipv6": [
+                    {"address": "2001:db8:20::15", "prefix_length": 64, "scope": "global"},
+                    {"address": "fe80::211:32ff:feaa:ca59", "prefix_length": 64, "scope": "link"}
+                  ],
+                  "mac": "00-11-32-AA-CA-59",
+                  "type": "lan"
+                },
+                {
+                  "id": "eth2",
+                  "ip": [{"address": "169.254.158.209", "netmask": "255.255.0.0"}],
+                  "mac": "00-11-32-AA-CA-5A",
+                  "type": "lan"
+                },
+                {
+                  "id": "pppoe0",
+                  "ip": [{"address": "203.0.113.77", "netmask": "255.255.255.255"}],
+                  "type": "pppoe"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vmm-guests",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.Virtualization.API.Guest"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "guests": [
+                {
+                  "autorun": 1,
+                  "description": "Domain controller",
+                  "guest_id": "49dee62c-8ea2-465b-9dff-815025f91bba",
+                  "guest_name": "dc01",
+                  "status": "running",
+                  "storage_id": "afb50893-1111-2222-3333-444455556666",
+                  "storage_name": "Synology - VM Storage 1",
+                  "vcpu_num": 4,
+                  "vram_size": 8192,
+                  "vdisks": [{"controller": 1, "unmap": false, "vdisk_id": "ec671cfd-aaaa", "vdisk_size": 102400}],
+                  "vnics": [
+                    {"mac": "02:11:32:21:f2:1b", "model": 1, "network_id": "bfffe844-aaaa", "network_name": "Default VM Network", "vnic_id": "600eada2-aaaa"}
+                  ]
+                },
+                {
+                  "autorun": 0,
+                  "guest_id": "8b21c0de-4c4e-4f6a-9d18-0a1b2c3d4e5f",
+                  "guest_name": "build-runner",
+                  "status": "shutdown",
+                  "vcpu_num": 8,
+                  "vram_size": 16384,
+                  "vnics": []
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cameras",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.SurveillanceStation.Camera"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "total": 3,
+              "keyTotalCnt": 2,
+              "keyUsedCnt": 2,
+              "cameras": [
+                {
+                  "id": 1,
+                  "name": "Front Door",
+                  "host": "192.168.20.101",
+                  "port": 554,
+                  "vendor": "Hikvision",
+                  "model": "DS-2CD2143G2-I",
+                  "firmware": "V5.7.3",
+                  "enabled": true,
+                  "status": 0,
+                  "camStatus": 1,
+                  "resolution": "2688x1520",
+                  "fps": 20,
+                  "channel_id": "1",
+                  "deviceType": 1
+                },
+                {
+                  "id": 2,
+                  "name": "Garage",
+                  "host": "garage-cam.example.com",
+                  "port": 80,
+                  "vendor": "User",
+                  "model": "Define",
+                  "firmware": "",
+                  "enabled": true,
+                  "status": 0,
+                  "resolution": "1920x1080",
+                  "fps": 15,
+                  "channel_id": "1"
+                },
+                {
+                  "id": 3,
+                  "name": "Unconfigured",
+                  "host": "",
+                  "port": 0,
+                  "vendor": "User",
+                  "model": "Define",
+                  "enabled": false,
+                  "status": 6
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "active-backup",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.ActiveBackup.Task"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "has_devices": true,
+              "has_windows_agent": true,
+              "tasks": [
+                {
+                  "task_id": 3,
+                  "task_name": "Workstations",
+                  "device_count": 2,
+                  "devices": [
+                    {
+                      "agent_status": "online",
+                      "agent_can_backup": true,
+                      "backup_type": 2,
+                      "create_time": 1709413484,
+                      "device_id": 5,
+                      "device_uuid": "3f5b1a90-77aa-4bb1-9cc2-0d1e2f3a4b5c",
+                      "host_ip": "192.168.20.63",
+                      "host_name": "WORKSTATION01",
+                      "host_port": 0,
+                      "login_user": "jsmith",
+                      "os_name": "Windows 11(64-bit)",
+                      "platform_type": 1
+                    },
+                    {
+                      "agent_status": "offline",
+                      "backup_type": 3,
+                      "device_id": 7,
+                      "device_uuid": "9c8d7e6f-1111-2222-3333-444455556666",
+                      "host_ip": "192.168.20.64",
+                      "host_name": "build-server",
+                      "os_name": "Ubuntu 24.04",
+                      "platform_type": 2
+                    },
+                    {
+                      "agent_status": "unknown",
+                      "device_id": 9,
+                      "device_uuid": "",
+                      "host_ip": "",
+                      "host_name": "",
+                      "os_name": ""
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.Network.DHCPServer.ClientList"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "clients": [
+                {"mac": "B8-27-EB-01-02-03", "ip": "192.168.20.140", "hostname": "octopi", "expired_time": 1786900000},
+                {"mac": "3C-22-FB-99-88-77", "ip": "192.168.20.141", "hostname": "ipad-kitchen", "expired_time": 1786910000},
+                {"mac": "00-11-32-AA-CA-59", "ip": "192.168.20.15", "hostname": "vault-nas", "expired_time": 0},
+                {"mac": "", "ip": "192.168.20.199", "hostname": "ghost"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "logout",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "method=logout"},
+      "responses": [{"status": 200, "json": {"success": true}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"success": false, "error": {"code": 102}}
+  },
+  "expect": {
+    "asset_count": 8,
+    "ids": [
+      "synology:serial:2140PDN123456",
+      "synology:vm:49dee62c-8ea2-465b-9dff-815025f91bba",
+      "synology:$HOST:camera:1",
+      "synology:$HOST:camera:2",
+      "synology:$HOST:backup-device:3f5b1a90-77aa-4bb1-9cc2-0d1e2f3a4b5c",
+      "synology:$HOST:backup-device:9c8d7e6f-1111-2222-3333-444455556666",
+      "synology:$HOST:lease:b8:27:eb:01:02:03"
+    ],
+    "ids_absent": [
+      "synology:$HOST:nas",
+      "synology:vm:8b21c0de-4c4e-4f6a-9d18-0a1b2c3d4e5f",
+      "synology:$HOST:camera:3",
+      "synology:$HOST:lease:00:11:32:aa:ca:59"
+    ],
+    "assets": [
+      {
+        "id": "synology:serial:2140PDN123456",
+        "fields": {
+          "deviceType": "Storage",
+          "manufacturer": "Synology",
+          "os": "DSM",
+          "osVersion": "DSM 7.2.1-69057 Update 5",
+          "model": "DS1821+",
+          "hostnames": "vault-nas",
+          "ipAddresses": "192.168.20.15\t2001:db8:20::15\t203.0.113.77",
+          "macAddresses": "00:11:32:aa:ca:59\t00:11:32:aa:ca:5a",
+          "synology_serial": "2140PDN123456",
+          "synology_cpu_series": "V1500B",
+          "synology_usb_devices": "Back-UPS RS 1500",
+          "synology_network_workgroup": "WORKGROUP"
+        }
+      },
+      {
+        "id": "synology:vm:49dee62c-8ea2-465b-9dff-815025f91bba",
+        "fields": {
+          "deviceType": "Virtual Machine",
+          "hostnames": "dc01",
+          "macAddresses": "00:11:32:21:f2:1b",
+          "synology_status": "running",
+          "synology_networks": "Default VM Network"
+        }
+      },
+      {
+        "id": "synology:$HOST:camera:1",
+        "fields": {
+          "deviceType": "IP Camera",
+          "manufacturer": "Hikvision",
+          "model": "DS-2CD2143G2-I",
+          "osVersion": "V5.7.3",
+          "ipAddresses": "192.168.20.101",
+          "synology_camera_name": "Front Door",
+          "synology_port": "554"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "synology:$HOST:camera:2",
+        "fields": {
+          "deviceType": "IP Camera",
+          "hostnames": "Garage\tgarage-cam.example.com"
+        },
+        "fields_absent": ["ipAddresses", "manufacturer", "model"]
+      },
+      {
+        "id": "synology:$HOST:backup-device:3f5b1a90-77aa-4bb1-9cc2-0d1e2f3a4b5c",
+        "fields": {
+          "hostnames": "WORKSTATION01",
+          "ipAddresses": "192.168.20.63",
+          "os": "Windows 11(64-bit)",
+          "synology_agent_status": "online",
+          "synology_task_name": "Workstations"
+        }
+      },
+      {
+        "id": "synology:$HOST:lease:b8:27:eb:01:02:03",
+        "fields": {
+          "hostnames": "octopi",
+          "ipAddresses": "192.168.20.140",
+          "macAddresses": "b8:27:eb:01:02:03",
+          "synology_lease_expiry_raw": "1786900000"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/webapi/query.cgi", "query_contains": "SYNO.API.Info"},
+      {"method": "POST", "path_contains": "/webapi/entry.cgi", "body_contains": "enable_syno_token=yes"},
+      {"method": "POST", "body_contains": "format=sid"},
+      {"header": {"X-SYNO-TOKEN": "fixture-syno-token"}},
+      {"method": "GET", "query_contains": "api=SYNO.DSM.Info&"},
+      {"method": "GET", "query_contains": "ifname=bond0"},
+      {"method": "GET", "query_contains": "method=logout"}
+    ],
+    "requests_absent": [
+      {"query_contains": "passwd="}
+    ],
+    "log_contains": [
+      "reported 1 virtual machines",
+      "1 virtual machines had no virtual NIC and were skipped",
+      "reported 2 cameras",
+      "1 cameras had no usable address and were skipped",
+      "reported 2 backup devices",
+      "reported 2 DHCP leases",
+      "reported 1 NAS, 1 virtual machines, 2 cameras, 2 backup devices, 2 leases"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

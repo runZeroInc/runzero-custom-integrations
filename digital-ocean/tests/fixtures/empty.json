@@ -1,0 +1,17 @@
+{
+  "name": "empty",
+  "description": "An account with no droplets. The run must report zero assets and say so, not fail.",
+  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "routes": [
+    {
+      "name": "droplets",
+      "match": {"method": "GET", "path": "/v2/droplets"},
+      "responses": [{"status": 200, "json": {"droplets": [], "links": {}, "meta": {"total": 0}}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["no assets"]
+  }
+}

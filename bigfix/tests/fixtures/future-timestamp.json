@@ -1,0 +1,67 @@
+{
+  "name": "future-timestamp",
+  "integration": "bigfix",
+  "description": "One computer's Last Report Time is in 2099, which is what the root server records for an endpoint whose clock is wrong. runZero rejects an ImportAsset whose last-seen time is ahead of now by failing the whole record, and the rejection aborts main, so an unclamped value costs the healthy computer beside it and every remaining id range rather than just the skewed row. _parse_ts caps the value at now, so both computers import and the value as reported survives in the bigfix_last_report_time attribute. The property list is cut to two so the tuple width stays readable; happy.json covers the full default list.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "page_size": "500",
+    "properties": "Serial Number,MAC Addresses"
+  },
+  "routes": [
+    {
+      "name": "range-query",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "whose"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Tuple><Answer type=\"string\">201</Answer><Answer type=\"string\">SKEW01</Answer><Answer type=\"string\">skew01.corp.example.com</Answer><Answer type=\"string\">Win2019 10.0.17763.5458</Answer><Answer type=\"string\">10.72.0.201</Answer><Answer type=\"string\">Wed, 07 Nov 2099 15:18:14 +0000</Answer><Answer type=\"string\">SN-BF-201</Answer><Answer type=\"string\">00:11:22:BB:00:01</Answer></Tuple><Tuple><Answer type=\"string\">202</Answer><Answer type=\"string\">CLEAN02</Answer><Answer type=\"string\">clean02.corp.example.com</Answer><Answer type=\"string\">Win11 10.0.22631.4169</Answer><Answer type=\"string\">10.72.0.202</Answer><Answer type=\"string\">Sat, 08 Nov 2025 09:02:00 +0000</Answer><Answer type=\"string\">SN-BF-202</Answer><Answer type=\"string\">00:11:22:BB:00:02</Answer></Tuple></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "computer-id-census",
+      "match": {
+        "method": "GET",
+        "path": "/api/query"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Answer type=\"string\">201</Answer><Answer type=\"string\">202</Answer></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "bigfix:$HOST:201",
+      "bigfix:$HOST:202"
+    ],
+    "assets": [
+      {
+        "id": "bigfix:$HOST:201",
+        "fields": {
+          "bigfix_last_report_time": "Wed, 07 Nov 2099 15:18:14 +0000"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

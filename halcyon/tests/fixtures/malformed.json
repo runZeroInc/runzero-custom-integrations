@@ -1,0 +1,135 @@
+{
+  "name": "malformed",
+  "integration": "halcyon",
+  "description": "Malformed responses must degrade, never abort. Page one returns a documented envelope whose items list carries a bare string where an object is documented -- that row is skipped with a log line -- plus a good row whose detail record answers with \"ipAddresses\": null and \"macAddresses\": null, the present-but-null shape .get(key, []) does not defend; that asset must import carrying its hostname and no interface. Page two answers 200 with a bare JSON array where an object carrying \"items\" is documented -- the shape a gateway or a changed API version returns -- and the walk must stop cleanly with a printed diagnostic rather than aborting on list.get.\n\nThis scenario used to be a regression lock asserting the abort ('list has no .get field or method'); the guards are now in place and it asserts the fixed behaviour.\n\nnamespaced_ids is skipped: the id is the bare Halcyon asset uuid with no tenant scope, as in happy.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/identity/auth/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "accessToken": "fixture-access-token"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "search-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "body_contains": "\"page\":1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              "not-an-object-row",
+              {
+                "id": "7f0e3002-0000-4000-8000-000000003002",
+                "name": "syn-halcyon-nullnet.example.com",
+                "operatingSystem": "Windows Server 2022",
+                "agentVersion": "1.9.3",
+                "registeredDate": "2026-01-08T00:00:00Z"
+              }
+            ],
+            "pagination": {
+              "currentPage": 1,
+              "totalPages": 2
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "search-page-2-wrong-shape",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "body_contains": "\"page\":2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "7f0e3001-0000-4000-8000-000000003001",
+              "name": "syn-halcyon-x.example.com"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-null-addresses",
+      "match": {
+        "method": "GET",
+        "path": "/v2/assets/7f0e3002-0000-4000-8000-000000003002"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "7f0e3002-0000-4000-8000-000000003002",
+            "name": "syn-halcyon-nullnet.example.com",
+            "ipAddresses": null,
+            "macAddresses": null,
+            "lastHeartbeatDate": "2026-01-09T00:00:00Z"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "7f0e3002-0000-4000-8000-000000003002"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "body_contains": "\"page\":2"
+      }
+    ],
+    "assets": [
+      {
+        "id": "7f0e3002-0000-4000-8000-000000003002",
+        "fields": {
+          "hostnames": "syn-halcyon-nullnet.example.com",
+          "os": "Windows Server 2022",
+          "deviceType": "Server"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      }
+    ],
+    "log_contains": [
+      "halcyon: skipping non-object search row",
+      "halcyon: asset search returned an unexpected response shape; expected an object with items"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

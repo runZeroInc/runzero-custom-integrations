@@ -1,0 +1,268 @@
+{
+  "name": "duplicate-daemon",
+  "integration": "portainer",
+  "description": "REGRESSION LOCK for duplicate foreign ids when two Portainer environments front one Docker daemon. This is a real configuration and it was found by a real container: a host registered once as a local socket entry and again through the Portainer agent shows up twice in /api/endpoints, and both /docker/info calls return the SAME daemon ID. Every id this integration mints -- the host, its containers, its swarm nodes -- is scoped on that daemon ID, so the run emitted docker:<host>:host:bea7c305-... twice, differing only in the portainer.endpoint_id attribute. The unique_ids invariant catches it.\n\nThe resolution is to emit one asset per DAEMON, not per environment: two environments reading the same Docker socket are two paths to one machine, and giving them distinct ids would create two permanent assets for it -- two foreign ids from one integration can never merge back onto each other. The second environment is skipped whole, which also removes the duplicate container and swarm-node ids that came with it. Environment 1 wins because it is enumerated first, and the log names both so the fold is visible rather than silent.\n\nEnvironment 3 is a genuinely different daemon and must still be collected, which is what proves the dedup keys on the daemon ID rather than merely stopping after the first environment.",
+  "kwargs": {
+    "url": "$BASE",
+    "mode": "portainer",
+    "api_key": "ptr_fixtureAPIKeyValue0000000000000000000000=",
+    "import_containers": "routable-only",
+    "import_published_ports": "false"
+  },
+  "routes": [
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoints"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Id": 1,
+              "Name": "docker-hq-local",
+              "Type": 1,
+              "ContainerEngine": "docker",
+              "URL": "tcp://192.0.2.40:2375",
+              "GroupId": 1,
+              "Status": 1,
+              "Snapshots": []
+            },
+            {
+              "Id": 2,
+              "Name": "docker-hq-agent",
+              "Type": 2,
+              "ContainerEngine": "docker",
+              "URL": "tcp://192.0.2.40:9001",
+              "GroupId": 1,
+              "Status": 1,
+              "Snapshots": []
+            },
+            {
+              "Id": 3,
+              "Name": "docker-branch",
+              "Type": 2,
+              "ContainerEngine": "docker",
+              "URL": "tcp://192.0.2.50:9001",
+              "GroupId": 1,
+              "Status": 1,
+              "Snapshots": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "docker-info-1",
+      "match": {"method": "GET", "path": "/api/endpoints/1/docker/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ID": "bea7c305-c44d-475b-8c73-6f4215a5c947",
+            "Containers": 1,
+            "ContainersRunning": 1,
+            "Images": 4,
+            "Driver": "overlay2",
+            "KernelVersion": "6.8.0-31-generic",
+            "OperatingSystem": "Ubuntu 24.04 LTS",
+            "OSVersion": "24.04",
+            "OSType": "linux",
+            "Architecture": "x86_64",
+            "NCPU": 8,
+            "Name": "docker-hq-01",
+            "ServerVersion": "27.0.1",
+            "Swarm": {"NodeID": "", "LocalNodeState": "inactive"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "docker-info-2-same-daemon",
+      "match": {"method": "GET", "path": "/api/endpoints/2/docker/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ID": "bea7c305-c44d-475b-8c73-6f4215a5c947",
+            "Containers": 1,
+            "ContainersRunning": 1,
+            "Images": 4,
+            "Driver": "overlay2",
+            "KernelVersion": "6.8.0-31-generic",
+            "OperatingSystem": "Ubuntu 24.04 LTS",
+            "OSVersion": "24.04",
+            "OSType": "linux",
+            "Architecture": "x86_64",
+            "NCPU": 8,
+            "Name": "docker-hq-01",
+            "ServerVersion": "27.0.1",
+            "Swarm": {"NodeID": "", "LocalNodeState": "inactive"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "docker-info-3",
+      "match": {"method": "GET", "path": "/api/endpoints/3/docker/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ID": "c91f0a22-7f18-4a2c-9e55-1b7d9c0e4411",
+            "Containers": 0,
+            "ContainersRunning": 0,
+            "Images": 1,
+            "Driver": "overlay2",
+            "KernelVersion": "6.8.0-31-generic",
+            "OperatingSystem": "Debian GNU/Linux 12",
+            "OSVersion": "12",
+            "OSType": "linux",
+            "Architecture": "x86_64",
+            "NCPU": 4,
+            "Name": "docker-branch-01",
+            "ServerVersion": "27.0.1",
+            "Swarm": {"NodeID": "", "LocalNodeState": "inactive"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "containers-1",
+      "match": {"method": "GET", "path": "/api/endpoints/1/docker/containers/json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Id": "8dfafdbc3a40f6e0b1e6f10a0b7c1e1c4a5f9c1d2e3b4a5968778695a4b3c2d1",
+              "Names": ["/homeassistant"],
+              "Image": "ghcr.io/home-assistant/home-assistant:2026.7",
+              "Command": "/init",
+              "Created": 1784000000,
+              "State": "running",
+              "Status": "Up 4 days",
+              "Ports": [],
+              "Labels": {},
+              "HostConfig": {"NetworkMode": "lan-macvlan"},
+              "NetworkSettings": {
+                "Networks": {
+                  "lan-macvlan": {
+                    "NetworkID": "9a8b7c6d5e4f30211201f2e3d4c5b6a798877665544332211aabbccddeeff001",
+                    "Gateway": "198.51.100.1",
+                    "IPAddress": "198.51.100.42",
+                    "IPPrefixLen": 24,
+                    "MacAddress": "02:42:c6:33:64:2a"
+                  }
+                }
+              },
+              "Mounts": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "containers-2-same-daemon",
+      "match": {"method": "GET", "path": "/api/endpoints/2/docker/containers/json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Id": "8dfafdbc3a40f6e0b1e6f10a0b7c1e1c4a5f9c1d2e3b4a5968778695a4b3c2d1",
+              "Names": ["/homeassistant"],
+              "Image": "ghcr.io/home-assistant/home-assistant:2026.7",
+              "Command": "/init",
+              "Created": 1784000000,
+              "State": "running",
+              "Status": "Up 4 days",
+              "Ports": [],
+              "Labels": {},
+              "HostConfig": {"NetworkMode": "lan-macvlan"},
+              "NetworkSettings": {
+                "Networks": {
+                  "lan-macvlan": {
+                    "NetworkID": "9a8b7c6d5e4f30211201f2e3d4c5b6a798877665544332211aabbccddeeff001",
+                    "Gateway": "198.51.100.1",
+                    "IPAddress": "198.51.100.42",
+                    "IPPrefixLen": 24,
+                    "MacAddress": "02:42:c6:33:64:2a"
+                  }
+                }
+              },
+              "Mounts": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "containers-3",
+      "match": {"method": "GET", "path": "/api/endpoints/3/docker/containers/json"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path_regex": "/api/endpoints/[0-9]+/docker/networks$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "Name": "lan-macvlan",
+              "Id": "9a8b7c6d5e4f30211201f2e3d4c5b6a798877665544332211aabbccddeeff001",
+              "Scope": "local",
+              "Driver": "macvlan",
+              "IPAM": {"Driver": "default", "Config": [{"Subnet": "198.51.100.0/24", "Gateway": "198.51.100.1"}]},
+              "Options": {"parent": "eth0"}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "docker:$HOST:host:bea7c305-c44d-475b-8c73-6f4215a5c947",
+      "docker:$HOST:bea7c305-c44d-475b-8c73-6f4215a5c947:container:homeassistant",
+      "docker:$HOST:host:c91f0a22-7f18-4a2c-9e55-1b7d9c0e4411"
+    ],
+    "assets": [
+      {
+        "id": "docker:$HOST:host:bea7c305-c44d-475b-8c73-6f4215a5c947",
+        "fields": {
+          "hostnames": "docker-hq-01",
+          "portainer.endpoint_id": "1",
+          "portainer.endpoint_name": "docker-hq-local",
+          "portainer.endpoint_type": "docker-local"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/endpoints/1/docker/info"},
+      {"method": "GET", "path": "/api/endpoints/2/docker/info"},
+      {"method": "GET", "path": "/api/endpoints/3/docker/info"}
+    ],
+    "requests_absent": [
+      {"path": "/api/endpoints/2/docker/containers/json"},
+      {"path": "/api/endpoints/2/docker/networks"}
+    ],
+    "log_contains": [
+      "environment 2 (docker-hq-agent) reports daemon bea7c305-c44d-475b-8c73-6f4215a5c947, already collected from environment 1; two environments fronting one Docker daemon describe one machine",
+      "portainer: reported 3 assets from 3 environment(s)"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

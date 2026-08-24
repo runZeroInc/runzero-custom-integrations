@@ -1,0 +1,160 @@
+{
+  "name": "itemtype-identity",
+  "integration": "glpi",
+  "description": "GLPI restarts its integer id sequence per item type, so id 7 exists independently as a Computer, a NetworkEquipment, and a Printer. All three are served here with the SAME numeric id and different hardware. The ItemType has to be part of the foreign id or the three collapse onto one asset; the three distinct ids plus the unique_ids invariant are what prove it does not happen.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "app_token": "fixture-app-token",
+    "include_software": "false",
+    "include_network_devices": "true"
+  },
+  "routes": [
+    {
+      "name": "init-session",
+      "match": {"method": "GET", "path": "/apirest.php/initSession"},
+      "responses": [{"status": 200, "json": {"session_token": "fixture-session-token"}}]
+    },
+    {
+      "name": "item-operating-system",
+      "match": {"method": "GET", "path": "/apirest.php/Item_OperatingSystem"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1,
+              "itemtype": "Computer",
+              "items_id": 7,
+              "_keys_names": {"operatingsystems_id": "Windows", "operatingsystemversions_id": "11 24H2"}
+            },
+            {
+              "id": 2,
+              "itemtype": "NetworkEquipment",
+              "items_id": 7,
+              "_keys_names": {"operatingsystems_id": "Cisco IOS", "operatingsystemversions_id": "17.9.4"}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computer-collection",
+      "match": {"method": "GET", "path": "/apirest.php/Computer"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 7,
+              "name": "ws-0007",
+              "serial": "SN-COMPUTER-7",
+              "computertypes_id": "Laptop",
+              "manufacturers_id": "Lenovo",
+              "computermodels_id": "ThinkPad T14",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {
+                    "id": 71,
+                    "name": "eth0",
+                    "mac": "00:11:22:70:00:01",
+                    "NetworkName": {"IPAddress": [{"name": "10.70.0.1"}]}
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "networkequipment-collection",
+      "match": {"method": "GET", "path": "/apirest.php/NetworkEquipment"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 7,
+              "name": "sw-core-01",
+              "serial": "SN-SWITCH-7",
+              "networkequipmenttypes_id": "Switch",
+              "networkequipmentmodels_id": "Catalyst 9300",
+              "manufacturers_id": "Cisco Systems",
+              "sysdescr": "Cisco IOS Software, Catalyst L3 Switch Software",
+              "_networkports": {
+                "NetworkPortAggregate": [
+                  {
+                    "id": 72,
+                    "name": "Po1",
+                    "mac": "00:11:22:70:00:02",
+                    "NetworkName": {"IPAddress": [{"name": "10.70.0.2"}]}
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "printer-collection",
+      "match": {"method": "GET", "path": "/apirest.php/Printer"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 7,
+              "name": "prn-floor2",
+              "serial": "SN-PRINTER-7",
+              "printertypes_id": "Laser printer",
+              "printermodels_id": "LaserJet M507",
+              "manufacturers_id": "HP Inc.",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {
+                    "id": 73,
+                    "name": "net0",
+                    "mac": "00:11:22:70:00:03",
+                    "NetworkName": {"IPAddress": [{"name": "10.70.0.3"}]}
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "kill-session",
+      "match": {"method": "GET", "path": "/apirest.php/killSession"},
+      "responses": [{"status": 200, "json": {}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "glpi:127.0.0.1:Computer:7",
+      "glpi:127.0.0.1:NetworkEquipment:7",
+      "glpi:127.0.0.1:Printer:7"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/apirest.php/initSession", "header_contains": "Basic "},
+      {"method": "GET", "path": "/apirest.php/NetworkEquipment"},
+      {"method": "GET", "path": "/apirest.php/Printer"}
+    ],
+    "requests_absent": [{"path": "/apirest.php/Software"}],
+    "log_contains": [
+      "glpi: reported 1 assets from Computer",
+      "glpi: reported 1 assets from NetworkEquipment",
+      "glpi: reported 1 assets from Printer"
+    ]
+  },
+  "invariants": {"skip": []}
+}

@@ -1,0 +1,78 @@
+{
+  "name": "paged",
+  "integration": "absolute",
+  "description": "Proves the opaque nextPage cursor is carried into the second request. Absolute hides the query string inside the base64url JOSE header of the signed envelope, so the cursor is a run of 'A' characters, whose base64url encoding is the block 'QUFB' repeated no matter where the run starts. The page-two route matches only a body carrying that block, and the page-one route returns nothing once consumed: a walk that dropped the cursor would import one device instead of three rather than silently passing.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1"
+  },
+  "routes": [
+    {
+      "name": "devices-page-2-carrying-the-cursor",
+      "match": {"method": "POST", "path": "/jws/validate", "body_contains": "QUFBQUFBQUFBQUFB"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": [
+              {
+                "deviceUid": "paged-device-0002",
+                "deviceName": "FIXTURE-PAGE2-A",
+                "serialNumber": "FIXTURESN0002",
+                "localIp": "10.150.0.2",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              },
+              {
+                "deviceUid": "paged-device-0003",
+                "deviceName": "FIXTURE-PAGE2-B",
+                "serialNumber": "FIXTURESN0003",
+                "localIp": "10.150.0.3",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+            "data": [
+              {
+                "deviceUid": "paged-device-0001",
+                "deviceName": "FIXTURE-PAGE1-A",
+                "serialNumber": "FIXTURESN0001",
+                "localIp": "10.150.0.1",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "absolute:$HOST:paged-device-0001",
+      "absolute:$HOST:paged-device-0002",
+      "absolute:$HOST:paged-device-0003"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/jws/validate", "body_contains": "QUFBQUFBQUFBQUFB"}
+    ],
+    "log_contains": ["absolute: reported 3 devices"]
+  },
+  "invariants": {"skip": []}
+}

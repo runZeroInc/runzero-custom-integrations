@@ -1,0 +1,62 @@
+{
+  "name": "max-pages",
+  "integration": "tp-link-omada",
+  "description": "The max_pages ceiling now goes through pager(), so hitting it RAISES with the loop label instead of ending the walk silently - a truncated import must read as an error, not as a complete run. max_pages=1 and page_size=1 against a site reporting totalRows=5: page 1 is fetched and its one client streamed, then the guard fires before page 2 is ever requested. The one asset already reported survives the abort because the walk streams per page. request_count pins that no second clients page was fetched.",
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret",
+    "extract_devices": "false",
+    "site_ids": "site-a",
+    "page_size": "1",
+    "max_pages": "1"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/openapi/authorize/token"},
+      "responses": [
+        {"status": 200, "json": {"errorCode": 0, "msg": "Success.", "result": {"accessToken": "fixture-omada-token", "tokenType": "bearer", "expiresIn": 7200}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/site-a/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 5,
+              "currentPage": 1,
+              "currentSize": 1,
+              "data": [
+                {"mac": "3C-22-FB-77-88-99", "name": "capped-client", "ip": "192.0.2.150", "wireless": false, "active": true}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:77:88:99"],
+    "request_count": 2,
+    "requests_absent": [
+      {"path_contains": "/clients", "query_contains": "page=2"}
+    ],
+    "log_contains": [
+      "pagination limit reached: \"clients for site site-a\" ran 1 pages"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  }
+}

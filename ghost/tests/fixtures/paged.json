@@ -1,0 +1,173 @@
+{
+  "name": "paged",
+  "integration": "ghost",
+  "description": "The regression test for /v1/findings being fetched once. Both collections page with a cursor: the request carries `cursor` and `size`, the response carries `items`, `has_more` and `next_cursor` (Ghost's own OpenAPI document at https://api.ghostsecurity.ai/openapi.json -- there is no `page`, `offset`, or `limit` parameter anywhere in the API).\n\nRepos come back over two pages and findings over three, and every page route after the first matches on the exact cursor its predecessor returned. A walk that failed to send the cursor, or sent a stale one, starves on the next route rather than quietly passing. Each route is when_exhausted:error, so no request may repeat.\n\nThe assertions that matter are on page 2+: repo-page-2 exists only in the second repos page, and the findings on lonely-service (page 2) and legacy-billing (page 3) exist only in the later findings pages. An unpaged findings walk imports one vulnerability instead of four and this scenario fails on the count and on both request matchers.\n\nThe last page of each collection sets has_more:false while still returning a next_cursor, which is the shape that catches a walk keying only on the cursor's presence; requests_absent proves neither trailing cursor was followed.\n\nnamespaced_ids is skipped because the foreign id is the bare repository name with no tenant scope -- a known defect outside the scope of this change.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-ghost-token"
+  },
+  "routes": [
+    {
+      "name": "repos-page-2",
+      "match": {"method": "GET", "path": "/v1/repos", "query_contains": "cursor=repos-cursor-2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "next_cursor": "repos-cursor-never-followed",
+            "total": 2,
+            "items": [
+              {
+                "id": "repo-page-2",
+                "name": "lonely-service",
+                "projects": [{"deployments": {"production": ["https://lonely.example.com"]}}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "repos-page-1",
+      "match": {"method": "GET", "path": "/v1/repos"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": true,
+            "next_cursor": "repos-cursor-2",
+            "total": 2,
+            "items": [
+              {
+                "id": "repo-page-1",
+                "name": "example-storefront",
+                "projects": [{"deployments": {"production": ["https://shop.example.com/"]}}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings-page-2",
+      "match": {"method": "GET", "path": "/v1/findings", "query_contains": "cursor=findings-cursor-2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": true,
+            "next_cursor": "findings-cursor-3",
+            "items": [
+              {
+                "id": "finding-p2-a",
+                "name": "Missing rate limit on login",
+                "repo_id": "repo-page-2",
+                "repo_url": "https://git.example.com/example/lonely",
+                "severity": "medium",
+                "description": "The login route accepts unlimited attempts.",
+                "remediation": "Add a rate limit."
+              },
+              {
+                "id": "finding-p2-b",
+                "name": "Weak session cookie flags",
+                "repo_id": "repo-page-2",
+                "repo_url": "https://git.example.com/example/lonely",
+                "severity": "low",
+                "description": "The session cookie is missing Secure and HttpOnly.",
+                "remediation": "Set both flags."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings-page-3",
+      "match": {"method": "GET", "path": "/v1/findings", "query_contains": "cursor=findings-cursor-3"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "next_cursor": "findings-cursor-never-followed",
+            "items": [
+              {
+                "id": "finding-p3-a",
+                "name": "SQL built by string concatenation",
+                "repo_id": "repo-not-in-list",
+                "repo_url": "legacy-billing",
+                "severity": "high",
+                "description": "A query is assembled from request input.",
+                "remediation": "Use a parameterized query.",
+                "project": {"deployments": {"production": ["https://billing.example.com/pay"]}}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings-page-1",
+      "match": {"method": "GET", "path": "/v1/findings"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": true,
+            "next_cursor": "findings-cursor-2",
+            "items": [
+              {
+                "id": "finding-p1-a",
+                "name": "Unauthenticated administrative route",
+                "repo_id": "repo-page-1",
+                "repo_url": "https://git.example.com/example/storefront",
+                "severity": "critical",
+                "description": "An administrative route is reachable without authentication.",
+                "remediation": "Require authentication on the route."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["example-storefront", "lonely-service", "legacy-billing"],
+    "assets": [
+      {
+        "id": "lonely-service",
+        "fields": {"hostnames": "lonely.example.com"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "legacy-billing",
+        "fields": {"hostnames": "billing.example.com"}
+      }
+    ],
+    "min_vulnerabilities_total": 4,
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/v1/repos", "query_contains": "cursor=repos-cursor-2"},
+      {"method": "GET", "path": "/v1/findings", "query_contains": "cursor=findings-cursor-2"},
+      {"method": "GET", "path": "/v1/findings", "query_contains": "cursor=findings-cursor-3"}
+    ],
+    "requests_absent": [
+      {"query_contains": "cursor=repos-cursor-never-followed"},
+      {"query_contains": "cursor=findings-cursor-never-followed"},
+      {"query_contains": "page="}
+    ],
+    "log_contains": [
+      "ghost: repos page 2 returned 1 rows (has_more=False)",
+      "ghost: findings page 3 returned 1 rows (has_more=False)",
+      "Total findings returned: 4"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

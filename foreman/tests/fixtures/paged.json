@@ -1,0 +1,128 @@
+{
+  "name": "paged",
+  "integration": "foreman",
+  "description": "Both of Foreman's paginated walks at once. fact_values is paginated by individual FACT VALUE rather than by host, so one host's facts straddle a page boundary: srv-a's mac arrives on page 1 and its ip on page 2, and srv-b's facts straddle pages 2 and 3. The pages must be merged into one map per host rather than the later page replacing the earlier one, and the walk must stop on the first short page. The host list is walked separately with its own page/per_page pair and its own stop condition. Asserts every page number on both endpoints, that the configured search filter is forwarded on the host list, and that no page 4 or page 3 is requested respectively.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-token",
+    "search": "organization = Acme",
+    "include_facts": "true",
+    "include_interfaces": "false",
+    "include_packages": "false",
+    "page_size": "2",
+    "fact_page_size": "4"
+  },
+  "routes": [
+    {
+      "name": "fact-values",
+      "match": {"method": "GET", "path": "/api/v2/fact_values"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "per_page": 4,
+            "results": {
+              "srv-a.corp.example.net": {
+                "os::name": "RedHat",
+                "os::release::full": "9.4",
+                "dmi::manufacturer": "Dell Inc.",
+                "networking::interfaces::eth0::mac": "00:1a:2b:00:aa:01"
+              }
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "page": 2,
+            "per_page": 4,
+            "results": {
+              "srv-a.corp.example.net": {
+                "networking::interfaces::eth0::ip": "10.220.0.1",
+                "dmi::chassis::type": "Rack Mount Chassis"
+              },
+              "srv-b.corp.example.net": {
+                "os::name": "Debian",
+                "networking::interfaces::eth0::mac": "00:1a:2b:00:aa:02"
+              }
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "page": 3,
+            "per_page": 4,
+            "results": {
+              "srv-b.corp.example.net": {
+                "networking::interfaces::eth0::ip": "10.220.0.2"
+              },
+              "srv-c.corp.example.net": {
+                "os::name": "Ubuntu"
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v2/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "page": 1,
+            "per_page": 2,
+            "results": [
+              {"id": 21, "name": "srv-a.corp.example.net", "ip": "10.220.0.1", "mac": "00:1a:2b:00:aa:01", "domain_name": "corp.example.net", "operatingsystem_name": "RedHat 9.4", "organization_name": "Acme", "managed": true, "created_at": "2025-02-01T10:00:00.000Z", "last_report": "2026-08-14T06:00:00.000Z"},
+              {"id": 22, "name": "srv-b.corp.example.net", "ip": "10.220.0.2", "mac": "00:1a:2b:00:aa:02", "domain_name": "corp.example.net", "operatingsystem_name": "Debian 12", "organization_name": "Acme", "managed": true, "created_at": "2025-02-02T10:00:00.000Z", "last_report": "2026-08-14T06:01:00.000Z"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "page": 2,
+            "per_page": 2,
+            "results": [
+              {"id": 23, "name": "srv-c.corp.example.net", "ip": "10.220.0.3", "mac": "00:1a:2b:00:aa:03", "domain_name": "corp.example.net", "operatingsystem_name": "Ubuntu 24.04", "organization_name": "Acme", "managed": true, "created_at": "2025-02-03T10:00:00.000Z", "last_report": "2026-08-14T06:02:00.000Z"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "foreman:127.0.0.1:21",
+      "foreman:127.0.0.1:22",
+      "foreman:127.0.0.1:23"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/fact_values", "query_contains": "page=1&per_page=4"},
+      {"method": "GET", "path": "/api/v2/fact_values", "query_contains": "page=2&per_page=4"},
+      {"method": "GET", "path": "/api/v2/fact_values", "query_contains": "page=3&per_page=4"},
+      {"method": "GET", "path": "/api/v2/hosts", "query_contains": "page=1&per_page=2"},
+      {"method": "GET", "path": "/api/v2/hosts", "query_contains": "page=2&per_page=2"},
+      {"method": "GET", "path": "/api/v2/hosts", "query_contains": "search=organization+%3D+Acme"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2/fact_values", "query_contains": "page=4&per_page=4"},
+      {"path": "/api/v2/hosts", "query_contains": "page=3&per_page=2"}
+    ],
+    "log_contains": [
+      "foreman: indexed 10 fact values for 3 hosts",
+      "foreman: reported 3 assets so far"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

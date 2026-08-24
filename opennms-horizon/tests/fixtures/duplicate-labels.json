@@ -1,0 +1,109 @@
+{
+  "name": "duplicate-labels",
+  "integration": "opennms-horizon",
+  "description": "REGRESSION LOCK for the label-keyed service merge. The global /rest/ifservices view identifies a node by LABEL, and OpenNMS allows two nodes to share one label -- the old label-only index merged both nodes' service lists onto both assets. Nodes 21 and 22 share the label dup-host.example.com: node 21 monitors ICMP and HTTP (HTTP down) on 192.0.2.61, node 22 monitors SNMP on 192.0.2.62. Each asset must carry exactly its own services, matched by label PLUS an address the node actually carries, and the down list must stay with the node that owns it.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero-ro",
+    "password": "fixture-not-a-real-password"
+  },
+  "routes": [
+    {
+      "name": "v2-ipinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/ipinterfaces"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 2,
+            "offset": 0,
+            "ipInterface": [
+              {"id": "61", "nodeId": 21, "ipAddress": "192.0.2.61", "hostName": "dup-host.example.com", "ifIndex": 1, "isManaged": "M", "snmpPrimary": "P"},
+              {"id": "62", "nodeId": 22, "ipAddress": "192.0.2.62", "hostName": "dup-host.example.com", "ifIndex": 1, "isManaged": "M", "snmpPrimary": "P"}
+            ]
+          }
+        },
+        {"status": 204}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v2-snmpinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces"},
+      "responses": [
+        {"status": 204}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v1-ifservices",
+      "match": {"method": "GET", "path": "/opennms/rest/ifservices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 3,
+            "totalCount": 3,
+            "offset": 0,
+            "monitored-service": [
+              {"id": "31", "ipAddress": "192.0.2.61", "isDown": false, "isMonitored": true, "node": "dup-host.example.com", "serviceName": "ICMP", "status": "Managed", "statusCode": "A"},
+              {"id": "32", "ipAddress": "192.0.2.61", "isDown": true, "isMonitored": true, "node": "dup-host.example.com", "serviceName": "HTTP", "status": "Managed", "statusCode": "A"},
+              {"id": "33", "ipAddress": "192.0.2.62", "isDown": false, "isMonitored": true, "node": "dup-host.example.com", "serviceName": "SNMP", "status": "Managed", "statusCode": "A"}
+            ]
+          }
+        },
+        {"status": 200, "json": {"count": 0, "totalCount": 3, "offset": 3}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v1-nodes",
+      "match": {"method": "GET", "path": "/opennms/rest/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 2,
+            "offset": 0,
+            "node": [
+              {"id": "21", "label": "dup-host.example.com", "labelSource": "H", "type": "A"},
+              {"id": "22", "label": "dup-host.example.com", "labelSource": "H", "type": "A"}
+            ]
+          }
+        },
+        {"status": 200, "json": {"count": 0, "totalCount": 2, "offset": 2}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "opennms:$HOST:21",
+      "opennms:$HOST:22"
+    ],
+    "assets": [
+      {
+        "id": "opennms:$HOST:21",
+        "fields": {
+          "ipAddresses": "192.0.2.61",
+          "opennms_monitored_services": "ICMP,HTTP",
+          "opennms_monitored_service_count": "2",
+          "opennms_services_down": "HTTP"
+        }
+      },
+      {
+        "id": "opennms:$HOST:22",
+        "fields": {
+          "ipAddresses": "192.0.2.62",
+          "opennms_monitored_services": "SNMP",
+          "opennms_monitored_service_count": "1"
+        },
+        "fields_absent": ["opennms_services_down"]
+      }
+    ]
+  },
+  "invariants": {"skip": []}
+}

@@ -1,0 +1,122 @@
+{
+  "name": "malformed",
+  "integration": "cyberwatch",
+  "description": "Wrong types in every documented-object position: addresses as a bare string, os/environment as strings, groups as a list of strings, packages and ports as scalars, services as a list of strings, updates as a string. Each must be coerced or skipped without aborting the run. Also proves the CVE code is upper-cased before it reaches the Vulnerability, since a lowercase cve fails the platform's pattern and would drop the whole asset record.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_access_key": "fixture-access",
+    "api_secret_key": "fixture-secret",
+    "include_details": "true"
+  },
+  "routes": [
+    {
+      "name": "server-list",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 401,
+              "hostname": "junk-401",
+              "category": "server",
+              "created_at": "not-a-timestamp",
+              "last_communication": 1723600000,
+              "addresses": "10.90.0.1",
+              "os": "Windows Server 2022",
+              "environment": "production",
+              "groups": ["ops", {"name": "platform"}],
+              "compliance_groups": "none",
+              "cve_announcements_count": "many"
+            },
+            {
+              "id": 402,
+              "hostname": "junk-402",
+              "category": "unmapped_category",
+              "created_at": "2025-04-01T00:00:00.000Z",
+              "last_communication": "2026-08-11T00:00:00.000Z",
+              "addresses": ["10.90.0.2", 12345, null, "  "],
+              "os": {"name": null, "short_name": "rhel9"},
+              "groups": null
+            },
+            "this record is a string, not an object"
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vuln-detail-401",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers/401"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 401,
+            "addresses": ["10.90.0.1", "junk-401.corp.example.net"],
+            "analyzed_at": "2026-08-11T12:00:00.000Z",
+            "cve_announcements": [
+              {"cve_code": "cve-2026-55555", "score": 8.1, "active": true, "detected_at": "2026-05-01T00:00:00.000Z"},
+              {"cve_code": "  ", "score": 3.0, "active": true},
+              "a string where an object is documented",
+              {"cve_code": "CVE-2026-66666", "score": "not a number", "environmental_score": null, "active": true}
+            ],
+            "updates": "the API sent a string here"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-detail-401",
+      "match": {"method": "GET", "path": "/api/v3/assets/servers/401"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 401,
+            "packages": ["openssl 1.1.1", {"product": null, "version": "1"}, {"product": "curl", "version": 8, "type": null}],
+            "ports": ["8080/tcp", 9090, {"port": "not-a-port"}, {"port": 70000, "protocol": "tcp"}, {"port": 25, "protocol": "smtp"}],
+            "services": ["cron", {"name": "sshd", "status": "running"}, {"status": "stopped"}],
+            "metadata": "nope",
+            "connector": "agent",
+            "security_issues": [{"sid": "cw-issue-1"}, "bare-string"]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vuln-detail-402",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers/402"},
+      "responses": [
+        {"status": 200, "json": {"id": 402, "addresses": ["10.90.0.2"], "cve_announcements": null, "updates": null}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-detail-402",
+      "match": {"method": "GET", "path": "/api/v3/assets/servers/402"},
+      "responses": [
+        {"status": 200, "json": {"id": 402, "packages": null, "ports": null, "services": null}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cyberwatch:127.0.0.1:401",
+      "cyberwatch:127.0.0.1:402"
+    ],
+    "request_count": 6,
+    "min_software_total": 1,
+    "min_services_total": 3,
+    "log_contains": [
+      "reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

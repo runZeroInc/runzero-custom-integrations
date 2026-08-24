@@ -1,0 +1,58 @@
+{
+  "name": "degraded",
+  "integration": "scale-computing",
+  "description": "Only VirDomain is readable: the Cluster call is refused (403, as it is for a role without cluster read) and VirDomainNetDevice fails (500). Neither is essential to identity, so the VMs must still be imported - without cluster names and without interfaces - rather than the run ending. The surviving correlator is the VM name, which is what keeps these assets mergeable at all in this state.\n\nnamespaced_ids is skipped for the reason recorded in happy.json.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/rest/v1/Cluster"},
+      "responses": [{"status": 403, "json": {"error": "forbidden"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "virdomain",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomain"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "vm-uuid-0100",
+              "name": "vm-degraded-01",
+              "operatingSystem": "os_other",
+              "description": "Alpine",
+              "state": "RUNNING",
+              "nodeUUID": "node-uuid-0001",
+              "mem": 1073741824,
+              "numVCPU": 1,
+              "created": 1750000000,
+              "modified": 1786000000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "virdomain-netdevice",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"},
+      "responses": [{"status": 500, "text": "internal error"}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["vm-uuid-0100"],
+    "min_requests": 3,
+    "log_contains": [
+      "scale-computing: could not read the cluster record",
+      "scale-computing: could not list network devices",
+      "scale-computing: reported 1 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

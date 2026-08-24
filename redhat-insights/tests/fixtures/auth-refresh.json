@@ -1,0 +1,107 @@
+{
+  "name": "auth-refresh",
+  "integration": "redhat-insights",
+  "description": "The 15-minute service account token is rejected part way through the walk -- more than once, because a long import outlives several tokens and the re-auth used to be gated to fire at most ONCE per run (ctx['reauthed']), after which every later expiry ended the run with only a log line. Page one answers 401 and the run must mint a second token and retry the same page; page two answers 401 again and must mint a THIRD token rather than giving up. CVE enrichment is on, and the third system's per-system CVE call also answers 401 -- the path that previously had no re-auth at all, silently importing systems with zero findings -- so a FOURTH token is minted and the CVE page retried, and the run must still report every system and at least one finding. request_count 12 pins the exact sequence: token, p1(401), token, p1, cves, cves, p2(401), token, p2, cves(401), token, cves.",
+  "kwargs": {
+    "url": "$BASE",
+    "sso_url": "$BASE",
+    "client_id": "fixture-service-account",
+    "client_secret": "fixture-secret",
+    "scope": "api.console",
+    "page_size": "2",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "first-fixture-token", "expires_in": 900}},
+        {"status": 200, "json": {"access_token": "second-fixture-token", "expires_in": 900}},
+        {"status": 200, "json": {"access_token": "third-fixture-token", "expires_in": 900}},
+        {"status": 200, "json": {"access_token": "fourth-fixture-token", "expires_in": 900}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-1",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=1"},
+      "responses": [
+        {"status": 401, "json": {"errors": [{"status": 401, "detail": "Unauthorized: token expired"}]}},
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "results": [
+              {"id": "20000000-0000-4000-8000-000000000001", "org_id": "10009999", "fqdn": "reauth-a.fixture.example", "ip_addresses": ["10.91.0.1"]},
+              {"id": "20000000-0000-4000-8000-000000000002", "org_id": "10009999", "fqdn": "reauth-b.fixture.example", "ip_addresses": ["10.91.0.2"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-2",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"},
+      "responses": [
+        {"status": 401, "json": {"errors": [{"status": 401, "detail": "Unauthorized: token expired"}]}},
+        {
+          "status": 200,
+          "json": {
+            "total": 3,
+            "results": [
+              {"id": "20000000-0000-4000-8000-000000000003", "org_id": "10009999", "fqdn": "reauth-c.fixture.example", "ip_addresses": ["10.91.0.3"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cves-third-system-expires-mid-enrichment",
+      "match": {"method": "GET", "path": "/api/vulnerability/v1/systems/20000000-0000-4000-8000-000000000003/cves"},
+      "responses": [
+        {"status": 401, "json": {"errors": [{"status": 401, "detail": "Unauthorized: token expired"}]}},
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {"id": "CVE-2026-30001", "attributes": {"impact": "Important", "cvss3_score": "8.100", "public_date": "2026-02-01T00:00:00+00:00", "advisories_list": ["RHSA-2026:2222"]}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cves-other-systems",
+      "match": {"method": "GET", "path_prefix": "/api/vulnerability/v1/systems/"},
+      "responses": [
+        {"status": 200, "json": {"data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "redhat-insights:10009999:20000000-0000-4000-8000-000000000001",
+      "redhat-insights:10009999:20000000-0000-4000-8000-000000000003"
+    ],
+    "request_count": 12,
+    "min_vulnerabilities_total": 1,
+    "requests_include": [
+      {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token", "body_contains": "scope=api.console"},
+      {"header_contains": "Bearer first-fixture-token"},
+      {"header_contains": "Bearer second-fixture-token"},
+      {"header_contains": "Bearer third-fixture-token"},
+      {"method": "GET", "path": "/api/vulnerability/v1/systems/20000000-0000-4000-8000-000000000003/cves", "header_contains": "Bearer fourth-fixture-token"},
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"}
+    ],
+    "log_contains": [
+      "redhat-insights: reported 3 of 3 systems"
+    ]
+  },
+  "invariants": {"skip": []}
+}

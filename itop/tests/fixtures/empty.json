@@ -1,0 +1,53 @@
+{
+  "name": "empty",
+  "integration": "itop",
+  "description": "A CMDB with no configuration items of the selected class. iTop answers with objects: null rather than an empty object, which must read as the end of the data and not as a failure.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "include_interfaces": "false",
+    "classes": "Server"
+  },
+  "routes": [
+    {
+      "name": "servers",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22Server%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "itop: reported 0 assets from Server",
+      "itop: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

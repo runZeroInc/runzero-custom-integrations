@@ -1,0 +1,80 @@
+{
+  "name": "paged",
+  "integration": "kubernetes",
+  "description": "Chunked LIST handling. The node collection is served in two limit/continue chunks: the first response carries metadata.continue, and the second request must send that token back while the first must not carry one. Every request must ask for a bounded page via limit. Both nodes must import and be counted once, proving assets are reported per item while the walk is still in flight rather than buffered to the end. Services are disabled to keep the walk to one collection. Skips namespaced_ids for the reason the other kubernetes scenarios record: ids are 'k8s-node-' plus the object UID and carry no ':'.",
+  "kwargs": {
+    "url": "$BASE",
+    "bearer_token": "fixture-sa-token",
+    "include_loadbalancer_services": "false"
+  },
+  "routes": [
+    {
+      "name": "nodes-chunk-2",
+      "match": {"method": "GET", "path": "/api/v1/nodes", "query_contains": "continue=chunk-token-1"},
+      "responses": [{"status": 200, "json": {
+        "kind": "NodeList",
+        "metadata": {},
+        "items": [
+          {
+            "metadata": {"name": "worker-12", "uid": "7f1c9a10-0000-4000-8000-000000000202", "creationTimestamp": "2026-01-05T09:12:00Z"},
+            "spec": {"podCIDR": "10.244.2.0/24"},
+            "status": {
+              "addresses": [
+                {"type": "InternalIP", "address": "10.41.0.12"},
+                {"type": "Hostname", "address": "worker-12"}
+              ],
+              "nodeInfo": {"architecture": "amd64", "kubeletVersion": "v1.30.2", "operatingSystem": "linux", "osImage": "Ubuntu 22.04.4 LTS"}
+            }
+          }
+        ]
+      }}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "nodes-chunk-1",
+      "match": {"method": "GET", "path": "/api/v1/nodes"},
+      "responses": [{"status": 200, "json": {
+        "kind": "NodeList",
+        "metadata": {"continue": "chunk-token-1", "remainingItemCount": 1},
+        "items": [
+          {
+            "metadata": {"name": "worker-11", "uid": "7f1c9a10-0000-4000-8000-000000000201", "creationTimestamp": "2026-01-05T09:11:00Z"},
+            "spec": {"podCIDR": "10.244.1.0/24"},
+            "status": {
+              "addresses": [
+                {"type": "InternalIP", "address": "10.41.0.11"},
+                {"type": "Hostname", "address": "worker-11"}
+              ],
+              "nodeInfo": {"architecture": "amd64", "kubeletVersion": "v1.30.2", "operatingSystem": "linux", "osImage": "Ubuntu 22.04.4 LTS"}
+            }
+          }
+        ]
+      }}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "k8s-node-7f1c9a10-0000-4000-8000-000000000201",
+      "k8s-node-7f1c9a10-0000-4000-8000-000000000202"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/nodes", "query_contains": "limit=500"},
+      {"method": "GET", "path": "/api/v1/nodes", "query_contains": "continue=chunk-token-1"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1/services"},
+      {"path": "/api/v1/pods"}
+    ],
+    "log_contains": [
+      "kubernetes: imported 2 nodes",
+      "kubernetes: reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  },
+  "check_determinism": true
+}

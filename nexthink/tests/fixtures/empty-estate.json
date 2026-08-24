@@ -1,0 +1,53 @@
+{
+  "name": "empty-estate",
+  "integration": "nexthink",
+  "description": "A tenant whose NQL query matches no devices: the export completes and the CSV carries only the header row. The run must finish cleanly with zero assets and say so, rather than failing on an empty rows list or importing a phantom record from the header.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/oauth2/default/v1/token"},
+      "responses": [{"status": 200, "json": {"access_token": "nexthink-token-6"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export",
+      "match": {"method": "POST", "path": "/api/v1/nql/export"},
+      "responses": [{"status": 200, "json": {"exportId": "exp-0006"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status",
+      "match": {"method": "GET", "path": "/api/v1/nql/status/exp-0006"},
+      "responses": [
+        {"status": 200, "json": {"status": "COMPLETED", "resultsFileUrl": "$BASE/exports/exp-0006.csv"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "results-csv",
+      "match": {"method": "GET", "path": "/exports/exp-0006.csv"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/csv"},
+          "text": "device.uid,device.name,device.operating_system.name,device.collector.local_ip\n"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 4,
+    "log_contains": [
+      "No rows returned from Nexthink export workflow"
+    ]
+  },
+  "invariants": {"skip": []}
+}

@@ -1,0 +1,25 @@
+{
+  "name": "unauthorized",
+  "integration": "cisco-ise",
+  "description": "ISE rejects the basic-auth credential. Proves the run degrades to zero assets and a printed status instead of aborting the task. The pinned request count also documents that this integration calls the raw http.get helper, which carries no retry budget: a rate-limit scenario would prove nothing here, because a 429 would be handed straight back the same way this 401 is.",
+  "kwargs": {
+    "url": "$BASE",
+    "basic_auth_credential": "d3Jvbmc6Y3JlZGVudGlhbA=="
+  },
+  "routes": [
+    {
+      "name": "active-session-list-denied",
+      "match": {"method": "GET", "path": "/admin/API/mnt/Session/ActiveList"},
+      "responses": [
+        {"status": 401, "headers": {"Content-Type": "application/xml"}, "text": "<sessionParameters><error>Authentication failed</error></sessionParameters>"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": ["cisco-ise: failed to retrieve endpoints from /admin/API/mnt/Session/ActiveList: status 401", "No sessions found."]
+  },
+  "invariants": {"skip": []}
+}

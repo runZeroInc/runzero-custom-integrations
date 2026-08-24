@@ -1,0 +1,77 @@
+{
+  "name": "golden-image-guid",
+  "integration": "cisco-secure-endpoint",
+  "description": "connector_guid identifies a connector installation, not a machine. A golden image captured with a populated local.xml hands the same GUID to every clone, so two physically distinct hosts arrive under one id. This scenario feeds exactly that: two computers sharing connector_guid but with different hostnames and different MACs, plus a third host on its own GUID. It proves both clones are still emitted (nothing is silently dropped at the script level) and that the emitted matchBehavior leaves mac-break and name-break ON, which is what stops the platform collapsing the fleet onto one asset. unique_ids is skipped deliberately: emitting one foreign id twice is the exact condition under test, and it is the vendor's data doing it, not the script.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "client_id": "fixture-client-id",
+    "api_key": "fixture-api-key",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"results": {"total": 3}},
+            "data": [
+              {
+                "connector_guid": "cccccccc-1111-4000-8000-00000000cl0n",
+                "hostname": "lab-clone-a",
+                "active": true,
+                "demo": false,
+                "operating_system": "Windows 10 (Build 19045.3803)",
+                "os_version": "10.0.19045.3803",
+                "policy": {"name": "Golden Image Policy"},
+                "group_guid": "gggggggg-1111-4000-8000-000000000001",
+                "last_seen": "2026-08-14T10:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:c1:00:0a", "ip": "10.30.1.10"}],
+                "internal_ips": ["10.30.1.10"]
+              },
+              {
+                "connector_guid": "cccccccc-1111-4000-8000-00000000cl0n",
+                "hostname": "lab-clone-b",
+                "active": true,
+                "demo": false,
+                "operating_system": "Windows 10 (Build 19045.3803)",
+                "os_version": "10.0.19045.3803",
+                "policy": {"name": "Golden Image Policy"},
+                "group_guid": "gggggggg-1111-4000-8000-000000000001",
+                "last_seen": "2026-08-14T10:05:00Z",
+                "network_addresses": [{"mac": "00:50:56:c1:00:0b", "ip": "10.30.1.11"}],
+                "internal_ips": ["10.30.1.11"]
+              },
+              {
+                "connector_guid": "cccccccc-1111-4000-8000-000000000003",
+                "hostname": "lab-standalone-c",
+                "active": true,
+                "demo": false,
+                "operating_system": "Windows 11",
+                "os_version": "10.0.22621.2861",
+                "last_seen": "2026-08-14T11:00:00Z",
+                "network_addresses": [{"mac": "00:50:56:c1:00:0c", "ip": "10.30.1.12"}],
+                "internal_ips": ["10.30.1.12"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "cisco-secure-endpoint:127.0.0.1:cccccccc-1111-4000-8000-00000000cl0n",
+      "cisco-secure-endpoint:127.0.0.1:cccccccc-1111-4000-8000-000000000003"
+    ],
+    "request_count": 1,
+    "log_contains": ["cisco-secure-endpoint: reported 3 computers"]
+  },
+  "invariants": {
+    "skip": ["unique_ids"]
+  }
+}

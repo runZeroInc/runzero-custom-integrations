@@ -1,0 +1,266 @@
+{
+  "name": "happy",
+  "integration": "librenms",
+  "description": "A full LibreNMS collection: the unpaginated /devices table, per-device addresses and ports, and the estate-wide ARP and FDB tables. Envelope key order is status, devices, count, taken from api_success() in includes/html/api_functions.inc.php rather than from the doc, which prints them in a different order. Device rows carry the SELECT d.* field set including the SNMP credential columns, which is what a real server returns and which this integration must NOT write into runZero. ARP and FDB rows follow the vendor's own documented examples, with bare 12-hex MACs. Proves: /devices/{id}/ports is asked for ifPhysAddress explicitly, because the default response is ONLY ifName; the /devices/{id}/ip response merges v4 and v6 rows into one heterogeneous array; a device whose hostname is a bare IP contributes an address rather than a hostname; loopback and link-local are dropped; the ARP and FDB views of one MAC collapse into a single endpoint asset; and community, authpass, and cryptopass never reach a custom attribute. no_mac_in_id is skipped for the endpoint assets: an ARP or FDB row has no identifier but its MAC, and the id is paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-auth-token",
+    "collect_fdb": "true"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v0/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "devices": [
+              {
+                "device_id": 1,
+                "hostname": "192.0.2.11",
+                "sysName": "core-sw01.example.com",
+                "display": null,
+                "ip": "192.0.2.11",
+                "overwrite_ip": null,
+                "community": "public-secret",
+                "authlevel": null,
+                "authname": "snmpuser",
+                "authpass": "supersecret",
+                "authalgo": "SHA",
+                "cryptopass": "alsosecret",
+                "cryptoalgo": "AES",
+                "snmpver": "v2c",
+                "port": 161,
+                "transport": "udp",
+                "sysObjectID": ".1.3.6.1.4.1.9.1.2494",
+                "sysDescr": "Cisco IOS Software, C3750E Software (C3750E-UNIVERSALK9-M), Version 15.2(4)E10",
+                "sysContact": "netops@example.com",
+                "version": "15.2(4)E10",
+                "hardware": "WS-C3750X-48P",
+                "features": "IP Services",
+                "location_id": 3,
+                "location": "Building A / MDF",
+                "lat": null,
+                "lng": null,
+                "os": "ios",
+                "status": 1,
+                "status_reason": "",
+                "ignore": 0,
+                "disabled": 0,
+                "uptime": 10432000,
+                "last_polled": "2026-08-15 03:00:11",
+                "last_discovered": "2026-08-15 02:00:04",
+                "purpose": "campus core",
+                "type": "network",
+                "serial": "FDO1234ABCD",
+                "icon": "cisco.svg",
+                "poller_group": 0,
+                "notes": null,
+                "dependency_parent_id": null,
+                "dependency_parent_hostname": null
+              },
+              {
+                "device_id": 2,
+                "hostname": "fw01.example.com",
+                "sysName": "fw01",
+                "display": "Edge firewall",
+                "ip": "198.51.100.5",
+                "community": "public-secret",
+                "snmpver": "v3",
+                "port": 161,
+                "transport": "udp",
+                "sysDescr": "PAN-OS 11.1.4-h7",
+                "version": "11.1.4-h7",
+                "hardware": "PA-3410",
+                "location": "Building A / DMZ",
+                "os": "panos",
+                "status": 0,
+                "status_reason": "icmp",
+                "ignore": 0,
+                "disabled": 0,
+                "uptime": 0,
+                "last_polled": "2026-08-15 02:55:00",
+                "last_discovered": "2026-08-14 02:00:00",
+                "type": "firewall",
+                "serial": "PA3410-000123",
+                "poller_group": 0
+              }
+            ],
+            "count": 2
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-1-ip",
+      "match": {"method": "GET", "path": "/api/v0/devices/1/ip"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "addresses": [
+              {"ipv4_address_id": 1, "ipv4_address": "192.0.2.11", "ipv4_prefixlen": 24, "ipv4_network_id": "1", "port_id": 10, "context_name": ""},
+              {"ipv4_address_id": 2, "ipv4_address": "127.0.0.1", "ipv4_prefixlen": 8, "ipv4_network_id": "2", "port_id": 11, "context_name": ""},
+              {"ipv6_address_id": 5, "ipv6_address": "2001:0db8:0100:0000:0000:0000:0000:0011", "ipv6_compressed": "2001:db8:100::11", "ipv6_prefixlen": 64, "ipv6_origin": "static", "ipv6_network_id": "3", "port_id": 10, "context_name": ""},
+              {"ipv6_address_id": 6, "ipv6_address": "fe80:0000:0000:0000:0211:22ff:fe33:4455", "ipv6_compressed": "fe80::211:22ff:fe33:4455", "ipv6_prefixlen": 64, "ipv6_origin": "linklayer", "ipv6_network_id": "4", "port_id": 10, "context_name": ""}
+            ],
+            "count": 4
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-2-ip",
+      "match": {"method": "GET", "path": "/api/v0/devices/2/ip"},
+      "responses": [{"status": 404, "json": {"status": "error", "message": "Device does not exist"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-1-ports",
+      "match": {"method": "GET", "path": "/api/v0/devices/1/ports"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "ports": [
+              {"port_id": 10, "ifIndex": 1, "ifName": "Vl10", "ifDescr": "Vlan10", "ifAlias": "management", "ifPhysAddress": "0011223344 55", "ifOperStatus": "up", "ifAdminStatus": "up", "ifType": "l2vlan", "ifSpeed": 1000000000},
+              {"port_id": 11, "ifIndex": 2, "ifName": "Gi1/0/1", "ifDescr": "GigabitEthernet1/0/1", "ifAlias": "uplink", "ifPhysAddress": "001122334456", "ifOperStatus": "up", "ifAdminStatus": "up", "ifType": "ethernetCsmacd", "ifSpeed": 1000000000},
+              {"port_id": 12, "ifIndex": 3, "ifName": "Gi1/0/2", "ifDescr": "GigabitEthernet1/0/2", "ifAlias": "", "ifPhysAddress": "", "ifOperStatus": "down", "ifAdminStatus": "up", "ifType": "ethernetCsmacd", "ifSpeed": 0}
+            ],
+            "count": 3
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-2-ports",
+      "match": {"method": "GET", "path": "/api/v0/devices/2/ports"},
+      "responses": [{"status": 404, "json": {"status": "error", "message": "No ports found"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp",
+      "match": {"method": "GET", "path": "/api/v0/resources/ip/arp/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "count": 4,
+            "arp": [
+              {"port_id": 11, "device_id": 1, "mac_address": "00505696f6c1", "ipv4_address": "192.0.2.51", "context_name": ""},
+              {"port_id": 11, "device_id": 1, "mac_address": "3c22fbaabbcc", "ipv4_address": "192.0.2.52", "context_name": ""},
+              {"port_id": 10, "device_id": 1, "mac_address": "001122334456", "ipv4_address": "192.0.2.11", "context_name": ""},
+              {"port_id": 11, "device_id": 1, "mac_address": "ffffffffffff", "ipv4_address": "192.0.2.255", "context_name": ""}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "fdb",
+      "match": {"method": "GET", "path": "/api/v0/resources/fdb"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "ports_fdb": [
+              {"ports_fdb_id": 10, "port_id": 11, "mac_address": "00505696f6c1", "vlan_id": 20, "device_id": 1, "created_at": "2026-08-01 01:01:01", "updated_at": "2026-08-15 03:00:00"},
+              {"ports_fdb_id": 11, "port_id": 12, "mac_address": "b827eb445566", "vlan_id": 30, "device_id": 1, "created_at": "2026-08-01 01:01:01", "updated_at": "2026-08-15 03:00:00"}
+            ],
+            "count": 2
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"status": "error", "message": "This API route doesn't exist."}},
+  "expect": {
+    "asset_count": 6,
+    "ids": [
+      "librenms:$HOST:device:1",
+      "librenms:$HOST:device:2",
+      "librenms:$HOST:endpoint:00:50:56:96:f6:c1",
+      "librenms:$HOST:endpoint:3c:22:fb:aa:bb:cc",
+      "librenms:$HOST:endpoint:00:11:22:33:44:56",
+      "librenms:$HOST:endpoint:b8:27:eb:44:55:66"
+    ],
+    "ids_absent": ["librenms:$HOST:endpoint:ff:ff:ff:ff:ff:ff"],
+    "assets": [
+      {
+        "id": "librenms:$HOST:device:1",
+        "fields": {
+          "_attrType": "device",
+          "deviceType": "Network Device",
+          "os": "ios",
+          "osVersion": "15.2(4)E10",
+          "model": "WS-C3750X-48P",
+          "hostnames": "core-sw01.example.com",
+          "librenms_status": "up",
+          "librenms_port_count": "3",
+          "librenms_last_polled_raw": "2026-08-15 03:00:11"
+        },
+        "fields_absent": ["librenms_community", "librenms_authpass", "librenms_cryptopass", "librenms_authname"]
+      },
+      {
+        "id": "librenms:$HOST:device:2",
+        "fields": {
+          "_attrType": "device",
+          "deviceType": "Firewall",
+          "os": "panos",
+          "librenms_status": "down",
+          "librenms_status_reason": "icmp",
+          "ipAddresses": "198.51.100.5"
+        }
+      },
+      {
+        "id": "librenms:$HOST:endpoint:00:50:56:96:f6:c1",
+        "fields": {
+          "_attrType": "endpoint",
+          "ipAddresses": "192.0.2.51",
+          "librenms_sources": "arp,fdb",
+          "librenms_vlans": "20"
+        }
+      },
+      {
+        "id": "librenms:$HOST:endpoint:b8:27:eb:44:55:66",
+        "fields": {
+          "_attrType": "endpoint",
+          "librenms_sources": "fdb",
+          "librenms_port_names": "Gi1/0/2"
+        },
+        "fields_absent": ["ipAddresses"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/api/v0/devices", "header": {"X-Auth-Token": "fixture-auth-token"}},
+      {"method": "GET", "path_contains": "/api/v0/devices/1/ports", "query_contains": "ifPhysAddress"},
+      {"method": "GET", "path_contains": "/api/v0/devices/1/ip"},
+      {"method": "GET", "path_contains": "/api/v0/resources/ip/arp/all"},
+      {"method": "GET", "path_contains": "/api/v0/resources/fdb"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/v0/devices/1/arp"}
+    ],
+    "log_contains": [
+      "reported 2 devices",
+      "ARP entries read: 3",
+      "FDB entries read: 2",
+      "reported 4 discovered endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

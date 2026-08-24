@@ -1,0 +1,108 @@
+{
+  "name": "happy",
+  "integration": "extrahop",
+  "description": "Enterprise (API key) deployment: the networks bootstrap resolves the appliance UUID that scopes every id, one device page is parsed, and the three skip paths are exercised. The L2 parent and the L3 child deliberately carry the SAME macaddr: an ExtraHop L3 record inherits its MAC from the router it was observed through, so only the L2 record may keep it. The L3 child is given an IPv4 address so it still has a correlator once its MAC is suppressed.",
+  "kwargs": {
+    "url": "$BASE",
+    "deployment": "enterprise",
+    "api_key": "fixture-api-key",
+    "require_ip_address": "false",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/api/v1/networks"},
+      "responses": [
+        {"status": 200, "json": [{"node_id": null, "appliance_uuid": "appl-uuid-0001"}]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "POST", "path": "/api/v1/devices/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 101,
+              "discovery_id": "l2parent01",
+              "extrahop_id": "extrahop-l2parent01",
+              "node_id": null,
+              "is_l3": false,
+              "macaddr": "00:11:22:33:44:01",
+              "vendor": "Cisco Systems",
+              "model": "ISR 4331",
+              "dns_name": "gw01.corp.example.com",
+              "default_name": "Cisco 334401",
+              "display_name": "Cisco 334401",
+              "role": "gateway",
+              "auto_role": "gateway",
+              "analysis": "advanced",
+              "critical": true,
+              "vlanid": 10,
+              "discover_time": 1750000000000,
+              "last_seen_time": 1786000000000
+            },
+            {
+              "id": 102,
+              "discovery_id": "l3child001",
+              "extrahop_id": "extrahop-l3child001",
+              "node_id": null,
+              "is_l3": true,
+              "parent_id": 101,
+              "macaddr": "00:11:22:33:44:01",
+              "ipaddr4": "10.30.0.50",
+              "vendor": "Dell Inc.",
+              "dns_name": "host50.corp.example.com",
+              "netbios_name": "HOST50",
+              "default_name": "Dell 334401",
+              "display_name": "Dell 334401",
+              "role": "pc",
+              "analysis": "standard",
+              "discover_time": 1750000000000,
+              "last_seen_time": 1786000000000
+            },
+            {
+              "id": 103,
+              "discovery_id": "",
+              "node_id": null,
+              "ipaddr4": "10.30.0.51",
+              "dns_name": "nodiscoveryid.corp.example.com"
+            },
+            {
+              "id": 104,
+              "discovery_id": "orphan0001",
+              "node_id": 9,
+              "ipaddr4": "10.30.0.52",
+              "dns_name": "orphan.corp.example.com"
+            },
+            "this-row-is-a-string-not-an-object"
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "extrahop:appl-uuid-0001:l2parent01",
+      "extrahop:appl-uuid-0001:l3child001"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/networks"},
+      {"method": "POST", "path": "/api/v1/devices/search", "body_contains": "\"active_until\":0"},
+      {"header_contains": "ExtraHop apikey=fixture-api-key"}
+    ],
+    "log_contains": [
+      "extrahop: skipping device with no discovery_id: device_id=103",
+      "extrahop: skipping device with no appliance UUID: discovery_id=orphan0001 node_id=9",
+      "extrahop: skipping malformed device record",
+      "extrahop: reported 2 devices"
+    ]
+  },
+  "invariants": {"skip": []}
+}

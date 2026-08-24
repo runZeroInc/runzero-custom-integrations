@@ -1,0 +1,217 @@
+{
+  "name": "malformed",
+  "integration": "forescout-counteract",
+  "description": "Every documented shape is violated somewhere: the field index carries a bare string and an unnamed entry, the host index carries a string element, a null hostId, a blank hostId, and a duplicate row, and the property documents come back as a list, as a host with a string fields member, and as a 404. Every bad record must be skipped and the run must still import the three real hosts. Host 4004 carries only placeholder names (UNKNOWN, a bare IP) in its NBT/DHCP properties; it must import on its address with no hostname at all, because a shared placeholder name is a merge hazard.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/api/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYWQifQ.YmFkLXNpZ25hdHVyZS1maXh0dXJl"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {
+        "method": "GET",
+        "path": "/api/hostfields"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hostFields": [
+              "hostname",
+              {
+                "label": "an entry with no name"
+              },
+              {
+                "name": 12345
+              },
+              {
+                "name": "hostname"
+              },
+              {
+                "name": "openports"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-4001",
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts/4001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "host": {
+                "id": 4001
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "host-detail-4002",
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts/4002"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 4002,
+              "fields": "not an object"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-4003",
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts/4003"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "status": 404,
+            "message": "host not found"
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-4004",
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts/4004"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 4004,
+              "fields": {
+                "hostname": {
+                  "value": "UNKNOWN"
+                },
+                "nbthost": {
+                  "value": "unknown"
+                },
+                "dhcp_hostname": {
+                  "value": "10.70.0.14"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-index",
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              "a bare string where an object is documented",
+              {
+                "hostId": null,
+                "ip": "10.70.0.9",
+                "mac": "00:11:22:cc:00:09"
+              },
+              {
+                "hostId": "   ",
+                "ip": "10.70.0.10"
+              },
+              {
+                "hostId": 4001,
+                "ip": "10.70.0.11",
+                "mac": "00:11:22:cc:00:11"
+              },
+              {
+                "hostId": 4001,
+                "ip": "10.70.0.99",
+                "mac": "00:11:22:cc:00:99"
+              },
+              {
+                "hostId": 4002,
+                "ip": "not-an-ip-address",
+                "mac": "00:11:22:cc:00:12"
+              },
+              {
+                "hostId": 4003,
+                "ip": "10.70.0.13",
+                "mac": "ff:ff:ff:ff:ff:ff"
+              },
+              {
+                "hostId": 4004,
+                "ip": "10.70.0.14",
+                "mac": "00:11:22:cc:00:14"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "forescout-counteract:$HOST:4001",
+      "forescout-counteract:$HOST:4002",
+      "forescout-counteract:$HOST:4003",
+      "forescout-counteract:$HOST:4004"
+    ],
+    "ids_absent": [
+      "forescout-counteract:$HOST:None",
+      "forescout-counteract:$HOST:"
+    ],
+    "log_contains": [
+      "forescout-counteract: skipping host with no object id: ip=10.70.0.9",
+      "forescout-counteract: skipping host with no object id: ip=10.70.0.10",
+      "forescout-counteract: failed to fetch properties for host 4003",
+      "forescout-counteract: reported 4 assets"
+    ],
+    "assets": [
+      {
+        "id": "forescout-counteract:$HOST:4004",
+        "fields_absent": [
+          "hostnames"
+        ]
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "rc-error",
+  "integration": "ntopng",
+  "description": "An interface id that ntopng does not know. Every v2 endpoint answers with its own rc field alongside the HTTP status, and rc -2 is INVALID_INTERFACE. The run must report the named code rather than an empty result.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_macs": "false",
+    "interface_ids": "99"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua"
+      },
+      "responses": [
+        {
+          "status": 400,
+          "json": {
+            "rc": -2,
+            "rc_str": "INVALID_INTERFACE",
+            "rc_str_hr": "Invalid interface",
+            "rsp": {}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "rc": -1,
+      "rc_str": "NOT_FOUND",
+      "rc_str_hr": "Not found",
+      "rsp": {}
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "requests_absent": [
+      {
+        "path_contains": "interfaces.lua"
+      }
+    ],
+    "log_contains": [
+      "fetching hosts on interface 99",
+      "ntopng: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

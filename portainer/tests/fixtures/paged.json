@@ -1,0 +1,94 @@
+{
+  "name": "paged",
+  "integration": "portainer",
+  "description": "Portainer's /api/endpoints returns a bare array and reports the filtered total only in the X-Total-Count response header, which the JSON helper does not surface, so the loop must page on start/limit and stop on a short page. With page_size 2 and three environments, the second request must carry start=3 and the third must never be made. Portainer's start is 1-based because the handler decrements it. Container collection is disabled so the scenario asserts the pagination alone.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "mode": "portainer",
+    "api_key": "ptr_fixtureAPIKeyValue0000000000000000000000=",
+    "page_size": "2",
+    "import_containers": "none",
+    "import_published_ports": "false"
+  },
+
+  "routes": [
+    {
+      "name": "endpoints-page-1",
+      "match": {"method": "GET", "path": "/api/endpoints", "query_contains": "start=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"Id": 1, "Name": "edge-a", "Type": 4, "URL": "tcp://192.0.2.11:2376", "Status": 1, "Snapshots": []},
+            {"Id": 2, "Name": "edge-b", "Type": 1, "URL": "tcp://192.0.2.12:2376", "Status": 1, "Snapshots": []}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "endpoints-page-2",
+      "match": {"method": "GET", "path": "/api/endpoints", "query_contains": "start=3"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"Id": 3, "Name": "edge-c", "Type": 2, "URL": "tcp://192.0.2.13:2376", "Status": 2, "Snapshots": []}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "info-1",
+      "match": {"method": "GET", "path": "/api/endpoints/1/docker/info"},
+      "responses": [{"status": 200, "json": {"ID": "11111111-1111-4111-8111-111111111111", "Name": "edge-a-host", "OperatingSystem": "Debian GNU/Linux 12 (bookworm)", "OSVersion": "12", "OSType": "linux", "Architecture": "x86_64", "ServerVersion": "26.1.4", "Swarm": {"LocalNodeState": "inactive"}}}]
+    },
+    {
+      "name": "info-2",
+      "match": {"method": "GET", "path": "/api/endpoints/2/docker/info"},
+      "responses": [{"status": 200, "json": {"ID": "22222222-2222-4222-8222-222222222222", "Name": "edge-b-host", "OperatingSystem": "Alpine Linux v3.20", "OSType": "linux", "Architecture": "aarch64", "ServerVersion": "27.0.1", "Swarm": {"LocalNodeState": "inactive"}}}]
+    },
+    {
+      "name": "info-3",
+      "match": {"method": "GET", "path": "/api/endpoints/3/docker/info"},
+      "responses": [{"status": 200, "json": {"ID": "33333333-3333-4333-8333-333333333333", "Name": "edge-c-host", "OperatingSystem": "Ubuntu 22.04.4 LTS", "OSVersion": "22.04", "OSType": "linux", "Architecture": "x86_64", "ServerVersion": "24.0.7", "Swarm": {"LocalNodeState": "inactive"}}}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "docker:$HOST:host:11111111-1111-4111-8111-111111111111",
+      "docker:$HOST:host:22222222-2222-4222-8222-222222222222",
+      "docker:$HOST:host:33333333-3333-4333-8333-333333333333"
+    ],
+    "assets": [
+      {
+        "id": "docker:$HOST:host:33333333-3333-4333-8333-333333333333",
+        "fields": {
+          "hostnames": "edge-c-host",
+          "ipAddresses": "192.0.2.13",
+          "portainer.endpoint_status": "down",
+          "portainer.endpoint_type": "docker-agent"
+        }
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/endpoints", "query_contains": "start=1"},
+      {"method": "GET", "path": "/api/endpoints", "query_contains": "limit=2"},
+      {"method": "GET", "path": "/api/endpoints", "query_contains": "start=3"},
+      {"method": "GET", "path": "/api/endpoints", "query_contains": "excludeSnapshots=true"}
+    ],
+    "requests_absent": [
+      {"query_contains": "start=5"},
+      {"path_contains": "/containers/json"},
+      {"path_contains": "/docker/networks"}
+    ],
+    "log_contains": ["collecting 3 Docker environment(s)"]
+  },
+
+  "check_determinism": true
+}

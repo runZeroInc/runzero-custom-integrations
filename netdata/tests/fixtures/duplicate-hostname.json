@@ -1,0 +1,114 @@
+{
+  "name": "duplicate-hostname",
+  "integration": "netdata",
+  "description": "Two children streaming to one Parent under the same kernel hostname. Child detail is fetched by hostname (/host/<name>/api/v1/info), and that path can only name one machine, so the Parent would serve one machine's info body for both GUIDs -- silently attributing one node's OS detail to the other. Detail is skipped for the ambiguous name instead: both children still import (their GUIDs differ), no /host/dup-node request is made, and the skip is logged per node. The Parent's own detail still arrives from the unprefixed path.",
+  "kwargs": {
+    "url": "$BASE",
+    "collect_node_details": "true"
+  },
+  "routes": [
+    {
+      "name": "nodes-v3",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api": 3,
+            "nodes": [
+              {
+                "mg": "5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+                "nm": "netdata-parent",
+                "ni": 0,
+                "st": {"ai": 0, "code": 200, "msg": "", "ms": 0.4},
+                "version": "v2.3.2",
+                "hops": 0,
+                "state": "reachable"
+              },
+              {
+                "mg": "a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+                "nm": "dup-node",
+                "ni": 1,
+                "st": {"ai": 0, "code": 200, "msg": "", "ms": 1.8},
+                "version": "v2.3.2",
+                "hops": 1,
+                "state": "reachable"
+              },
+              {
+                "mg": "b2c3d4e5-f607-4819-a2b3-c4d5e6f70819",
+                "nm": "dup-node",
+                "ni": 2,
+                "st": {"ai": 0, "code": 200, "msg": "", "ms": 2.1},
+                "version": "v2.3.2",
+                "hops": 1,
+                "state": "reachable"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "info-local",
+      "match": {"method": "GET", "path": "/api/v1/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v2.3.2",
+            "uid": "5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+            "os_name": "Debian GNU/Linux",
+            "os_id": "debian",
+            "os_version": "12",
+            "os_version_id": "12",
+            "os_detection": "/etc/os-release",
+            "kernel_name": "Linux",
+            "kernel_version": "6.1.0-21-amd64",
+            "is_k8s_node": false,
+            "architecture": "x86_64",
+            "virtualization": "kvm",
+            "virt_detection": "systemd-detect-virt",
+            "container": "none",
+            "container_detection": "none",
+            "labels": {}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "netdata:$HOST:5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+      "netdata:$HOST:a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+      "netdata:$HOST:b2c3d4e5-f607-4819-a2b3-c4d5e6f70819"
+    ],
+    "assets": [
+      {
+        "id": "netdata:$HOST:5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+        "fields": {"hostnames": "netdata-parent", "os": "Debian GNU/Linux"}
+      },
+      {
+        "id": "netdata:$HOST:a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+        "fields": {"hostnames": "dup-node"},
+        "fields_absent": ["os", "osVersion"]
+      },
+      {
+        "id": "netdata:$HOST:b2c3d4e5-f607-4819-a2b3-c4d5e6f70819",
+        "fields": {"hostnames": "dup-node"},
+        "fields_absent": ["os", "osVersion"]
+      }
+    ],
+    "request_count": 2,
+    "requests_absent": [
+      {"path_contains": "/host/dup-node"}
+    ],
+    "log_contains": [
+      "netdata: hostname dup-node is reported by more than one node; skipping detail for a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071 rather than attributing another machine's info to it",
+      "netdata: hostname dup-node is reported by more than one node; skipping detail for b2c3d4e5-f607-4819-a2b3-c4d5e6f70819 rather than attributing another machine's info to it"
+    ]
+  }
+}

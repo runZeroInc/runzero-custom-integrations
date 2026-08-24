@@ -1,0 +1,58 @@
+{
+  "name": "auth-refresh",
+  "integration": "leanix",
+  "description": "The bearer token expires mid-run: the GraphQL endpoint answers 401 once, the script re-authenticates, and the same cursor is retried and succeeds. Proves the 3600-second token lifetime cannot truncate a long walk.\n\nInvariant has_correlator is skipped by design: logical inventory records without addressing are the normal case, per the README.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "fact_sheet_types": "ITComponent",
+    "page_size": 100
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/services/mtm/v1/oauth2/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "bearer-tok-1", "token_type": "bearer", "expires_in": 3599}},
+        {"status": 200, "json": {"access_token": "bearer-tok-2", "token_type": "bearer", "expires_in": 3599}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql"},
+      "responses": [
+        {"status": 401, "json": {"errorMessage": "Unauthorized"}},
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 1,
+                "pageInfo": {"hasNextPage": false, "endCursor": "END"},
+                "edges": [
+                  {"node": {"id": "44444444-4444-4444-8444-444444444444", "name": "Redis 7", "displayName": "Redis 7", "type": "ITComponent", "description": "", "status": "ACTIVE", "updatedAt": "2026-08-01T00:00:00Z", "tags": [], "lifecycle": {"asString": "active"}}}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["leanix:$HOST:44444444-4444-4444-8444-444444444444"],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/services/pathfinder/v1/graphql", "header_contains": "Bearer bearer-tok-2"}
+    ],
+    "log_contains": [
+      "leanix: bearer token rejected; re-authenticating"
+    ]
+  },
+  "invariants": {"skip": ["has_correlator"]},
+  "check_determinism": true
+}

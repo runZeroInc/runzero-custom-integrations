@@ -1,0 +1,427 @@
+{
+  "name": "happy",
+  "integration": "unraid",
+  "description": "A full collection from Unraid 7.2. Field names come from the generated GraphQL SDL in unraid/api (api/generated-schema.graphql), not from the published docs, which still show a root dockerContainers query that does not exist in the schema. Proves: the collection is split into several small documents so one field a given schema lacks cannot fail every other query; machineId becomes a real foreign id that IS allowed to drive merges; br0 survives interface filtering even though the API reports virtual=true, because on Unraid the bridge IS the primary interface, while lo (internal=true) and docker0 are dropped; os.uptime is a BOOT TIME ISO string rather than a duration and becomes firstSeenTS; PrefixedID values arrive as '1:<id>' and the prefix is stripped; a macvlan container on br0 with a real LAN address becomes its own asset with its published ports as services; a container on Docker's default NAT bridge is NOT imported, because 172.17.0.0/16 is the same range on every Docker host and importing it would merge unrelated containers across servers; a container on host networking is not imported because it shares the server's stack and could never merge with anything; and VMs are recorded on the server rather than emitted as assets, because the schema exposes no MAC, address, or libvirt XML for a guest. The container MAC also pins the LAA divergence: the id keeps 02:42:c0:a8:01:3d losslessly while the emitted interface carries 00:42:c0:a8:01:3d, because net.network_interface clears the locally administered bit that Docker sets on every MAC it generates.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "info",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidInfo"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "info": {
+                "machineId": "8f2a1c4e9b7d43a6bd0e5f1c2a3b4c5d",
+                "os": {
+                  "platform": "linux",
+                  "distro": "Unraid",
+                  "release": "7.2.1",
+                  "kernel": "6.12.24-Unraid",
+                  "arch": "x64",
+                  "hostname": "media-nas01",
+                  "fqdn": "media-nas01.example.com",
+                  "uptime": "2026-08-01T09:12:44.000Z",
+                  "uefi": true
+                },
+                "system": {
+                  "manufacturer": "Supermicro",
+                  "model": "X11SCH-F",
+                  "version": "1.01",
+                  "serial": "S123456789",
+                  "uuid": "00000000-0000-0000-0000-AC1F6BAA1234",
+                  "sku": "Default string",
+                  "virtual": false
+                },
+                "baseboard": {
+                  "manufacturer": "Supermicro",
+                  "model": "X11SCH-F",
+                  "version": "1.01",
+                  "serial": "WM20AS012345",
+                  "assetTag": "Default string"
+                },
+                "cpu": {
+                  "manufacturer": "Intel",
+                  "brand": "Xeon E-2278G",
+                  "vendor": "GenuineIntel",
+                  "family": "6",
+                  "model": "158",
+                  "cores": 8,
+                  "threads": 16,
+                  "processors": 1,
+                  "socket": "LGA1151",
+                  "speed": 3.4,
+                  "speedmax": 5.0
+                },
+                "versions": {
+                  "core": {"unraid": "7.2.1", "api": "4.37.1", "kernel": "6.12.24-Unraid"},
+                  "packages": {"docker": "27.5.1", "php": "8.3.14", "nginx": "1.27.3", "openssl": "3.4.0", "node": "22.14.0"}
+                },
+                "networkInterfaces": [
+                  {
+                    "name": "br0",
+                    "description": "br0",
+                    "macAddress": "ac:1f:6b:aa:12:34",
+                    "mtu": 1500,
+                    "speed": 1000,
+                    "duplex": "full",
+                    "internal": false,
+                    "virtual": true,
+                    "operstate": "up",
+                    "type": "bridge",
+                    "vlanId": null,
+                    "ipv4Addresses": [{"address": "192.168.1.50", "netmask": "255.255.255.0"}],
+                    "ipv6Addresses": [{"address": "fe80::ae1f:6bff:feaa:1234", "prefixLength": 64}],
+                    "ipAddress": "192.168.1.50",
+                    "netmask": "255.255.255.0",
+                    "useDhcp": false,
+                    "ipv6Address": "fe80::ae1f:6bff:feaa:1234",
+                    "status": "up"
+                  },
+                  {
+                    "name": "eth1",
+                    "description": "eth1",
+                    "macAddress": "ac:1f:6b:aa:12:35",
+                    "mtu": 9000,
+                    "speed": 10000,
+                    "duplex": "full",
+                    "internal": false,
+                    "virtual": false,
+                    "operstate": "up",
+                    "type": "wired",
+                    "vlanId": null,
+                    "ipv4Addresses": [{"address": "10.10.10.50", "netmask": "255.255.255.0"}],
+                    "ipv6Addresses": [],
+                    "ipAddress": "10.10.10.50",
+                    "netmask": "255.255.255.0",
+                    "useDhcp": false,
+                    "ipv6Address": "",
+                    "status": "up"
+                  },
+                  {
+                    "name": "lo",
+                    "description": "lo",
+                    "macAddress": "00:00:00:00:00:00",
+                    "mtu": 65536,
+                    "speed": null,
+                    "duplex": "",
+                    "internal": true,
+                    "virtual": false,
+                    "operstate": "up",
+                    "type": "virtual",
+                    "ipv4Addresses": [{"address": "127.0.0.1", "netmask": "255.0.0.0"}],
+                    "ipv6Addresses": [],
+                    "ipAddress": "127.0.0.1",
+                    "netmask": "255.0.0.0",
+                    "useDhcp": false,
+                    "ipv6Address": "",
+                    "status": "up"
+                  },
+                  {
+                    "name": "docker0",
+                    "description": "docker0",
+                    "macAddress": "02:42:8b:1c:44:f0",
+                    "mtu": 1500,
+                    "speed": null,
+                    "duplex": "",
+                    "internal": false,
+                    "virtual": true,
+                    "operstate": "up",
+                    "type": "bridge",
+                    "ipv4Addresses": [{"address": "172.17.0.1", "netmask": "255.255.0.0"}],
+                    "ipv6Addresses": [],
+                    "ipAddress": "172.17.0.1",
+                    "netmask": "255.255.0.0",
+                    "useDhcp": false,
+                    "ipv6Address": "",
+                    "status": "up"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vars",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVars"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "vars": {
+                "version": "7.2.1",
+                "name": "media-nas01",
+                "comment": "Media and backup server",
+                "timeZone": "America/Chicago",
+                "domain": "example.com",
+                "localTld": "local",
+                "sysModel": "Custom",
+                "flashGuid": "0781-5583-8A21-40A012345678",
+                "flashProduct": "Ultra_Fit",
+                "flashVendor": "SanDisk",
+                "regTy": "PRO",
+                "regState": "PRO",
+                "deviceCount": 9
+              },
+              "metrics": {
+                "memory": {
+                  "total": "34273218560",
+                  "used": "12884901888",
+                  "free": "21388316672",
+                  "available": "20401094656",
+                  "percentTotal": 37.6
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "storage",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidStorage"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "array": {
+                "state": "STARTED",
+                "capacity": {"kilobytes": {"free": "5497558138", "used": "10995116277", "total": "16492674415"}},
+                "disks": [
+                  {"id": "1:disk1", "idx": 1, "name": "disk1", "device": "sdc", "size": "7814026584", "status": "DISK_OK", "type": "DATA", "fsType": "xfs", "temp": 36, "rotational": true, "transport": "ata"}
+                ],
+                "parities": [
+                  {"id": "1:parity", "idx": 0, "name": "parity", "device": "sdb", "size": "7814026584", "status": "DISK_OK", "type": "PARITY"}
+                ],
+                "caches": [
+                  {"id": "1:cache", "idx": 30, "name": "cache", "device": "nvme0n1", "size": "976762584", "status": "DISK_OK", "type": "CACHE", "fsType": "btrfs"}
+                ]
+              },
+              "disks": [
+                {"id": "1:WDC_WD80EAZZ_VGH12345", "device": "/dev/sdc", "type": "HD", "name": "WDC WD80EAZZ-00BKLB0", "vendor": "Western Digital", "size": 8001563222016, "serialNum": "VGH12345", "firmwareRevision": "83.00A83", "interfaceType": "SATA", "smartStatus": "OK", "temperature": 36}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "docker",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidDocker"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "docker": {
+                "containers": [
+                  {
+                    "id": "1:3f9a2b7c1d4e",
+                    "names": ["/plex"],
+                    "image": "lscr.io/linuxserver/plex:latest",
+                    "imageId": "sha256:9c1e0f2a7b3d4c5e6f708192a3b4c5d6",
+                    "state": "RUNNING",
+                    "status": "Up 14 days",
+                    "created": 1754006400,
+                    "autoStart": true,
+                    "isOrphaned": false,
+                    "isUpdateAvailable": false,
+                    "ports": [{"ip": "0.0.0.0", "privatePort": 32400, "publicPort": 32400, "type": "TCP"}],
+                    "labels": {"org.opencontainers.image.title": "Plex"},
+                    "hostConfig": {"networkMode": "bridge"},
+                    "networkSettings": {
+                      "Networks": {
+                        "bridge": {
+                          "NetworkID": "b1c2d3e4f5a6",
+                          "Gateway": "172.17.0.1",
+                          "IPAddress": "172.17.0.4",
+                          "IPPrefixLen": 16,
+                          "GlobalIPv6Address": "",
+                          "MacAddress": "02:42:ac:11:00:04"
+                        }
+                      }
+                    },
+                    "templatePath": "/boot/config/plugins/dockerMan/templates-user/my-plex.xml",
+                    "projectUrl": "https://www.plex.tv/",
+                    "webUiUrl": "http://192.168.1.50:32400/web"
+                  },
+                  {
+                    "id": "1:7d8e9f0a1b2c",
+                    "names": ["/pihole"],
+                    "image": "pihole/pihole:latest",
+                    "imageId": "sha256:1a2b3c4d5e6f7081",
+                    "state": "RUNNING",
+                    "status": "Up 15 days",
+                    "created": 1753920000,
+                    "autoStart": true,
+                    "isOrphaned": false,
+                    "isUpdateAvailable": true,
+                    "ports": [
+                      {"ip": "", "privatePort": 53, "publicPort": 53, "type": "UDP"},
+                      {"ip": "", "privatePort": 53, "publicPort": 53, "type": "TCP"},
+                      {"ip": "", "privatePort": 80, "publicPort": 80, "type": "TCP"}
+                    ],
+                    "labels": {"com.docker.compose.project": "homelab", "com.docker.compose.service": "pihole"},
+                    "hostConfig": {"networkMode": "br0"},
+                    "networkSettings": {
+                      "Networks": {
+                        "br0": {
+                          "IPAMConfig": {"IPv4Address": "192.168.1.61"},
+                          "NetworkID": "c3d4e5f60718",
+                          "Gateway": "192.168.1.1",
+                          "IPAddress": "192.168.1.61",
+                          "IPPrefixLen": 24,
+                          "GlobalIPv6Address": "",
+                          "MacAddress": "02:42:c0:a8:01:3d"
+                        }
+                      }
+                    },
+                    "templatePath": null,
+                    "projectUrl": null,
+                    "webUiUrl": null
+                  },
+                  {
+                    "id": "1:aa11bb22cc33",
+                    "names": ["/homeassistant"],
+                    "image": "ghcr.io/home-assistant/home-assistant:stable",
+                    "imageId": "sha256:ffee0011",
+                    "state": "RUNNING",
+                    "status": "Up 3 days",
+                    "created": 1755100000,
+                    "autoStart": true,
+                    "isOrphaned": false,
+                    "isUpdateAvailable": false,
+                    "ports": [],
+                    "labels": {},
+                    "hostConfig": {"networkMode": "host"},
+                    "networkSettings": {"Networks": {"host": {"IPAddress": "", "MacAddress": "", "GlobalIPv6Address": ""}}},
+                    "templatePath": null,
+                    "projectUrl": null,
+                    "webUiUrl": null
+                  },
+                  {
+                    "id": "1:dd44ee55ff66",
+                    "names": ["/old-backup-job"],
+                    "image": "alpine:3.20",
+                    "imageId": "sha256:beefcafe",
+                    "state": "EXITED",
+                    "status": "Exited (0) 6 weeks ago",
+                    "created": 1750000000,
+                    "autoStart": false,
+                    "isOrphaned": true,
+                    "isUpdateAvailable": false,
+                    "ports": [],
+                    "labels": {},
+                    "hostConfig": {"networkMode": "br0"},
+                    "networkSettings": {"Networks": {}},
+                    "templatePath": null,
+                    "projectUrl": null,
+                    "webUiUrl": null
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "vms": {
+                "domains": [
+                  {"id": "1:4c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f", "name": "Windows 11", "state": "RUNNING"},
+                  {"id": "1:9f8e7d6c-5b4a-3210-fedc-ba9876543210", "name": "Home Assistant OS", "state": "SHUTOFF"}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"errors": [{"message": "Cannot query field on type Query."}]}
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "unraid:machine:8f2a1c4e9b7d43a6bd0e5f1c2a3b4c5d",
+      "unraid:$HOST:container:pihole"
+    ],
+    "ids_absent": [
+      "unraid:$HOST:server",
+      "unraid:$HOST:container:plex",
+      "unraid:$HOST:container:homeassistant",
+      "unraid:$HOST:container:old-backup-job"
+    ],
+    "assets": [
+      {
+        "id": "unraid:machine:8f2a1c4e9b7d43a6bd0e5f1c2a3b4c5d",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Unraid",
+          "osVersion": "7.2.1",
+          "manufacturer": "Supermicro",
+          "model": "X11SCH-F",
+          "hostnames": "media-nas01\tmedia-nas01.example.com",
+          "unraid_machine_id": "8f2a1c4e9b7d43a6bd0e5f1c2a3b4c5d",
+          "unraid_vars_flashGuid": "0781-5583-8A21-40A012345678",
+          "unraid_vars_regTy": "PRO",
+          "unraid_storage_array_state": "STARTED",
+          "unraid_storage_disk_serials": "VGH12345",
+          "unraid_vm_guest_count": "2",
+          "unraid_cpu_brand": "Xeon E-2278G",
+          "unraid_boot_time_raw": "2026-08-01T09:12:44.000Z"
+        }
+      },
+      {
+        "id": "unraid:$HOST:container:pihole",
+        "fields": {
+          "deviceType": "Container",
+          "os": "pihole/pihole:latest",
+          "ipAddresses": "192.168.1.61",
+          "macAddresses": "00:42:c0:a8:01:3d",
+          "unraid_container_id": "7d8e9f0a1b2c",
+          "unraid_network_mode": "br0",
+          "unraid_update_available": "true",
+          "unraid_label_com.docker.compose.project": "homelab"
+        }
+      }
+    ],
+    "min_services_total": 3,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/graphql", "header": {"x-api-key": "fixture-api-key"}},
+      {"body_contains": "RunZeroUnraidInfo"},
+      {"body_contains": "RunZeroUnraidDocker"},
+      {"body_contains": "RunZeroUnraidVms"},
+      {"body_contains": "RunZeroUnraidStorage"}
+    ],
+    "log_contains": [
+      "reported 1 containers with an address of their own",
+      "3 containers were not imported as assets",
+      "recorded 2 virtual machines on the server asset",
+      "reported 1 server and 1 containers"
+    ]
+  },
+  "check_determinism": true
+}

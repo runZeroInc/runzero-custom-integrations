@@ -1,0 +1,76 @@
+{
+  "name": "poll-timeout",
+  "integration": "nexthink",
+  "description": "An export that never leaves RUNNING must end the run cleanly rather than hang. This scenario also pins the poll budget: the budget is the poll_timeout CONFIG parameter (default 300 seconds, spent in 2-second intervals), because large-estate exports routinely take minutes and a small fixed budget imported nothing on every run. The scenario sets poll_timeout=10 so the walk makes exactly 5 status polls (plus the token and export-start calls: 7 requests) over about 8 seconds. request_count is asserted exactly so that any later change to the interval or the budget arithmetic shows up here rather than being merged silently. check_determinism is off because the scenario emits no assets, so a second run would compare two empty id lists at the cost of another 8 seconds.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "poll_timeout": 10
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "nexthink-token-3"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/nql/export"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "exportId": "exp-0003"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status-never-finishes",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/nql/status/exp-0003"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "RUNNING",
+            "progressPercentage": 12
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 7,
+    "log_contains": [
+      "NQL export did not complete in time. Last status: RUNNING",
+      "No rows returned from Nexthink export workflow"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "timeout": 120,
+  "check_determinism": false
+}

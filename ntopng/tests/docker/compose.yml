@@ -1,0 +1,186 @@
+# A real ntopng Community Edition, fed by traffic that two other containers
+# really generated and a third really captured off the bridge.
+#
+# THE ONE UNPINNED IMAGE IN THIS SUITE. `ntop/ntopng` publishes exactly one
+# tag, `latest` -- there is no version tag to pin to and no ntop-published
+# alternative for the stable channel. The harness rule was waived for this
+# integration specifically. The digest actually tested is recorded in
+# manifest.json as `_image_digest`, so a future failure can be attributed to an
+# image change rather than to the integration. See tests/README.md.
+#
+# WHY A CAPTURE FILE RATHER THAN A LIVE INTERFACE
+# -----------------------------------------------
+# The traffic is real either way; what changes is only how ntopng receives it.
+# `ntop/ntopng` is published for linux/amd64 ONLY -- there is no arm64 build on
+# the stable channel -- so on an arm64 host every ntopng process runs under
+# QEMU user-mode emulation, and QEMU does not implement the AF_PACKET options
+# libpcap needs:
+#
+#   promiscuous open -> setsockopt(PACKET_ADD_MEMBERSHIP): Protocol not available
+#   non-promiscuous  -> segmentation fault inside libpcap
+#   ioctl            -> SIOCETHTOOL(ETHTOOL_GLINK): Function not implemented
+#
+# Verified with tcpdump inside the ntopng image itself; the same tcpdump run
+# natively on this host captures fine, so it is the emulation and not the
+# kernel, the capabilities, or the bridge. `-i eth0` therefore aborts at
+# startup with "Unable to open interface eth0 with pcap [92]" on any non-amd64
+# host, and no ntopng flag avoids it.
+#
+# So the capture is done by a native-architecture sidecar and handed to ntopng
+# as a file. Nothing is faked and nothing is hand-written: `client-a` and
+# `client-b` emit genuine ARP, ICMP and HTTP; `sniffer` records the actual
+# frames off the compose bridge with tcpdump; and ntopng then runs its real
+# packet parser, flow engine, nDPI fingerprinter, MAC table and host table over
+# them. What the integration reads is what ntopng made of real traffic. The
+# arrangement is also architecture-independent: only the tiny sidecar touches
+# AF_PACKET, and it always runs natively.
+services:
+  # 1. The capture. Starts first, serves a page for the clients to fetch, and
+  #    records the segment for a bounded window before exiting 0.
+  sniffer:
+    image: alpine:3.20
+    networks:
+      lan:
+        ipv4_address: 10.222.9.3
+    # Locally-administered bit already clear, so the emitted MAC matches the
+    # configured one and the expectation stays readable.
+    mac_address: "00:11:22:33:44:77"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - capture:/capture
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        # busybox-extras carries the httpd applet; Alpine moved it out of the
+        # core busybox binary, so `busybox httpd` is applet-not-found (exit 127).
+        apk add --no-cache tcpdump busybox-extras >/dev/null 2>&1
+        mkdir -p /www
+        echo 'runzero ntopng container test' > /www/index.html
+        busybox-extras httpd -p 8080 -h /www
+        # Talk to the bridge gateway from HERE, so the exchange is captured.
+        # A Linux bridge delivers unicast only to the addressed port, so a
+        # client pinging the gateway is invisible to this container -- the
+        # gateway would then appear in ntopng's table only when it happened to
+        # broadcast an ARP request, which is exactly the kind of timing
+        # dependency that makes a test flap. Pinging it from the sniffer puts
+        # the gateway on one end of a captured flow every single run.
+        ( while true; do ping -c 1 -W 1 10.222.9.1 >/dev/null 2>&1; sleep 2; done ) &
+        rm -f /capture/lan.pcap
+        # SIGINT rather than SIGKILL so tcpdump flushes and closes the file.
+        timeout -s INT 30 tcpdump -i eth0 -s 512 -w /capture/lan.pcap 2>/dev/null || true
+        # ntopng drops privileges to the `ntopng` user after opening its input,
+        # so the file it is handed has to be world-readable.
+        chmod 0644 /capture/lan.pcap
+        ls -l /capture/lan.pcap
+        echo "capture complete"
+
+  # 2. Two devices to be seen. A container's eth0 on a Linux bridge receives
+  #    only frames addressed to it or broadcast, so the traffic is aimed AT the
+  #    sniffer: every exchange below puts both endpoints in the capture, which
+  #    is what fills ntopng's host table and its layer 2 table.
+  client-a:
+    image: busybox:1.36
+    depends_on: [sniffer]
+    networks:
+      lan:
+        ipv4_address: 10.222.9.11
+    mac_address: "00:11:22:33:44:66"
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          ping -c 2 -W 1 10.222.9.3 >/dev/null 2>&1
+          wget -q -O /dev/null -T 3 http://10.222.9.3:8080/ 2>/dev/null
+          sleep 1
+        done
+
+  client-b:
+    image: busybox:1.36
+    depends_on: [sniffer]
+    networks:
+      lan:
+        ipv4_address: 10.222.9.12
+    # Deliberately carries the locally-administered bit, the way every Docker
+    # container's default MAC does. ntopng reports it verbatim and the
+    # platform's network_interface() clears that bit, so this row is emitted as
+    # 00:42:0a:de:09:0b. The manifest asserts both sides so the transformation
+    # is visible rather than surprising -- the same demonstration the pihole and
+    # adguard-home stacks make, but on a MAC this stack controls rather than on
+    # the bridge gateway's, which Docker randomises per network.
+    mac_address: "02:42:0a:de:09:0b"
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          ping -c 2 -W 1 10.222.9.3 >/dev/null 2>&1
+          wget -q -O /dev/null -T 3 http://10.222.9.3:8080/ 2>/dev/null
+          sleep 1
+        done
+
+  # 3. The software under test. Starts only once the capture file is complete.
+  ntopng:
+    image: ntop/ntopng:latest
+    hostname: rz-ntopng
+    depends_on:
+      sniffer:
+        condition: service_completed_successfully
+    networks:
+      lan:
+        ipv4_address: 10.222.9.2
+    volumes:
+      - capture:/capture:ro
+    # /run.sh starts the bundled redis and then execs `ntopng "$@"`.
+    #   -i /capture/lan.pcap  read the captured segment. pcap_open_offline is
+    #                         plain file I/O, so none of the AF_PACKET options
+    #                         QEMU lacks are involved.
+    #   -m                    make the compose subnet a LOCAL network. This is
+    #                         what makes host_mode=local return anything at
+    #                         all: ntopng's default local list is
+    #                         192.168.1.0/24, and every host outside it counts
+    #                         as remote and is invisible to mode=local.
+    #   -n 1                  resolve numeric IPs, so Docker's embedded
+    #                         resolver gets a chance to supply names and the
+    #                         integration's hostname path is exercised.
+    #   --disable-purge       keep the hosts in memory. Without it ntopng ages
+    #                         idle hosts out, and the table could empty between
+    #                         the seed observing it and the scanner reading it.
+    #   --limit-resources     skips NetworkDiscovery, which opens a promiscuous
+    #                         socket of its own at startup and would abort
+    #                         interface initialisation under emulation even in
+    #                         pcap mode.
+    #   -q                    no logout on inactivity.
+    command: >
+      -i /capture/lan.pcap
+      -w 3000
+      -m 10.222.9.0/24
+      -n 1
+      -q
+      --disable-purge
+      --limit-resources
+      -d /var/lib/ntopng
+    ports:
+      - "${RZ_HOST_PORT}:3000"
+
+volumes:
+  # Carries the capture from the sniffer to ntopng. `compose down -v` removes
+  # it, so no run ever reads the previous run's traffic.
+  capture:
+
+networks:
+  lan:
+    # Fixed for the same reason as the pihole and adguard-home stacks: the
+    # addresses are asserted directly, so they cannot come from Docker's
+    # rotating pool. 10.222.9.0/24 sits clear of Docker's default pools and of
+    # the 10.222.7.0/24 and 10.222.8.0/24 those two stacks use -- they never
+    # run at once, but a distinct subnet keeps a stale network out of the way.
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.222.9.0/24
+          gateway: 10.222.9.1

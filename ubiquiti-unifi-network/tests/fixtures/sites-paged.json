@@ -1,0 +1,64 @@
+{
+  "name": "sites-paged",
+  "integration": "ubiquiti-unifi-network",
+  "description": "An MSP console with more sites than one page. The site lookup used to send a single unpaginated request, so a site beyond the default page could never be found and the run ended with 'no site is named'. The lookup now walks offset/limit like the other collections: the target site arrives on page TWO, and the offset=2 request assertion pins that the second page was actually requested. The found site's clients collection is empty, which doubles as the empty-site case: a site with no clients must produce a clean zero-asset run, not a failure.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "Branch-Oslo",
+    "page_limit": "2",
+    "extract_devices": "false"
+  },
+  "routes": [
+    {
+      "name": "sites-page-2",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites", "query_contains": "offset=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 2, "limit": 2, "count": 1, "totalCount": 3, "data": [
+            {"id": "site-uuid-oslo", "name": "Branch-Oslo"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sites-page-1",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 2, "count": 2, "totalCount": 3, "data": [
+            {"id": "site-uuid-hq", "name": "HQ"},
+            {"id": "site-uuid-warehouse", "name": "Warehouse"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "clients-empty",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-oslo/clients"},
+      "responses": [
+        {"status": 200, "json": {"offset": 0, "limit": 2, "count": 0, "totalCount": 0, "data": []}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/proxy/network/integration/v1/sites", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/proxy/network/integration/v1/sites", "query_contains": "offset=2"},
+      {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-oslo/clients"}
+    ],
+    "log_contains": [
+      "unifi: found site ID site-uuid-oslo",
+      "unifi: reported 0 client assets",
+      "unifi: reported 0 assets"
+    ]
+  }
+}

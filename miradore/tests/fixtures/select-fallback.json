@@ -1,0 +1,93 @@
+{
+  "name": "select-fallback",
+  "integration": "miradore",
+  "description": "A live Miradore site answers 500 -- not 400 -- to a query it dislikes, and fails it whole. This walks the entire attribute ladder: the full set is refused, the core set is refused, and only the third rung, which sends no select at all, succeeds. The path probe also sends no select, so it succeeds first and picks the endpoint. Proves an import still happens when every attribute list is rejected, and that the log names the rung it ended on.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme"
+  },
+  "routes": [
+    {
+      "name": "reject-full",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "InvDevice.MarketingName"
+      },
+      "responses": [
+        {
+          "status": 500,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<Content><Error><Description>Internal server error</Description><Code>500</Code></Error></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "reject-core",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "select="
+      },
+      "responses": [
+        {
+          "status": 500,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<Content><Error><Description>Internal server error</Description><Code>500</Code></Error></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "defaults",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"1\"><Device><ID>7</ID><Platform>iOS</Platform><IPAddress>10.40.0.7</IPAddress><MACAddress>00:11:22:CC:00:07</MACAddress><Status>Active</Status><InvDevice><DeviceName>core-only-07</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone15,2</Model></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "miradore:acme:7"
+    ],
+    "request_count": 4,
+    "log_contains": [
+      "Internal server error",
+      "retrying with core attribute set",
+      "retrying with the API's default attribute set",
+      "ran with the API's default attribute set",
+      "reported 1 of 1 devices matched by the query"
+    ],
+    "assets": [
+      {
+        "id": "miradore:acme:7",
+        "fields": {
+          "os": "iOS",
+          "model": "iPhone15,2",
+          "hostnames": "core-only-07",
+          "ipAddresses": "10.40.0.7"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "name": "delete-default-off",
+  "integration": "runzero-scan-passive-assets",
+  "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
+  "description": "The shipped default: delete_assets is not set, scans are queued, and NOTHING is polled or deleted. Deletion is opt-in because of an unresolved merge question -- the active scan of the same IP in the same site may merge onto the very passive asset being tracked (IP-match is the platform default for a record whose only correlator is that IP), in which case the delete would erase the freshly scanned asset. Until that is settled per environment, the safe default is to queue the scans and keep every passive record. Three requests exactly: the export and two scan PUTs; requests_absent pins that no task poll and no bulk delete ever fire.",
+  "kwargs": {
+    "url": "$BASE",
+    "site_id": "77777777-6666-5555-4444-333333333333",
+    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+  },
+  "routes": [
+    {
+      "name": "passive asset export",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "11111111-aaaa-4bbb-8ccc-000000000001",
+              "addresses": ["10.42.0.11"],
+              "last_agent_id": "a0a0a0a0-1111-4222-8333-444444444444"
+            },
+            {
+              "id": "11111111-aaaa-4bbb-8ccc-000000000002",
+              "addresses": ["172.16.9.9"],
+              "last_agent_id": "b1b1b1b1-5555-4666-8777-888888888888"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "create scan task",
+      "match": {"method": "PUT", "path": "/api/v1.0/org/sites/77777777-6666-5555-4444-333333333333/scan"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "cccccccc-3333-4444-8555-666666666666",
+            "site_id": "77777777-6666-5555-4444-333333333333",
+            "agent_id": "a0a0a0a0-1111-4222-8333-444444444444",
+            "type": "scan",
+            "status": "new",
+            "stats": {}
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "id": "cccccccc-4444-4555-8666-777777777777",
+            "site_id": "77777777-6666-5555-4444-333333333333",
+            "agent_id": "b1b1b1b1-5555-4666-8777-888888888888",
+            "type": "scan",
+            "status": "new",
+            "stats": {}
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      {"method": "PUT", "path": "/api/v1.0/org/sites/77777777-6666-5555-4444-333333333333/scan", "body_contains": "10.42.0.11"},
+      {"method": "PUT", "path": "/api/v1.0/org/sites/77777777-6666-5555-4444-333333333333/scan", "body_contains": "172.16.9.9"}
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/api/v1.0/org/assets/bulk/delete"},
+      {"method": "GET", "path_contains": "/api/v1.0/org/tasks/"}
+    ],
+    "log_contains": [
+      "delete_assets is off; queued 2 scan(s) and keeping every passive asset"
+    ]
+  }
+}

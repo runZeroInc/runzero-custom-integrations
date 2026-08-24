@@ -1,0 +1,38 @@
+{
+  "name": "export-license-error",
+  "integration": "sumo-logic",
+  "script": "sumo-logic/sumo-logic.star",
+  "description": "The export endpoint answers 402 Payment Required with a JSON error body, which is what exportAssetsJSON renders when exportValidateLicense fails -- an expired or invalid license, the easiest failure to overlook because it is neither 401 nor 5xx. get_json must surface it as an error and the run must stop there. The point of the scenario is the second assertion: a failed source read must not turn into a POST. Uploading an empty or partial batch here would silently truncate the receiver's view of the estate while every run still reported success. 402 is also outside get_json's retry set (408/425/429/500/502/503/504), so exactly one request is made -- request_count pins that, and would catch a retry storm against an endpoint that will never relent.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+  },
+
+  "routes": [
+    {
+      "name": "runzero asset export, license invalid",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {"status": 402, "json": {"error": "license is expired"}}
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/export/org/assets.json"}
+    ],
+    "requests_absent": [
+      {"method": "POST"}
+    ],
+    "log_contains": [
+      "runZero export failed:"
+    ]
+  }
+}

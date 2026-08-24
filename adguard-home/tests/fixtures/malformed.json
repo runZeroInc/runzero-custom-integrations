@@ -1,0 +1,128 @@
+{
+  "name": "malformed",
+  "integration": "adguard-home",
+  "description": "Every field arrives in the wrong shape: dns_addresses as a bare string, a null version, leases as a string where the spec documents an array, a non-object element inside static_leases, a lease with a null mac and a null ip, a lease whose mac is not hex, a lease whose ip is not an address, clients as a string, an auto_client with a null name and a whois_info that is not an object, and an auto_client with no ip at all. Proves each unusable record is skipped and counted rather than aborting the run, that a lease with only a usable MAC and one with only a usable IP each still produce a keyable asset, and that a loopback-only query source is not imported. It also pins the split between the id and the interface: aa:bb:cc:00:11:09 keeps its locally administered bit in the foreign id and is emitted on the interface as a8:bb:cc:00:11:09, because network_interface clears that bit to match across sources while the id must stay lossless. no_mac_in_id is skipped for every adguard-home scenario: the MAC from the DHCP server is the only durable key the API publishes, and the id is paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "status",
+      "match": {"method": "GET", "path": "/control/status"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": null,
+            "language": "en",
+            "dns_addresses": "192.0.2.10",
+            "dns_port": "53",
+            "http_port": 3000,
+            "protection_enabled": true,
+            "running": true
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-status",
+      "match": {"method": "GET", "path": "/control/dhcp/status"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "enabled": true,
+            "interface_name": "eth0",
+            "leases": "unavailable",
+            "static_leases": [
+              {"mac": "aa:bb:cc:00:11:08", "ip": "192.0.2.62", "hostname": "ok-host"},
+              "not-an-object",
+              {"mac": null, "ip": null, "hostname": "ghost"},
+              {"mac": "zz:zz:zz:zz:zz:zz", "ip": "192.0.2.61", "hostname": "bad-mac"},
+              {"mac": "aa:bb:cc:00:11:09", "ip": "not-an-ip", "hostname": "no-ip"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path": "/control/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "clients": "nope",
+            "auto_clients": [
+              {"ip": "192.0.2.71", "name": null, "source": "rDNS", "whois_info": "not-a-dict"},
+              {"ip": null, "name": "ghost", "source": "rDNS", "whois_info": {}},
+              "not-an-object",
+              {"ip": "127.0.0.1", "name": "localhost", "source": "etc/hosts", "whois_info": {}}
+            ],
+            "supported_tags": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "adguard-home:$HOST:appliance",
+      "adguard-home:$HOST:client:aa:bb:cc:00:11:08",
+      "adguard-home:$HOST:client:aa:bb:cc:00:11:09",
+      "adguard-home:$HOST:client-ip:192.0.2.61",
+      "adguard-home:$HOST:client-ip:192.0.2.71"
+    ],
+    "ids_absent": [
+      "adguard-home:$HOST:client-ip:127.0.0.1",
+      "adguard-home:$HOST:client-ip:192.0.2.62"
+    ],
+    "assets": [
+      {
+        "id": "adguard-home:$HOST:appliance",
+        "fields": {
+          "ipAddresses": "192.0.2.10"
+        },
+        "fields_absent": ["osVersion"]
+      },
+      {
+        "id": "adguard-home:$HOST:client:aa:bb:cc:00:11:09",
+        "fields": {
+          "macAddresses": "a8:bb:cc:00:11:09"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "adguard-home:$HOST:client-ip:192.0.2.61",
+        "fields": {
+          "hostnames": "bad-mac"
+        },
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "adguard-home:$HOST:client-ip:192.0.2.71",
+        "fields": {
+          "adguard_client_source": "rDNS"
+        },
+        "fields_absent": ["hostnames", "macAddresses"]
+      }
+    ],
+    "log_contains": [
+      "DHCP leases read: 0 dynamic, 3 static",
+      "runtime clients read: 1",
+      "persistent client entries applied: 0 (0 created)",
+      "reported 1 appliance and 4 clients"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

@@ -33,8 +33,9 @@ CONFIG = {
     "name": "Integration Name",
     "type": "inbound",
     "description": "Short summary shown in the catalog.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "client_id",
@@ -63,8 +64,8 @@ load("runzero.types", "ImportAsset")
 - `CONFIG` must be the first top-level statement. Comments and blank lines may precede it; `load(...)`, constants, and other statements may not.
 - All values must be literals (`True`/`False`/`None`, strings, ints, floats, lists, tuples, dicts with string keys, negated numbers via unary `-`).
 - `id` must be a stable lower-case integration identifier, e.g. `runzero-tailscale`.
-- `version` must use the integration version string for the target release, e.g. `26052700`.
-- Scripts in this v2 library must set `minVersion` to `5.1.0` or later. Before the script runs, the Explorer version is compared against it and older releases fail with a clear upgrade message. Development builds using the `0.0.0` sentinel skip the check.
+- `version` is the script's own revision, not a date stamp. Every integration in this library ships `"1"`; bump it only if a script needs to be versioned independently.
+- Scripts in this v2 library set `minVersion` to `5.1.260818.0`. Before the script runs, the Explorer version is compared against it and older releases fail with a clear upgrade message rather than aborting somewhere inside the script. Development builds using the `0.0.0` sentinel skip the check. Raise it above the library value only when a script needs a capability that shipped later, and say which one in a comment beside it.
 - `type` must be `inbound`, `outbound`, or `internal`.
 - Each `params[].key` must match `^[a-zA-Z_][a-zA-Z0-9_]*$` and must match the kwarg name the script reads.
 - `type: "secret"` (or `secret: True`) marks the field for masked input and log redaction; never log or print these values, and never set a `default` on them. All dynamic credential fields are encrypted at rest.
@@ -72,7 +73,71 @@ load("runzero.types", "ImportAsset")
 - Baseline URL parameters for API endpoints must be set in the `CONFIG`.
 - IP addresses for direct protocol connections must be set in the `CONFIG`. 
 
-**Supported top-level CONFIG fields:** `id`, `name`, `type`, `description`, `version`, `minVersion`, `params`, `includes`, `rejectUnknown`, `atLeastOneOf`, `exactlyOneOf`, `validationMode`.
+- `maturity` is `alpha`, `beta`, or `stable` and drives how the integration is presented in the catalog. An absent value is read as `alpha`.
+- `sourceId` and `sourceName` are reserved for runZero-shipped integrations. A script that declares either is rejected on save.
+
+**Supported top-level CONFIG fields:** `id`, `name`, `type`, `description`, `version`, `maturity`, `minVersion`, `matchBehavior`, `assetTypeBehavior` (alias `sourceTypeBehavior`), `assetType`, `ownershipAttributes`, `trustOS`, `trustOSVersion`, `trustType`, `maxPages`, `params`, `includes`, `rejectUnknown`, `atLeastOneOf`, `exactlyOneOf`, `validationMode`.
+
+- `assetType` sets the default attribute category for every asset the script reports, matching `^[a-z0-9][a-z0-9_-]{0,63}$`. Individual assets override it with `ImportAsset(assetType=...)`.
+- `ownershipAttributes` lists `customAttributes` keys whose values name the asset's owner, so device ownership is populated automatically.
+- `trustOS`, `trustOSVersion`, `trustType` are booleans. When true, the script-supplied OS, OS version, or device type is authoritative and is not replaced by runZero fingerprinting. Leave them out unless the source is genuinely more reliable than fingerprinting.
+
+`matchBehavior` declares the asset-reconciliation policy once for the whole
+integration, as a space-separated flag string placed after `minVersion` and
+before `params`. It is not a field on `ImportAsset`; the merge path needs the
+behavior before it has an asset, so a script that passes `matchBehavior=` to
+`ImportAsset` fails validation. Omit the key for the default, which matches and
+breaks on all four dimensions. Keep a comment beside the value explaining why
+the default is wrong for this source — see the root README for the flag table
+and presets.
+
+### Asset types and per-type merge policy
+
+Some integrations report genuinely different kinds of thing from one source: a
+NAS and the VMs on it, a router and the hosts it observed, an agent record and
+a DHCP lease. `assetType` labels each population, and `assetTypeBehavior` gives
+a population its own merge policy on top of the integration-wide one.
+
+```python
+CONFIG = {
+    ...
+    # The policy that fits MOST records goes here.
+    "matchBehavior": "no-mac-break no-ip-break no-name-break",
+    # Only the populations that need something different are named here.
+    "assetTypeBehavior": {
+        "lease": "no-id-match no-id-break",
+    },
+}
+
+# ...and the script labels that population as it builds it:
+ImportAsset(id=..., assetType="lease", ...)
+```
+
+Rules worth knowing before you use it:
+
+- A key in `assetTypeBehavior` only takes effect on assets the script actually
+  labels with that `assetType`. A declared key nothing emits is dead
+  configuration, and the mistake is invisible at runtime — the records quietly
+  inherit the integration-wide policy instead, which is usually the opposite of
+  what was intended.
+- Type keys match `^[a-z0-9][a-z0-9_-]{0,63}$`, the same constraint as
+  `assetType`.
+- Levels layer rather than replace: the integration-wide value survives
+  wherever the type-specific string is silent. Splitting one population's flags
+  across the two levels leaks them onto every other population, so give each
+  type its complete policy.
+- Emitting an `assetType` with no matching `assetTypeBehavior` entry is normal
+  and often the point — it labels the population for the operator while leaving
+  the integration-wide policy in force.
+- An integration that splits one population across asset types usually also
+  wants `no-type-break`, so a record moving between types is not refused a
+  merge for that reason alone.
+- `sourceTypeBehavior` is an accepted alias. Declaring a key under both
+  spellings with different values is an error.
+
+Choose the type name for the operator, not for the code: it becomes a visible
+attribute category, so `lease`, `container`, `camera`, and `swarm-node` are
+good names and `type2` is not.
 
 **Supported param types:** `string`, `secret`, `int`, `float`, `bool`, `enum` (requires `options`), `url`, `textarea`, `json`.
 
@@ -144,45 +209,68 @@ Use descriptive parameter keys such as `username`, `password`, `api_token`, `cli
     is imported in addition to whatever was already reported).
 *   **Outbound**: Typically returns `None` after performing the export operation.
 
-### Streaming assets with `report_assets` (large datasets)
+### Streaming assets with `report_asset` (large datasets)
 
 Returning one giant `list` from `main` forces the whole result set — every
 `ImportAsset`, plus the raw API responses used to build them — to live in
 memory at once. For integrations that page through large inventories this can
-exhaust the Explorer's memory. Instead, report assets to runZero as you build
-them and let each page be garbage-collected before the next is fetched:
+exhaust the Explorer's memory. Instead, report each asset as you build it:
 
 ```python
 def main(**kwargs):
     total = 0
     cursor = None
-    while True:
+    p = pager("devices")                           # CONFIG-bounded loop guard
+    while p.next():
         page, cursor = fetch_page(kwargs, cursor)  # one page of raw records
         if not page:
             break
-        assets = build_assets(page)                # build just this page
-        report_assets(assets)                      # stream it to runZero
-        total += len(assets)
+        for record in page:
+            total += report_asset(build_asset(record))
         if not cursor:
             break
     print("reported {} assets".format(total))
     return None                                    # nothing buffered in main
 ```
 
-`report_assets` is a predeclared builtin (no `load` required) and accepts any
-combination of:
+`report_asset` and `report_assets` are predeclared builtins (no `load`
+required).
 
-```python
-report_assets(asset)            # a single ImportAsset
-report_assets(asset1, asset2)   # several as positional args
-report_assets(page_assets)      # a list/tuple of ImportAsset
-report_assets(*page_assets)     # the same, spread
-n = report_assets(batch)        # returns the count reported, for logging
-```
+**Do not batch.** The accumulate-then-flush pattern —
+`batch.append(asset)`, flush at `BATCH_SIZE`, plus a trailing `if batch:` —
+buys nothing: the host already writes incrementally, so the batch is just a
+second buffer in front of it. Reporting per asset bounds memory regardless of
+estate size and cannot lose a partial final batch when a script returns early.
 
-Notes:
+*   `report_asset(asset)` takes exactly one `ImportAsset` and returns `1`, so
+    `total += report_asset(asset)` accumulates a count. `report_asset(None)` is
+    a no-op returning `0`, so it is safe to wrap a builder that may decline a
+    record.
+*   `report_assets(...)` remains available for the cases where you genuinely
+    have a list, and accepts a single asset, several positional assets, a
+    list/tuple, or a spread. It returns the count reported.
 *   Reported assets are merged with any `list` returned from `main`, so a
     partial migration (report some pages, return the rest) is safe.
+
+### Bounding pagination loops
+
+Every pagination loop needs a backstop, or a source whose cursor never
+terminates spins until the task's wall-clock deadline with no indication of
+why. Do **not** declare your own `MAX_PAGES` constant. Set the limit in
+`CONFIG` where an operator can see it, and guard the loop with `pager()`:
+
+```python
+CONFIG = {
+    ...
+    "maxPages": 5000,      # optional; defaults to 1,000,000
+}
+```
+
+`p.next()` returns `True` while the loop may continue and **raises** when the
+limit is reached, naming the label and the `maxPages` key — an incomplete
+import is reported as an error rather than silently truncated. Give each loop
+its own label; a script that pages parents and then each parent's children has
+two different bounds. See `docs/starlark-helpers.md` for the full API.
 
 
 ### Available Libraries
@@ -199,11 +287,14 @@ load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Service',
 load('kwargs', 'require', 'has', 'get_string', 'get_bool', 'get_int',
                'get_list', 'get_http_options')
 load('json', json_encode='encode', json_decode='decode')
-load('net', 'ip_address', 'network_interface', 'normalize_mac', 'resolve')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'mac_key',
+            'routable_ip', 'routable_ips', 'clean_hostname', 'clean_hostnames', 'resolve')
+load('coerce', 'as_text', 'as_dict', 'as_list', 'dicts', 'as_int', 'as_float',
+               'as_bool', 'dedupe')
 load('http', http_post='post', http_get='get', 'get_json', 'post_json',
              'url_encode', 'bearer', 'basic', 'oauth2_token')
 load('uuid', 'new_uuid')
-load('time', 'parse_time', 'parse_duration', 'now')
+load('time', 'parse_ts', 'parse_time', 'parse_duration', 'now')
 load('gzip', gzip_decompress='decompress', gzip_compress='compress')
 load('base64', base64_encode='encode', base64_decode='decode')
 load('crypto', 'sha256', 'sha512', 'sha1', 'md5', 'hmac_sha256')
@@ -216,7 +307,7 @@ The Starlark `runzero.types` library exposes `ImportAsset`, `NetworkInterface`, 
 - `ImportAsset`: unique `id`; `hostnames`/`tags` accept plain strings or wrapped types; optional `os`, `osVersion`, `services`, `software`, `vulnerabilities`; `customAttributes` should stay under 1024 entries with keys <=256 chars and values <=1024 chars.
 - `NetworkInterface`: `macAddress`, `ipv4Addresses`, `ipv6Addresses`; IP strings are parsed/validated.
 - `Software`, `Service`, `ServiceProtocolData`: lower-case transports/protocol names, parse addresses from strings, and share the same custom attribute limits as `ImportAsset`.
-- `Vulnerability`: lower-cases transport/CPE, upper-cases CVE, and parses addresses from strings; custom attribute limits apply.
+- `Vulnerability`: `cve` is accepted in any case and canonicalized to upper case, so a source that reports `cve-2024-0001` imports cleanly; it must still match `CVE-YYYY-NNNN` in shape, and a malformed id fails the whole record rather than the field. `cpe23` needs only the `cpe:` prefix (`Software.cpe23` is stricter — it requires the CPE 2.2 URI binding `cpe:/a:`). Addresses are parsed from strings; custom attribute limits apply.
 - `CustomAttribute` in the SDK is deprecated—use plain strings for `customAttributes`.
 
 ### Inbound asset example with SDK types
@@ -233,7 +324,7 @@ assets.append(ImportAsset(
     networkInterfaces=[
         NetworkInterface(macAddress="aa:bb:cc:dd:ee:ff", ipv4Addresses=[ip_address("10.0.0.5")])
     ],
-    software=[Software(name="nginx", version="1.25.3", serviceTransport="tcp")],
+    software=[Software(id="nginx", product="nginx", version="1.25.3", serviceTransport="tcp")],
     vulnerabilities=[Vulnerability(cve="CVE-2023-0001", serviceTransport="tcp", serviceAddress="10.0.0.5")],
     customAttributes={"location": "SFO-1", "serial": "ABC123"}
 ))
@@ -359,13 +450,21 @@ def json_example():
 ### time
 Used for parsing time strings.
 
-```python
-load('time', 'parse_time')
+**Use `parse_ts` for anything that came from an API.** `parse_time` raises on
+input it does not recognize, and a raise from a builtin aborts the whole
+script — so one malformed or zero timestamp on one record loses the entire
+import. `parse_ts` returns its `default` (`None`) instead, accepts epoch
+numbers and the offset-less shapes on-premise sources emit
+(`2026-08-15 08:44:01`), and clamps future values to now so a fast appliance
+clock does not cause the platform to drop every record.
 
-def time_example():
-    time_str = "2023-10-27T10:00:00Z"
-    parsed = parse_time(time_str)
-    print("Unix Timestamp:", parsed.unix)
+```python
+load('time', 'parse_ts')
+
+def time_example(record):
+    first_seen = parse_ts(record.get("created"))          # None if unparseable
+    last_seen = parse_ts(record.get("last_seen_ms"), unit="ms")
+    print("Unix Timestamp:", first_seen.unix if first_seen else "unknown")
 ```
 
 ### uuid
@@ -440,8 +539,26 @@ def kwargs_example(**kwargs):
 ```
 
 ### get_json / post_json
-Drop-in replacements for `GET` + status-check + `json_decode`, with retry
-and backoff. Return `(data, err)`.
+Drop-in replacements for `GET` + status-check + `json_decode`. Return
+`(data, err)`.
+
+Retry and backoff are on by default: `retries` defaults to `3` (up to four
+attempts), covering `408, 425, 429, 500, 502, 503, 504` and transport
+errors with exponential backoff, honoring `Retry-After`. Rate-limited and
+paged APIs need no extra configuration.
+
+A target the scanner refuses to dial -- on a hosted scan, a URL that
+resolves to an internal address -- aborts the script rather than
+returning an `err` string, so a tolerant fetch helper cannot walk its
+whole endpoint list logging one dial failure per endpoint. Other
+transport failures (DNS, refused, TLS, timeout) still arrive as `err`.
+
+Pass `retries=0` when a request is not safe to repeat, or narrow
+`retry_on` to statuses that mean the request was rejected unprocessed
+(e.g. `retry_on=[429, 503]`) — a retried `post_json` that creates
+something can otherwise apply twice. Note the raw `http.get`/`post`/
+`put`/`patch` builtins take no `retries` kwarg at all; passing one is an
+error.
 
 ```python
 load('http', 'get_json', 'post_json', 'bearer')
@@ -563,7 +680,7 @@ def main(**kwargs):
     for device in devices:
         assets.append(ImportAsset(
             id=device.get("id"),
-            hostnames=[device.get("hostname")],
+            hostnames=clean_hostnames([device.get("hostname")]),
             os=device.get("os"),
             networkInterfaces=[build_network_interface(device.get("ips", []), device.get("mac"))],
             customAttributes={"serial": device.get("serial")}

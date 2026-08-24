@@ -1,0 +1,139 @@
+{
+  "name": "session-relogin",
+  "integration": "synology-dsm",
+  "description": "A session lost mid-run that RECOVERS. DSM invalidates the first session between the network read and the camera read (error 119, the shape a duplicated login produces), and the script must re-authenticate once and retry the failed request with the new sid rather than losing every remaining collection. The camera route answers 119 to the first attempt and a real camera to the retry; the _sid=fixture-sid-2 query assertion pins that the retry carried the NEW session, and request_count pins exactly one extra login plus one retry. The persistent-loss case, where the retry fails too and the run degrades to the diagnostic, is in the malformed scenario. no_mac_in_id is skipped for the reason recorded in happy.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-runzero",
+    "password": "fixture-password",
+    "collect_vms": "false",
+    "collect_backup_devices": "false",
+    "collect_dhcp_leases": "false"
+  },
+  "routes": [
+    {
+      "name": "api-info",
+      "match": {"method": "GET", "path": "/webapi/query.cgi"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "SYNO.API.Auth": {"path": "entry.cgi", "minVersion": 3, "maxVersion": 7},
+              "SYNO.DSM.Info": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2},
+              "SYNO.DSM.Network": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2},
+              "SYNO.SurveillanceStation.Camera": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 9}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/webapi/entry.cgi", "body_contains": "method=login"},
+      "responses": [
+        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-1"}}},
+        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-2"}}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "dsm-info",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {"model": "DS723+", "serial": "2310RELOGIN01", "version_string": "DSM 7.2.2-72806"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dsm-network",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Network"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "hostname": "relogin-nas",
+              "interfaces": [
+                {"id": "eth0", "ip": [{"address": "10.44.0.5", "netmask": "255.255.255.0"}], "mac": "00-11-32-BB-CC-01", "type": "lan"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cameras",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.SurveillanceStation.Camera"},
+      "responses": [
+        {"status": 200, "json": {"success": false, "error": {"code": 119}}},
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "total": 1,
+              "cameras": [
+                {"id": 9, "name": "dock-cam", "host": "10.44.0.9", "port": 554, "vendor": "Axis", "model": "M2035-LE", "firmware": "11.11.73", "enabled": true}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "logout",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "method=logout"},
+      "responses": [{"status": 200, "json": {"success": true}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"success": false, "error": {"code": 102}}
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "synology:serial:2310RELOGIN01",
+      "synology:$HOST:camera:9"
+    ],
+    "assets": [
+      {
+        "id": "synology:$HOST:camera:9",
+        "fields": {
+          "deviceType": "IP Camera",
+          "manufacturer": "Axis",
+          "model": "M2035-LE",
+          "ipAddresses": "10.44.0.9",
+          "hostnames": "dock-cam"
+        }
+      }
+    ],
+    "request_count": 8,
+    "requests_include": [
+      {"method": "GET", "query_contains": "api=SYNO.SurveillanceStation.Camera"},
+      {"method": "GET", "query_contains": "_sid=fixture-sid-2"}
+    ],
+    "log_contains": [
+      "cameras lost the session (error 119: invalid session); re-authenticating once",
+      "reported 1 cameras",
+      "reported 1 NAS, 0 virtual machines, 1 cameras, 0 backup devices, 0 leases"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

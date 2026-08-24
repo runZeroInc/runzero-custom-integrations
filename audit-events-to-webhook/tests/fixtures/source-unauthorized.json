@@ -1,0 +1,39 @@
+{
+  "name": "source-unauthorized",
+  "integration": "audit-events-to-webhook",
+  "script": "audit-events-to-webhook/audit-events-to-webhook.star",
+  "description": "The single most likely misconfiguration for this integration, and the one its README warns about: /api/v1.0/account/* is the Account API, which an organization token, an export token, or a download token cannot reach at all. Only an account token (CT) authorizes, so the wrong token type answers 401 rather than returning an empty list. The run must stop at the source and never POST -- a fetch failure that still delivered would push a truncated or empty batch to a SIEM and look like a quiet hour instead of a broken credential. 401 is outside get_json's retry set (408/425/429/500/502/503/504), so request_count==1 also pins that a permanent auth failure is not retried three more times against the console.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/hooks/runzero-audit",
+    "rz_account_token": "OT-this-is-an-org-token-not-an-account-token",
+    "external_api_key": "whk-fixture-webhook-key"
+  },
+
+  "routes": [
+    {
+      "name": "account event log, wrong token class",
+      "match": {"method": "GET", "path": "/api/v1.0/account/events.json"},
+      "responses": [
+        {"status": 401, "json": {"error": "unauthorized"}}
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/account/events.json"}
+    ],
+    "requests_absent": [
+      {"method": "POST"}
+    ],
+    "log_contains": [
+      "Failed to fetch events from runZero:"
+    ]
+  }
+}

@@ -1,13 +1,36 @@
-# Copyright 2026 runZero, Inc. Available under the MIT License
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
 
 CONFIG = {
     "id": "runzero-maze",
     "name": "Maze",
     "type": "inbound",
     "description": "Imports vulnerability investigations from Maze.",
-    "version": "26072400",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
+    # Maze assigns no asset identifier. Every id here is a NAME supplied by
+    # whichever upstream scanner fed Maze, and the two fields that carry one
+    # -- `related_scanner_findings[].asset_name` and the asset segment of
+    # `scanner_finding_hash` -- need not spell the same host the same way.
+    # Under the default (`id-break` on) a device named both ways forks into
+    # two assets that can never merge, because a foreign-id disagreement
+    # vetoes the hostname match. Turning both id flags off is the governing
+    # rule's answer for scan-derived data with no vendor key: ignore the id
+    # for matching and converge on hostname and address instead.
+    "matchBehavior": "no-id-match no-id-break",
+    # Backstop for the cursor loop. pager() raises when it is hit, so a
+    # truncated import surfaces as an error instead of ending silently.
+    "maxPages": 5000,
     "params": [
+        {
+            "key": "url",
+            "label": "Maze API URL",
+            "type": "url",
+            "required": False,
+            "default": "https://api.mazehq.com",
+            "placeholder": "https://api.mazehq.com",
+            "description": "Maze's API endpoint. Override only for a regional or self-hosted deployment.",
+        },
         {
             "key": "api_key",
             "label": "Maze API key",
@@ -35,10 +58,23 @@ load('json', json_encode='encode')
 load('http', 'post_json')
 load('kwargs', 'get_string', 'get_int', 'get_http_options')
 load('time', 'now', 'parse_duration')
+load('coerce', 'as_dict', 'as_list', 'dicts', 'as_float', text='as_text')
+load('re', re_match='match')
 
-MAZE_API_URL = "https://api.mazehq.com"
+# Used when the url parameter is unset. The endpoint stays configurable rather
+# than compiled in, so a regional or self-hosted deployment can be reached
+# without editing the script.
+DEFAULT_MAZE_API_URL = "https://api.mazehq.com"
 PAGE_LIMIT = 1000
-REPORT_BATCH = 500
+# The platform caps a child collection at 99 entries; slicing here keeps the
+# asset importable rather than letting the whole record fail validation.
+MAX_CHILDREN = 99
+
+# The platform rejects a Vulnerability whose cve field is not CVE-YYYY-NNNN
+# shaped, and a bad value fails the whole ImportAsset rather than the field.
+# Maze's cve_id is screened before it is assigned; a non-CVE code still imports,
+# keeping the raw value as the vulnerability name and maze_cve_id attribute.
+CVE_RE = r"^CVE-[0-9]{4}-[0-9]{4,19}$"
 
 SEVERITY_RANK = {
     "CRITICAL": 4,
@@ -58,21 +94,32 @@ SEVERITY_SCORE = {
 
 
 def compute_updated_from(days_back):
-    """Compute ISO 8601 timestamp for N days ago."""
+    """Compute an RFC 3339 timestamp for N days ago.
+
+    format() rather than slicing str(cutoff) on ".": a timestamp with exactly
+    zero nanoseconds renders with no fraction at all, and the slice then
+    produced a garbage updated_from that failed the first request.
+    """
     duration_str = "-{}h".format(days_back * 24)
     cutoff = now() + parse_duration(duration_str)
-    raw = str(cutoff).split(".")[0]
-    return raw.replace(" ", "T") + "Z"
+    return cutoff.format("2006-01-02T15:04:05Z07:00")
 
 
 def parse_asset_id(scanner_finding_hash):
-    """Extract asset identifier from scanner_finding_hash (format: scanner::CVE::asset_id)."""
+    """Extract the asset segment of scanner_finding_hash (scanner::CVE::asset_id).
+
+    Returns "" when the value carries no asset segment, which is what lets the
+    caller skip the record. The whole hash used to be returned in that case, and
+    the hash embeds the CVE -- so `tenable::CVE-2024-1234` became an asset id and
+    every CVE on that host minted a different one. A value with fewer than three
+    segments names no asset at all, and saying so is better than inventing one.
+    """
     if not scanner_finding_hash:
         return ""
     parts = scanner_finding_hash.split("::")
     if len(parts) >= 3:
-        return parts[2]
-    return scanner_finding_hash
+        return parts[2].strip()
+    return ""
 
 
 def force_string(value):
@@ -91,47 +138,56 @@ def build_root_cause_summary(rca_list):
     if not rca_list:
         return ""
     parts = []
-    for rca in rca_list:
-        title = rca.get("title", "")
-        status = rca.get("status", "")
-        reasoning = rca.get("reasoning", "")
+    # dicts() drops null and non-object members, which the API can send.
+    for rca in dicts(rca_list):
+        title = text(rca.get("title"))
+        status = text(rca.get("status"))
+        reasoning = text(rca.get("reasoning"))
         parts.append("{}: {} - {}".format(title, status, reasoning))
     return " | ".join(parts)[:1023]
 
 
 def build_vulnerability(investigation):
-    """Convert a Maze investigation into a runZero Vulnerability object."""
-    inv_id = investigation.get("id", "")
-    cve_id = investigation.get("cve_id", "")
-    maze_severity = investigation.get("maze_severity", "")
-    exploitability = investigation.get("exploitability", "")
+    """Convert a Maze investigation into a runZero Vulnerability object.
+
+    Every field read goes through coerce: the schema is a suggestion, and a
+    documented string can arrive as null, a number, or an object. A raise here
+    would abort the whole run, losing every asset already grouped.
+    """
+    inv_id = force_string(investigation.get("id", ""))
+    cve_id = text(investigation.get("cve_id"))
+    maze_severity = text(investigation.get("maze_severity"))
+    exploitability = text(investigation.get("exploitability"))
     exploitability_reason = investigation.get("exploitability_reason", "")
 
-    snapshot = investigation.get("snapshot", {}) or {}
-    cve_info = snapshot.get("cve", {}) or {}
-    cvss_info = snapshot.get("cvss", {}) or {}
+    snapshot = as_dict(investigation.get("snapshot"))
+    cve_info = as_dict(snapshot.get("cve"))
+    cvss_info = as_dict(snapshot.get("cvss"))
 
-    description = cve_info.get("description", "")
-    cvss_base = cvss_info.get("base_score", 0.0)
-    if cvss_base == None:
-        cvss_base = 0.0
-    cvss_version = cvss_info.get("version", "")
+    # text() rather than a bare .get default: the default only covers a MISSING
+    # key, and Maze sends an explicit null for an unscored CVE. A null
+    # description otherwise imports as the literal string "None", and a null
+    # version reaches .startswith and aborts the run.
+    description = text(cve_info.get("description"))
+    cvss_base = as_float(cvss_info.get("base_score"))
+    cvss_version = text(cvss_info.get("version"))
 
     rank = SEVERITY_RANK.get(maze_severity, 0)
     score = SEVERITY_SCORE.get(maze_severity, 0.0)
 
     is_exploitable = exploitability == "exploitable"
 
-    severity_details = investigation.get("severity_details", {}) or {}
+    severity_details = as_dict(investigation.get("severity_details"))
     severity_reasoning = severity_details.get("reasoning", "")
 
     rca_list = investigation.get("vulnerability_root_cause_analysis", []) or []
     rca_summary = build_root_cause_summary(rca_list)
 
-    remediation = investigation.get("remediation", "") or ""
+    remediation = text(investigation.get("remediation"))
 
     custom_attrs = to_custom_attributes({
-        "maze_investigation_id": force_string(inv_id),
+        "maze_investigation_id": inv_id,
+        "maze_cve_id": cve_id,
         "maze_exploitability": force_string(exploitability),
         "maze_exploitability_reason": force_string(exploitability_reason),
         "maze_severity": force_string(maze_severity),
@@ -149,9 +205,8 @@ def build_vulnerability(investigation):
     vuln_params = {
         "id": inv_id,
         "name": cve_id,
-        "description": str(description)[:1024],
-        "cve": cve_id,
-        "solution": str(remediation)[:1024],
+        "description": description[:1024],
+        "solution": remediation[:1024],
         "severityRank": rank,
         "severityScore": float(score),
         "riskRank": rank,
@@ -159,6 +214,12 @@ def build_vulnerability(investigation):
         "exploitable": is_exploitable,
         "customAttributes": custom_attrs,
     }
+
+    # Only a value the platform will accept reaches the cve field. The finding
+    # is imported either way: a non-CVE code (a vendor advisory id, a scanner's
+    # own key) stays as the name and the maze_cve_id attribute.
+    if re_match(CVE_RE, cve_id.upper()):
+        vuln_params["cve"] = cve_id
 
     if cvss_version.startswith("2"):
         vuln_params["cvss2BaseScore"] = float(cvss_base)
@@ -174,9 +235,11 @@ def extract_os_from_rca(rca_list):
     os_version = ""
     if not rca_list:
         return os_name, os_version
-    for rca in rca_list:
-        title = rca.get("title", "").lower()
-        actual = rca.get("actual_value", "")
+    # dicts() drops null and non-object members; text() covers the
+    # null-vs-missing trap (a null title must not reach .lower()).
+    for rca in dicts(rca_list):
+        title = text(rca.get("title")).lower()
+        actual = text(rca.get("actual_value"))
         if not actual:
             continue
         if "operating system" in title:
@@ -187,7 +250,15 @@ def extract_os_from_rca(rca_list):
 
 
 def add_to_asset_map(asset_map, asset_id, hostname, finding, inv):
-    """Add an investigation to the asset map, accumulating metadata and vulns."""
+    """Add an investigation to the asset map, accumulating metadata and vulns.
+
+    One investigation can reach the same asset several times -- several of its
+    related findings naming that asset, or several nameless ones all falling
+    back to the same segment of `scanner_finding_hash`. Every arrival merges its
+    finding's metadata, but only the first contributes a Vulnerability: an
+    investigation is one CVE against one thing, and appending per arrival put N
+    identical copies of it on the asset, all carrying `investigation.id`.
+    """
     if asset_id not in asset_map:
         asset_map[asset_id] = {
             "id": asset_id,
@@ -201,6 +272,7 @@ def add_to_asset_map(asset_map, asset_id, hostname, finding, inv):
             "os": "",
             "os_version": "",
             "vulnerabilities": [],
+            "investigation_ids": {},
         }
 
     entry = asset_map[asset_id]
@@ -226,25 +298,62 @@ def add_to_asset_map(asset_map, asset_id, hostname, finding, inv):
     if os_version and not entry["os_version"]:
         entry["os_version"] = os_version
 
-    vuln = build_vulnerability(inv)
-    entry["vulnerabilities"].append(vuln)
+    # One Vulnerability per (asset, investigation). Every related finding above
+    # still merged its metadata into the entry, but an investigation is one CVE
+    # against one thing: appending per arrival put N identical copies on the
+    # asset, all under the same investigation.id.
+    inv_id = force_string(inv.get("id", "") or "")
+    if inv_id:
+        if inv_id in entry["investigation_ids"]:
+            return
+        entry["investigation_ids"][inv_id] = True
+    entry["vulnerabilities"].append(build_vulnerability(inv))
 
 
 def group_investigations(asset_map, investigations):
-    """Group a page of investigations by asset into asset_map."""
-    for inv in investigations:
-        scanner_hash = inv.get("scanner_finding_hash", "")
-        asset_id = parse_asset_id(scanner_hash)
-        if not asset_id:
-            asset_id = inv.get("id", "")
+    """Group a page of investigations by asset into asset_map.
 
-        related = inv.get("related_scanner_findings", []) or []
-        if related:
-            for finding in related:
-                finding_asset = finding.get("asset_name", "") or asset_id
+    Returns the number of investigations skipped: non-object records, plus
+    records naming no asset. Only two fields in the payload name one:
+    `related_scanner_findings[].asset_name` and
+    the third segment of `scanner_finding_hash`. An investigation is one CVE
+    against one thing, so falling back to `investigation.id` -- which the code
+    used to do whenever both were absent -- guaranteed one runZero asset per
+    finding rather than one per device. There is no third source of asset
+    identity to fall back to, so such a record is skipped and logged instead.
+    """
+    skipped = 0
+    for inv in as_list(investigations):
+        # A list member that is not an object (a null, a stray string) cannot
+        # carry an investigation; it is skipped with a print, never a raise.
+        if type(inv) != "dict":
+            skipped += 1
+            print("maze: skipping non-object investigation record: {}".format(force_string(inv)[:128]))
+            continue
+        scanner_hash = text(inv.get("scanner_finding_hash"))
+        asset_id = parse_asset_id(scanner_hash)
+
+        # A related finding names its own asset. One that does not still belongs
+        # to the investigation's asset, when the hash named one. Several of them
+        # can land on the SAME asset, which is why add_to_asset_map counts an
+        # investigation once per asset rather than once per finding. dicts()
+        # drops null and non-object members of the findings list.
+        targets = []
+        for finding in dicts(inv.get("related_scanner_findings")):
+            finding_asset = text(finding.get("asset_name")).strip() or asset_id
+            if finding_asset:
+                targets.append((finding_asset, finding))
+
+        if targets:
+            for finding_asset, finding in targets:
                 add_to_asset_map(asset_map, finding_asset, finding_asset, finding, inv)
-        else:
+        elif asset_id:
             add_to_asset_map(asset_map, asset_id, asset_id, None, inv)
+        else:
+            skipped += 1
+            print("maze: skipping investigation with no asset name or asset segment: id={} scanner_finding_hash={}".format(
+                force_string(inv.get("id", "")), force_string(scanner_hash)))
+    return skipped
 
 
 def build_asset(asset_id, asset_data):
@@ -274,7 +383,7 @@ def build_asset(asset_id, asset_data):
     asset_params = {
         "id": str(asset_id),
         "hostnames": [hostname] if hostname else [],
-        "vulnerabilities": vulns[:999],
+        "vulnerabilities": vulns[:MAX_CHILDREN],
         "customAttributes": to_custom_attributes(custom_attrs),
     }
     if os_name:
@@ -296,46 +405,44 @@ def main(**kwargs):
         "X-API-Key": api_key,
         "Accept": "application/json",
     })
-    url = "{}/v1/investigations/search".format(MAZE_API_URL)
+    # The platform applies the CONFIG default, but fall back explicitly so the
+    # script still works if it is invoked without one.
+    base_url = (kwargs.get("url") or DEFAULT_MAZE_API_URL).rstrip("/")
+    url = "{}/v1/investigations/search".format(base_url)
 
     # Investigations are grouped into assets across pages, so accumulate the
-    # grouped map while paging (dropping each raw page as we go) and stream the
-    # finished assets to runZero in batches at the end.
+    # grouped map while paging (dropping each raw page as we go) and stream
+    # each finished asset to runZero as it is built at the end.
     asset_map = {}
     cursor = None
     total_inv = 0
-    page = 0
+    total_skipped = 0
 
-    for page in range(1, 100001):
+    p = pager("investigations")
+    while p.next():
         body = {"limit": PAGE_LIMIT, "updated_from": updated_from}
         if cursor:
             body["cursor"] = cursor
 
         data, err = post_json(url, json=body, **http_options)
         if err:
-            print("Maze API error on page {}: {}".format(page, err))
+            print("Maze API error on page {}: {}".format(p.page, err))
             break
 
-        data = data or {}
-        investigations = data.get("data", []) or []
+        data = as_dict(data)
+        investigations = as_list(data.get("data"))
         total_inv += len(investigations)
-        group_investigations(asset_map, investigations)
+        total_skipped += group_investigations(asset_map, investigations)
 
         cursor = data.get("next_cursor")
         if not data.get("has_more", False) or not cursor:
             break
 
     total_assets = 0
-    batch = []
     for asset_id, asset_data in asset_map.items():
-        batch.append(build_asset(asset_id, asset_data))
-        if len(batch) >= REPORT_BATCH:
-            report_assets(batch)
-            total_assets += len(batch)
-            batch = []
-    if batch:
-        report_assets(batch)
-        total_assets += len(batch)
+        total_assets += report_asset(build_asset(asset_id, asset_data))
 
     print("Reported {} assets from {} investigations".format(total_assets, total_inv))
+    if total_skipped:
+        print("Skipped {} investigations that named no asset".format(total_skipped))
     return None

@@ -1,0 +1,77 @@
+{
+  "name": "paged",
+  "integration": "netskope",
+  "description": "Pagination against a server that caps pages BELOW the requested limit=20000, which is what Netskope's datasearch guidance describes. The old loop treated any page shorter than the limit as the last page, so a capped server silently truncated a large tenant to one page while the task reported success. Page one answers 2 rows, page two answers 1 row, and the offset must advance by the number of rows actually received (offset=0, then 2, then 3) rather than by the requested limit. The final page answers `result: null` -- present-but-null, the shape .get defaults do not defend -- which must end the walk cleanly instead of aborting on len(None). Skips namespaced_ids: netskope uses the bare nsdeviceuid as the foreign id, with no tenant scope; a documented, deliberate gap, not this scenario's defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-netskope-token"
+  },
+  "routes": [
+    {
+      "name": "clientstatus",
+      "match": {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ok": 1,
+            "status": 200,
+            "result": [
+              {
+                "_id": {"nsdeviceuid": "NSDEV-PAGED-0001"},
+                "hostname": "paged-01",
+                "mac_addresses": ["00:1B:44:11:3A:D1"],
+                "os": "Windows",
+                "ns_tenant_id": "fixture-tenant"
+              },
+              {
+                "_id": {"nsdeviceuid": "NSDEV-PAGED-0002"},
+                "hostname": "paged-02",
+                "mac_addresses": ["00:1B:44:11:3A:D2"],
+                "os": "Windows",
+                "ns_tenant_id": "fixture-tenant"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "ok": 1,
+            "status": 200,
+            "result": [
+              {
+                "_id": {"nsdeviceuid": "NSDEV-PAGED-0003"},
+                "hostname": "paged-03",
+                "mac_addresses": ["00:1B:44:11:3A:D3"],
+                "os": "Windows",
+                "ns_tenant_id": "fixture-tenant"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"ok": 1, "status": 200, "result": null}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "NSDEV-PAGED-0001",
+      "NSDEV-PAGED-0002",
+      "NSDEV-PAGED-0003"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"query_contains": "offset=0"},
+      {"query_contains": "offset=2"},
+      {"query_contains": "offset=3"},
+      {"header": {"Netskope-Api-Token": "fixture-netskope-token"}},
+      {"header": {"Authorization": "Bearer fixture-netskope-token"}}
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

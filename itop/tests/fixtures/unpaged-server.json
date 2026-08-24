@@ -1,0 +1,125 @@
+{
+  "name": "unpaged-server",
+  "integration": "itop",
+  "description": "An iTop older than the release that added the limit and page parameters ignores both and answers every request with the whole result set. Left unguarded that is an infinite loop, not an error: each page looks full, so the loop asks for the next one forever. The run must notice the repeat and stop.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "page_size": "2",
+    "include_interfaces": "false",
+    "classes": "Server",
+    "api_version": "1.3"
+  },
+  "routes": [
+    {
+      "name": "servers",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22Server%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::11": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 11,
+                "fields": {
+                  "id": "11",
+                  "name": "srv-db-01.example.com",
+                  "description": "Primary database node",
+                  "organization_name": "Demo",
+                  "business_criticity": "high",
+                  "move2production": "2024-03-11",
+                  "serialnumber": "SN-11-ABC",
+                  "location_name": "Paris DC",
+                  "status": "production",
+                  "brand_name": "Dell",
+                  "model_name": "PowerEdge R750",
+                  "asset_number": "AST-0011",
+                  "purchase_date": "2024-01-05",
+                  "end_of_warranty": "2027-01-05",
+                  "managementip": "10.10.0.11",
+                  "rack_name": "R14",
+                  "enclosure_name": "",
+                  "nb_u": "2",
+                  "osfamily_name": "Linux",
+                  "osversion_name": "RHEL 9",
+                  "oslicence_name": "",
+                  "cpu": "2 x Xeon Gold 6338",
+                  "ram": "256"
+                }
+              },
+              "Server::12": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 12,
+                "fields": {
+                  "id": "12",
+                  "name": "Unnamed rack unit",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "low",
+                  "move2production": "",
+                  "serialnumber": "",
+                  "location_name": "",
+                  "status": "stock",
+                  "brand_name": "",
+                  "model_name": "",
+                  "asset_number": "",
+                  "purchase_date": "",
+                  "end_of_warranty": "",
+                  "managementip": "",
+                  "rack_name": "",
+                  "enclosure_name": "",
+                  "nb_u": "0",
+                  "osfamily_name": "",
+                  "osversion_name": "",
+                  "oslicence_name": "",
+                  "cpu": "",
+                  "ram": ""
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 2"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "itop:$HOST:Server:11"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "body_contains": "version=1.3"
+      }
+    ],
+    "log_contains": [
+      "repeated the previous page; the server appears to ignore limit and page"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

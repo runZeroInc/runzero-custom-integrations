@@ -1,0 +1,70 @@
+{
+  "name": "malformed",
+  "integration": "kandji",
+  "description": "One page carrying a healthy device, a null row, a bare-string row, and a device whose details endpoint answers a 2xx list where the object envelope is documented. A non-dict row used to abort the script at the first .get, and a list-shaped details body aborted it at details.get('general'), so any of these lost every device already parsed. All three malformed shapes must be skipped with a log line while the healthy device still imports. namespaced_ids is skipped for the reason recorded in happy: the id is the bare Kandji device id with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-kandji-token"
+  },
+  "routes": [
+    {
+      "name": "details-good",
+      "match": {"method": "GET", "path": "/devices/k0000000-0000-4000-8000-000000000201/details"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "general": {"model": "Mac mini (2023)", "platform": "Mac", "os_version": "14.4.1"},
+            "network": {"local_hostname": "lab-mini-201", "mac_address": "AC:DE:48:00:13:01", "ip_address": "10.132.1.10"},
+            "hardware_overview": {"serial_number": "C02KANDJI201"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "details-list-shaped",
+      "match": {"method": "GET", "path": "/devices/k0000000-0000-4000-8000-000000000202/details"},
+      "responses": [
+        {"status": 200, "json": [{"general": {"model": "iMac"}}]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-list",
+      "match": {"method": "GET", "path": "/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"device_id": "k0000000-0000-4000-8000-000000000201", "device_name": "lab-mini-201", "platform": "Mac"},
+            null,
+            "this row is a string, not an object",
+            {"device_id": "k0000000-0000-4000-8000-000000000202", "device_name": "lab-broken-202", "platform": "Mac"}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["k0000000-0000-4000-8000-000000000201"],
+    "ids_absent": ["k0000000-0000-4000-8000-000000000202"],
+    "assets": [
+      {
+        "id": "k0000000-0000-4000-8000-000000000201",
+        "fields": {"deviceType": "Desktop", "os": "macOS"}
+      }
+    ],
+    "request_count": 4,
+    "log_contains": [
+      "kandji: skipping non-object device record:",
+      "kandji: unexpected details shape for device k0000000-0000-4000-8000-000000000202; wanted an object"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

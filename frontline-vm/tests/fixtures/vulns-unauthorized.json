@@ -1,0 +1,64 @@
+{
+  "name": "vulns-unauthorized",
+  "integration": "frontline-vm",
+  "description": "The vulnerability collection rejects the token while the host collection answers normally. Proves a failure on the enrichment half does not cost the inventory half: the run prints the credential hint, keeps going, and still imports every host, just without findings attached. It also pins that a 401 is returned immediately rather than being retried three times -- the retry budget covers transient statuses, and burning it on a permanent rejection would triple the load on a failing appliance.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "expired-token",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "vulnerabilities-denied",
+      "match": {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/"},
+      "responses": [
+        {"status": 401, "json": {"detail": "Invalid token."}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/scanresults/active/hosts/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "next": null,
+            "results": [
+              {
+                "id": 701,
+                "ip_address": "10.42.0.30",
+                "hostname": "edge01",
+                "mac_address": "00:11:22:33:99:01",
+                "os": "VyOS 1.4",
+                "os_type": "Linux",
+                "date_created": "2026-06-01T12:00:00Z"
+              },
+              {
+                "id": 702,
+                "ip_address": "10.42.0.31",
+                "hostname": "edge02",
+                "mac_address": "00:11:22:33:99:02",
+                "os": "VyOS 1.4",
+                "os_type": "Linux",
+                "date_created": "2026-06-01T12:05:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 2,
+    "log_contains": [
+      "frontline-vm: failed to fetch vulnerabilities:",
+      "frontline-vm: check the API token"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": false
+}

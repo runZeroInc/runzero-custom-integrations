@@ -1,0 +1,90 @@
+{
+  "name": "malformed",
+  "integration": "netdata",
+  "description": "Every shape of unusable node in one listing: a null machine guid, a guid that is not a UUID, a node that is a bare string instead of an object, a node whose name is the placeholder 'localhost', a node whose name is a bare IP address, and a node whose name contains a path separator so it can never be interpolated into a /host/ URL. Each must be skipped or degraded with a log line while the one good node still imports. The good node's own detail call returns a JSON string where an object is documented, which must not abort the run.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "collect_node_details": "true"
+  },
+
+  "routes": [
+    {
+      "name": "nodes-v3-malformed",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api": 3,
+            "agents": [{"mg": "7a8b9c0d-1e2f-4304-a516-273849506172", "nm": "parent", "ai": 0}],
+            "nodes": [
+              {"mg": null, "nm": "no-guid-host", "ni": 0, "st": {}, "hops": 1, "state": "reachable"},
+              {"mg": "not-a-uuid", "nm": "bad-guid-host", "ni": 1, "st": {}, "hops": 1, "state": "reachable"},
+              "a string where an object is documented",
+              {"mg": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9", "nm": "localhost", "ni": 2, "st": {}, "hops": 1, "state": "reachable"},
+              {"mg": "2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901", "nm": "192.0.2.44", "ni": 3, "st": {}, "hops": 1, "state": "reachable"},
+              {"mg": "3c4d5e6f-7081-4293-a4b5-c6d7e8f90123", "nm": "bad/name?x=1", "ni": 4, "st": {}, "hops": 1, "state": "reachable"},
+              {
+                "mg": "4d5e6f70-8192-43a4-b5c6-d7e8f9012345",
+                "nm": "good-host",
+                "ni": 5,
+                "st": {"ai": 0, "code": 200},
+                "version": "v2.3.2",
+                "hops": 1,
+                "state": "reachable"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "info-good-host-wrong-type",
+      "match": {"method": "GET", "path": "/host/good-host/api/v1/info"},
+      "responses": [
+        {"status": 200, "json": "netdata daemon not ready"}
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "netdata:$HOST:3c4d5e6f-7081-4293-a4b5-c6d7e8f90123",
+      "netdata:$HOST:4d5e6f70-8192-43a4-b5c6-d7e8f9012345"
+    ],
+    "ids_absent": [
+      "netdata:$HOST:1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+      "netdata:$HOST:2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901"
+    ],
+    "assets": [
+      {
+        "id": "netdata:$HOST:4d5e6f70-8192-43a4-b5c6-d7e8f9012345",
+        "fields": {"hostnames": "good-host"},
+        "fields_absent": ["os", "osVersion"]
+      },
+      {
+        "id": "netdata:$HOST:3c4d5e6f-7081-4293-a4b5-c6d7e8f90123",
+        "fields": {"hostnames": "bad/name?x=1"},
+        "fields_absent": ["os"]
+      }
+    ],
+    "log_contains": [
+      "skipping node with no usable machine guid",
+      "skipping node 1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9 with no usable hostname",
+      "skipping node 2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901 with no usable hostname",
+      "is not usable in a /host/ path",
+      "skipped 5 node(s) with no usable identity",
+      "netdata: import complete"
+    ],
+    "requests_absent": [
+      {"path_contains": "/host/localhost/"},
+      {"path_contains": "/host/bad/"}
+    ]
+  },
+
+  "check_determinism": true
+}

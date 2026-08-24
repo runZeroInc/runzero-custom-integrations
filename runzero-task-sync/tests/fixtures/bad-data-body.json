@@ -1,0 +1,146 @@
+{
+  "name": "bad-data-body",
+  "integration": "runzero-task-sync",
+  "script": "runzero-task-sync/runzero-task-sync.star",
+  "description": "A task whose data download answers 200 with a body that is neither JSON nor gzip -- an HTML proxy page is the realistic shape. The old first-byte sniff fed anything not starting with '{' straight to gzip_decompress, which raises on such a body and aborts the whole run, silently skipping every later task. The guard must skip THAT task with a log line and carry on: the healthy task after it is still downloaded, imported, and hidden. The healthy task's hide then answers 500, which must also be logged rather than silent -- with hide_tasks_on_sync on, a persistently failing hide re-syncs the same task every run with no visible cause. The failed-body task must never be hidden and never be imported.",
+  "kwargs": {
+    "src_url": "$BASE",
+    "src_org_id": "aaaaaaaa-1111-4222-8333-444444444444",
+    "src_task_search_filter": "type:scan",
+    "dst_url": "$BASE",
+    "dst_org_id": "bbbbbbbb-5555-4666-8777-888888888888",
+    "dst_site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+    "hide_tasks_on_sync": "true",
+    "src_api_token": "OT-source-fixture-token",
+    "dst_api_token": "OT-destination-fixture-token"
+  },
+  "routes": [
+    {
+      "name": "source task list",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "d7d7d7d7-1111-4222-8333-444444444444",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "name": "Sweep behind a proxy",
+              "created_at": 1755270000,
+              "updated_at": 1755273600,
+              "hidden": false,
+              "recur": false,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "params": {},
+              "stats": {}
+            },
+            {
+              "id": "d8d8d8d8-6666-4777-8888-999999999999",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "name": "Healthy sweep",
+              "created_at": 1755280000,
+              "updated_at": 1755283600,
+              "hidden": false,
+              "recur": false,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "params": {},
+              "stats": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "proxy answers HTML for the first task's data",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d7d7d7d7-1111-4222-8333-444444444444/data"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/html"},
+          "text": "<html><body>502 Bad Gateway</body></html>"
+        }
+      ]
+    },
+    {
+      "name": "healthy task data redirect",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d8d8d8d8-6666-4777-8888-999999999999/data"},
+      "responses": [
+        {
+          "status": 303,
+          "headers": {"Location": "$BASE/scan-bucket/scan_d8d8d8d8_eeeeeeee.json.gz"},
+          "json": {"url": "$BASE/scan-bucket/scan_d8d8d8d8_eeeeeeee.json.gz"}
+        }
+      ]
+    },
+    {
+      "name": "healthy task scan data object",
+      "match": {"method": "GET", "path": "/scan-bucket/scan_d8d8d8d8_eeeeeeee.json.gz"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/gzip"},
+          "body_base64": "H4sIAAAAAAAC/02MwQ7CIBBE7/0KsmeX0FrB9uaXGFIwEiyQLjGapv8utBdnLzszebNC/iYLIwOadEAXHhFODLImf3em5kYeh7IIe6UUXotw+FNF3nYhF0NFLlzwTgrVnbmArVlhnx1ZefZJTWQzRt9WzqWbMYstEdWuFbzvCi9lLZ+RctDzUUWPouVTXBK3Hz2nly1mhm1rfvc5T6jGAAAA"
+        }
+      ]
+    },
+    {
+      "name": "destination import",
+      "match": {"method": "PUT", "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "f4f4f4f4-1111-4222-8333-444444444444",
+            "organization_id": "bbbbbbbb-5555-4666-8777-888888888888",
+            "site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+            "type": "import",
+            "status": "new",
+            "name": "Scan Import",
+            "created_at": 1755400000,
+            "updated_at": 1755400000,
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "hide fails on the healthy task",
+      "match": {"method": "POST", "path": "/api/v1.0/org/tasks/d8d8d8d8-6666-4777-8888-999999999999/hide"},
+      "responses": [
+        {"status": 500, "json": {"error": "internal error"}}
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 6,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/org/tasks/d7d7d7d7-1111-4222-8333-444444444444/data", "query_contains": "_oid=aaaaaaaa-1111-4222-8333-444444444444"},
+      {"method": "GET", "path": "/scan-bucket/scan_d8d8d8d8_eeeeeeee.json.gz"},
+      {"method": "PUT", "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import"},
+      {"method": "POST", "path": "/api/v1.0/org/tasks/d8d8d8d8-6666-4777-8888-999999999999/hide"}
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/api/v1.0/org/tasks/d7d7d7d7-1111-4222-8333-444444444444/hide"},
+      {"method": "PUT", "body_contains": "502 Bad Gateway"}
+    ],
+    "log_contains": [
+      "Task data was neither JSON nor gzip; skipping task: d7d7d7d7-1111-4222-8333-444444444444",
+      "Sync failed for task: d7d7d7d7-1111-4222-8333-444444444444",
+      "Successfully synced task: d8d8d8d8-6666-4777-8888-999999999999",
+      "Failed to hide task d8d8d8d8-6666-4777-8888-999999999999: status 500"
+    ]
+  }
+}

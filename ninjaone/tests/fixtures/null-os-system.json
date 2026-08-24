@@ -1,0 +1,91 @@
+{
+  "name": "null-os-system",
+  "integration": "ninjaone",
+  "description": "The null-versus-absent trap plus two attribute defects, pinned together. NJ-NULL-6001 arrives with `os`, `system`, `ipAddresses`, and `macAddresses` all PRESENT but null -- .get's default only covers the absent key, so item.get('os', {}).get(...) used to abort the whole task on this record; it must now import with a hostname and nothing else. NJ-OK-6002 is healthy and locks the two attribute fixes: systemSerialNumber must carry system.serialNumber (the old code read the 'serialNumberr' typo, so the attribute was always empty) and osReleaseId must carry os.releaseId (the old code copy-pasted os.manufacturer into it). The record with no id must be skipped with a log line, not abort.\n\nInvariant namespaced_ids is skipped because this integration emits the bare NinjaOne device id as the foreign id with no tenant or instance scope; that defect is reported separately rather than worked around here.",
+  "kwargs": {
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/ws/oauth/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "token_type": "Bearer", "expires_in": 3600}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-detailed",
+      "match": {"method": "GET", "path": "/v2/devices-detailed"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 6001,
+              "displayName": "NJ-NULL-6001",
+              "systemName": "nj-null-6001",
+              "nodeClass": "WINDOWS_WORKSTATION",
+              "ipAddresses": null,
+              "macAddresses": null,
+              "os": null,
+              "system": null
+            },
+            {
+              "id": 6002,
+              "displayName": "NJ-OK-6002",
+              "systemName": "nj-ok-6002",
+              "nodeClass": "WINDOWS_WORKSTATION",
+              "ipAddresses": ["10.141.0.2"],
+              "macAddresses": ["00:2f:00:00:60:02"],
+              "os": {
+                "name": "Windows 11 Pro",
+                "manufacturer": "Microsoft",
+                "releaseId": "23H2",
+                "buildNumber": "22631"
+              },
+              "system": {
+                "manufacturer": "Dell Inc.",
+                "model": "OptiPlex 7010",
+                "serialNumber": "SER-6002",
+                "biosSerialNumber": "BIOS-6002"
+              }
+            },
+            {
+              "displayName": "NJ-NO-ID",
+              "systemName": "nj-no-id"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["6001", "6002"],
+    "assets": [
+      {
+        "id": "6001",
+        "fields": {"hostnames": "NJ-NULL-6001\tnj-null-6001"},
+        "fields_absent": ["ipAddresses", "macAddresses", "os"]
+      },
+      {
+        "id": "6002",
+        "fields": {
+          "os": "Windows 11 Pro",
+          "osReleaseId": "23H2",
+          "systemSerialNumber": "SER-6002",
+          "systemBiosSerialNumber": "BIOS-6002"
+        }
+      }
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "ninjaone: skipping device with no id: systemName=nj-no-id"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

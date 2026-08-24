@@ -1,0 +1,65 @@
+{
+  "name": "rate-limit",
+  "integration": "aruba-clearpass",
+  "description": "The appliance answers 429 once on the token exchange and once on the first endpoint page, then relents. Proves the shared get_json/post_json retry budget -- three attempts by default -- absorbs both without the integration hand-rolling a retry loop, and that the endpoint read still starts at offset 0 after the retry rather than skipping a page. The extra attempts show up as extra requests, so the request count is what pins the behaviour: 2 token calls plus 2 endpoint calls.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "include_sessions": "false",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"detail": "too many requests"}},
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 28800}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/api/endpoint"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"detail": "too many requests"}},
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 7001,
+                  "mac_address": "00:11:22:33:66:01",
+                  "status": "Known",
+                  "added_at": "2026-03-01 09:00:00",
+                  "updated_at": "2026-08-12 09:00:00",
+                  "profile": {"ipv4_address": "10.34.0.7", "host_name": "kiosk-01", "device_category": "Computer", "last_profiled_at": "2026-08-12 08:59:00"}
+                }
+              ]
+            },
+            "_links": {"self": {"href": "/api/endpoint?offset=0"}}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["aruba-clearpass:127.0.0.1:00:11:22:33:66:01"],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "offset=0"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/api/endpoint", "query_contains": "offset=500"}
+    ],
+    "log_contains": ["aruba-clearpass: reported 1 endpoints from 127.0.0.1"]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "timeout": 300
+}

@@ -1,0 +1,241 @@
+{
+  "name": "malformed",
+  "integration": "synology-dsm",
+  "description": "Junk in every collection, plus the two DSM-specific hazards. First, the DSM 6 spelling of the DHCP API - SYNO.Core.Network.DHCPServer.ClientList rather than the DSM 7 SYNO.Network.DHCPServer.ClientList - which proves both are probed rather than one being hardcoded, and lease records using an ALTERNATIVE key spelling (mac_address/ip_address/host_name), which is the defence against a response schema Synology has never published and that no public capture exists for. Second, a mid-run session loss that PERSISTS: DSM answers error 119 on the VM collection, the script re-authenticates once (the second login response) and retries, and the retry answers 119 again - so the collection is reported as a session problem naming the concurrent-session limit rather than as an empty result, and no further re-login is attempted. The recovery case, where the retry succeeds, is the session-relogin scenario. Also covers rows that are strings instead of objects, a guest whose vnics list holds junk, a camera whose host is a bare space, a backup device with no uuid, and a lease for the NAS's own MAC, which must not become a second asset for the NAS. The NAS reports the factory hostname 'DiskStation', which every unconfigured unit shares and which is therefore not imported as a hostname.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-runzero",
+    "password": "fixture-password",
+    "dhcp_interfaces": "ovs_eth0"
+  },
+  "routes": [
+    {
+      "name": "api-info",
+      "match": {"method": "GET", "path": "/webapi/query.cgi"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "SYNO.API.Auth": {"path": "entry.cgi", "minVersion": 3, "maxVersion": 7},
+              "SYNO.DSM.Info": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2},
+              "SYNO.DSM.Network": {"path": "entry.cgi", "minVersion": 2, "maxVersion": 2},
+              "SYNO.Virtualization.API.Guest": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 1},
+              "SYNO.SurveillanceStation.Camera": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 9},
+              "SYNO.ActiveBackup.Task": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 2},
+              "SYNO.Core.Network.DHCPServer.ClientList": {"path": "entry.cgi", "minVersion": 1, "maxVersion": 1},
+              "SYNO.Core.System": "this should have been an object"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/webapi/entry.cgi"},
+      "responses": [
+        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-mixed"}}},
+        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-relogin"}}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "dsm-info",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {"model": "DS923+", "serial": "2250PDN000111", "version_string": "DSM 7.2.2-72806", "ram": 4096, "uptime": 1200}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dsm-network",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.DSM.Network"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "hostname": "DiskStation",
+              "gateway": "10.30.0.1",
+              "interfaces": [
+                {
+                  "id": "ovs_eth0",
+                  "ip": [{"address": "10.30.0.40", "netmask": "255.255.255.0"}],
+                  "ipv6": "this should have been a list",
+                  "mac": "90-09-D0-11-22-33",
+                  "type": "lan"
+                },
+                "this should have been an object",
+                {"id": "eth1", "ip": [], "mac": "not-a-mac", "type": "lan"},
+                {"id": "eth2", "ip": [{"address": "not-an-ip"}], "mac": null, "type": "lan"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vmm-session-lost",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.Virtualization.API.Guest"},
+      "responses": [
+        {"status": 200, "json": {"success": false, "error": {"code": 119}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cameras",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.SurveillanceStation.Camera"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "total": 3,
+              "cameras": [
+                "this should have been an object",
+                {"id": 4, "name": "Side Gate", "host": "   ", "vendor": "Axis"},
+                {"id": "", "name": "No Id", "host": "10.30.0.51"},
+                {"id": 6, "name": "Loading Bay", "host": "10.30.0.52", "port": 80, "vendor": "Axis", "model": "M3085-V", "firmware": "11.9.55", "enabled": true}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "active-backup",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.ActiveBackup.Task"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "tasks": [
+                "this should have been an object",
+                {"task_name": "Servers", "devices": "this should have been a list"},
+                {
+                  "task_name": "Laptops",
+                  "devices": [
+                    {"device_uuid": "", "device_id": 0, "host_ip": "10.30.0.90", "host_name": "orphan"},
+                    {"device_uuid": "aa11-bb22", "host_ip": "10.30.0.91", "host_name": "sales-laptop", "os_name": "Windows 10(64-bit)", "agent_status": "online"},
+                    {"device_uuid": "aa11-bb22", "host_ip": "10.30.0.91", "host_name": "sales-laptop", "os_name": "Windows 10(64-bit)", "agent_status": "online"}
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases-dsm6-spelling",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "api=SYNO.Core.Network.DHCPServer.ClientList"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "success": true,
+            "data": {
+              "leases": [
+                "this should have been an object",
+                {"mac_address": "90-09-D0-11-22-33", "ip_address": "10.30.0.40", "host_name": "DiskStation"},
+                {"mac_address": "F4-D4-88-AA-BB-CC", "ip_address": "10.30.0.120", "host_name": "warehouse-scanner", "lease_time": "86400"},
+                {"mac_address": "01-00-5E-00-00-01", "ip_address": "10.30.0.121"},
+                {"mac_address": "F4-D4-88-DD-EE-FF"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "logout",
+      "match": {"method": "GET", "path": "/webapi/entry.cgi", "query_contains": "method=logout"},
+      "responses": [{"status": 200, "json": {"success": true}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"success": false, "error": {"code": 102}}
+  },
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "synology:serial:2250PDN000111",
+      "synology:$HOST:camera:6",
+      "synology:$HOST:backup-device:aa11-bb22",
+      "synology:$HOST:lease:f4:d4:88:aa:bb:cc",
+      "synology:$HOST:lease:f4:d4:88:dd:ee:ff"
+    ],
+    "ids_absent": [
+      "synology:$HOST:camera:4",
+      "synology:$HOST:backup-device:orphan",
+      "synology:$HOST:lease:90:09:d0:11:22:33",
+      "synology:$HOST:lease:01:00:5e:00:00:01",
+      "synology:$HOST:backup-device:id-0"
+    ],
+    "assets": [
+      {
+        "id": "synology:serial:2250PDN000111",
+        "fields": {
+          "deviceType": "Storage",
+          "manufacturer": "Synology",
+          "model": "DS923+",
+          "ipAddresses": "10.30.0.40",
+          "macAddresses": "90:09:d0:11:22:33"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "synology:$HOST:camera:6",
+        "fields": {
+          "deviceType": "IP Camera",
+          "manufacturer": "Axis",
+          "model": "M3085-V",
+          "osVersion": "11.9.55",
+          "ipAddresses": "10.30.0.52"
+        }
+      },
+      {
+        "id": "synology:$HOST:lease:f4:d4:88:aa:bb:cc",
+        "fields": {
+          "hostnames": "warehouse-scanner",
+          "ipAddresses": "10.30.0.120",
+          "synology_lease_expiry_raw": "86400"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "query_contains": "api=SYNO.Core.Network.DHCPServer.ClientList"},
+      {"method": "GET", "query_contains": "ifname=ovs_eth0"}
+    ],
+    "log_contains": [
+      "virtual machines lost the session (error 119: invalid session)",
+      "DSM allows few concurrent sessions",
+      "2 cameras had no usable address and were skipped",
+      "1 backup devices had no usable identifier, address, or hostname and were skipped",
+      "reported 2 DHCP leases",
+      "reported 1 NAS, 0 virtual machines, 1 cameras, 1 backup devices, 2 leases"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

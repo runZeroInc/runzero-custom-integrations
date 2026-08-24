@@ -1,0 +1,29 @@
+{
+  "name": "auth-failure",
+  "integration": "absolute",
+  "description": "A rejected credential: the JWS validator answers 401 to the first device request. The run must end cleanly with zero assets and a printed diagnostic rather than aborting, and it must not keep hammering the endpoint -- 401 is not a retried status, so exactly one request is made.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-wrong-secret"
+  },
+  "routes": [
+    {
+      "name": "jws-validate-unauthorized",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {"status": 401, "json": {"errorCode": "1001", "message": "Authorization header is invalid"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "absolute: failed to fetch devices:",
+      "absolute: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []}
+}

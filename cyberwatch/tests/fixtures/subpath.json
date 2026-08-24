@@ -1,0 +1,49 @@
+{
+  "name": "subpath",
+  "integration": "cyberwatch",
+  "description": "REGRESSION LOCK for get_url_base discarding the URL path. main used to build base_url with get_url_base(kwargs), which keeps only the scheme and host -- verified against the scanner, https://proxy.example.com:8443/cyberwatch/sub comes back as https://proxy.example.com:8443. A Cyberwatch master published through a reverse proxy under a path prefix therefore had every /api/v3 request sent to the proxy root, which is not Cyberwatch at all, and the run reported nothing.\n\nThe configured URL here carries a /cyberwatch prefix and the fixture server answers ONLY under it, so a run that drops the path 404s on every call and emits no assets. requests_absent pins the unprefixed path so the failure is named rather than merely counted. The scope in the foreign id is taken from the hostname and is unaffected by the prefix, which is why the id is still cyberwatch:127.0.0.1:501.",
+  "kwargs": {
+    "url": "$BASE/cyberwatch",
+    "api_access_key": "fixture-access",
+    "api_secret_key": "fixture-secret",
+    "include_details": "false"
+  },
+  "routes": [
+    {
+      "name": "server-list-under-prefix",
+      "match": {"method": "GET", "path": "/cyberwatch/api/v3/vulnerabilities/servers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 501,
+              "hostname": "proxied-501",
+              "category": "server",
+              "status": "active",
+              "created_at": "2025-01-15T08:00:00.000Z",
+              "last_communication": "2026-08-14T10:00:00.000Z",
+              "addresses": ["192.0.2.51"],
+              "os": {"name": "Debian 12", "short_name": "debian12", "type": "Os::Debian"}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route: the proxy root is not Cyberwatch"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["cyberwatch:127.0.0.1:501"],
+    "requests_include": [
+      {"method": "GET", "path": "/cyberwatch/api/v3/vulnerabilities/servers"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v3/vulnerabilities/servers"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

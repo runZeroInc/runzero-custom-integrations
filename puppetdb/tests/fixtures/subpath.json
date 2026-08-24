@@ -1,0 +1,90 @@
+{
+  "name": "subpath",
+  "integration": "puppetdb",
+  "description": "REGRESSION LOCK for get_url_base discarding the URL path. main used to build base_url with get_url_base(kwargs), which keeps only the scheme and host -- verified against the scanner, https://proxy.example.com/puppetdb comes back as https://proxy.example.com. PuppetDB has no authentication of its own, so a correctly deployed one is fronted by a reverse proxy that terminates TLS and mounts it under a prefix; dropping the path sent every /pdb/query/v4 request to the proxy root and the run reported nothing. The installs that were configured properly were the ones that failed.\n\nThe configured URL here carries a /puppetdb prefix and the fixture server answers ONLY under it, so a run that drops the path 404s on every call and emits no assets. requests_absent pins the unprefixed paths so the failure is named rather than merely counted. The scope in the foreign id comes from the hostname and is unaffected by the prefix.",
+  "kwargs": {
+    "url": "$BASE/puppetdb",
+    "auth_token": "fixture-rbac-token",
+    "page_size": "500",
+    "fact_page_size": "2000"
+  },
+  "routes": [
+    {
+      "name": "facts-under-prefix",
+      "match": {"method": "GET", "path": "/puppetdb/pdb/query/v4/facts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "certname": "proxied01.corp.example.com",
+              "name": "networking",
+              "environment": "production",
+              "value": {
+                "fqdn": "proxied01.corp.example.com",
+                "hostname": "proxied01",
+                "domain": "corp.example.com",
+                "primary": "ens192",
+                "ip": "192.0.2.61",
+                "mac": "00:50:56:aa:00:61",
+                "interfaces": {
+                  "ens192": {
+                    "mac": "00:50:56:aa:00:61",
+                    "bindings": [{"address": "192.0.2.61", "netmask": "255.255.255.0"}]
+                  }
+                }
+              }
+            },
+            {
+              "certname": "proxied01.corp.example.com",
+              "name": "os",
+              "value": {
+                "name": "Ubuntu",
+                "family": "Debian",
+                "architecture": "amd64",
+                "release": {"full": "22.04", "major": "22"}
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "nodes-under-prefix",
+      "match": {"method": "GET", "path": "/puppetdb/pdb/query/v4/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "certname": "proxied01.corp.example.com",
+              "facts_environment": "production",
+              "report_environment": "production",
+              "latest_report_status": "changed",
+              "report_timestamp": "2026-02-01T10:00:00.000Z",
+              "facts_timestamp": "2026-02-01T09:58:00.000Z"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route: the proxy root is not PuppetDB"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["puppetdb:$HOST:proxied01.corp.example.com"],
+    "requests_include": [
+      {"method": "GET", "path": "/puppetdb/pdb/query/v4/nodes"},
+      {"method": "GET", "path": "/puppetdb/pdb/query/v4/facts"}
+    ],
+    "requests_absent": [
+      {"path": "/pdb/query/v4/nodes"},
+      {"path": "/pdb/query/v4/facts"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

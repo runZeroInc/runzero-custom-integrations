@@ -1,0 +1,63 @@
+{
+  "name": "registry-churn-dupe",
+  "integration": "home-assistant",
+  "description": "The device registry changes between page renders. Each page re-derives the device-id list from states and slices it, so a device registered mid-run shifts the later slices and the same row can appear in two consecutive pages: page dids[0:2] returns devices one and two, and page dids[2:4] returns device two AGAIN followed by device three. The repeated row must be skipped -- emitting it twice would put a duplicate foreign id into one run -- and the skip must be logged. The residual half of the churn hazard, a row shifting OUT of every slice for one poll, is inherent to the vendor's template-only registry access (there is no REST registry endpoint and no stable cursor) and heals on the next poll.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-long-lived-token",
+    "device_page_size": "2",
+    "collect_device_trackers": "false"
+  },
+  "routes": [
+    {
+      "name": "states",
+      "match": {"method": "GET", "path": "/api/states"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "config-entries",
+      "match": {"method": "GET", "path": "/api/config/config_entries/entry"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "POST", "path": "/api/template", "body_contains": "dids[0:2]"},
+      "responses": [
+        {"status": 200, "text": "[{\"id\": \"cc000000000000000000000000000001\", \"name\": \"dev-one\", \"connections\": [[\"mac\", \"00:11:22:cc:00:01\"]], \"entities\": [], \"identifiers\": []}, {\"id\": \"cc000000000000000000000000000002\", \"name\": \"dev-two\", \"connections\": [[\"mac\", \"00:11:22:cc:00:02\"]], \"entities\": [], \"identifiers\": []}]"}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-2-shifted",
+      "match": {"method": "POST", "path": "/api/template", "body_contains": "dids[2:4]"},
+      "responses": [
+        {"status": 200, "text": "[{\"id\": \"cc000000000000000000000000000002\", \"name\": \"dev-two\", \"connections\": [[\"mac\", \"00:11:22:cc:00:02\"]], \"entities\": [], \"identifiers\": []}, {\"id\": \"cc000000000000000000000000000003\", \"name\": \"dev-three\", \"connections\": [[\"mac\", \"00:11:22:cc:00:03\"]], \"entities\": [], \"identifiers\": []}]"}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-3-empty",
+      "match": {"method": "POST", "path": "/api/template", "body_contains": "dids[4:6]"},
+      "responses": [
+        {"status": 200, "text": "[]"}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "home-assistant:$HOST:device:cc000000000000000000000000000001",
+      "home-assistant:$HOST:device:cc000000000000000000000000000002",
+      "home-assistant:$HOST:device:cc000000000000000000000000000003"
+    ],
+    "log_contains": [
+      "skipped 1 device rows repeated across registry pages"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

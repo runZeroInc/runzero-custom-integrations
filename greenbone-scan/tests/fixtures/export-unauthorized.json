@@ -1,0 +1,40 @@
+{
+  "name": "export-unauthorized",
+  "integration": "greenbone-scan",
+  "script": "greenbone-scan/greenbone-scan.star",
+  "description": "The runZero export token is wrong or revoked, so the CSV endpoint answers 401. The script must report the status and return before touching Greenbone: a failed target read means the target LIST is unknown, not empty, and the two must not be conflated -- proceeding would create a target from whatever partial parse the body produced. request_count==1 also pins that this is not retried, which is correct here because the integration uses the raw http.get builtin (it needs resp.body as CSV text rather than decoded JSON) and raw http.* accepts no retries argument at all.",
+  "kwargs": {
+    "runzero_url": "$BASE",
+    "runzero_export_token": "ET-revoked-token",
+    "transport": "tls",
+    "gmp_host": "127.0.0.1",
+    "gmp_username": "admin",
+    "gmp_password": "fixture-gmp-password"
+  },
+  "routes": [
+    {
+      "name": "runzero asset CSV export, unauthorized",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.csv"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "text": "unauthorized"
+        }
+      ]
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "failed to fetch runZero targets: runZero export returned status 401"
+    ]
+  }
+}

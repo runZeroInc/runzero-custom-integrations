@@ -1,0 +1,33 @@
+{
+  "name": "hangup",
+  "integration": "greenbone",
+  "script": "greenbone/greenbone.star",
+  "description": "gvmd hangs up rather than replying when it rejects a command: a live gvmd 25.2.1 closes the socket immediately after answering a pre-authenticate command, and the next send fails with a broken pipe. This scenario points that behaviour at the importer's response framer -- the connection dies with no bytes delivered.\n\nThe framer reads through recv, which returns EMPTY bytes at EOF, rather than recv_until, which RAISES at EOF and used to abort the whole run with an opaque 'failed to call main function: recv_until: EOF'. A hangup must now surface as the framer's own printed error, mark the connection dead so nothing sends on it again, and end the run cleanly with zero assets -- which is exactly what this scenario asserts.",
+  "kwargs": {
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "fixture-user",
+    "gmp_password": "fixture-password",
+    "tls_disable_validation": "true"
+  },
+  "gmp": {
+    "routes": [
+      {
+        "name": "hang-up-without-replying",
+        "match": {"command": "authenticate"},
+        "responses": [
+          {"xml": "", "close": true}
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GMP", "path": "authenticate"}
+    ],
+    "log_contains": ["connection closed before a complete response was read"]
+  }
+}

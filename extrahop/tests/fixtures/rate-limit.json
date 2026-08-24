@@ -1,0 +1,53 @@
+{
+  "name": "rate-limit",
+  "integration": "extrahop",
+  "description": "A 429 on the first device search followed by success. post_json retries transient statuses on its own (three retries by default, widened backoff here), so the run must recover and import the page rather than aborting. The fixture server records the retried call, so the request count proves the retry happened rather than the response being skipped.",
+  "kwargs": {
+    "url": "$BASE",
+    "deployment": "enterprise",
+    "api_key": "fixture-api-key",
+    "require_ip_address": "false",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/api/v1/networks"},
+      "responses": [
+        {"status": 200, "json": [{"node_id": null, "appliance_uuid": "appl-uuid-0001"}]}
+      ]
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "POST", "path": "/api/v1/devices/search"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "too many requests"}},
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 601,
+              "discovery_id": "throttled01",
+              "node_id": null,
+              "is_l3": false,
+              "macaddr": "00:11:22:33:66:01",
+              "ipaddr4": "10.50.0.5",
+              "dns_name": "throttled01.corp.example.com",
+              "role": "file_server",
+              "last_seen_time": 1786000000000
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["extrahop:appl-uuid-0001:throttled01"],
+    "min_requests": 3,
+    "requests_absent": [{"path_contains": "/api/v1/devices/601/software"}],
+    "log_contains": ["extrahop: reported 1 devices"]
+  },
+  "invariants": {"skip": []}
+}

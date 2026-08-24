@@ -1,0 +1,142 @@
+{
+  "name": "pods",
+  "integration": "kubernetes",
+  "description": "Pod import, which CONFIG advertised for as long as the integration has existed while /api/v1/pods was never called. Proves the four decisions the feature rests on.\n\n(1) IDENTITY. metadata.uid is the key, prefixed k8s-pod-, exactly as nodes and services are. A pod with no uid is skipped AND logged -- the silent version of that skip is what item 15 was about.\n\n(2) POD IPs NEVER REACH AN INTERFACE. storefront carries podIP 10.244.1.17, which is a cluster-pod-CIDR address: the same default range on virtually every install, AND recycled within one cluster minutes after a pod exits. Importing it would IP-match a pod in one cluster onto an unrelated pod in another, and a dead pod onto its replacement. The asset must carry NO ipAddresses; the value survives as an attribute.\n\n(3) hostNetwork IS THE TRAP, and kube-proxy is here for it. Its podIP EQUALS its hostIP (10.40.0.11) because it shares the node's network namespace, and its in-container hostname is the NODE's hostname -- so importing either would merge the pod into worker-01. It must carry no address and a pod-scoped hostname. The bare metadata.name is never imported as a hostname for the same class of reason: a StatefulSet names its pods web-0 and db-1, which collide with real hosts.\n\n(4) IMAGE PARSING. The tag is whatever follows the LAST colon, and only when no '/' follows it -- registry.example.com:5000/acme/migrate:2.0 has a colon in the registry host and must still resolve to version 2.0, not to '5000/acme/migrate:2.0'. A digest reference splits on '@' instead, and status.containerStatuses wins over spec because it names the image the kubelet actually resolved.\n\nSkips namespaced_ids for the same reason the other kubernetes scenarios do: ids are a prefix plus the object UID, unique per cluster by construction but carrying no ':' for the invariant to see. has_correlator is NOT skipped, and that is the point of the synthesized hostname: with no address of any kind, it is the only thing keeping a pod asset from being one that can never merge with anything.",
+  "kwargs": {
+    "url": "$BASE",
+    "bearer_token": "fixture-sa-token",
+    "include_loadbalancer_services": "false",
+    "include_pods": "true"
+  },
+  "routes": [
+    {
+      "name": "nodes",
+      "match": {"method": "GET", "path": "/api/v1/nodes"},
+      "responses": [{"status": 200, "json": {"kind": "NodeList", "items": []}}]
+    },
+    {
+      "name": "pods",
+      "match": {"method": "GET", "path": "/api/v1/pods"},
+      "responses": [{"status": 200, "json": {
+        "kind": "PodList",
+        "items": [
+          {
+            "metadata": {
+              "name": "storefront-7d9f8b6c5-abcde",
+              "namespace": "shop",
+              "uid": "c3d40000-0000-4000-8000-0000000000b1",
+              "creationTimestamp": "2026-03-02T11:00:00Z",
+              "labels": {"app": "storefront", "pod-template-hash": "7d9f8b6c5"},
+              "ownerReferences": [{"kind": "ReplicaSet", "name": "storefront-7d9f8b6c5", "uid": "c3d40000-0000-4000-8000-0000000000rs"}]
+            },
+            "spec": {
+              "nodeName": "worker-01",
+              "serviceAccountName": "storefront",
+              "restartPolicy": "Always",
+              "priorityClassName": "high-priority",
+              "initContainers": [{"name": "migrate", "image": "registry.example.com:5000/acme/migrate:2.0"}],
+              "containers": [
+                {"name": "storefront", "image": "ghcr.io/acme/storefront:1.4.2"},
+                {"name": "sidecar", "image": "docker.io/envoyproxy/envoy@sha256:1111111111111111111111111111111111111111111111111111111111111111"}
+              ]
+            },
+            "status": {
+              "phase": "Running",
+              "qosClass": "Burstable",
+              "startTime": "2026-03-02T11:00:07Z",
+              "podIP": "10.244.1.17",
+              "podIPs": [{"ip": "10.244.1.17"}],
+              "hostIP": "10.40.0.11",
+              "initContainerStatuses": [
+                {"name": "migrate", "image": "registry.example.com:5000/acme/migrate:2.0", "ready": true, "restartCount": 0}
+              ],
+              "containerStatuses": [
+                {"name": "storefront", "image": "ghcr.io/acme/storefront:1.4.2", "imageID": "ghcr.io/acme/storefront@sha256:2222222222222222222222222222222222222222222222222222222222222222", "ready": true, "restartCount": 3, "started": true},
+                {"name": "sidecar", "image": "docker.io/envoyproxy/envoy@sha256:1111111111111111111111111111111111111111111111111111111111111111", "ready": true, "restartCount": 1, "started": true}
+              ]
+            }
+          },
+          {
+            "metadata": {
+              "name": "kube-proxy-x7k2m",
+              "namespace": "kube-system",
+              "uid": "c3d40000-0000-4000-8000-0000000000b2",
+              "creationTimestamp": "2026-01-04T09:12:10Z",
+              "labels": {"k8s-app": "kube-proxy"},
+              "ownerReferences": [{"kind": "DaemonSet", "name": "kube-proxy", "uid": "c3d40000-0000-4000-8000-0000000000ds"}]
+            },
+            "spec": {
+              "nodeName": "worker-01",
+              "hostNetwork": true,
+              "serviceAccountName": "kube-proxy",
+              "containers": [{"name": "kube-proxy", "image": "registry.k8s.io/kube-proxy:v1.30.2"}]
+            },
+            "status": {
+              "phase": "Running",
+              "qosClass": "BestEffort",
+              "podIP": "10.40.0.11",
+              "podIPs": [{"ip": "10.40.0.11"}],
+              "hostIP": "10.40.0.11",
+              "containerStatuses": [{"name": "kube-proxy", "image": "registry.k8s.io/kube-proxy:v1.30.2", "ready": true, "restartCount": 0, "started": true}]
+            }
+          },
+          {
+            "metadata": {"name": "pod-with-no-uid", "namespace": "shop", "creationTimestamp": "2026-03-02T11:30:00Z"},
+            "spec": {"nodeName": "worker-01", "containers": [{"name": "app", "image": "ghcr.io/acme/app:1.0"}]},
+            "status": {"phase": "Running", "podIP": "10.244.1.18"}
+          }
+        ]
+      }}]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "k8s-pod-c3d40000-0000-4000-8000-0000000000b1",
+      "k8s-pod-c3d40000-0000-4000-8000-0000000000b2"
+    ],
+    "assets": [
+      {
+        "id": "k8s-pod-c3d40000-0000-4000-8000-0000000000b1",
+        "fields": {
+          "hostnames": "storefront-7d9f8b6c5-abcde.shop.pod",
+          "deviceType": "Kubernetes Pod",
+          "k8s.pod.pod_ip": "10.244.1.17",
+          "k8s.pod.host_ip": "10.40.0.11",
+          "k8s.pod.node_name": "worker-01",
+          "k8s.pod.phase": "Running",
+          "k8s.pod.restart_count": "4",
+          "k8s.pod.owners": "[\"ReplicaSet/storefront-7d9f8b6c5\"]"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "k8s-pod-c3d40000-0000-4000-8000-0000000000b2",
+        "fields": {
+          "hostnames": "kube-proxy-x7k2m.kube-system.pod",
+          "k8s.pod.host_network": "true",
+          "k8s.pod.pod_ip": "10.40.0.11"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "min_software_total": 4,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/nodes"},
+      {"method": "GET", "path": "/api/v1/pods"},
+      {"header_contains": "fixture-sa-token"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1/services"}
+    ],
+    "log_contains": [
+      "kubernetes: skipped 1 pods with no metadata.uid (first name: pod-with-no-uid)",
+      "kubernetes: imported 2 pods"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  },
+  "check_determinism": true
+}

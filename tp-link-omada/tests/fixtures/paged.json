@@ -1,0 +1,147 @@
+{
+  "name": "paged",
+  "integration": "tp-link-omada",
+  "description": "Two sites, each with two pages of clients at pageSize 2. Proves the walk advances the page parameter rather than re-requesting page 1, that it stops when totalRows is reached instead of fetching an empty third page, and that the per-site paths carry the right siteId. Devices are disabled so the assertions are about the client walk alone.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret",
+    "extract_devices": "false",
+    "page_size": "2"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/openapi/authorize/token"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {"accessToken": "AT-page", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT-page"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 2,
+              "currentPage": 1,
+              "currentSize": 2,
+              "data": [
+                {"siteId": "660293f1ae766909a69251d4", "name": "Branch-Hamburg", "region": "Germany", "timeZone": "Europe/Amsterdam", "scenario": "Office", "type": 0},
+                {"siteId": "660293f1ae766909a69251d5", "name": "Branch-Lisbon", "region": "Portugal", "timeZone": "Europe/Lisbon", "scenario": "Office", "type": 0}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/clients", "query_contains": "page=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 3,
+              "currentPage": 1,
+              "currentSize": 2,
+              "data": [
+                {"mac": "3C-22-FB-11-22-33", "name": "hamburg-laptop-a", "ip": "192.0.2.101", "wireless": true, "ssid": "Corp-WiFi", "active": true},
+                {"mac": "3C-22-FB-11-22-34", "name": "hamburg-laptop-b", "ip": "192.0.2.102", "wireless": true, "ssid": "Corp-WiFi", "active": true}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/clients", "query_contains": "page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 3,
+              "currentPage": 2,
+              "currentSize": 1,
+              "data": [
+                {"mac": "3C-22-FB-11-22-35", "name": "hamburg-phone", "ip": "192.0.2.103", "wireless": true, "ssid": "Guest-WiFi", "guest": true, "active": true}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d5/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 1,
+              "currentPage": 1,
+              "currentSize": 1,
+              "data": [
+                {"mac": "B8-27-EB-44-55-66", "name": "lisbon-sensor", "ip": "198.51.100.10", "wireless": false, "switchName": "Lisbon-SW1", "port": 3, "active": true}
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"errorCode": -1600, "msg": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:33",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:34",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:35",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:B8:27:EB:44:55:66"
+    ],
+    "assets": [
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:B8:27:EB:44:55:66",
+        "fields": {"omada_site_name": "Branch-Lisbon", "omada_site_id": "660293f1ae766909a69251d5"}
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:35",
+        "fields": {"omada_site_name": "Branch-Hamburg", "omada_guest": "true"}
+      }
+    ],
+    "requests_include": [
+      {"path_contains": "/sites/660293f1ae766909a69251d4/clients", "query_contains": "page=1"},
+      {"path_contains": "/sites/660293f1ae766909a69251d4/clients", "query_contains": "page=2"},
+      {"path_contains": "/sites/660293f1ae766909a69251d5/clients", "query_contains": "page=1"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/devices"},
+      {"path_contains": "/sites/660293f1ae766909a69251d4/clients", "query_contains": "page=3"}
+    ]
+  },
+
+  "invariants": {"skip": ["no_mac_in_id"]},
+  "check_determinism": true
+}

@@ -1,0 +1,43 @@
+{
+  "name": "empty-and-service-failure",
+  "integration": "kubernetes",
+  "description": "An empty cluster whose ServiceAccount was never granted list on services. The node list is empty and the service list answers 403 Forbidden. Proves the run reports zero assets without failing, that the service failure is a warning rather than a fatal error, and that the service call is still attempted. Skips namespaced_ids: no assets are emitted, but the skip keeps the file consistent with the other kubernetes scenarios.",
+  "kwargs": {
+    "url": "$BASE",
+    "bearer_token": "fixture-sa-token",
+    "include_loadbalancer_services": "true"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/v1/nodes"},
+      "responses": [{"status": 200, "json": {"kind": "NodeList", "apiVersion": "v1", "items": []}}]
+    },
+    {
+      "match": {"method": "GET", "path": "/api/v1/services"},
+      "responses": [{"status": 403, "json": {
+        "kind": "Status",
+        "status": "Failure",
+        "message": "services is forbidden: User \"system:serviceaccount:kube-system:runzero\" cannot list resource \"services\" in API group \"\" at the cluster scope",
+        "reason": "Forbidden",
+        "code": 403
+      }}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "min_requests": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/nodes"},
+      {"method": "GET", "path": "/api/v1/services"}
+    ],
+    "log_contains": [
+      "kubernetes: imported 0 nodes",
+      "kubernetes: failed to list services",
+      "kubernetes: reported 0 assets"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

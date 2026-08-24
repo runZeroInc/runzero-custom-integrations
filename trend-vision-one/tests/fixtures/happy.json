@@ -1,0 +1,123 @@
+{
+  "name": "happy",
+  "integration": "trend-vision-one",
+  "description": "One page of the endpoint inventory with the adapter pass off. Proves the top page-size parameter is sent, that ids are namespaced by the regional API host, that loopback, link-local and unspecified addresses are stripped from ipAddresses while lastUsedIp is kept off the interface entirely (it is the NAT/Service Gateway egress address shared by every endpoint behind it), that the Trend agent products become Software rows, that a row with no agentGuid is skipped with a log line, and that a non-object element in items is dropped rather than aborting the run.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "api_token": "fixture-vision-one-key",
+    "import_software": "true",
+    "fetch_interfaces": "false",
+    "page_size": "100"
+  },
+  "routes": [
+    {
+      "name": "endpoints",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "totalCount": 3,
+          "items": [
+            {
+              "agentGuid": "aaaaaaaa-1111-4000-8000-000000000001",
+              "endpointName": "WIN-APP-01",
+              "displayName": "WIN-APP-01",
+              "type": "server",
+              "osName": "Windows Server 2022",
+              "osVersion": "10.0.20348",
+              "osPlatform": "windows",
+              "osArchitecture": "x86_64",
+              "cpuArchitecture": "x86_64",
+              "ipAddresses": ["10.100.1.10", "127.0.0.1", "fe80::1", "169.254.9.9", "2001:db8:100::10"],
+              "lastUsedIp": "198.51.100.77",
+              "serialNumber": "VMW-FIXTURE-0001",
+              "isolationStatus": "off",
+              "lastLoggedOnUser": "CORP\\\\svc-app",
+              "serviceGatewayOrProxy": "sg-primary",
+              "eppAgent": {
+                "status": "on",
+                "version": "12.5.1234",
+                "productNames": ["Trend Vision One Endpoint Security"],
+                "componentVersion": "1.2.3.4",
+                "policyName": "Server Standard",
+                "endpointGroup": "Servers",
+                "lastConnectedDateTime": "2026-06-01T12:00:00Z"
+              },
+              "edrSensor": {
+                "status": "on",
+                "version": "1.2.3",
+                "connectivity": "connected",
+                "productNames": ["Trend Vision One Endpoint Sensor"],
+                "lastConnectedDateTime": "2026-06-02T08:30:00Z"
+              }
+            },
+            {
+              "agentGuid": "aaaaaaaa-1111-4000-8000-000000000002",
+              "endpointName": "MAC-DEV-02",
+              "type": "desktop",
+              "osName": "macOS",
+              "osVersion": "14.5",
+              "osPlatform": "macosx",
+              "ipAddresses": ["10.100.2.20"],
+              "lastUsedIp": "198.51.100.77",
+              "isolationStatus": "isolated",
+              "eppAgent": {},
+              "edrSensor": {}
+            },
+            {
+              "agentGuid": "",
+              "endpointName": "NO-GUID-03",
+              "type": "desktop",
+              "ipAddresses": ["10.100.3.30"]
+            },
+            "items is documented as a list of objects, so a bare string must not abort the run"
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "assets": [
+      {
+        "id": "trend-vision-one:$HOST:aaaaaaaa-1111-4000-8000-000000000001",
+        "fields": {
+          "ipAddresses": "10.100.1.10\t2001:db8:100::10",
+          "hostnames": "WIN-APP-01",
+          "deviceType": "Server",
+          "os": "Windows Server 2022",
+          "osVersion": "10.0.20348",
+          "lastSeenTS": "1780389000",
+          "trend_vision_one_last_used_ip": "198.51.100.77"
+        },
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "trend-vision-one:$HOST:aaaaaaaa-1111-4000-8000-000000000002",
+        "fields": {"ipAddresses": "10.100.2.20", "deviceType": "Desktop", "os": "macOS"}
+      }
+    ],
+    "asset_count": 2,
+    "ids": [
+      "trend-vision-one:127.0.0.1:aaaaaaaa-1111-4000-8000-000000000001",
+      "trend-vision-one:127.0.0.1:aaaaaaaa-1111-4000-8000-000000000002"
+    ],
+    "request_count": 1,
+    "min_software_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "top=100"},
+      {"header_contains": "fixture-vision-one-key"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/v3.0/endpointSecurity/endpoints/"}
+    ],
+    "log_contains": [
+      "trend-vision-one: 3 endpoints reported by the API",
+      "trend-vision-one: skipping endpoint with no agentGuid: name=NO-GUID-03",
+      "trend-vision-one: reported 2 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

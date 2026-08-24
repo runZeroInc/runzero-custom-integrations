@@ -1,0 +1,49 @@
+{
+  "name": "login-redirect",
+  "integration": "ntopng",
+  "description": "An unauthenticated request. ntopng's own source records the trap in a comment on every v2 endpoint: 'in case of invalid login, no error is returned but redirected to login'. What the server sends is a 302 to the login page -- never a 401 -- and the HTTP helper follows it, so what the script sees is the login page itself: HTML carrying a 200. Either way a run that trusted the status code would report a healthy empty network, so the failure has to be named for what it is.\n\nThis fixture serves the end state of that sequence, the 200 HTML, because that is what the script's code path actually receives; the 302 itself is exercised by the container scenario, whose readiness gate polls /lua/login.lua rather than a REST endpoint precisely because every REST v2 URL answers 302 until the seed retires the default password.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_macs": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path_prefix": "/lua/rest/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "text/html"
+          },
+          "text": "<!DOCTYPE html><html><head><title>ntopng</title></head><body>Login</body></html>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "rc": -1,
+      "rc_str": "NOT_FOUND",
+      "rc_str_hr": "Not found",
+      "rsp": {}
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "redirects an unauthenticated request to the login page",
+      "ntopng: no monitored interfaces were found"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

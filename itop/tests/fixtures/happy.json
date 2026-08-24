@@ -1,0 +1,511 @@
+{
+  "name": "happy",
+  "integration": "itop",
+  "description": "The four default CI classes, with the interface classes read once up front and joined by owner id. Proves version and json_data travel as form fields while the credential stays in an Authorization header - iTop's auth_user and auth_pwd fields belong to the 'url' login type, which is absent from the shipped allowed_login_types default; that PhysicalInterface and LogicalInterface are read directly instead of through a *_list link set the vendor docs warn against; that a managementip becomes an interface only when no modelled interface already carries it; that an unparseable macaddress is dropped rather than passed through; that a loopback interface yields no address; and that a move2production date in the future is clamped rather than dropping the whole record.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "page_size": "200"
+  },
+  "routes": [
+    {
+      "name": "physical-interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22PhysicalInterface%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "PhysicalInterface::501": {
+                "code": 0,
+                "message": "",
+                "class": "PhysicalInterface",
+                "key": 501,
+                "fields": {
+                  "id": "501",
+                  "name": "eth0",
+                  "ipaddress": "192.0.2.31",
+                  "macaddress": "aa:bb:cc:44:55:66",
+                  "speed": "1000",
+                  "connectableci_id": "11"
+                }
+              },
+              "PhysicalInterface::502": {
+                "code": 0,
+                "message": "",
+                "class": "PhysicalInterface",
+                "key": 502,
+                "fields": {
+                  "id": "502",
+                  "name": "eth1",
+                  "ipaddress": "198.51.100.31",
+                  "macaddress": "aa:bb:cc:44:55:67",
+                  "speed": "1000",
+                  "connectableci_id": "11"
+                }
+              },
+              "PhysicalInterface::503": {
+                "code": 0,
+                "message": "",
+                "class": "PhysicalInterface",
+                "key": 503,
+                "fields": {
+                  "id": "503",
+                  "name": "Gi0/1",
+                  "ipaddress": "192.0.2.1",
+                  "macaddress": "not-a-mac",
+                  "speed": "1000",
+                  "connectableci_id": "21"
+                }
+              },
+              "PhysicalInterface::504": {
+                "code": 0,
+                "message": "",
+                "class": "PhysicalInterface",
+                "key": 504,
+                "fields": {
+                  "id": "504",
+                  "name": "lo",
+                  "ipaddress": "127.0.0.1",
+                  "macaddress": "",
+                  "speed": "",
+                  "connectableci_id": "11"
+                }
+              },
+              "PhysicalInterface::505": {
+                "code": 0,
+                "message": "",
+                "class": "PhysicalInterface",
+                "key": 505,
+                "fields": {
+                  "id": "505",
+                  "name": "orphan",
+                  "ipaddress": "203.0.113.5",
+                  "macaddress": "",
+                  "speed": "",
+                  "connectableci_id": "0"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 5"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "logical-interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22LogicalInterface%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "LogicalInterface::601": {
+                "code": 0,
+                "message": "",
+                "class": "LogicalInterface",
+                "key": 601,
+                "fields": {
+                  "id": "601",
+                  "name": "ens192",
+                  "ipaddress": "192.0.2.60",
+                  "macaddress": "00:50:56:aa:bb:cc",
+                  "speed": "10000",
+                  "virtualmachine_id": "31"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 1"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "servers",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22Server%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "Server::11": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 11,
+                "fields": {
+                  "id": "11",
+                  "name": "srv-db-01.example.com",
+                  "description": "Primary database node",
+                  "organization_name": "Demo",
+                  "business_criticity": "high",
+                  "move2production": "2024-03-11",
+                  "serialnumber": "SN-11-ABC",
+                  "location_name": "Paris DC",
+                  "status": "production",
+                  "brand_name": "Dell",
+                  "model_name": "PowerEdge R750",
+                  "asset_number": "AST-0011",
+                  "purchase_date": "2024-01-05",
+                  "end_of_warranty": "2027-01-05",
+                  "managementip": "10.10.0.11",
+                  "rack_name": "R14",
+                  "enclosure_name": "",
+                  "nb_u": "2",
+                  "osfamily_name": "Linux",
+                  "osversion_name": "RHEL 9",
+                  "oslicence_name": "",
+                  "cpu": "2 x Xeon Gold 6338",
+                  "ram": "256"
+                }
+              },
+              "Server::12": {
+                "code": 0,
+                "message": "",
+                "class": "Server",
+                "key": 12,
+                "fields": {
+                  "id": "12",
+                  "name": "Unnamed rack unit",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "low",
+                  "move2production": "",
+                  "serialnumber": "",
+                  "location_name": "",
+                  "status": "stock",
+                  "brand_name": "",
+                  "model_name": "",
+                  "asset_number": "",
+                  "purchase_date": "",
+                  "end_of_warranty": "",
+                  "managementip": "",
+                  "rack_name": "",
+                  "enclosure_name": "",
+                  "nb_u": "0",
+                  "osfamily_name": "",
+                  "osversion_name": "",
+                  "oslicence_name": "",
+                  "cpu": "",
+                  "ram": ""
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 2"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "netdevs",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22NetworkDevice%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "NetworkDevice::21": {
+                "code": 0,
+                "message": "",
+                "class": "NetworkDevice",
+                "key": 21,
+                "fields": {
+                  "id": "21",
+                  "name": "sw-core-01",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "high",
+                  "move2production": "2023-06-01 09:15:00",
+                  "serialnumber": "FDO2140Z0AB",
+                  "location_name": "Paris DC",
+                  "status": "production",
+                  "brand_name": "Cisco",
+                  "model_name": "Catalyst 9300",
+                  "asset_number": "",
+                  "purchase_date": "",
+                  "end_of_warranty": "",
+                  "managementip": "10.10.0.21",
+                  "rack_name": "R01",
+                  "enclosure_name": "",
+                  "nb_u": "1",
+                  "networkdevicetype_name": "Switch",
+                  "iosversion_name": "17.09.04",
+                  "ram": "8"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 1"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22VirtualMachine%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "VirtualMachine::31": {
+                "code": 0,
+                "message": "",
+                "class": "VirtualMachine",
+                "key": 31,
+                "fields": {
+                  "id": "31",
+                  "name": "vm-app-01.example.com",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "medium",
+                  "move2production": "2025-02-14",
+                  "status": "production",
+                  "managementip": "192.0.2.60",
+                  "virtualhost_name": "esx-01",
+                  "oslicence_name": "",
+                  "cpu": "4",
+                  "ram": "16",
+                  "osfamily_name": "Windows",
+                  "osversion_name": "Windows Server 2022"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 1"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "pcs",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22PC%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "objects": {
+              "PC::41": {
+                "code": 0,
+                "message": "",
+                "class": "PC",
+                "key": 41,
+                "fields": {
+                  "id": "41",
+                  "name": "LT-4411",
+                  "description": "",
+                  "organization_name": "Demo",
+                  "business_criticity": "low",
+                  "move2production": "2026-11-30",
+                  "serialnumber": "5CD1234XYZ",
+                  "location_name": "Lyon",
+                  "status": "production",
+                  "brand_name": "HP",
+                  "model_name": "EliteBook 840",
+                  "asset_number": "AST-4411",
+                  "purchase_date": "2026-11-01",
+                  "end_of_warranty": "2029-11-01",
+                  "osfamily_name": "Windows",
+                  "osversion_name": "Windows 11",
+                  "cpu": "i7",
+                  "ram": "32",
+                  "type": "laptop"
+                }
+              }
+            },
+            "code": 0,
+            "message": "Found: 1"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "objects": null,
+            "code": 0,
+            "message": "Found: 0"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "itop:$HOST:Server:11",
+      "itop:$HOST:NetworkDevice:21",
+      "itop:$HOST:VirtualMachine:31",
+      "itop:$HOST:PC:41"
+    ],
+    "ids_absent": [
+      "itop:$HOST:Server:12"
+    ],
+    "assets": [
+      {
+        "id": "itop:$HOST:Server:11",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Linux",
+          "osVersion": "RHEL 9",
+          "manufacturer": "Dell",
+          "model": "PowerEdge R750",
+          "hostnames": "srv-db-01.example.com",
+          "itop_serialnumber": "SN-11-ABC",
+          "itop_interface_count": "3",
+          "macAddresses": "a8:bb:cc:44:55:66\ta8:bb:cc:44:55:67"
+        }
+      },
+      {
+        "id": "itop:$HOST:NetworkDevice:21",
+        "fields": {
+          "deviceType": "Network Device",
+          "itop_network_device_type": "Switch",
+          "ipAddresses": "10.10.0.21\t192.0.2.1"
+        },
+        "fields_absent": [
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "itop:$HOST:VirtualMachine:31",
+        "fields": {
+          "deviceType": "Virtual Machine",
+          "os": "Windows",
+          "ipAddresses": "192.0.2.60",
+          "itop_virtual_host": "esx-01"
+        }
+      },
+      {
+        "id": "itop:$HOST:PC:41",
+        "fields": {
+          "deviceType": "Laptop",
+          "itop_pc_type": "laptop"
+        }
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "version=1.4"
+      },
+      {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22operation%22%3A%22core%2Fget%22"
+      },
+      {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22limit%22%3A200"
+      },
+      {
+        "header_contains": "Basic "
+      },
+      {
+        "header": {
+          "content-type": "application/x-www-form-urlencoded"
+        }
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "auth_pwd"
+      },
+      {
+        "body_contains": "_list"
+      }
+    ],
+    "log_contains": [
+      "itop: indexed 4 PhysicalInterface records",
+      "itop: indexed 1 LogicalInterface records",
+      "skipping Server 12: no address, MAC, or usable name",
+      "itop: reported 1 assets from Server"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

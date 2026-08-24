@@ -1,0 +1,135 @@
+{
+  "name": "happy",
+  "integration": "fleet-osquery",
+  "description": "One page of hosts with software, CVE findings, listening-port services, labels, and policies. Proves the host list is parsed, that generated_cpe in the CPE 2.3 binding is kept off Software.cpe23 (which only accepts cpe:/a:) so the record survives, that a wildcard listening bind is rewritten to the host's primary address, and that a host whose only address is loopback still imports with no interface address.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_software": "true",
+    "include_vulnerabilities": "true",
+    "include_labels": "true",
+    "include_policies": "true",
+    "listening_ports_query": "listening_ports",
+    "page_size": "10"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v1/fleet/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {
+                "id": 11,
+                "hostname": "web01.corp.example.com",
+                "computer_name": "web01",
+                "display_name": "web01",
+                "platform": "ubuntu",
+                "os_version": "Ubuntu 22.04.3 LTS",
+                "primary_ip": "10.40.0.11",
+                "primary_mac": "3c:22:fb:10:00:11",
+                "hardware_serial": "SN-WEB-0011",
+                "hardware_model": "PowerEdge R650",
+                "hardware_vendor": "Dell Inc.",
+                "team_name": "Platform",
+                "status": "online",
+                "created_at": "2026-01-04T09:15:00Z",
+                "seen_time": "2026-02-01T18:30:00Z",
+                "disk_encryption_enabled": true,
+                "mdm": {"enrollment_status": "On (automatic)", "name": "Fleet"},
+                "issues": {"failing_policies_count": 1, "total_issues_count": 1},
+                "labels": [
+                  {"name": "All Hosts", "label_type": "builtin"},
+                  {"name": "Production", "label_type": "regular"}
+                ],
+                "policies": [
+                  {"name": "Full disk encryption", "response": "pass"},
+                  {"name": "SSH root login disabled", "response": "fail", "critical": true}
+                ],
+                "software": [
+                  {
+                    "id": 5001,
+                    "name": "openssl",
+                    "version": "3.0.2",
+                    "source": "deb_packages",
+                    "generated_cpe": "cpe:2.3:a:openssl:openssl:3.0.2:*:*:*:*:*:*:*",
+                    "installed_paths": ["/usr/lib/x86_64-linux-gnu/libssl.so.3"],
+                    "vulnerabilities": [
+                      {
+                        "cve": "CVE-2022-3602",
+                        "cvss_score": 7.5,
+                        "cve_published": "2022-11-01T00:00:00Z",
+                        "cve_description": "A buffer overrun can be triggered in X.509 certificate verification.",
+                        "resolved_in_version": "3.0.7",
+                        "cisa_known_exploit": false,
+                        "details_link": "https://fixture.invalid/cve/CVE-2022-3602"
+                      },
+                      {
+                        "cve": "not-a-cve",
+                        "cvss_score": 9.9
+                      }
+                    ]
+                  },
+                  {
+                    "id": 5002,
+                    "name": "nginx",
+                    "version": "1.22.0",
+                    "source": "deb_packages",
+                    "generated_cpe": "cpe:/a:nginx:nginx:1.22.0"
+                  }
+                ],
+                "additional": {
+                  "listening_ports": [
+                    {"port": "443", "protocol": "6", "address": "0.0.0.0", "pid": "911", "path": "/usr/sbin/nginx", "family": "2"},
+                    {"port": "5353", "protocol": "17", "address": "10.40.0.11", "pid": "640", "path": "/usr/sbin/avahi", "family": "2"},
+                    {"port": "0", "protocol": "6", "address": "10.40.0.11", "pid": "1", "path": "/sbin/init"},
+                    {"port": "22", "protocol": "1", "address": "10.40.0.11", "pid": "700", "path": "/usr/sbin/sshd"}
+                  ]
+                }
+              },
+              {
+                "id": 12,
+                "hostname": "laptop-a.corp.example.com",
+                "computer_name": "laptop-a",
+                "display_name": "laptop-a",
+                "platform": "darwin",
+                "os_version": "macOS 15.2",
+                "primary_ip": "127.0.0.1",
+                "primary_mac": "00:00:00:00:00:00",
+                "hardware_serial": "SN-LAP-0012",
+                "hardware_model": "MacBookPro18,3",
+                "hardware_vendor": "Apple Inc.",
+                "created_at": "2026-01-06T11:00:00Z",
+                "seen_time": "2026-02-01T08:05:00Z",
+                "labels": [{"name": "Laptops", "label_type": "regular"}],
+                "policies": [{"name": "FileVault enabled", "response": "pass"}],
+                "software": [
+                  {"id": 5003, "name": "Firefox", "version": "134.0", "source": "apps"}
+                ],
+                "additional": {"listening_ports": []}
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"hosts": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["fleet-osquery:$HOST:11", "fleet-osquery:$HOST:12"],
+    "min_requests": 1,
+    "min_software_total": 3,
+    "min_services_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=0"},
+      {"query_contains": "populate_software=true"},
+      {"query_contains": "additional_info_filters=listening_ports"},
+      {"header_contains": "fixture-token"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

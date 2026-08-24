@@ -1,0 +1,29 @@
+{
+  "name": "empty",
+  "integration": "absolute",
+  "description": "An account with no devices: the first report page carries an empty data array. The run must finish cleanly with zero assets and say so, not fail.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key"
+  },
+  "routes": [
+    {
+      "name": "jws-validate",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {"status": 200, "json": {"metadata": {"pagination": {"nextPage": ""}}, "data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "absolute: reported 0 devices",
+      "absolute: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []}
+}

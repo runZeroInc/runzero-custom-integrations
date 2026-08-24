@@ -1,0 +1,207 @@
+{
+  "name": "happy",
+  "integration": "lansweeper",
+  "description": "The authorized-site bootstrap followed by one page of assetResources. Proves the site query result drives the per-site asset query, that an item is keyed on its site-scoped key, that softwares becomes Software with the CPE 2.2 application binding assigned to cpe23 while a CPE 2.3 formatted string is kept as a custom attribute instead (Software.cpe23 only accepts ^cpe:/a: and a 2.3 string would fail validation and drop the whole record), that a duplicate name/version pair is folded, and that an item with no key and a non-object item are each skipped by name without ending the page. A site whose id contains characters Lansweeper never issues is refused, because the id is interpolated straight into the GraphQL document. The asset query must name \"key\" in its requested fields list: build_asset reads item.key as the foreign id, and a Lansweeper that returned only the requested fields would otherwise hand back keyless items and import zero assets.",
+  "kwargs": {
+    "url": "$BASE",
+    "application_identity_code": "fixture-identity-code",
+    "import_software": "true",
+    "page_size": "200"
+  },
+  "routes": [
+    {
+      "name": "authorized-sites",
+      "match": {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "authorizedSites"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "authorizedSites": {
+                "sites": [
+                  {
+                    "id": "site-aaa111",
+                    "name": "HQ"
+                  },
+                  {
+                    "id": "bad site id",
+                    "name": "Injected"
+                  },
+                  {
+                    "id": "",
+                    "name": "No id"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-page-first",
+      "match": {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "\"page\":\"FIRST\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "site": {
+                "assetResources": {
+                  "total": 3,
+                  "pagination": {
+                    "limit": 200,
+                    "current": "cursor-0",
+                    "next": null,
+                    "page": "FIRST"
+                  },
+                  "items": [
+                    {
+                      "key": "asset-key-0001",
+                      "url": "https://lansweeper.invalid/asset/1",
+                      "assetBasicInfo": {
+                        "name": "WKS-0001",
+                        "fqdn": "wks-0001.corp.example.com",
+                        "domain": "corp.example.com",
+                        "userName": "jdoe",
+                        "userDomain": "CORP",
+                        "description": "Finance workstation",
+                        "type": "Windows",
+                        "mac": "00:1A:2B:3C:4D:01",
+                        "ipAddress": "10.90.0.11",
+                        "firstSeen": "2026-01-10T08:00:00Z",
+                        "lastSeen": "2026-02-05T18:30:00Z"
+                      },
+                      "assetCustom": {
+                        "model": "OptiPlex 7090",
+                        "serialNumber": "SN-LS-0001",
+                        "manufacturer": "Dell Inc.",
+                        "sku": "OPX7090",
+                        "firmwareVersion": "1.21.0",
+                        "dnsName": "wks-0001.corp.example.com",
+                        "location": "Floor 3",
+                        "department": "Finance",
+                        "stateName": "Active"
+                      },
+                      "operatingSystem": {
+                        "caption": "Microsoft Windows 11 Enterprise",
+                        "productType": "Workstation"
+                      },
+                      "softwares": [
+                        {
+                          "name": "Google Chrome",
+                          "version": "131.0.6778.86",
+                          "publisher": "Google LLC",
+                          "cpe": "cpe:/a:google:chrome:131.0.6778.86",
+                          "installDate": "2026-01-20T00:00:00Z"
+                        },
+                        {
+                          "name": "7-Zip",
+                          "version": "24.09",
+                          "publisher": "Igor Pavlov",
+                          "cpe": "cpe:2.3:a:7-zip:7-zip:24.09:*:*:*:*:*:*:*"
+                        },
+                        {
+                          "name": "Google Chrome",
+                          "version": "131.0.6778.86",
+                          "publisher": "Google LLC"
+                        },
+                        {
+                          "name": "",
+                          "version": "1.0"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "asset-key-0002",
+                      "assetBasicInfo": {
+                        "name": "SRV-0002",
+                        "fqdn": "srv-0002.corp.example.com",
+                        "domain": "corp.example.com",
+                        "type": "Windows Server",
+                        "mac": "00:1A:2B:3C:4D:02",
+                        "ipAddress": "10.90.0.12",
+                        "lastSeen": "2026-02-05T19:00:00Z"
+                      },
+                      "assetCustom": {
+                        "serialNumber": "SN-LS-0002",
+                        "manufacturer": "HPE",
+                        "model": "ProLiant DL380",
+                        "stateName": "Active"
+                      },
+                      "operatingSystem": {
+                        "caption": "Microsoft Windows Server 2022 Standard"
+                      },
+                      "softwares": []
+                    },
+                    {
+                      "key": "",
+                      "assetBasicInfo": {
+                        "name": "NOKEY",
+                        "ipAddress": "10.90.0.13"
+                      }
+                    },
+                    "this item is a string, not an object"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "lansweeper:site-aaa111:asset-key-0001",
+      "lansweeper:site-aaa111:asset-key-0002"
+    ],
+    "min_software_total": 2,
+    "request_count": 2,
+    "log_contains": [
+      "skipping site with unexpected id characters",
+      "skipping asset with no key: name=NOKEY",
+      "skipping non-object asset record in site site-aaa111",
+      "reported 2 of 3 assets from site HQ (site-aaa111)"
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "authorizedSites"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "site(id: \\\"site-aaa111\\\")"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "softwares.cpe"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "\\\"key\\\""
+      },
+      {
+        "header_contains": "fixture-identity-code"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

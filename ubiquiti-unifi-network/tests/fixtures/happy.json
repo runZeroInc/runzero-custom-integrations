@@ -1,0 +1,155 @@
+{
+  "name": "happy",
+  "integration": "ubiquiti-unifi-network",
+  "description": "The site-name to site-id lookup that every other call depends on, then one page of clients and one page of network devices. Proves the site bootstrap is required and honoured, that the X-API-KEY header carries the credential, that a client name ending in the last two MAC octets has that suffix trimmed back off, that a client with no MAC is skipped, and that the model string is mapped to a device type.\n\nClient 0001's display label 'Kitchen TV' is an operator annotation, not a machine name: it carries a space, so it must land in unifi_name and NOT in hostnames, where it would be a weak merge key. DNS-shaped names (reception-printer, sw-core-01) still import as hostnames.\n\nIdentity is the controller's own per-site `id`, namespaced as unifi:<siteId>:<kind>:<id>. Client aa:bb:cc:dd:ee:01 is the case that shows why: network_interface clears the locally administered bit, so it is imported with interface MAC a8:bb:cc:dd:ee:01 -- a MAC-derived id would have folded it onto whatever else normalizes to that value. No invariant is skipped.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "Default",
+    "page_limit": "100"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 25, "count": 2, "totalCount": 2, "data": [
+            {"id": "site-uuid-other", "name": "Warehouse"},
+            {"id": "site-uuid-default", "name": "Default"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 100, "count": 3, "totalCount": 3, "data": [
+            {
+              "id": "client-0001",
+              "name": "Kitchen TV ee:01",
+              "macAddress": "aa:bb:cc:dd:ee:01",
+              "ipAddress": "10.95.0.11",
+              "type": "WIRELESS",
+              "connectedAt": "2026-02-01T10:00:00Z",
+              "uplinkDeviceId": "device-0001"
+            },
+            {
+              "id": "client-0002",
+              "name": "reception-printer",
+              "macAddress": "00:11:22:dd:00:02",
+              "ipAddress": "10.95.0.12",
+              "type": "WIRED",
+              "connectedAt": "2026-02-01T11:30:00Z",
+              "uplinkDeviceId": "device-0001"
+            },
+            {
+              "id": "client-0003",
+              "name": "no-mac-client",
+              "ipAddress": "10.95.0.13",
+              "type": "WIRELESS",
+              "connectedAt": "2026-02-01T12:00:00Z"
+            }
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 100, "count": 2, "totalCount": 2, "data": [
+            {
+              "id": "device-0001",
+              "name": "sw-core-01",
+              "model": "USW-Pro-24-PoE",
+              "macAddress": "00:11:22:ee:00:01",
+              "ipAddress": "10.95.0.2",
+              "state": "ONLINE",
+              "features": ["switching", "poe"],
+              "interfaces": ["ports"]
+            },
+            {
+              "id": "device-0002",
+              "name": "ap-lobby-01",
+              "model": "U6-Enterprise",
+              "macAddress": "00:11:22:ee:00:02",
+              "ipAddress": "10.95.0.3",
+              "state": "ONLINE",
+              "features": ["accessPoint"],
+              "interfaces": ["radios", "ports"]
+            }
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "unifi:site-uuid-default:client:client-0001",
+      "unifi:site-uuid-default:client:client-0002",
+      "unifi:site-uuid-default:device:device-0001",
+      "unifi:site-uuid-default:device:device-0002"
+    ],
+    "ids_absent": [
+      "aa:bb:cc:dd:ee:01",
+      "00:11:22:ee:00:01",
+      "unifi:site-uuid-default:client:client-0003"
+    ],
+    "assets": [
+      {
+        "id": "unifi:site-uuid-default:client:client-0001",
+        "fields": {
+          "unifi_name": "Kitchen TV",
+          "ipAddresses": "10.95.0.11",
+          "macAddresses": "a8:bb:cc:dd:ee:01",
+          "unifi_id": "client-0001",
+          "unifi_site_id": "site-uuid-default"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "unifi:site-uuid-default:client:client-0002",
+        "fields": {
+          "hostnames": "reception-printer"
+        }
+      },
+      {
+        "id": "unifi:site-uuid-default:device:device-0001",
+        "fields": {
+          "deviceType": "Switch",
+          "manufacturer": "Ubiquiti",
+          "model": "USW-Pro-24-PoE",
+          "unifi_id": "device-0001"
+        }
+      },
+      {
+        "id": "unifi:site-uuid-default:device:device-0002",
+        "fields": {"deviceType": "WAP"}
+      }
+    ],
+    "request_count": 3,
+    "log_contains": [
+      "unifi: found site ID site-uuid-default",
+      "unifi: reported 2 client assets",
+      "unifi: reported 2 device assets",
+      "unifi: skipped 1 clients with no MAC (first name: no-mac-client)"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/clients", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/devices", "query_contains": "limit=100"},
+      {"header": {"X-API-KEY": "fixture-unifi-key"}}
+    ]
+  }
+}

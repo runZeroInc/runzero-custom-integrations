@@ -1,0 +1,148 @@
+{
+  "name": "paged",
+  "integration": "snipe-it",
+  "description": "Two pages of hardware over limit/offset. The script used to issue one unpaginated GET /api/v1/hardware and take whatever Snipe-IT's default page held (50 rows), so an install with more hardware than that imported a fraction of its register with nothing in the log to say so. This proves the second page is requested and its assets are imported. Three further things it pins: 'limit' carries the configured page_size; the offset advances by the number of ROWS received rather than the number of assets reported, so the row skipped for having no id does not push page 2 back onto rows already read; and page 1 being SHORT (3 rows against a page_size of 4, which is how an install that caps 'limit' server-side answers every page) does not end the run while 'total' says there are more, because ending there is the same truncation in a smaller form. The run stops once the accumulated row count reaches 'total', asserted by the absence of a third request.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-snipe-token",
+    "page_size": 4
+  },
+  "routes": [
+    {
+      "name": "hardware-page-1",
+      "match": {"method": "GET", "path": "/api/v1/hardware", "query_contains": "offset=0"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "total": 5,
+          "rows": [
+            {
+              "id": 101,
+              "name": "hq-laptop-101",
+              "asset_tag": "RZ-0101",
+              "serial": "SER0000101",
+              "model": {"id": 4, "name": "Latitude 7440"},
+              "category": {"id": 1, "name": "Laptop"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "status_label": {"id": 2, "name": "Deployed", "status_type": "deployable"},
+              "location": {"id": 3, "name": "HQ"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:41:01", "field_format": "MAC"},
+                "IP Address": {"field": "_snipeit_ip_address_2", "value": "10.141.1.101", "field_format": "IP"}
+              },
+              "created_at": {"datetime": "2026-01-10 09:00:00"},
+              "updated_at": {"datetime": "2026-06-10 09:00:00"}
+            },
+            {
+              "id": 102,
+              "name": "hq-laptop-102",
+              "asset_tag": "RZ-0102",
+              "serial": "SER0000102",
+              "model": {"id": 4, "name": "Latitude 7440"},
+              "category": {"id": 1, "name": "Laptop"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "status_label": {"id": 2, "name": "Deployed", "status_type": "deployable"},
+              "location": {"id": 3, "name": "HQ"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:41:02", "field_format": "MAC"},
+                "IP Address": {"field": "_snipeit_ip_address_2", "value": "10.141.1.102", "field_format": "IP"}
+              },
+              "created_at": {"datetime": "2026-01-11 09:00:00"},
+              "updated_at": {"datetime": "2026-06-11 09:00:00"}
+            },
+            {
+              "id": null,
+              "name": "page-1-unidentifiable-row",
+              "asset_tag": "",
+              "serial": "",
+              "model": {"id": 9, "name": "Unknown"},
+              "category": {"id": 3, "name": "Accessory"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:41:03", "field_format": "MAC"}
+              }
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hardware-page-2",
+      "match": {"method": "GET", "path": "/api/v1/hardware", "query_contains": "offset=3"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "total": 5,
+          "rows": [
+            {
+              "id": 104,
+              "name": "dc-switch-104",
+              "asset_tag": "RZ-0104",
+              "serial": "SER0000104",
+              "model": {"id": 7, "name": "CBS350-24T"},
+              "category": {"id": 2, "name": "Network Device"},
+              "manufacturer": {"id": 3, "name": "Cisco Systems"},
+              "status_label": {"id": 2, "name": "Deployed", "status_type": "deployable"},
+              "location": {"id": 4, "name": "DC1"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:41:04", "field_format": "MAC"},
+                "IP Address": {"field": "_snipeit_ip_address_2", "value": "10.141.2.104", "field_format": "IP"}
+              },
+              "created_at": {"datetime": "2026-02-10 09:00:00"},
+              "updated_at": {"datetime": "2026-06-12 09:00:00"}
+            },
+            {
+              "id": 105,
+              "name": "dc-server-105",
+              "asset_tag": "RZ-0105",
+              "serial": "SER0000105",
+              "model": {"id": 11, "name": "PowerEdge R650"},
+              "category": {"id": 4, "name": "Server"},
+              "manufacturer": {"id": 2, "name": "Dell Inc."},
+              "status_label": {"id": 2, "name": "Deployed", "status_type": "deployable"},
+              "location": {"id": 4, "name": "DC1"},
+              "custom_fields": {
+                "MAC Address": {"field": "_snipeit_mac_address_1", "value": "00:1B:44:11:41:05", "field_format": "MAC"},
+                "IP Address": {"field": "_snipeit_ip_address_2", "value": "10.141.2.105", "field_format": "IP"}
+              },
+              "created_at": {"datetime": "2026-02-11 09:00:00"},
+              "updated_at": {"datetime": "2026-06-13 09:00:00"}
+            }
+          ]
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route for this offset"},
+  "expect": {
+    "assets": [
+      {
+        "id": "snipe-it:$HOST:hardware:101",
+        "fields": {"macAddresses": "00:1b:44:11:41:01", "ipAddresses": "10.141.1.101", "deviceType": "Laptop", "asset.tag": "RZ-0101"}
+      },
+      {
+        "id": "snipe-it:$HOST:hardware:105",
+        "fields": {"macAddresses": "00:1b:44:11:41:05", "ipAddresses": "10.141.2.105", "deviceType": "Server", "asset.tag": "RZ-0105", "location": "DC1"}
+      }
+    ],
+    "asset_count": 4,
+    "ids": ["snipe-it:$HOST:hardware:101", "snipe-it:$HOST:hardware:102", "snipe-it:$HOST:hardware:104", "snipe-it:$HOST:hardware:105"],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/hardware", "query_contains": "limit=4"},
+      {"query_contains": "offset=0"},
+      {"query_contains": "offset=3"},
+      {"header_contains": "fixture-snipe-token"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=2"},
+      {"query_contains": "offset=5"}
+    ],
+    "log_contains": [
+      "snipe-it: skipping hardware with no id/asset_tag/serial",
+      "snipe-it: reported 2 assets from 3 of 5 hardware records",
+      "snipe-it: reported 4 assets from 5 of 5 hardware records"
+    ]
+  }
+}

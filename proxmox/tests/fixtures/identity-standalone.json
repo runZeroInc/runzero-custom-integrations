@@ -1,0 +1,252 @@
+{
+  "name": "identity-standalone",
+  "integration": "proxmox",
+  "description": "A STANDALONE Proxmox host -- the common single-server deployment, which belongs to no cluster and whose /cluster/status therefore contains no entry of type 'cluster'. The id scope used to fall back to the literal string 'proxmox' in exactly this case, so every standalone host in an estate shared one scope: VMID 100 exists on all of them, each minted 'proxmox-vm-100', and unrelated guests on different servers merged onto a single asset. The scope now comes from the base URL host, which is unique per deployment. Clustered installs are unaffected and keep their existing ids -- identity-on-pve1 and identity-on-pve2 pin that.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "svc@pve!runzero",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/version"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "release": "8.2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/status"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/config/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "node": "pve1",
+                "nodeid": 1,
+                "ring0_addr": "10.30.0.11"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/resources"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "type": "node",
+                "node": "pve1",
+                "status": "online",
+                "maxcpu": 32
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "vmid": 100,
+                "name": "app01",
+                "status": "running"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu/100/config"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "name": "app01",
+              "net0": "virtio=AA:BB:CC:00:01:10,bridge=vmbr0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu/100/agent/network-get-interfaces"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "result": [
+                {
+                  "name": "eth0",
+                  "hardware-address": "aa:bb:cc:00:01:10",
+                  "ip-addresses": [
+                    {
+                      "ip-address": "10.30.10.20",
+                      "prefix": 24
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu/100/agent/get-osinfo"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "result": {
+                "pretty-name": "Debian GNU/Linux 12 (bookworm)",
+                "version-id": "12"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "vmid": 200,
+                "name": "dns01",
+                "status": "running"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/200/config"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "hostname": "dns01.lab.example.com",
+              "ostype": "debian"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/200/interfaces"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "name": "eth0",
+                "hwaddr": "BC:24:11:AA:BB:01",
+                "ip-addresses": [
+                  {
+                    "ip-address": "10.30.20.30",
+                    "prefix": 24
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "$HOST-node-pve1",
+      "$HOST-vm-100",
+      "$HOST-ct-200"
+    ],
+    "ids_absent": [
+      "proxmox-vm-100",
+      "proxmox-ct-200",
+      "proxmox-node-pve1"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

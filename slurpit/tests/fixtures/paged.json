@@ -1,0 +1,148 @@
+{
+  "name": "paged",
+  "integration": "slurpit",
+  "description": "Two pages of devices, asserting the second request carries the offset the page size implies and that a short page ends the walk. Also proves the free-tier license placeholders are stripped rather than imported as a serial number, that Slurp'it's STRING '0'/'1' booleans are read correctly, that a disabled device is skipped by default, and that a future createddate is clamped. Shapes and field names follow the official slurpit SDK and the Slurp'it NetBox plugin; values are synthetic.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "3"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/platform/ping"},
+      "responses": [{"status": 200, "json": {"status": "up"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/sites"},
+      "responses": [
+        {"status": 200, "json": [
+          {"id": 1, "sitename": "HQ", "description": "Head office", "street": "1 Example Way", "city": "Amsterdam", "country": "NL", "status": 1},
+          {"id": 2, "sitename": "DC1", "description": "Primary datacentre", "street": "2 Example Road", "city": "Dublin", "country": "IE", "status": 1}
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/devices", "query_contains": "offset=0"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": 1, "hostname": "sw01", "fqdn": "sw01.lab.example", "address": "10.20.0.1",
+            "family": "ios", "port": 22, "device_os": "ios", "os_version": "15.2(7)E3",
+            "serial": "FTX1234ABCD", "device_type": "Switch", "brand": "Cisco", "telnet": "0",
+            "disabled": "0", "blacklisted": "0", "site": "HQ", "group_name": "campus",
+            "description": "Access switch", "parent": null,
+            "snmp_contact": "netops@lab.example", "snmp_location": "HQ / Rack A",
+            "snmp_description": "Cisco IOS Software, C2960X", "snmp_uptime": 8213400, "snmp_port": 161,
+            "tags": "core,managed", "added": "2025-01-04 08:00:00",
+            "last_seen": "2026-08-15 06:30:00", "createddate": "2025-01-04 08:00:00",
+            "changeddate": "2026-08-15 06:30:00"
+          },
+          {
+            "id": 2, "hostname": "fw01", "fqdn": "fw01.lab.example", "address": "10.20.0.2",
+            "device_os": "fortios", "os_version": "7.4.1", "serial": "FGT60F0000",
+            "device_type": "Firewall", "brand": "Fortinet", "disabled": "1", "blacklisted": "0",
+            "site": "HQ", "tags": "", "createddate": "2025-02-01 09:00:00",
+            "changeddate": "2026-06-01 09:00:00"
+          },
+          {
+            "id": 3, "hostname": "rtr01", "fqdn": "rtr01.lab.example", "address": "10.20.0.3",
+            "device_os": "iosxe", "os_version": "License Required", "serial": "License limit reached",
+            "device_type": "Router", "brand": "Cisco", "disabled": "0", "blacklisted": "0",
+            "site": "DC1", "tags": "edge", "createddate": "2025-03-01 10:00:00",
+            "changeddate": "2026-08-14 10:00:00", "last_seen": "2026-08-14 10:00:00"
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/devices", "query_contains": "offset=3"},
+      "responses": [
+        {"status": 200, "json": [
+          {
+            "id": 4, "hostname": null, "fqdn": null, "address": null,
+            "device_os": null, "device_type": null, "brand": null,
+            "disabled": "0", "site": "", "tags": ""
+          },
+          {
+            "id": 5, "hostname": "ap01", "fqdn": "ap01.lab.example", "address": "10.20.0.5",
+            "device_os": "arubaos", "os_version": "8.10", "serial": "AP0099XYZ",
+            "device_type": "Wireless", "brand": "Aruba", "disabled": "0", "blacklisted": "0",
+            "site": "HQ", "tags": ["wireless", "floor-2"],
+            "createddate": "2099-01-01 00:00:00", "changeddate": "2099-01-01 00:00:00",
+            "last_seen": "2099-01-01 00:00:00"
+          }
+        ]}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "slurpit:$HOST:device:1",
+      "slurpit:$HOST:device:3",
+      "slurpit:$HOST:device:5"
+    ],
+    "ids_absent": [
+      "slurpit:$HOST:device:2",
+      "slurpit:$HOST:device:4"
+    ],
+    "assets": [
+      {
+        "id": "slurpit:$HOST:device:1",
+        "fields": {
+          "deviceType": "Switch",
+          "manufacturer": "Cisco",
+          "os": "ios",
+          "osVersion": "15.2(7)E3",
+          "slurpit_serial": "FTX1234ABCD",
+          "slurpit_site": "HQ",
+          "slurpit_site_city": "Amsterdam",
+          "slurpit_site_country": "NL",
+          "slurpit_snmp_location": "HQ / Rack A",
+          "slurpit_disabled": "false"
+        }
+      },
+      {
+        "id": "slurpit:$HOST:device:3",
+        "comment": "The free tier substitutes these literals into unparsed fields. They must not become a serial number or an OS version.",
+        "fields": {"deviceType": "Router", "manufacturer": "Cisco"},
+        "fields_absent": ["osVersion", "slurpit_serial", "slurpit_os_version"]
+      },
+      {
+        "id": "slurpit:$HOST:device:5",
+        "comment": "Every timestamp is in 2099. A future timestamp makes the platform reject the ENTIRE record, so all three must be clamped; the raw values survive as attributes.",
+        "fields": {
+          "deviceType": "Wireless Access Point",
+          "slurpit_createddate_raw": "2099-01-01 00:00:00",
+          "slurpit_last_seen_raw": "2099-01-01 00:00:00"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/api/platform/ping"},
+      {"header_contains": "Bearer fixture-api-key"},
+      {"path_contains": "/api/sites"},
+      {"path_contains": "/api/devices", "query_contains": "offset=0"},
+      {"path_contains": "/api/devices", "query_contains": "offset=3"}
+    ],
+    "requests_absent": [
+      {"query_contains": "offset=6"}
+    ],
+    "log_contains": [
+      "slurpit: skipping device 4 with no usable address or hostname",
+      "slurpit: reported 3 devices",
+      "slurpit: skipped 1 disabled devices"
+    ]
+  },
+
+  "check_determinism": true
+}

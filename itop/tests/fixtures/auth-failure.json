@@ -1,0 +1,52 @@
+{
+  "name": "auth-failure",
+  "integration": "itop",
+  "description": "The credential is accepted by the web server but the iTop user lacks the REST Services User profile, which iTop reports as HTTP 200 with code 1 rather than as a 401. A run that only checked the HTTP status would report an empty CMDB, so the body's own code has to be read.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "restuser",
+    "password": "fixture-secret",
+    "include_interfaces": "false",
+    "classes": "Server"
+  },
+  "routes": [
+    {
+      "name": "servers",
+      "match": {
+        "method": "POST",
+        "path": "/webservices/rest.php",
+        "body_contains": "%22Server%22"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "code": 1,
+            "message": "Error: the user is not authorized to use the REST services. Missing profile 'REST Services User'"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "objects": null,
+      "code": 0,
+      "message": "Found: 0"
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "UNAUTHORIZED",
+      "REST Services User",
+      "itop: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

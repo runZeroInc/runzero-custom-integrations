@@ -1,0 +1,88 @@
+{
+  "name": "detail-cap",
+  "integration": "open-audit",
+  "description": "The per-device include=ip,network read is N+1 by design -- Open-AudIT exposes no way to join the ip and network sub-tables onto a collection response, because the collection query only joins a table a filter names. On an estate of thousands of devices that is thousands of requests, so the cap exists and this proves it is honoured. With the cap set to 1, only the first device is read in detail; the second is still imported from the collection row, keeping its primary address and everything on the device record, and only its extra addresses and MAC are missing. Asserts the skipped count is logged, that the second device's detail endpoint is never called, and that both devices still come out as assets.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_interfaces": "true",
+    "collect_software": "false",
+    "max_detail_devices": "1"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-cap-session; Path=/"}, "json": {"id": "3", "name": "runzero"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-401-detail",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices/401"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "read", "format": "json", "id": 401, "header": 200},
+            "included": {
+              "ip": [
+                {"id": 960, "device_id": 401, "current": "y", "mac": "00:25:90:1a:2b:01", "net_index": "1", "ip": "203.0.113.41", "version": 4},
+                {"id": 961, "device_id": 401, "current": "y", "mac": "00:25:90:1a:2b:02", "net_index": "2", "ip": "203.0.113.42", "version": 4}
+              ],
+              "network": [
+                {"id": 720, "device_id": 401, "current": "y", "name": "eno1", "mac": "00:25:90:1a:2b:01", "description": "Intel I350 Gigabit Network Connection", "net_index": "1", "type": "ethernet", "connection_status": "connected"},
+                {"id": 721, "device_id": 401, "current": "y", "name": "eno2", "mac": "00:25:90:1a:2b:02", "description": "Intel I350 Gigabit Network Connection", "net_index": "2", "type": "ethernet", "connection_status": "connected"}
+              ]
+            },
+            "logs": [],
+            "data": [{"id": 401, "type": "devices", "attributes": {"id": 401, "name": "detailed-host"}}]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 500, "offset": 0, "total": 2, "filtered": 2},
+            "included": [],
+            "logs": [],
+            "data": [
+              {"id": 401, "type": "devices", "attributes": {"id": 401, "name": "detailed-host", "ip": "203.0.113.41", "type": "computer", "class": "server", "os_name": "Ubuntu 22.04.4 LTS", "manufacturer": "Supermicro", "model": "X11SSH-F", "serial": "S123456X7890123", "last_seen": "2026-08-15 04:00:00"}},
+              {"id": 402, "type": "devices", "attributes": {"id": 402, "name": "capped-host", "ip": "203.0.113.50", "type": "computer", "class": "server", "os_name": "Ubuntu 22.04.4 LTS", "manufacturer": "Supermicro", "model": "X11SSH-F", "serial": "S123456X7890124", "last_seen": "2026-08-15 04:01:00"}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": ["open-audit:$HOST:401", "open-audit:$HOST:402"],
+    "assets": [
+      {"id": "open-audit:$HOST:401", "fields": {"open_audit_mac_addresses": "00:25:90:1a:2b:01, 00:25:90:1a:2b:02"}},
+      {"id": "open-audit:$HOST:402", "fields_absent": ["macAddresses", "open_audit_mac_addresses"]}
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/open-audit/index.php/devices/401"}
+    ],
+    "requests_absent": [
+      {"path": "/open-audit/index.php/devices/402"}
+    ],
+    "log_contains": [
+      "open-audit: detail cap of 1 reached, 1 devices imported without addresses"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

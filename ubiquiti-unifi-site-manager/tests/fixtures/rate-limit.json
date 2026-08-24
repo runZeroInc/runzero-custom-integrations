@@ -1,0 +1,102 @@
+{
+  "name": "rate-limit",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "The API answers 429 with a Retry-After header and its documented rate_limit body on the first hosts request and again on the first devices request, then serves both normally. get_json retries transient statuses three times by default and honours Retry-After, so nothing here hand-rolls a retry loop; the scenario proves the run survives a throttle rather than losing the estate.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key",
+    "extract_sites": "false"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/hosts"},
+      "responses": [
+        {
+          "status": 429,
+          "headers": {"Retry-After": "1"},
+          "json": {
+            "code": "rate_limit",
+            "httpStatusCode": 429,
+            "message": "rate limit exceeded, retry after 1.372786998s",
+            "traceId": "a7dc15e0eb4527142d7823515b15f87d"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "HOSTA:111111111",
+                "hardwareId": "a1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "203.0.113.10",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "2026-01-01T00:00:00Z",
+                "lastConnectionStateChange": "2026-06-21T10:00:00Z",
+                "reportedState": {
+                  "hardware": {"mac": "AABBCC000001", "name": "UniFi Dream Machine SE", "serialno": "aabbcc000001", "shortname": "UDMPROSE", "firmwareVersion": "4.0.6"},
+                  "hostname": "branch-a.example.com",
+                  "ip": "192.0.2.1",
+                  "ipAddrs": ["192.0.2.1"],
+                  "state": "connected",
+                  "version": "4.0.180"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-hosts"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/devices"},
+      "responses": [
+        {
+          "status": 429,
+          "headers": {"Retry-After": "1"},
+          "json": {
+            "code": "rate_limit",
+            "httpStatusCode": 429,
+            "message": "rate limit exceeded, retry after 1.372786998s",
+            "traceId": "a7dc15e0eb4527142d7823515b15f87d"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hostId": "HOSTA:111111111",
+                "hostName": "branch-a.example.com",
+                "devices": [
+                  {"id": "AABBCC000001", "mac": "AABBCC000001", "name": "branch-a.example.com", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "192.0.2.1", "productLine": "network", "status": "online", "version": "4.1.13", "firmwareStatus": "upToDate", "isConsole": true, "isManaged": true},
+                  {"id": "AABBCC000011", "mac": "AABBCC000011", "name": "Riga-Switch", "model": "USW Lite 8 PoE", "shortname": "USWLITE8POE", "ip": "192.0.2.20", "productLine": "network", "status": "online", "version": "7.0.50", "firmwareStatus": "upToDate", "isConsole": false, "isManaged": true}
+                ],
+                "updatedAt": "2026-06-23T07:21:27Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-devices"
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"code": "not_found", "httpStatusCode": 404, "message": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 2,
+    "min_requests": 4,
+    "ids": [
+      "unifi-site-manager:$HOST:device:AABBCC000001",
+      "unifi-site-manager:$HOST:device:AABBCC000011"
+    ]
+  },
+
+  "check_determinism": true
+}

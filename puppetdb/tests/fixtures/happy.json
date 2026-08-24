@@ -1,0 +1,361 @@
+{
+  "name": "happy",
+  "integration": "puppetdb",
+  "description": "One fact walk plus one node page. Proves the structured Facter 4 facts are read (networking.interfaces per device, os.release.full, dmi.product.serial_number) and that the flat legacy fact names still work for a node that reports only those, that a bond and its slave device sharing one MAC are folded into a single interface rather than duplicated, that a node with no facts at all still imports on its certname, and that a node whose only address is 127.0.0.1 on the lo device yields an asset with NO interface -- Facter reports loopback on every node, so importing it would give the whole estate one shared address. A node with no certname and a non-object row are skipped.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_token": "fixture-rbac-token",
+    "page_size": "500",
+    "fact_page_size": "2000"
+  },
+  "routes": [
+    {
+      "name": "facts",
+      "match": {
+        "method": "GET",
+        "path": "/pdb/query/v4/facts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "certname": "web01.corp.example.com",
+              "name": "networking",
+              "environment": "production",
+              "value": {
+                "fqdn": "web01.corp.example.com",
+                "hostname": "web01",
+                "domain": "corp.example.com",
+                "primary": "bond0",
+                "ip": "10.80.0.11",
+                "mac": "00:50:56:aa:00:11",
+                "interfaces": {
+                  "lo": {
+                    "ip": "127.0.0.1",
+                    "mac": "00:00:00:00:00:00",
+                    "bindings": [
+                      {
+                        "address": "127.0.0.1"
+                      }
+                    ]
+                  },
+                  "bond0": {
+                    "mac": "00:50:56:aa:00:11",
+                    "bindings": [
+                      {
+                        "address": "10.80.0.11",
+                        "netmask": "255.255.255.0"
+                      }
+                    ],
+                    "bindings6": [
+                      {
+                        "address": "2001:db8:80::11"
+                      }
+                    ]
+                  },
+                  "ens192": {
+                    "mac": "00:50:56:aa:00:11",
+                    "bindings": []
+                  },
+                  "ens224": {
+                    "mac": "00:50:56:aa:00:12",
+                    "bindings": [
+                      {
+                        "address": "10.81.0.11"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "certname": "web01.corp.example.com",
+              "name": "os",
+              "value": {
+                "name": "Ubuntu",
+                "family": "Debian",
+                "architecture": "amd64",
+                "release": {
+                  "full": "22.04",
+                  "major": "22"
+                },
+                "distro": {
+                  "description": "Ubuntu 22.04.3 LTS",
+                  "codename": "jammy"
+                }
+              }
+            },
+            {
+              "certname": "web01.corp.example.com",
+              "name": "dmi",
+              "value": {
+                "manufacturer": "VMware, Inc.",
+                "product": {
+                  "name": "VMware Virtual Platform",
+                  "serial_number": "VMware-SN-0011",
+                  "uuid": "4207b6a1-0000-0000-0000-000000000011"
+                },
+                "chassis": {
+                  "type": "Other"
+                },
+                "bios": {
+                  "vendor": "Phoenix Technologies LTD",
+                  "version": "6.00",
+                  "release_date": "11/12/2020"
+                }
+              }
+            },
+            {
+              "certname": "web01.corp.example.com",
+              "name": "virtual",
+              "value": "vmware"
+            },
+            {
+              "certname": "web01.corp.example.com",
+              "name": "is_virtual",
+              "value": true
+            },
+            {
+              "certname": "db01.corp.example.com",
+              "name": "networking",
+              "value": {
+                "fqdn": "db01.corp.example.com",
+                "hostname": "db01",
+                "domain": "corp.example.com",
+                "ip": "127.0.0.1",
+                "interfaces": {
+                  "lo": {
+                    "ip": "127.0.0.1",
+                    "mac": "00:00:00:00:00:00",
+                    "bindings": [
+                      {
+                        "address": "127.0.0.1"
+                      },
+                      {
+                        "address": "::1"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "certname": "db01.corp.example.com",
+              "name": "os",
+              "value": {
+                "name": "RedHat",
+                "family": "RedHat",
+                "release": {
+                  "full": "9.3",
+                  "major": "9"
+                }
+              }
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "operatingsystem",
+              "value": "CentOS"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "operatingsystemrelease",
+              "value": "7.9.2009"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "ipaddress",
+              "value": "10.80.0.13"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "macaddress",
+              "value": "00:50:56:aa:00:13"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "fqdn",
+              "value": "legacy01.corp.example.com"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "hostname",
+              "value": "legacy01"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "domain",
+              "value": "corp.example.com"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "manufacturer",
+              "value": "Dell Inc."
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "productname",
+              "value": "PowerEdge R640"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "serialnumber",
+              "value": "SN-PDB-0013"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "name": "virtual",
+              "value": "physical"
+            },
+            {
+              "certname": "",
+              "name": "kernel",
+              "value": "Linux"
+            },
+            {
+              "certname": "nofacts.corp.example.com",
+              "name": "",
+              "value": "dropped"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "nodes",
+      "match": {
+        "method": "GET",
+        "path": "/pdb/query/v4/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "certname": "web01.corp.example.com",
+              "facts_environment": "production",
+              "report_environment": "production",
+              "catalog_environment": "production",
+              "latest_report_status": "changed",
+              "latest_report_noop": false,
+              "report_timestamp": "2026-02-01T10:00:00.000Z",
+              "facts_timestamp": "2026-02-01T09:58:00.000Z",
+              "catalog_timestamp": "2026-02-01T09:57:00.000Z"
+            },
+            {
+              "certname": "db01.corp.example.com",
+              "facts_environment": "production",
+              "latest_report_status": "unchanged",
+              "report_timestamp": "2026-02-01T10:05:00.000Z"
+            },
+            {
+              "certname": "legacy01.corp.example.com",
+              "facts_environment": "legacy",
+              "latest_report_status": "failed",
+              "report_timestamp": "2026-02-01T10:06:00.000Z"
+            },
+            {
+              "certname": "nofacts.corp.example.com",
+              "facts_environment": "production",
+              "report_timestamp": "2026-02-01T10:07:00.000Z"
+            },
+            {
+              "certname": "",
+              "report_timestamp": "2026-02-01T10:08:00.000Z"
+            },
+            "this row is a string, not an object"
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "puppetdb:$HOST:web01.corp.example.com",
+      "puppetdb:$HOST:db01.corp.example.com",
+      "puppetdb:$HOST:legacy01.corp.example.com",
+      "puppetdb:$HOST:nofacts.corp.example.com"
+    ],
+    "log_contains": [
+      "skipping node with no certname",
+      "indexed 20 active fact rows for 3 nodes",
+      "reported 4 active nodes"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/pdb/query/v4/facts",
+        "query_contains": "networking"
+      },
+      {
+        "method": "GET",
+        "path": "/pdb/query/v4/nodes",
+        "query_contains": "order_by"
+      },
+      {
+        "header": {
+          "X-Authentication": "fixture-rbac-token"
+        }
+      }
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/package-inventory"
+      }
+    ],
+    "assets": [
+      {
+        "id": "puppetdb:$HOST:web01.corp.example.com",
+        "fields": {
+          "ipAddresses": "10.80.0.11\t10.81.0.11\t2001:db8:80::11",
+          "macAddresses": "00:50:56:aa:00:11\t00:50:56:aa:00:12",
+          "puppetdb_interface_identifiers": "bond0+ens192,ens224",
+          "deviceType": "Virtual Machine"
+        }
+      },
+      {
+        "id": "puppetdb:$HOST:db01.corp.example.com",
+        "fields": {
+          "os": "RedHat"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "puppetdb:$HOST:legacy01.corp.example.com",
+        "fields": {
+          "ipAddresses": "10.80.0.13",
+          "macAddresses": "00:50:56:aa:00:13",
+          "os": "CentOS",
+          "model": "PowerEdge R640"
+        }
+      },
+      {
+        "id": "puppetdb:$HOST:nofacts.corp.example.com",
+        "fields": {
+          "hostnames": "nofacts.corp.example.com"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "name": "degraded-envelope",
+  "integration": "ivanti_neurons",
+  "script": "ivanti_neurons/ivanti_neurons.star",
+  "description": "REGRESSION LOCK on two OData envelope fields the walk treated as guaranteed. Page one omits @odata.count: the loop condition was len(assets_all) < @odata.count - 1, so it evaluated None - 1 and aborted the script outright. Page three is an error document with no value array: assets = data['value'] was direct key access, which aborted it the same way. Starlark has no exception handling, so either abort took down the whole import and lost every device already collected, not just the bad page.\n\nBoth are now shape-checked. The countless page is walked on its next link, the error document ends the walk with a logged reason, and the three devices that did arrive are imported.",
+  "kwargs": {
+    "url": "$BASE",
+    "tenant_id": "fixture-tenant",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-jwt-token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-page-3-error-document",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices", "query_contains": "scrollID=page3"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "@odata.count": 9,
+            "error": {"code": "ScrollExpired", "message": "The scrollID is no longer valid."}
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices", "query_contains": "scrollID=page2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "@odata.count": 9,
+            "value": [
+              {
+                "DiscoveryId": "44440000-4a11-4c31-9c31-1a2b3c4d5e03",
+                "DeviceID": "device-0003",
+                "DeviceName": "server-03.example.com",
+                "DisplayName": "Server 03",
+                "OS": {"Name": "Windows Server 2022", "Version": "10.0.20348"},
+                "System": {"Model": "PowerEdge R650"},
+                "Network": {"TCPIP": {"IPAddress": "192.0.2.33"}}
+              }
+            ],
+            "@odata.nextLink": "$BASE/api/apigatewaydataservices/v1/devices?$scrollID=page3"
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-1-no-count",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "value": [
+              {
+                "DiscoveryId": "44440000-4a11-4c31-9c31-1a2b3c4d5e01",
+                "DeviceID": "device-0001",
+                "DeviceName": "workstation-01.example.com",
+                "DisplayName": "Workstation 01",
+                "OS": {"Name": "Windows 11 Pro", "Version": "10.0.22631"},
+                "System": {"Model": "OptiPlex 7090"},
+                "Network": {"TCPIP": {"IPAddress": "192.0.2.31"}}
+              },
+              {
+                "DiscoveryId": "44440000-4a11-4c31-9c31-1a2b3c4d5e02",
+                "DeviceID": "device-0002",
+                "DeviceName": "laptop-02.example.com",
+                "DisplayName": "Laptop 02",
+                "OS": {"Name": "Windows 10 Enterprise", "Version": "10.0.19045"},
+                "System": {"Model": "Latitude 5420"},
+                "Network": {"TCPIP": {"IPAddress": "192.0.2.32"}}
+              }
+            ],
+            "@odata.nextLink": "$BASE/api/apigatewaydataservices/v1/devices?$scrollID=page2"
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "ivanti-neurons:fixture-tenant:44440000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:44440000-4a11-4c31-9c31-1a2b3c4d5e02",
+      "ivanti-neurons:fixture-tenant:44440000-4a11-4c31-9c31-1a2b3c4d5e03"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices", "query_contains": "scrollID=page3"}
+    ],
+    "log_contains": [
+      "ivanti-neurons: response carried no value array, stopping the walk"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

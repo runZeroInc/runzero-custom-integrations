@@ -1,0 +1,244 @@
+{
+  "name": "malformed",
+  "integration": "openwrt",
+  "description": "Junk in every collection, to prove one bad row cannot end a run. getHostHints is an object keyed by MAC, so a key that is not a MAC and a value that is not an object are both possible on a device with a hand-edited /etc/ethers; getDHCPLeases carries a lease with a null macaddr and a lease list that is a string; getWirelessDevices carries a radio whose interfaces list is a string and an interface with no ifname; getNetworkDevices carries a device that is a string. Also pins the factory-default hostname rule: this router reports 'OpenWrt', the name every unflashed device ships with, and it is NOT imported as a hostname - with no stable foreign id, merging falls back to MAC, IP, and hostname, so a name shared across the estate would merge unrelated routers. The router still correlates on its br-lan MAC and address. Everything valid still imports.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-root",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"session\",\"login\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [0, {
+              "ubus_rpc_session": "0f0e0d0c0b0a09080706050403020100",
+              "timeout": 900,
+              "expires": 900,
+              "acls": {
+                "ubus": {
+                  "iwinfo": ["assoclist", "info"],
+                  "luci-rpc": ["getBoardJSON", "getHostHints", "getNetworkDevices", "getWirelessDevices", "getDHCPLeases"],
+                  "session": ["access", "login"],
+                  "system": ["board", "info"]
+                }
+              },
+              "data": {"username": "fixture-root"}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "system-board",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"board\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": [0, {
+              "kernel": "6.6.93",
+              "hostname": "OpenWrt",
+              "model": "Linksys E8450 (UBI)",
+              "board_name": "linksys,e8450-ubi",
+              "release": {"distribution": "OpenWrt", "version": "24.10.8", "target": "mediatek/mt7622"}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-info",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"info\""},
+      "responses": [
+        {"status": 200, "json": {"jsonrpc": "2.0", "id": 3, "result": [0, {"uptime": 77, "memory": "not-an-object"}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-devices",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getNetworkDevices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": [0, {
+              "br-lan": {
+                "name": "br-lan",
+                "mac": "C4:41:1E:99:88:77",
+                "ipaddrs": [{"address": "10.10.0.1", "netmask": "255.255.255.0"}],
+                "ip6addrs": [{"address": "fe80::c641:1eff:fe99:8877"}],
+                "flags": {"up": true, "loopback": false}
+              },
+              "eth1": "this should have been an object",
+              "wg0": {
+                "name": "wg0",
+                "mac": "00:00:00:00:00:00",
+                "ipaddrs": [{"address": "10.99.0.1", "netmask": "255.255.255.0"}],
+                "flags": {"up": true, "loopback": false}
+              },
+              "ghost": {
+                "name": "ghost",
+                "mac": null,
+                "ipaddrs": [],
+                "ip6addrs": [],
+                "flags": {"up": false, "loopback": false}
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-hints",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getHostHints"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": [0, {
+              "not-a-mac-at-all": {"ipaddrs": ["10.10.0.9"], "ip6addrs": []},
+              "AA:BB": {"ipaddrs": ["10.10.0.10"], "ip6addrs": []},
+              "5C:CF:7F:01:02:03": "this should have been an object",
+              "E4:5F:01:AA:BB:CC": {"ipaddrs": "10.10.0.11", "ip6addrs": null, "name": "kitchen-display"},
+              "68:D7:9A:12:34:56": {"ipaddrs": ["10.10.0.12", "not-an-ip", null], "ip6addrs": [], "name": "  "},
+              "01:23:45:67:89:AB": {"ipaddrs": ["10.10.0.13"], "ip6addrs": []}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-leases",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getDHCPLeases"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": [0, {
+              "dhcp_leases": [
+                {"expires": 100, "macaddr": null, "ipaddr": "10.10.0.20", "hostname": "no-mac"},
+                {"expires": 200, "macaddr": "", "ipaddr": "10.10.0.21"},
+                "this should have been an object",
+                {"expires": 300, "macaddr": "68:D7:9A:12:34:56", "ipaddr": "10.10.0.12", "hostname": "living-room-tv"}
+              ],
+              "dhcp6_leases": "this should have been a list"
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "wireless-devices",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getWirelessDevices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": [0, {
+              "radio0": {"up": true, "interfaces": "this should have been a list"},
+              "radio1": {"up": true, "interfaces": [{"section": "d1"}, {"ifname": "", "config": {"ssid": "nameless"}}]},
+              "radio2": "this should have been an object",
+              "radio3": {"up": true, "interfaces": [{"ifname": "wlan3", "config": {"ssid": "guest-net"}}]}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assoclist-wlan3",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"device\":\"wlan3\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": [0, {
+              "results": [
+                "this should have been an object",
+                {"mac": null, "signal": -60},
+                {"mac": "A0:78:17:AA:BB:CC", "signal": -48, "noise": -95, "inactive": 40}
+              ]
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"jsonrpc": "2.0", "id": 99, "error": {"code": -32000, "message": "Object not found"}}
+  },
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "openwrt:$HOST:router",
+      "openwrt:$HOST:host:e4:5f:01:aa:bb:cc",
+      "openwrt:$HOST:host:68:d7:9a:12:34:56",
+      "openwrt:$HOST:host:a0:78:17:aa:bb:cc"
+    ],
+    "ids_absent": [
+      "openwrt:$HOST:host:01:23:45:67:89:ab",
+      "openwrt:$HOST:host:5c:cf:7f:01:02:03"
+    ],
+    "assets": [
+      {
+        "id": "openwrt:$HOST:router",
+        "fields": {
+          "deviceType": "Router",
+          "model": "Linksys E8450 (UBI)",
+          "ipAddresses": "10.10.0.1",
+          "macAddresses": "c4:41:1e:99:88:77"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "openwrt:$HOST:host:68:d7:9a:12:34:56",
+        "fields": {
+          "hostnames": "living-room-tv",
+          "ipAddresses": "10.10.0.12",
+          "openwrt_observed_by": "host-hints,dhcp-lease"
+        }
+      },
+      {
+        "id": "openwrt:$HOST:host:a0:78:17:aa:bb:cc",
+        "fields": {
+          "openwrt_wifi_ssid": "guest-net",
+          "openwrt_wifi_ifname": "wlan3"
+        }
+      }
+    ],
+    "log_contains": [
+      "factory-default hostname",
+      "reported 1 router and 3 observed hosts"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,435 @@
+{
+  "name": "happy",
+  "integration": "truenas",
+  "description": "The full seven-request walk of a TrueNAS SCALE system: system/info, network/configuration, interface, pool, disk, app, and vm. Proves the NAS becomes one asset carrying its own interfaces, its chassis identity, its pool and disk inventory, and its applications as software plus published ports as services -- and that virtual machines become their own assets keyed on the middleware row id. Three VM cases are covered: one with a virtual NIC, whose MAC is read from the device list embedded on the VM row so the separate /vm/device endpoint is never requested; one with no NIC at all but a DNS-shaped name, which is imported on the name alone; and one whose name is free text an operator typed, which has no MAC and no usable name and must be skipped rather than have 'Windows 11 Desktop' imported as a hostname and correlate two unrelated guests. The lo and docker0 interfaces must be filtered as guest and container plumbing. Payload shapes are taken from the TrueNAS middleware's own API models: system.info from plugins/system/info.py, InterfaceEntry/InterfaceEntryState from api/v25_10_0/interface.py, NetworkConfigurationEntry from api/v25_10_2/network_configuration.py, PoolEntry and DiskEntry from api/v25_10_2/{pool,disk}.py, AppEntry/AppActiveWorkloads/UsedPorts/HostPorts from api/v25_04_0/app.py, and VMEntry/VMStatus/VMDeviceEntry/VMNICDevice from api/v25_04_2/{vm,vm_device}.py. All data is synthetic.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1-fixtureapikeyabcdef0123456789abcdef0123456789abcdef0123456789ab"
+  },
+  "routes": [
+    {
+      "name": "system_info",
+      "match": {"method": "GET", "path": "/api/v2.0/system/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "TrueNAS-SCALE-24.04.2.2",
+            "buildtime": {"$date": 1718900000000},
+            "hostname": "nas01.example.com",
+            "physmem": 67430793216,
+            "model": "Intel(R) Xeon(R) E-2246G CPU @ 3.60GHz",
+            "cores": 12,
+            "physical_cores": 6,
+            "loadavg": [0.31, 0.28, 0.25],
+            "uptime": "12 days, 4:11:07",
+            "uptime_seconds": 1051867.4,
+            "system_serial": "S1234567890",
+            "system_product": "Super Server",
+            "system_product_version": "0123456789",
+            "license": null,
+            "boottime": {"$date": 1755000000000},
+            "datetime": {"$date": 1755300000000},
+            "timezone": "Etc/UTC",
+            "system_manufacturer": "Supermicro",
+            "ecc_memory": true
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "network_configuration",
+      "match": {"method": "GET", "path": "/api/v2.0/network/configuration"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 1,
+            "hostname": "nas01",
+            "domain": "example.com",
+            "ipv4gateway": "192.0.2.1",
+            "ipv6gateway": "",
+            "nameserver1": "192.0.2.53",
+            "nameserver2": "",
+            "nameserver3": "",
+            "httpproxy": "",
+            "hosts": [],
+            "domains": [],
+            "service_announcement": {"netbios": false, "mdns": true, "wsd": true},
+            "activity": {"type": "DENY", "activities": []},
+            "hostname_local": "nas01"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "interface",
+      "match": {"method": "GET", "path": "/api/v2.0/interface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "eno1",
+              "name": "eno1",
+              "fake": false,
+              "type": "PHYSICAL",
+              "state": {
+                "name": "eno1",
+                "orig_name": "eno1",
+                "description": "",
+                "mtu": 1500,
+                "cloned": false,
+                "flags": ["UP", "BROADCAST", "RUNNING", "MULTICAST"],
+                "nd6_flags": [],
+                "capabilities": [],
+                "link_state": "LINK_STATE_UP",
+                "media_type": "Ethernet",
+                "media_subtype": "1000baseT",
+                "active_media_type": "Ethernet",
+                "active_media_subtype": "1000baseT",
+                "supported_media": [],
+                "media_options": null,
+                "link_address": "00:25:90:11:22:33",
+                "permanent_link_address": "00:25:90:11:22:33",
+                "hardware_link_address": "00:25:90:11:22:33",
+                "aliases": [
+                  {"type": "INET", "address": "192.0.2.10", "netmask": 24, "broadcast": "192.0.2.255"},
+                  {"type": "INET6", "address": "2001:db8::10", "netmask": 64},
+                  {"type": "LINK", "address": "00:25:90:11:22:33"}
+                ],
+                "vrrp_config": []
+              },
+              "aliases": [{"type": "INET", "address": "192.0.2.10", "netmask": 24}]
+            },
+            {
+              "id": "lo",
+              "name": "lo",
+              "fake": false,
+              "type": "PHYSICAL",
+              "state": {
+                "name": "lo",
+                "orig_name": "lo",
+                "description": "",
+                "mtu": 65536,
+                "cloned": false,
+                "flags": ["UP", "LOOPBACK", "RUNNING"],
+                "nd6_flags": [],
+                "capabilities": [],
+                "link_state": "LINK_STATE_UP",
+                "media_type": "",
+                "media_subtype": "",
+                "active_media_type": "",
+                "active_media_subtype": "",
+                "supported_media": [],
+                "media_options": null,
+                "link_address": "00:00:00:00:00:00",
+                "permanent_link_address": null,
+                "hardware_link_address": "00:00:00:00:00:00",
+                "aliases": [{"type": "INET", "address": "127.0.0.1", "netmask": 8}],
+                "vrrp_config": []
+              },
+              "aliases": []
+            },
+            {
+              "id": "docker0",
+              "name": "docker0",
+              "fake": false,
+              "type": "BRIDGE",
+              "state": {
+                "name": "docker0",
+                "orig_name": "docker0",
+                "description": "",
+                "mtu": 1500,
+                "cloned": true,
+                "flags": ["UP", "BROADCAST", "MULTICAST"],
+                "nd6_flags": [],
+                "capabilities": [],
+                "link_state": "LINK_STATE_DOWN",
+                "media_type": "Ethernet",
+                "media_subtype": "autoselect",
+                "active_media_type": "Ethernet",
+                "active_media_subtype": "autoselect",
+                "supported_media": [],
+                "media_options": null,
+                "link_address": "02:42:5f:1a:2b:3c",
+                "permanent_link_address": null,
+                "hardware_link_address": "02:42:5f:1a:2b:3c",
+                "aliases": [{"type": "INET", "address": "198.51.100.1", "netmask": 16}],
+                "vrrp_config": []
+              },
+              "aliases": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "pool",
+      "match": {"method": "GET", "path": "/api/v2.0/pool"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"id": 1, "name": "tank", "guid": "1234567890123456789", "status": "ONLINE", "path": "/mnt/tank", "healthy": true, "scan": null},
+            {"id": 2, "name": "boot-pool", "guid": "9876543210987654321", "status": "ONLINE", "path": "/", "healthy": true, "scan": null}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "disk",
+      "match": {"method": "GET", "path": "/api/v2.0/disk"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"identifier": "{serial}WD-FIXT0001", "name": "sda", "subsystem": "scsi", "number": 2048, "serial": "WD-FIXT0001", "lunid": null, "size": 8001563222016, "description": "", "transfermode": "Auto", "hddstandby": "ALWAYS ON", "advpowermgmt": "DISABLED", "expiretime": null, "model": "WDC_WD80EFAX-68LHPN0", "rotationrate": 5400, "type": "HDD", "zfs_guid": "1111111111111111111", "bus": "SCSI", "devname": "sda", "enclosure": null, "pool": "tank"},
+            {"identifier": "{serial}WD-FIXT0002", "name": "sdb", "subsystem": "scsi", "number": 2064, "serial": "WD-FIXT0002", "lunid": null, "size": 8001563222016, "description": "", "transfermode": "Auto", "hddstandby": "ALWAYS ON", "advpowermgmt": "DISABLED", "expiretime": null, "model": "WDC_WD80EFAX-68LHPN0", "rotationrate": 5400, "type": "HDD", "zfs_guid": "2222222222222222222", "bus": "SCSI", "devname": "sdb", "enclosure": null, "pool": "tank"}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "app",
+      "match": {"method": "GET", "path": "/api/v2.0/app"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "name": "plex",
+              "id": "plex",
+              "state": "RUNNING",
+              "upgrade_available": false,
+              "latest_version": "1.40.2",
+              "image_updates_available": false,
+              "custom_app": false,
+              "migrated": false,
+              "human_version": "1.40.2_1.2.3",
+              "version": "1.2.3",
+              "metadata": {"title": "Plex", "train": "stable", "name": "plex"},
+              "active_workloads": {
+                "containers": 1,
+                "used_ports": [
+                  {"container_port": 32400, "protocol": "tcp", "host_ports": [{"host_port": 32400, "host_ip": "0.0.0.0"}]}
+                ],
+                "container_details": [],
+                "volumes": [],
+                "images": ["plexinc/pms-docker:1.40.2"],
+                "networks": []
+              },
+              "notes": null,
+              "portals": {"Web UI": "http://192.0.2.10:32400"}
+            },
+            {
+              "name": "syncthing",
+              "id": "syncthing",
+              "state": "RUNNING",
+              "upgrade_available": true,
+              "latest_version": "1.27.7",
+              "image_updates_available": false,
+              "custom_app": false,
+              "migrated": false,
+              "human_version": "1.27.6_1.0.9",
+              "version": "1.0.9",
+              "metadata": {"title": "Syncthing", "train": "community", "name": "syncthing"},
+              "active_workloads": {
+                "containers": 1,
+                "used_ports": [
+                  {"container_port": 8384, "protocol": "tcp", "host_ports": [{"host_port": 20910, "host_ip": "0.0.0.0"}]},
+                  {"container_port": 22000, "protocol": "udp", "host_ports": [{"host_port": 22000, "host_ip": "0.0.0.0"}]}
+                ],
+                "container_details": [],
+                "volumes": [],
+                "images": ["syncthing/syncthing:1.27.6"],
+                "networks": []
+              },
+              "notes": null,
+              "portals": {}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vm",
+      "match": {"method": "GET", "path": "/api/v2.0/vm"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1,
+              "name": "ubuntu-server",
+              "description": "Build agent",
+              "vcpus": 2,
+              "cores": 1,
+              "threads": 1,
+              "memory": 4096,
+              "min_memory": null,
+              "bootloader": "UEFI",
+              "bootloader_ovmf": "OVMF_CODE.fd",
+              "autostart": true,
+              "time": "LOCAL",
+              "shutdown_timeout": 90,
+              "arch_type": null,
+              "machine_type": null,
+              "uuid": "6f0b7f4e-1c2d-4e3f-8a9b-0c1d2e3f4a5b",
+              "cpu_mode": "CUSTOM",
+              "cpu_model": null,
+              "command_line_args": "",
+              "display_available": true,
+              "enable_secure_boot": false,
+              "status": {"state": "RUNNING", "pid": 12345, "domain_state": "RUNNING"},
+              "devices": [
+                {"id": 11, "vm": 1, "order": 1002, "attributes": {"dtype": "NIC", "type": "VIRTIO", "nic_attach": "eno1", "mac": "00:a0:98:aa:bb:01", "trust_guest_rx_filters": false}},
+                {"id": 12, "vm": 1, "order": 1001, "attributes": {"dtype": "DISK", "path": "/dev/zvol/tank/vm-ubuntu", "type": "VIRTIO"}}
+              ]
+            },
+            {
+              "id": 2,
+              "name": "media-server",
+              "description": "",
+              "vcpus": 1,
+              "cores": 2,
+              "threads": 1,
+              "memory": 8192,
+              "min_memory": null,
+              "bootloader": "UEFI",
+              "bootloader_ovmf": "OVMF_CODE.fd",
+              "autostart": false,
+              "time": "LOCAL",
+              "shutdown_timeout": 90,
+              "arch_type": null,
+              "machine_type": null,
+              "uuid": "7a1c8e5f-2d3e-4f50-9b0c-1d2e3f4a5b6c",
+              "cpu_mode": "CUSTOM",
+              "cpu_model": null,
+              "command_line_args": "",
+              "display_available": false,
+              "enable_secure_boot": false,
+              "status": {"state": "STOPPED", "pid": null, "domain_state": "SHUTOFF"},
+              "devices": [
+                {"id": 21, "vm": 2, "order": 1001, "attributes": {"dtype": "DISK", "path": "/dev/zvol/tank/vm-media", "type": "VIRTIO"}}
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Windows 11 Desktop",
+              "description": "",
+              "vcpus": 4,
+              "cores": 1,
+              "threads": 1,
+              "memory": 16384,
+              "min_memory": null,
+              "bootloader": "UEFI",
+              "bootloader_ovmf": "OVMF_CODE.fd",
+              "autostart": false,
+              "time": "LOCAL",
+              "shutdown_timeout": 90,
+              "arch_type": null,
+              "machine_type": null,
+              "uuid": "8b2d9f60-3e4f-5061-ac1d-2e3f4a5b6c7d",
+              "cpu_mode": "CUSTOM",
+              "cpu_model": null,
+              "command_line_args": "",
+              "display_available": true,
+              "enable_secure_boot": true,
+              "status": {"state": "STOPPED", "pid": null, "domain_state": "SHUTOFF"},
+              "devices": [
+                {"id": 31, "vm": 3, "order": 1001, "attributes": {"dtype": "DISK", "path": "/dev/zvol/tank/vm-win", "type": "AHCI"}}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "request_count": 7,
+    "ids": [
+      "truenas:$HOST:system",
+      "truenas:$HOST:vm:1",
+      "truenas:$HOST:vm:2"
+    ],
+    "ids_absent": ["truenas:$HOST:vm:3"],
+    "assets": [
+      {
+        "id": "truenas:$HOST:system",
+        "fields": {
+          "_attrType": "system",
+          "hostnames": "nas01",
+          "os": "TrueNAS",
+          "osVersion": "24.04.2.2",
+          "deviceType": "Storage",
+          "manufacturer": "Supermicro",
+          "model": "Super Server",
+          "ipAddresses": "192.0.2.10\t2001:db8::10",
+          "macAddresses": "00:25:90:11:22:33",
+          "truenas_appliance": "$HOST",
+          "truenas_version": "TrueNAS-SCALE-24.04.2.2",
+          "truenas_timezone": "Etc/UTC",
+          "truenas_system_serial": "S1234567890",
+          "truenas_cpu_model": "Intel(R) Xeon(R) E-2246G CPU @ 3.60GHz",
+          "truenas_license": "absent"
+        }
+      },
+      {
+        "id": "truenas:$HOST:vm:1",
+        "fields": {
+          "_attrType": "vm",
+          "deviceType": "Virtual Machine",
+          "hostnames": "ubuntu-server",
+          "macAddresses": "00:a0:98:aa:bb:01",
+          "truenas_vm_id": "1",
+          "truenas_vm_state": "RUNNING",
+          "truenas_vm_uuid": "6f0b7f4e-1c2d-4e3f-8a9b-0c1d2e3f4a5b"
+        }
+      },
+      {
+        "id": "truenas:$HOST:vm:2",
+        "fields": {
+          "_attrType": "vm",
+          "deviceType": "Virtual Machine",
+          "hostnames": "media-server",
+          "truenas_vm_state": "STOPPED"
+        },
+        "fields_absent": ["macAddresses", "ipAddresses"]
+      }
+    ],
+    "min_software_total": 2,
+    "min_services_total": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2.0/system/info"},
+      {"method": "GET", "path": "/api/v2.0/network/configuration"},
+      {"method": "GET", "path": "/api/v2.0/interface"},
+      {"method": "GET", "path": "/api/v2.0/pool", "query_contains": "limit=100"},
+      {"method": "GET", "path": "/api/v2.0/disk", "query_contains": "offset=0"},
+      {"method": "GET", "path": "/api/v2.0/app"},
+      {"method": "GET", "path": "/api/v2.0/vm"},
+      {"header_contains": "Bearer 1-fixtureapikeyabcdef0123456789abcdef0123456789abcdef0123456789ab"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/v2.0/vm/device"},
+      {"path_contains": "/api/v2.0/chart/release"}
+    ],
+    "log_contains": [
+      "truenas: reported the system asset for",
+      "truenas: skipping VM 3 with no MAC and no usable name",
+      "truenas: reported 2 virtual machines",
+      "truenas: 1 VM rows were skipped for want of an id or a correlator"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

@@ -1,0 +1,209 @@
+{
+  "name": "malformed",
+  "integration": "unraid",
+  "description": "Junk in every collection. networkSettings is the JSON scalar, so it is whatever the Docker daemon handed over and nothing in the schema constrains its shape - here it arrives as a string, as a null, and with Networks holding a string. names is documented as [String!]! but is tested as a null and as a bare string. Ports carry a null, a zero, and an out-of-range value, none of which may reach a Service. The server reports NO machineId, which forks the identity to the host-derived form and must log that it did. The hostname is the factory default 'Tower', which every unconfigured Unraid shares and which is therefore not imported as a hostname - on the host-derived branch there is no stable id, so merging falls back to MAC, IP, and hostname and a shared name would merge unrelated servers. os.uptime is not a parseable timestamp, which must not abort the run: time.parse_time aborts the whole script on bad input and Starlark has no exception handling. Everything valid still imports.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "collect_storage": "false"
+  },
+  "routes": [
+    {
+      "name": "info",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidInfo"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "info": {
+                "machineId": null,
+                "os": {"platform": "linux", "distro": "Unraid", "release": "7.2.1", "hostname": "Tower", "fqdn": "Tower", "uptime": "yesterday-ish", "arch": "x64"},
+                "system": "this should have been an object",
+                "baseboard": null,
+                "cpu": {"brand": "Celeron J4125", "cores": 4},
+                "versions": {"core": {"unraid": "7.2.1"}, "packages": null},
+                "networkInterfaces": [
+                  {
+                    "name": "br0",
+                    "macAddress": "not-a-mac",
+                    "internal": false,
+                    "ipv4Addresses": [{"address": "192.168.4.9", "netmask": "255.255.255.0"}],
+                    "ipv6Addresses": "this should have been a list",
+                    "ipAddress": "192.168.4.9",
+                    "ipv6Address": "fe80::1"
+                  },
+                  "this should have been an object",
+                  {
+                    "name": "eth2",
+                    "macAddress": "ac:1f:6b:00:99:88",
+                    "internal": false,
+                    "ipv4Addresses": [{"address": "169.254.77.1", "netmask": "255.255.0.0"}],
+                    "ipv6Addresses": [],
+                    "ipAddress": "169.254.77.1",
+                    "ipv6Address": ""
+                  },
+                  {
+                    "name": "ghost",
+                    "macAddress": null,
+                    "internal": false,
+                    "ipv4Addresses": [],
+                    "ipv6Addresses": [],
+                    "ipAddress": "",
+                    "ipv6Address": ""
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vars",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVars"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"data": {"vars": {"name": "Tower", "regTy": "TRIAL"}, "metrics": null}}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "docker",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidDocker"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "docker": {
+                "containers": [
+                  "this should have been an object",
+                  {
+                    "id": "1:aaaa1111",
+                    "names": null,
+                    "image": "nginx:1.27",
+                    "state": "RUNNING",
+                    "hostConfig": {"networkMode": "br0"},
+                    "networkSettings": "this should have been an object",
+                    "ports": []
+                  },
+                  {
+                    "id": "1:bbbb2222",
+                    "names": ["/scanner-agent"],
+                    "image": "example/agent:2.1",
+                    "state": "RUNNING",
+                    "hostConfig": {"networkMode": "br0.10"},
+                    "networkSettings": {"Networks": {"br0.10": "this should have been an object"}},
+                    "ports": []
+                  },
+                  {
+                    "id": "1:cccc3333",
+                    "names": ["/nvr"],
+                    "image": "blakeblackshear/frigate:0.14.1",
+                    "state": "RUNNING",
+                    "hostConfig": {"networkMode": "br0"},
+                    "networkSettings": {
+                      "Networks": {
+                        "br0": {"IPAddress": "192.168.4.71", "MacAddress": "d8:3a:dd:11:22:33", "GlobalIPv6Address": ""}
+                      }
+                    },
+                    "labels": null,
+                    "ports": [
+                      {"ip": "", "privatePort": null, "publicPort": 1, "type": "TCP"},
+                      {"ip": "", "privatePort": 0, "publicPort": 0, "type": "TCP"},
+                      {"ip": "", "privatePort": 99999, "publicPort": 99999, "type": "TCP"},
+                      {"ip": "0.0.0.0", "privatePort": 8971, "publicPort": 8971, "type": "TCP"},
+                      {"ip": "0.0.0.0", "privatePort": 8971, "publicPort": 8971, "type": "TCP"},
+                      "this should have been an object"
+                    ]
+                  },
+                  {
+                    "id": "1:dddd4444",
+                    "names": ["/nowhere"],
+                    "image": "busybox:1.36",
+                    "state": "RUNNING",
+                    "hostConfig": {"networkMode": "br0"},
+                    "networkSettings": null,
+                    "ports": []
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "vms": {
+                "domains": [
+                  "this should have been an object",
+                  {"id": "1:zzz", "name": "", "state": "RUNNING"},
+                  {"id": "1:yyy", "name": "pfSense", "state": "RUNNING"}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"errors": [{"message": "Cannot query field on type Query."}]}
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "unraid:$HOST:server",
+      "unraid:$HOST:container:nvr"
+    ],
+    "ids_absent": [
+      "unraid:$HOST:container:nowhere",
+      "unraid:$HOST:container:scanner-agent",
+      "unraid:$HOST:container:aaaa1111"
+    ],
+    "assets": [
+      {
+        "id": "unraid:$HOST:server",
+        "fields": {
+          "deviceType": "Server",
+          "os": "Unraid",
+          "osVersion": "7.2.1",
+          "ipAddresses": "192.168.4.9",
+          "macAddresses": "ac:1f:6b:00:99:88",
+          "unraid_vm_guest_count": "1"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "unraid:$HOST:container:nvr",
+        "fields": {
+          "deviceType": "Container",
+          "ipAddresses": "192.168.4.71",
+          "macAddresses": "d8:3a:dd:11:22:33",
+          "unraid_network_mode": "br0"
+        }
+      }
+    ],
+    "min_services_total": 1,
+    "log_contains": [
+      "the API returned no machineId",
+      "reported 1 containers with an address of their own",
+      "reported 1 server and 1 containers"
+    ]
+  },
+  "check_determinism": true
+}

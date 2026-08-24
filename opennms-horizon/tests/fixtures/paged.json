@@ -1,0 +1,374 @@
+{
+  "name": "paged",
+  "integration": "opennms-horizon",
+  "description": "The same four collections walked at page_size 2, so every one of them takes more than one request and each of the three ways an OpenNMS walk can end is exercised. OpenNMS pages with limit and offset and reports its own totals in the envelope, but the envelope is not what stops the walk: the script never reads count or totalCount, and instead keeps requesting until a page comes back shorter than the limit it asked for. That matters because totalCount is computed from a second, unfiltered count query on the v2 side and is not a promise about the page in hand. Here the v2 ipinterfaces walk ends on the OTHER terminator - two full pages followed by a 204 No Content, the empty answer an OpenNMS v2 endpoint really gives - while the snmpinterfaces, ifservices and nodes walks all end on a short page. The load-bearing assertion is that node 1's second address and both of its extra MAC addresses arrive on the SECOND page of their respective collections and still land on the asset built from the FIRST page of the node walk, which is only true if the two global interface indexes are completed before any node is built. A walk that stopped after one page would silently import node 1 with one address and one MAC and report success.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero-ro",
+    "password": "fixture-not-a-real-password",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "v2-ipinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/ipinterfaces"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 4,
+            "offset": 0,
+            "ipInterface": [
+              {
+                "id": "11",
+                "nodeId": 1,
+                "ipAddress": "192.0.2.31",
+                "hostName": "core-sw-01.example.com",
+                "ifIndex": 1,
+                "isManaged": "M",
+                "snmpPrimary": "P",
+                "snmpInterface": {
+                  "id": 101,
+                  "nodeId": 1,
+                  "ifIndex": 1,
+                  "ifType": 6,
+                  "ifName": "Gi1/0/1",
+                  "physAddr": "005056AA0001"
+                }
+              },
+              {
+                "id": "21",
+                "nodeId": 2,
+                "ipAddress": "192.0.2.32",
+                "hostName": "core-sw-02.example.com",
+                "ifIndex": 1,
+                "isManaged": "M",
+                "snmpPrimary": "P",
+                "snmpInterface": {
+                  "id": 201,
+                  "nodeId": 2,
+                  "ifIndex": 1,
+                  "ifType": 6,
+                  "ifName": "Gi1/0/1",
+                  "physAddr": "005056AA0002"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 4,
+            "offset": 2,
+            "ipInterface": [
+              {
+                "id": "31",
+                "nodeId": 3,
+                "ipAddress": "192.0.2.33",
+                "hostName": "core-sw-03.example.com",
+                "ifIndex": 1,
+                "isManaged": "M",
+                "snmpPrimary": "P",
+                "snmpInterface": {
+                  "id": 301,
+                  "nodeId": 3,
+                  "ifIndex": 1,
+                  "ifType": 6,
+                  "ifName": "Gi1/0/1",
+                  "physAddr": "005056AA0003"
+                }
+              },
+              {
+                "id": "12",
+                "nodeId": 1,
+                "ipAddress": "198.51.100.31",
+                "hostName": "198.51.100.31",
+                "ifIndex": 2,
+                "isManaged": "M",
+                "snmpPrimary": "S",
+                "snmpInterface": {
+                  "id": 102,
+                  "nodeId": 1,
+                  "ifIndex": 2,
+                  "ifType": 6,
+                  "ifName": "Gi1/0/2",
+                  "physAddr": "005056AA0004"
+                }
+              }
+            ]
+          }
+        },
+        {"status": 204}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v2-snmpinterfaces",
+      "match": {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 3,
+            "offset": 0,
+            "snmpInterface": [
+              {
+                "id": 202,
+                "nodeId": 2,
+                "ifIndex": 5,
+                "ifType": 6,
+                "ifName": "Gi1/0/5",
+                "physAddr": "005056AA0005"
+              },
+              {
+                "id": 302,
+                "nodeId": 3,
+                "ifIndex": 5,
+                "ifType": 6,
+                "ifName": "Gi1/0/5",
+                "physAddr": "005056AA0006"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "totalCount": 3,
+            "offset": 2,
+            "snmpInterface": [
+              {
+                "id": 103,
+                "nodeId": 1,
+                "ifIndex": 5,
+                "ifType": 6,
+                "ifName": "Gi1/0/5",
+                "physAddr": "005056AA0007"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "v1-ifservices",
+      "match": {"method": "GET", "path": "/opennms/rest/ifservices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 3,
+            "offset": 0,
+            "monitored-service": [
+              {
+                "id": "2",
+                "ipAddress": "192.0.2.31",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "core-sw-01.example.com",
+                "serviceName": "ICMP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 11
+              },
+              {
+                "id": "3",
+                "ipAddress": "192.0.2.31",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "core-sw-01.example.com",
+                "serviceName": "SNMP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 11
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "totalCount": 3,
+            "offset": 2,
+            "monitored-service": [
+              {
+                "id": "7",
+                "ipAddress": "198.51.100.31",
+                "isDown": false,
+                "isMonitored": true,
+                "node": "core-sw-01.example.com",
+                "serviceName": "HTTP",
+                "status": "Managed",
+                "statusCode": "A",
+                "ipInterfaceId": 12
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "v1-nodes",
+      "match": {"method": "GET", "path": "/opennms/rest/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "totalCount": 3,
+            "offset": 0,
+            "node": [
+              {
+                "id": "1",
+                "label": "core-sw-01.example.com",
+                "labelSource": "H",
+                "type": "A",
+                "foreignSource": "NetworkDevices",
+                "foreignId": "core-sw-01",
+                "location": "Default",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 1786320000000,
+                "sysName": "core-sw-01",
+                "sysDescription": "Arista Networks EOS version 4.31.2F running on an Arista Networks DCS-7050SX3-48YC8",
+                "sysObjectId": ".1.3.6.1.4.1.30065.1.3011.7050",
+                "categories": [{"id": 9, "name": "Network", "authorizedGroups": []}],
+                "assetRecord": {
+                  "id": 1,
+                  "category": "Unspecified",
+                  "manufacturer": "Arista Networks",
+                  "modelNumber": "DCS-7050SX3-48YC8",
+                  "serialNumber": "JPE00000001",
+                  "operatingSystem": null,
+                  "lastModifiedBy": "admin",
+                  "lastModifiedDate": 1705276800000
+                }
+              },
+              {
+                "id": "2",
+                "label": "core-sw-02.example.com",
+                "labelSource": "H",
+                "type": "A",
+                "foreignSource": "NetworkDevices",
+                "foreignId": "core-sw-02",
+                "location": "Default",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 1786320000000,
+                "sysName": "core-sw-02",
+                "sysDescription": "Arista Networks EOS version 4.31.2F running on an Arista Networks DCS-7050SX3-48YC8",
+                "sysObjectId": ".1.3.6.1.4.1.30065.1.3011.7050",
+                "categories": [{"id": 9, "name": "Network", "authorizedGroups": []}],
+                "assetRecord": {
+                  "id": 2,
+                  "category": "Unspecified",
+                  "manufacturer": "Arista Networks",
+                  "modelNumber": "DCS-7050SX3-48YC8",
+                  "serialNumber": "JPE00000002",
+                  "operatingSystem": null,
+                  "lastModifiedBy": "admin",
+                  "lastModifiedDate": 1705276800000
+                }
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "totalCount": 3,
+            "offset": 2,
+            "node": [
+              {
+                "id": "3",
+                "label": "core-sw-03.example.com",
+                "labelSource": "H",
+                "type": "A",
+                "foreignSource": "NetworkDevices",
+                "foreignId": "core-sw-03",
+                "location": "Default",
+                "createTime": 1705276800000,
+                "lastCapsdPoll": 1786320000000,
+                "sysName": "core-sw-03",
+                "sysDescription": "Arista Networks EOS version 4.31.2F running on an Arista Networks DCS-7050SX3-48YC8",
+                "sysObjectId": ".1.3.6.1.4.1.30065.1.3011.7050",
+                "categories": [{"id": 9, "name": "Network", "authorizedGroups": []}],
+                "assetRecord": {
+                  "id": 3,
+                  "category": "Unspecified",
+                  "manufacturer": "Arista Networks",
+                  "modelNumber": "DCS-7050SX3-48YC8",
+                  "serialNumber": "JPE00000003",
+                  "operatingSystem": null,
+                  "lastModifiedBy": "admin",
+                  "lastModifiedDate": 1705276800000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "opennms:$HOST:1",
+      "opennms:$HOST:2",
+      "opennms:$HOST:3"
+    ],
+    "assets": [
+      {
+        "id": "opennms:$HOST:1",
+        "fields": {
+          "deviceType": "Switch",
+          "hostnames": "core-sw-01\tcore-sw-01.example.com",
+          "ipAddresses": "192.0.2.31\t198.51.100.31",
+          "macAddresses": "00:50:56:aa:00:01\t00:50:56:aa:00:04\t00:50:56:aa:00:07",
+          "opennms_ip_interface_count": "2",
+          "opennms_snmp_interface_count": "1",
+          "opennms_interface_count": "3",
+          "opennms_monitored_services": "ICMP,SNMP,HTTP",
+          "opennms_monitored_service_count": "3"
+        }
+      },
+      {
+        "id": "opennms:$HOST:3",
+        "fields": {
+          "ipAddresses": "192.0.2.33",
+          "macAddresses": "00:50:56:aa:00:03\t00:50:56:aa:00:06"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/opennms/api/v2/ipinterfaces", "query_contains": "limit=2&offset=0"},
+      {"method": "GET", "path": "/opennms/api/v2/ipinterfaces", "query_contains": "limit=2&offset=2"},
+      {"method": "GET", "path": "/opennms/api/v2/ipinterfaces", "query_contains": "limit=2&offset=4"},
+      {"method": "GET", "path": "/opennms/api/v2/snmpinterfaces", "query_contains": "limit=2&offset=2"},
+      {"method": "GET", "path": "/opennms/rest/ifservices", "query_contains": "limit=2&offset=2"},
+      {"method": "GET", "path": "/opennms/rest/nodes", "query_contains": "limit=2&offset=0"},
+      {"method": "GET", "path": "/opennms/rest/nodes", "query_contains": "limit=2&offset=2"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/opennms/api/v2/snmpinterfaces", "query_contains": "offset=4"},
+      {"path_contains": "/opennms/rest/nodes", "query_contains": "offset=4"},
+      {"path_contains": "/rest/nodes/1/ipinterfaces"}
+    ],
+    "log_contains": [
+      "opennms: indexed IP interfaces for 3 nodes",
+      "opennms: reported 2 nodes so far",
+      "opennms: reported 3 nodes so far"
+    ]
+  },
+  "check_determinism": true
+}

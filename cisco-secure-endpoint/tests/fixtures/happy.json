@@ -1,0 +1,136 @@
+{
+  "name": "happy",
+  "integration": "cisco-secure-endpoint",
+  "description": "One page of connector-managed computers. Covers the adapter/internal_ips interface split, the deliberate exclusion of external_ip (the shared NAT egress address), loopback and link-local suppression, the OS name/version split for both the 'SP 0.0' and '(Build ...)' suffixes, and the demo-computer filter that is on by default.\n\nThe three imported computers also bracket the device-type hint. The computer object names no chassis -- there is no model or manufacturer anywhere in it, and this integration reports none -- so operating_system is the only statement of role: kiosk-lo-only reports 'Windows Server 2019 Datacenter' and must come out typed Server, while the Windows 10 workstation and the Mac must carry NO deviceType, because neither OS says whether it is a desktop or a laptop.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "client_id": "fixture-client-id",
+    "api_key": "fixture-api-key",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"results": {"total": 4, "current_item_count": 4, "index": 0, "items_per_page": 500}},
+            "data": [
+              {
+                "connector_guid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "hostname": "fin-ws-014",
+                "active": true,
+                "demo": false,
+                "connector_version": "8.1.5.21322",
+                "operating_system": "Windows 10, SP 0.0",
+                "os_version": "10.0.19044.1466",
+                "external_ip": "203.0.113.45",
+                "group_guid": "gggggggg-0000-4000-8000-000000000001",
+                "policy": {"guid": "pppppppp-0000-4000-8000-000000000001", "name": "Protect Workstations"},
+                "isolation": {"available": true, "status": "not_isolated"},
+                "orbital": {"status": "Installed"},
+                "install_date": "2025-04-11T09:12:00Z",
+                "last_seen": "2026-08-14T22:41:00Z",
+                "windows_processor_id": "BFEBFBFF000906EA",
+                "network_addresses": [
+                  {"mac": "00:50:56:aa:00:01", "ip": "10.10.4.14"},
+                  {"mac": "00:50:56:aa:00:02", "ip": "127.0.0.1"}
+                ],
+                "internal_ips": ["10.10.4.14", "169.254.11.2", "10.10.9.14"],
+                "groups": [{"name": "Finance Workstations"}]
+              },
+              {
+                "connector_guid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "hostname": "eng-mbp-221",
+                "active": true,
+                "demo": false,
+                "connector_version": "1.24.1",
+                "operating_system": "OS X 10.14.6",
+                "os_version": "10.14.6",
+                "external_ip": "203.0.113.45",
+                "policy": {"guid": "pppppppp-0000-4000-8000-000000000002", "name": "Protect Macs"},
+                "isolation": {"available": false, "status": "isolated"},
+                "install_date": "2025-09-02T14:00:00Z",
+                "last_seen": "2026-08-15T06:00:00Z",
+                "mac_hardware_id": "C02XX0000J1H",
+                "network_addresses": [
+                  {"mac": "8c:85:90:aa:00:11", "ip": "10.20.7.31"}
+                ],
+                "internal_ips": ["10.20.7.31"],
+                "is_compromised": true
+              },
+              {
+                "connector_guid": "aaaaaaaa-0000-4000-8000-000000000003",
+                "hostname": "kiosk-lo-only",
+                "active": false,
+                "demo": false,
+                "operating_system": "Windows Server 2019 Datacenter (Build 17763.2686)",
+                "os_version": "10.0.17763.2686",
+                "network_addresses": [
+                  {"mac": "", "ip": "127.0.0.1"},
+                  {"mac": "", "ip": "fe80::1"}
+                ],
+                "internal_ips": ["127.0.0.1", "::1"],
+                "last_seen": "2026-08-01T00:00:00Z"
+              },
+              {
+                "connector_guid": "aaaaaaaa-0000-4000-8000-000000000009",
+                "hostname": "Demo_AMP_Threat_Audit",
+                "active": true,
+                "demo": true,
+                "operating_system": "Windows 7, SP 1.0",
+                "internal_ips": ["10.99.99.99"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000001",
+      "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000002",
+      "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000003"
+    ],
+    "ids_absent": [
+      "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000009"
+    ],
+    "assets": [
+      {
+        "id": "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000003",
+        "fields": {"os": "Windows Server 2019 Datacenter", "deviceType": "Server"}
+      },
+      {
+        "id": "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000001",
+        "fields": {"os": "Windows 10"},
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "cisco-secure-endpoint:127.0.0.1:aaaaaaaa-0000-4000-8000-000000000002",
+        "fields": {"os": "OS X"},
+        "fields_absent": ["deviceType"]
+      }
+    ],
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/v1/computers", "query_contains": "limit=500"},
+      {"method": "GET", "path": "/v1/computers", "query_contains": "offset=0"},
+      {"header_contains": "Basic"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/vulnerabilities"}
+    ],
+    "log_contains": [
+      "cisco-secure-endpoint: 4 computers reported by the API",
+      "cisco-secure-endpoint: reported 3 computers"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

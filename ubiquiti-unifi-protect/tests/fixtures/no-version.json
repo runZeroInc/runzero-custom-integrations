@@ -1,0 +1,69 @@
+{
+  "name": "no-version",
+  "integration": "ubiquiti-unifi-protect",
+  "description": "A /meta/info that answers 200 but carries no applicationVersion - a proxy strips the body, a future Protect release renames the field. The preflight must not treat that as fatal: only a 404 (no Integration API) or a 401/403 (bad key) is definitive, so the run continues without a version string and the collections are attempted. One camera must import, with an empty protect_version attribute, while the collections that answer 404 each print and are skipped.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/meta/info"},
+      "responses": [
+        {"status": 200, "json": {"nvrMac": "F4E2C6A1B003"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/proxy/protect/integration/v1/cameras"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "672094f900e26303e800062a",
+              "mac": "24A43C3DFEB9",
+              "name": "Front Door",
+              "type": "UVC G4 Doorbell",
+              "modelKey": "camera",
+              "state": "CONNECTED"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/proxy/protect/integration/"},
+      "responses": [
+        {"status": 404, "text": "<html><head><title>404 Not Found</title></head><body>404 Not Found</body></html>"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062a"],
+    "assets": [
+      {
+        "id": "ubiquiti-unifi-protect:$HOST:camera:672094f900e26303e800062a",
+        "fields": {
+          "hostnames": "Front Door",
+          "macAddresses": "24:a4:3c:3d:fe:b9"
+        },
+        "fields_absent": ["unifi_protect_protect_version"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/proxy/protect/integration/v1/meta/info"},
+      {"method": "GET", "path_contains": "/proxy/protect/integration/v1/cameras"}
+    ],
+    "log_contains": [
+      "no applicationVersion",
+      "Attempting collection anyway",
+      "reported 1 camera"
+    ]
+  },
+  "check_determinism": true
+}

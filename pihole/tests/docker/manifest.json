@@ -1,0 +1,73 @@
+{
+  "name": "pihole",
+  "integration": "pihole",
+  "description": "Imports the two real devices a live Pi-hole v6 discovered on its own network, and proves the loopback row it also reports -- hwaddr 00:00:00:00:00:00 on 127.0.0.1 -- is dropped rather than imported.",
+  "compose": "compose.yml",
+  "service": "pihole",
+  "port": 80,
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "ftl api answering",
+      "http": {"path": "/api/info/version", "status": [200, 401]},
+      "timeout": 300,
+      "interval": 3
+    }
+  ],
+
+  "seed": "seed.py",
+  "seed_timeout": 420,
+
+  "kwargs": {
+    "url": "$BASE",
+    "password": "runzero-test-pw-2026",
+    "include_leases": "true",
+    "include_ip_only_devices": "false"
+  },
+
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "pihole:$HOST:${seed.client_device_id}",
+        "fields": {
+          "ipAddresses": "${seed.client_ip}",
+          "macAddresses": "${seed.client_mac}",
+          "macPairs": "${seed.client_ip}=${seed.client_mac}",
+          "manufacturer": "${seed.client_mac_vendor}",
+          "pihole_hwaddr": "${seed.client_mac}",
+          "pihole_interface": "eth0",
+          "pihole_has_layer2_identity": "true",
+          "pihole_address_count": "1",
+          "pihole_server": "$HOST"
+        }
+      },
+      {
+        "id": "pihole:$HOST:${seed.appliance_device_id}",
+        "fields": {
+          "ipAddresses": "${seed.appliance_ip}",
+          "macAddresses": "00:42:0a:de:08:02",
+          "pihole_hwaddr": "${seed.appliance_hwaddr}",
+          "pihole_has_layer2_identity": "true"
+        }
+      }
+    ],
+    "ids_absent": ["pihole:$HOST:${seed.loopback_device_id}"],
+    "log_contains": [
+      "read 0 DHCP leases",
+      "skipped 1 devices with no layer 2 identity",
+      "reported 2 assets"
+    ]
+  },
+
+  "_ids_absent_reason": "The strongest assertion in this case. Pi-hole really does report its own loopback interface as a device -- hwaddr 00:00:00:00:00:00, addresses 127.0.0.1 and ::1, name `localhost`. No hand-written fixture would think to include it, and importing it would attach a loopback address and an all-zero MAC to an asset that correlates with every other such asset in the estate. The row id is discovered by the seed because it depends on the order FTL saw the interfaces in.",
+
+  "_mac_note": "pihole_hwaddr keeps the raw 02:42:0a:de:08:02 the API returned, while macAddresses shows 00:42:0a:de:08:02 -- the platform's network_interface() helper clears the locally-administered bit. Asserting both sides makes the transformation visible.",
+
+  "invariants": {"skip": []},
+
+  "check_determinism": true,
+  "startup_timeout": 300,
+  "timeout": 300
+}

@@ -1,0 +1,380 @@
+{
+  "name": "happy",
+  "integration": "illumio-core",
+  "description": "A small estate below the 500-object synchronous cap. Proves the label catalog bootstrap resolves bare label hrefs on a workload, that the per-workload N+1 GET is what supplies open_service_ports (the collection response carries none), that an IANA protocol number is converted and a portless protocol counted rather than invented into a Service, that a 0.0.0.0 bind is rewritten to the workload's own address, that loopback and docker-bridge interfaces never reach an interface, and that a deleted workload, a workload with no href, and a non-object element are each skipped with a count. wl-0004 carries an updated_at a year in the future: the platform rejects an entire record whose timestamp is after now, so the clamp in _parse_ts is what keeps that asset.",
+  "kwargs": {
+    "url": "$BASE",
+    "org_id": "1",
+    "api_key_id": "api_fixture0001",
+    "api_secret": "fixture-secret",
+    "import_services": "true",
+    "service_detail_limit": "1000"
+  },
+  "routes": [
+    {
+      "name": "label-catalog",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/labels"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "href": "/orgs/1/labels/1",
+              "key": "app",
+              "value": "payments"
+            },
+            {
+              "href": "/orgs/1/labels/2",
+              "key": "loc",
+              "value": "eu-west"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "workload-detail-wl-0001",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "href": "/orgs/1/workloads/wl-0001",
+            "name": "web01",
+            "hostname": "web01.corp.example.com",
+            "os_id": "ubuntu-x86_64-jammy",
+            "os_detail": "Ubuntu 22.04.3 LTS",
+            "online": true,
+            "managed": true,
+            "enforcement_mode": "visibility_only",
+            "visibility_level": "flow_summary",
+            "public_ip": "203.0.113.9",
+            "created_at": "2026-01-02T08:00:00Z",
+            "updated_at": "2026-02-01T08:00:00Z",
+            "labels": [
+              {
+                "href": "/orgs/1/labels/1"
+              },
+              {
+                "key": "env",
+                "value": "prod"
+              }
+            ],
+            "interfaces": [
+              {
+                "name": "eth0",
+                "address": "10.50.0.11"
+              },
+              {
+                "name": "lo",
+                "address": "127.0.0.1",
+                "loopback": true
+              },
+              {
+                "name": "docker0",
+                "address": "172.17.0.1"
+              }
+            ],
+            "ven": {
+              "href": "/orgs/1/vens/ven-0001"
+            },
+            "agent": {
+              "href": "/orgs/1/agents/1",
+              "type": "Workload",
+              "status": {
+                "status": "active",
+                "agent_version": "21.5.30",
+                "last_heartbeat_on": "2026-02-01T09:30:00Z",
+                "security_policy_sync_state": "syncing"
+              }
+            },
+            "services": {
+              "uptime_seconds": 918273,
+              "open_service_ports": [
+                {
+                  "port": 443,
+                  "protocol": 6,
+                  "address": "0.0.0.0",
+                  "process_name": "nginx",
+                  "package": "nginx-core",
+                  "user": "root"
+                },
+                {
+                  "port": 53,
+                  "protocol": 17,
+                  "address": "10.50.0.11",
+                  "process_name": "systemd-resolve",
+                  "user": "systemd-resolve"
+                },
+                {
+                  "port": 0,
+                  "protocol": 1,
+                  "address": "10.50.0.11"
+                },
+                {
+                  "port": 70000,
+                  "protocol": 6,
+                  "address": "10.50.0.11",
+                  "process_name": "bogus"
+                }
+              ]
+            },
+            "vulnerabilities_summary": {
+              "num_vulnerabilities": 7,
+              "vulnerability_score": 340
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "workload-detail-wl-0002",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0002"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "href": "/orgs/1/workloads/wl-0002",
+            "name": "loopback-only",
+            "hostname": "loopback-only.corp.example.com",
+            "os_id": "rhel-x86_64-9.3",
+            "online": false,
+            "managed": true,
+            "created_at": "2026-01-03T08:00:00Z",
+            "updated_at": "2026-02-01T08:10:00Z",
+            "labels": [
+              {
+                "href": "/orgs/1/labels/2"
+              }
+            ],
+            "interfaces": [
+              {
+                "name": "lo",
+                "address": "127.0.0.1",
+                "loopback": true
+              },
+              {
+                "name": "lo",
+                "address": "::1",
+                "loopback": true
+              }
+            ],
+            "services": {
+              "open_service_ports": [
+                {
+                  "port": 22,
+                  "protocol": 6,
+                  "address": "0.0.0.0",
+                  "process_name": "sshd"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "workload-detail-wl-0003",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0003"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "href": "/orgs/1/workloads/wl-0003",
+            "name": "unmanaged database record",
+            "hostname": "db-unmanaged.corp.example.com",
+            "managed": false,
+            "created_at": "2026-01-04T08:00:00Z",
+            "updated_at": "2026-02-01T08:20:00Z",
+            "interfaces": [
+              {
+                "name": "eth0",
+                "address": "10.50.0.13/24"
+              }
+            ],
+            "labels": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "workload-detail-wl-0004",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0004"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "href": "/orgs/1/workloads/wl-0004",
+            "name": "clock-skew",
+            "hostname": "clock-skew.corp.example.com",
+            "os_id": "windows-x86_64-server2019",
+            "managed": true,
+            "online": true,
+            "created_at": "2026-01-05T08:00:00Z",
+            "updated_at": "2027-05-01T00:00:00Z",
+            "interfaces": [
+              {
+                "name": "Ethernet0",
+                "address": "10.50.0.14"
+              }
+            ],
+            "agent": {
+              "status": {
+                "status": "active",
+                "last_heartbeat_on": "2027-05-01T00:00:00Z"
+              }
+            },
+            "services": {
+              "open_service_ports": [
+                {
+                  "port": 3389,
+                  "protocol": 6,
+                  "address": "10.50.0.14",
+                  "win_service_name": "TermService"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "workloads-sync",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads",
+        "query_contains": "max_results=500"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "href": "/orgs/1/workloads/wl-0001",
+              "hostname": "web01.corp.example.com",
+              "name": "web01"
+            },
+            {
+              "href": "/orgs/1/workloads/wl-0002",
+              "hostname": "loopback-only.corp.example.com",
+              "name": "loopback-only"
+            },
+            {
+              "href": "/orgs/1/workloads/wl-0003",
+              "hostname": "db-unmanaged.corp.example.com",
+              "name": "unmanaged database record"
+            },
+            {
+              "href": "/orgs/1/workloads/wl-0004",
+              "hostname": "clock-skew.corp.example.com",
+              "name": "clock-skew"
+            },
+            {
+              "href": "/orgs/1/workloads/wl-0005",
+              "hostname": "retired.corp.example.com",
+              "deleted": true
+            },
+            {
+              "hostname": "orphan.corp.example.com",
+              "name": "orphan"
+            },
+            "this element is a string, not an object"
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "illumio-core:$HOST:/orgs/1/workloads/wl-0001",
+      "illumio-core:$HOST:/orgs/1/workloads/wl-0002",
+      "illumio-core:$HOST:/orgs/1/workloads/wl-0003",
+      "illumio-core:$HOST:/orgs/1/workloads/wl-0004"
+    ],
+    "ids_absent": [
+      "illumio-core:$HOST:/orgs/1/workloads/wl-0005"
+    ],
+    "min_services_total": 3,
+    "log_contains": [
+      "skipping workload with no href: hostname=orphan.corp.example.com",
+      "skipped 1 workloads with no href",
+      "skipped 1 malformed workload records",
+      "skipped 1 workloads marked deleted"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/labels",
+        "query_contains": "max_results=500"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads",
+        "query_contains": "max_results=500"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0001"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0004"
+      },
+      {
+        "header_contains": "Basic"
+      }
+    ],
+    "requests_absent": [
+      {
+        "method": "GET",
+        "path": "/api/v2/orgs/1/workloads/wl-0005"
+      }
+    ],
+    "assets": [
+      {
+        "id": "illumio-core:$HOST:/orgs/1/workloads/wl-0001",
+        "fields": {
+          "ipAddresses": "10.50.0.11",
+          "illumio_core_interfaces_excluded": "172.17.0.1",
+          "illumio_core_services_enriched": "true",
+          "os": "Ubuntu Linux"
+        }
+      },
+      {
+        "id": "illumio-core:$HOST:/orgs/1/workloads/wl-0002",
+        "fields": {
+          "hostnames": "loopback-only\tloopback-only.corp.example.com"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "illumio-core:$HOST:/orgs/1/workloads/wl-0003",
+        "fields": {
+          "ipAddresses": "10.50.0.13"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

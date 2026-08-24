@@ -1,0 +1,99 @@
+{
+  "name": "container",
+  "integration": "ocs-inventory",
+  "description": "Runs the integration against a real OCS Inventory NG 2.12.2 -- communication server, web console and REST API in one Apache -- on MariaDB. Two computers are delivered the way an agent delivers them, PROLOG then a zlib-compressed INVENTORY, and read back over /ocsapi/v1 behind the HTTP Basic credential the integration's README tells operators to add. rz-ocs-01 is the OCS container reporting ITSELF, with VIRTUALDEV computed the way the Unix agent computes it, from /sys/devices/virtual/net: inside a container that flags eth0 as well as lo, so every adapter is filtered and the asset's only address comes from the joined hardware.IPADDR fallback with the loopback stripped out of it. Its LASTCOME is written by a Europe/Paris server and published with no offset, so it reads two hours into the future and the platform would drop the whole record if the script did not clamp it. rz-ocs-02 carries one real NIC plus the three software devices a Docker host really reports -- a docker0 bridge flagged VIRTUALDEV, a VMware adapter that is NOT flagged and can only be recognised from its description, and a loopback -- so exactly one of its four MACs survives.",
+  "compose": "compose.yml",
+  "service": "ocs",
+  "scheme": "http",
+
+  "_platform_note": "OCS publishes an amd64-only image, so an arm64 host runs Apache and mod_perl under emulation. Measured end to end -- pull excluded, two scanner runs included -- that costs about 35 seconds, the same order as the other LAMP stacks here, so this is deliberately not marked heavy.",
+
+  "ready": [
+    {
+      "name": "communication server answering",
+      "http": {"path": "/ocsinventory", "status": [400]},
+      "timeout": 600,
+      "interval": 3
+    },
+    {
+      "name": "REST API location served",
+      "http": {"path": "/ocsapi/v1/computers?start=0&limit=1", "status": [200, 500]},
+      "timeout": 300,
+      "interval": 3
+    }
+  ],
+
+  "seed": "seed.py",
+  "seed_timeout": 900,
+
+  "ready_after_seed": [
+    {
+      "name": "REST API behind the Basic credential",
+      "http": {"path": "/ocsapi/v1/computers?start=0&limit=1", "status": [401]},
+      "timeout": 180,
+      "interval": 3
+    }
+  ],
+
+  "kwargs": {
+    "url": "$BASE",
+    "username": "${seed.username}",
+    "password": "${seed.password}",
+    "include_software": "true"
+  },
+
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "ocs-inventory:$HOST:${seed.one_id}",
+      "ocs-inventory:$HOST:${seed.two_id}"
+    ],
+    "assets": [
+      {
+        "id": "ocs-inventory:$HOST:${seed.one_id}",
+        "fields": {
+          "hostnames": "rz-ocs-01",
+          "ipAddresses": "${seed.container_ip}",
+          "deviceType": "Desktop",
+          "manufacturer": "Dell Inc.",
+          "model": "OptiPlex 7070",
+          "os": "Ubuntu 22.04.3 LTS",
+          "osVersion": "5.15.0-89-generic",
+          "ocs_inventory_serial": "RZOCS001",
+          "ocs_inventory_deviceid": "rz-ocs-01-2026-01-15-09-30-00",
+          "domain": "example.com",
+          "ocs_inventory_adapter_count": "0",
+          "ocs_inventory_virtual_adapters": "eth0,lo",
+          "ocs_inventory_reported_ip_addresses": "${seed.container_ip}/127.0.0.1",
+          "ocs_inventory_ip_addresses": "${seed.container_ip}"
+        },
+        "fields_absent": ["macAddresses"]
+      },
+      {
+        "id": "ocs-inventory:$HOST:${seed.two_id}",
+        "fields": {
+          "hostnames": "rz-ocs-02",
+          "ipAddresses": "10.88.0.21",
+          "macAddresses": "b4:2e:99:1c:0a:77",
+          "deviceType": "Laptop",
+          "manufacturer": "LENOVO",
+          "model": "20XW",
+          "os": "Ubuntu 24.04.1 LTS",
+          "ocs_inventory_chassis_type": "10",
+          "ocs_inventory_adapter_count": "1",
+          "ocs_inventory_adapter_names": "eth0",
+          "ocs_inventory_virtual_adapters": "docker0,VMware Virtual Ethernet Adapter for VMnet8,lo"
+        },
+        "fields_absent": ["ocs_inventory_serial", "ocs_inventory_uuid",
+                          "ocs_inventory_asset_tag", "domain"]
+      }
+    ],
+    "min_software_total": 3,
+    "log_contains": ["ocs-inventory: reported 2 computers"]
+  },
+
+  "invariants": {"skip": []},
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

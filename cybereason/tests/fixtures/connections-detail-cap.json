@@ -1,0 +1,125 @@
+{
+  "name": "connections-detail-cap",
+  "integration": "cybereason",
+  "description": "Optional connection enrichment with the per-sensor cap set to 1. Proves the N+1 investigation-graph query is capped and the skip is counted and logged, and proves the attribution rules that turn a Connection element into a Service: an OUTGOING connection is dropped because serverAddress is then the remote peer, an INCOMING connection whose server side is not one of this endpoint's own addresses is dropped, a port of 0 is dropped, and a repeat of an already-recorded address:port is deduplicated. Six elements yield five inbound, three dropped and two services on one asset; the second sensor is imported with no services at all.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password",
+    "import_connections": "true",
+    "connection_limit": "1",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/login.html"},
+      "responses": [{
+        "status": 200,
+        "headers": {"Set-Cookie": "JSESSIONID=FIXTURECONN01; Path=/", "Content-Type": "text/html"},
+        "text": "<html>ok</html>"
+      }],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "POST", "path": "/rest/sensors/query"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "sensors": [
+            {"sensorId": "conn-01", "pylumId": "PYLUMCLIENT_FIXTURE_SRV-EDGE-01_0800271A2B3C",
+             "machineName": "SRV-EDGE-01", "fqdn": "srv-edge-01.corp.example.com",
+             "internalIpAddress": "10.90.1.1", "externalIpAddress": "198.51.100.5",
+             "osType": "LINUX", "osVersionType": "Linux", "deviceType": "server",
+             "siteName": "DC1", "status": "ONLINE"},
+            {"sensorId": "conn-02", "pylumId": "PYLUMCLIENT_FIXTURE_SRV-EDGE-02_0800274D5E6F",
+             "machineName": "SRV-EDGE-02", "fqdn": "srv-edge-02.corp.example.com",
+             "internalIpAddress": "10.90.1.2",
+             "osType": "LINUX", "osVersionType": "Linux", "deviceType": "server",
+             "siteName": "DC1", "status": "ONLINE"}
+          ],
+          "totalResults": 2,
+          "hasMoreResults": false
+        }
+      }],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "visualsearch-for-srv-edge-01",
+      "match": {"method": "POST", "path": "/rest/visualsearch/query/simple", "body_contains": "SRV-EDGE-01"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "data": {
+            "resultIdToElementDataMap": {
+              "el-1": {"simpleValues": {
+                "elementDisplayName": {"values": ["10.0.0.9 > 10.90.1.1:443"], "totalValues": 1},
+                "direction": {"values": ["INCOMING"], "totalValues": 1},
+                "serverAddress": {"values": ["10.90.1.1"], "totalValues": 1},
+                "serverPort": {"values": ["443"], "totalValues": 1},
+                "portType": {"values": ["SERVICE_HTTPS"], "totalValues": 1}
+              }},
+              "el-2": {"simpleValues": {
+                "elementDisplayName": {"values": ["10.0.0.9 > 10.90.1.1:22"], "totalValues": 1},
+                "direction": {"values": ["INCOMING"], "totalValues": 1},
+                "serverAddress": {"values": ["10.90.1.1"], "totalValues": 1},
+                "serverPort": {"values": ["22"], "totalValues": 1},
+                "portType": {"values": ["SERVICE_SSH"], "totalValues": 1}
+              }},
+              "el-3": {"simpleValues": {
+                "elementDisplayName": {"values": ["10.90.1.1 > 203.0.113.9:443"], "totalValues": 1},
+                "direction": {"values": ["OUTGOING"], "totalValues": 1},
+                "serverAddress": {"values": ["203.0.113.9"], "totalValues": 1},
+                "serverPort": {"values": ["443"], "totalValues": 1},
+                "portType": {"values": ["SERVICE_HTTPS"], "totalValues": 1}
+              }},
+              "el-4": {"simpleValues": {
+                "elementDisplayName": {"values": ["10.0.0.9 > 198.51.100.5:8080"], "totalValues": 1},
+                "direction": {"values": ["INCOMING"], "totalValues": 1},
+                "serverAddress": {"values": ["198.51.100.5"], "totalValues": 1},
+                "serverPort": {"values": ["8080"], "totalValues": 1},
+                "portType": {"values": ["SERVICE_HTTP"], "totalValues": 1}
+              }},
+              "el-5": {"simpleValues": {
+                "elementDisplayName": {"values": ["10.0.0.9 > 10.90.1.1:0"], "totalValues": 1},
+                "direction": {"values": ["INCOMING"], "totalValues": 1},
+                "serverAddress": {"values": ["10.90.1.1"], "totalValues": 1},
+                "serverPort": {"values": ["0"], "totalValues": 1},
+                "portType": {"values": ["UNKNOWN"], "totalValues": 1}
+              }},
+              "el-6": {"simpleValues": {
+                "elementDisplayName": {"values": ["10.0.0.44 > 10.90.1.1:443"], "totalValues": 1},
+                "direction": {"values": ["INCOMING"], "totalValues": 1},
+                "serverAddress": {"values": ["10.90.1.1"], "totalValues": 1},
+                "serverPort": {"values": ["443"], "totalValues": 1},
+                "portType": {"values": ["SERVICE_HTTPS"], "totalValues": 1}
+              }}
+            }
+          }
+        }
+      }],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cybereason:127.0.0.1:conn-01",
+      "cybereason:127.0.0.1:conn-02"
+    ],
+    "request_count": 3,
+    "min_services_total": 2,
+    "requests_include": [
+      {"method": "POST", "path": "/rest/visualsearch/query/simple", "body_contains": "SRV-EDGE-01"}
+    ],
+    "requests_absent": [
+      {"path": "/rest/visualsearch/query/simple", "body_contains": "SRV-EDGE-02"}
+    ],
+    "log_contains": [
+      "cybereason: queried 1 sensors for connections: 6 connections, 5 inbound, 3 not attributable to the endpoint",
+      "cybereason: connection enrichment capped at 1, 1 sensors imported without services"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "name": "missing-connected-at",
+  "integration": "ubiquiti-unifi-network",
+  "description": "REGRESSION LOCK. build_client_assets called parse_time(client.get(\"connectedAt\")) unguarded, and parse_time aborts the script outright on a non-string -- 'parse_time: got NoneType, want string'. Starlark has no exception handling, so there was no recovering from it: the whole import died and the healthy clients in the same page went with it. The controller omits connectedAt for a client it has a record of but no active session (a wired client seen only in the ARP table, or one whose session predates a controller restart), so this is ordinary data, not corruption. connectedAt.unix was dereferenced off the same result and needed the same guard.\n\nThe timestamp is now screened against an RFC 3339 pattern before the call, and both attributes are only set when it parsed. Client 01 must carry connectedAt and client 02 must import without it.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "Default",
+    "extract_devices": "false",
+    "page_limit": "100"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {"status": 200, "json": {"offset": 0, "limit": 25, "count": 1, "totalCount": 1, "data": [{"id": "4f1a0000-0000-4000-8000-00000000site", "name": "Default"}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "clients",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/4f1a0000-0000-4000-8000-00000000site/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "offset": 0,
+            "limit": 100,
+            "count": 2,
+            "totalCount": 2,
+            "data": [
+              {
+                "id": "c0000000-0000-4000-8000-000000000001",
+                "name": "syn-desk-01",
+                "macAddress": "00:11:22:00:80:01",
+                "ipAddress": "192.0.2.101",
+                "type": "WIRED",
+                "connectedAt": "2026-06-01T09:15:00Z",
+                "uplinkDeviceId": "d0000000-0000-4000-8000-0000000000sw"
+              },
+              {
+                "id": "c0000000-0000-4000-8000-000000000002",
+                "name": "syn-desk-02",
+                "macAddress": "00:11:22:00:80:02",
+                "ipAddress": "192.0.2.102",
+                "type": "WIRED",
+                "uplinkDeviceId": "d0000000-0000-4000-8000-0000000000sw"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["unifi:4f1a0000-0000-4000-8000-00000000site:client:c0000000-0000-4000-8000-000000000001", "unifi:4f1a0000-0000-4000-8000-00000000site:client:c0000000-0000-4000-8000-000000000002"],
+    "assets": [
+      {
+        "id": "unifi:4f1a0000-0000-4000-8000-00000000site:client:c0000000-0000-4000-8000-000000000001",
+        "fields": {"hostnames": "syn-desk-01", "ipAddresses": "192.0.2.101", "connectedAtTS": "1780305300"}
+      },
+      {
+        "id": "unifi:4f1a0000-0000-4000-8000-00000000site:client:c0000000-0000-4000-8000-000000000002",
+        "fields": {"hostnames": "syn-desk-02", "ipAddresses": "192.0.2.102"},
+        "fields_absent": ["connectedAt", "connectedAtTS"]
+      }
+    ]
+  }
+}

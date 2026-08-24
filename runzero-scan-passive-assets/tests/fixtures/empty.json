@@ -1,0 +1,34 @@
+{
+  "name": "empty",
+  "integration": "runzero-scan-passive-assets",
+  "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
+  "description": "An organization where `source:sample source_count:1` matches nothing -- the steady state once this integration has been running for a while and has already cleaned up. exportAssetsJSON streams a literal `[` before the first row and `]` after the last, so zero rows is the two-byte body `[]`. That distinction is load-bearing here because, unlike the other runZero-sourced integrations in this repo, this script decodes the body with json_decode directly rather than through get_json, and Starlark has no exception handling: a body json_decode cannot parse aborts the entire run rather than returning an error. The run must complete having made exactly one request, scheduled no scan, and -- above all -- issued no bulk delete, since an empty asset_ids list is rejected by the API as a 404 and a delete with the wrong contents is unrecoverable.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "site_id": "77777777-6666-5555-4444-333333333333",
+    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0"
+  },
+
+  "routes": [
+    {
+      "name": "passive asset export, no rows",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [{"status": 200, "json": []}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/export/org/assets.json"}
+    ],
+    "requests_absent": [
+      {"method": "PUT"},
+      {"method": "POST"}
+    ]
+  }
+}

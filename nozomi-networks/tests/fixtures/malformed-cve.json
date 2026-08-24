@@ -1,0 +1,129 @@
+{
+  "name": "malformed-cve",
+  "integration": "nozomi-networks",
+  "description": "REGRESSION LOCK for the unscreened CVE field. Vulnerability(cve=...) raises inside the constructor on any value not shaped CVE-YYYY-NNNN, and a raise aborts the whole task mid-stream -- so one vendor advisory id or a joined list in the appliance's cve column used to lose the entire import. The rows here carry: a lower-case cve (well-formed after upper-casing, still asserted), a vendor advisory id (NN-2024-0007), and a comma-joined pair of CVEs. All three must import as findings -- the malformed ones keep the raw value as the finding name and the nozomi_cve_id attribute instead of asserting a cve -- and the asset walk afterwards must complete. Also locks the loopback-placeholder removal: airgapped-plc-2 has firmware data but no IP at all, and its firmware Software record must be emitted WITHOUT a 127.0.0.1 serviceAddress fallback.",
+  "kwargs": {
+    "url": "$BASE",
+    "key_name": "fixture-key-name",
+    "key_token": "fixture-key-token",
+    "include_cves": "true"
+  },
+  "routes": [
+    {
+      "name": "sign-in",
+      "match": {"method": "POST", "path": "/api/open/sign_in"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"authenticated": true},
+          "headers": {"Authorization": "Bearer nozomi-fixture-token"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cve-probe",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "count=1&"},
+      "responses": [
+        {"status": 200, "json": {"result": [{"id": "cve-row-1"}], "total": 3, "error": null}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "asset-cves",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=asset_cves"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "cve-row-1",
+                "asset_id": "fixture-asset-0001",
+                "cve": "cve-2024-11111",
+                "name": "Lower-case but well-formed",
+                "score": 8.1,
+                "resolved": false
+              },
+              {
+                "id": "cve-row-2",
+                "asset_id": "fixture-asset-0001",
+                "cve": "NN-2024-0007",
+                "name": "Vendor advisory without a CVE id",
+                "score": 6.5,
+                "resolved": false
+              },
+              {
+                "id": "cve-row-3",
+                "asset_id": "fixture-asset-0001",
+                "cve": "CVE-2021-22222, CVE-2021-33333",
+                "score": 4.0,
+                "resolved": false
+              }
+            ],
+            "total": 3,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=assets%20"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "fixture-asset-0001",
+                "name": "plc-line-7",
+                "ip": ["10.100.7.10"],
+                "mac_address": ["aa:bb:cc:00:07:01"],
+                "type": "PLC",
+                "vendor": "Fixture Automation",
+                "product_name": "FX-9000",
+                "firmware_version": "4.2.1"
+              },
+              {
+                "id": "fixture-asset-0002",
+                "name": "airgapped-plc-2",
+                "ip": [],
+                "mac_address": [],
+                "type": "PLC",
+                "vendor": "Fixture Automation",
+                "product_name": "FX-3000",
+                "firmware_version": "2.0.4"
+              }
+            ],
+            "total": 2,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "nozomi-networks:$HOST:fixture-asset-0001",
+      "nozomi-networks:$HOST:fixture-asset-0002"
+    ],
+    "assets": [
+      {
+        "id": "nozomi-networks:$HOST:fixture-asset-0002",
+        "fields": {"hostnames": "airgapped-plc-2", "deviceType": "PLC"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "min_software_total": 2,
+    "log_contains": [
+      "nozomi-networks: indexed 3 unresolved CVE findings across 1 assets",
+      "nozomi-networks: reported 2 assets"
+    ]
+  },
+  "invariants": {"skip": []}
+}

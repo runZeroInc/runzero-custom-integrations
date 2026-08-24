@@ -1,0 +1,77 @@
+{
+  "name": "reduced-params",
+  "integration": "fleet-osquery",
+  "description": "A pre-4.43 Fleet server rejects the string-valued populate_software (and the other newer populate_* parameters) with a 400. The fallback must not abandon software import: the retry goes out with the original boolean populate_software=true form those servers support, and only a second rejection would drop the optional parameters entirely. The first route answers the full-parameter request with the 400 and is when_exhausted:error, so a retry that re-sent the rejected form would fail loudly; the second route matches only the boolean form and serves the inventory. min_software_total proves the software that used to be silently lost on these servers now arrives.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_software": "true",
+    "include_labels": "true",
+    "include_policies": "true"
+  },
+  "routes": [
+    {
+      "name": "full parameters rejected",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/fleet/hosts",
+        "query_contains": "populate_software=without_vulnerability_details"
+      },
+      "responses": [
+        {"status": 400, "json": {"message": "unsupported query parameter", "errors": [{"name": "base", "reason": "unknown parameter populate_software=without_vulnerability_details"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "boolean fallback accepted",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/fleet/hosts",
+        "query_contains": "populate_software=true"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {
+                "id": 42,
+                "hostname": "legacy01.corp.example.com",
+                "computer_name": "legacy01",
+                "platform": "ubuntu",
+                "os_version": "Ubuntu 20.04.6 LTS",
+                "primary_ip": "10.40.0.42",
+                "primary_mac": "3c:22:fb:10:00:42",
+                "created_at": "2025-11-02T09:15:00Z",
+                "seen_time": "2026-02-01T18:30:00Z",
+                "software": [
+                  {
+                    "id": 6001,
+                    "name": "openssl",
+                    "version": "1.1.1f",
+                    "source": "deb_packages"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["fleet-osquery:$HOST:42"],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "populate_software=without_vulnerability_details"},
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "populate_software=true"}
+    ],
+    "min_software_total": 1,
+    "log_contains": [
+      "fleet-osquery: the server rejected the newer query parameters, retrying with boolean populate_software"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "empty",
+  "integration": "palo-alto-device-security",
+  "description": "A tenant with no devices and no confirmed vulnerabilities. Both endpoints answer 200 with empty collections. Proves an empty inventory ends the walk after one page per endpoint, reports zero assets with the 'no assets retrieved' notice, and never aborts - the difference between a small tenant and a broken one is the log line, not a failed task.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "tsg_id": "tsg-empty",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "lookback_days": "30"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/oauth2/access_token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "token_type": "Bearer", "expires_in": 899}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/iot/pub/v1/vulnerability/list"},
+      "responses": [
+        {"status": 200, "json": {"ver": "v4.0", "api": "/pub/v4.0/vulnerability/list", "items": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/iot/pub/v2/device/list"},
+      "responses": [
+        {"status": 200, "json": {"ver": "v4.0", "api": "/pub/v4.0/device/list", "total": 0, "devices": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "log_contains": [
+      "indexed 0 vulnerabilities across 0 devices",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

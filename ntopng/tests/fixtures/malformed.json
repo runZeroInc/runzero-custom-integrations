@@ -1,0 +1,183 @@
+{
+  "name": "malformed",
+  "integration": "ntopng",
+  "description": "A host table holding a string, a null, a record whose ip is missing, one whose numeric fields are strings, one whose nested bytes and thpt objects are strings, and a MAC table row that is not an object. None of those shapes appears in ntopng's own output; the run must skip what it cannot read and import the rest. Also pins the sentinel-MAC filter: the MAC table carries a broadcast row (FF:FF:FF:FF:FF:FF) and an all-zero row, and NEITHER may be indexed. Broadcast is the one that used to slip through -- the filter compared the NORMALIZED value against its sentinel list, and normalize_mac clears the locally-administered bit, rewriting ff:ff:ff:ff:ff:ff to fd:ff:ff:ff:ff:ff so it never matched. The all-zero address has that bit clear already, which is why only broadcast escaped. Indexing exactly 1 MAC from a 5-row table is the assertion.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/ntopng/interfaces.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [
+              {
+                "ifid": 1,
+                "ifname": "eth0",
+                "name": "eth0",
+                "is_packet_interface": true,
+                "is_pcap_interface": false,
+                "is_zmq_interface": false
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "macs",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/mac/macs_list.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [
+              "not-an-object",
+              null,
+              {
+                "mac": "AA:BB:CC:DD:EE:51",
+                "manufacturer": null,
+                "device_type": "not-an-object",
+                "seen_since": "never",
+                "hosts": "one"
+              },
+              {
+                "mac": "FF:FF:FF:FF:FF:FF",
+                "manufacturer": "Broadcast",
+                "device_type": {
+                  "device_type_label": "Unknown"
+                }
+              },
+              {
+                "mac": "00:00:00:00:00:00",
+                "manufacturer": null,
+                "device_type": {
+                  "device_type_label": "Unknown"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": {
+              "perPage": 250,
+              "currentPage": 1,
+              "data": [
+                "not-an-object",
+                null,
+                42,
+                {
+                  "key": "no_ip",
+                  "name": "no-address-host",
+                  "mac": "AA:BB:CC:DD:EE:52"
+                },
+                {
+                  "key": "bad_types",
+                  "ip": "192.0.2.51",
+                  "vlan": "thirty",
+                  "os": "windows",
+                  "mac": "AA:BB:CC:DD:EE:51",
+                  "name": "bad-types.example.com",
+                  "first_seen": "yesterday",
+                  "last_seen": null,
+                  "bytes": "not-an-object",
+                  "thpt": "not-an-object",
+                  "num_flows": null,
+                  "pool": "none",
+                  "is_multicast": null,
+                  "is_broadcast": null
+                },
+                {
+                  "key": "junk_ip",
+                  "ip": "not-an-address",
+                  "name": "junk",
+                  "mac": "AA:BB:CC:DD:EE:53"
+                }
+              ],
+              "sort": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "rc": -1,
+      "rc_str": "NOT_FOUND",
+      "rc_str_hr": "Not found",
+      "rsp": {}
+    }
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "ntopng:$HOST:0:192.0.2.51"
+    ],
+    "assets": [
+      {
+        "id": "ntopng:$HOST:0:192.0.2.51",
+        "fields": {
+          "hostnames": "bad-types.example.com",
+          "macAddresses": "a8:bb:cc:dd:ee:51"
+        },
+        "fields_absent": [
+          "os"
+        ]
+      }
+    ],
+    "log_contains": [
+      "ntopng: indexed 1 MACs on interface 1",
+      "skipped 5 records on interface 1 that were not addressable endpoints",
+      "ntopng: reported 1 assets from interface 1"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,131 @@
+{
+  "name": "filtered",
+  "integration": "phpipam",
+  "description": "The sections and address_tags include-filters, which are how an operator scopes a large IPAM down to the part runZero should own. Proves the filters accept a numeric ID (sections=10) and a NAME (address_tags=Used) interchangeably, that a subnet in an excluded section is never even walked so the filter saves requests rather than just assets, and that device import switches off independently. Each filter is given a single term because the harness refuses a kwarg containing a comma - the runZero CLI would split it into a second parameter - so the multi-term form cannot be exercised here.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "app_id": "runzero",
+    "username": "fixture-user",
+    "password": "fixture-pass",
+    "sections": "10",
+    "address_tags": "used",
+    "import_devices": "false"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/api/runzero/user/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": {"token": "filteredtoken00000000001", "expires": "2036-08-16 11:03:55"}, "time": 0.005}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/sections/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 1, "name": "Customers", "description": "Section for customers"},
+          {"id": 10, "name": "Lab Campus", "description": "Synthetic lab section"}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/tools/tags/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 1, "type": "Offline"},
+          {"id": 2, "type": "Used"},
+          {"id": 3, "type": "Reserved"},
+          {"id": 4, "type": "DHCP"}
+        ], "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/tools/locations/"},
+      "responses": [{"status": 404, "json": {"code": 404, "success": false, "message": "No locations found", "time": 0.001}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/tools/device_types/"},
+      "responses": [{"status": 200, "json": {"code": 200, "success": true, "data": [{"tid": 1, "tname": "Switch"}], "time": 0.001}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/vlans/"},
+      "responses": [{"status": 404, "json": {"code": 404, "success": false, "message": "No vlans found", "time": 0.001}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/devices/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 50, "hostname": "sw01.lab.example", "ip": "10.42.0.2", "type": 1, "sections": "10", "snmp_community": "labsecretcommunity"}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/subnets/20/addresses/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 100, "subnetId": 20, "ip": "10.42.0.1", "hostname": "used-tag.lab.example", "mac": "00:11:22:33:44:01", "tag": 2, "description": "tag Used, matched by name"},
+          {"id": 101, "subnetId": 20, "ip": "10.42.0.10", "hostname": "reserved-tag.lab.example", "mac": "aa:bb:cc:dd:ee:01", "tag": 3, "description": "tag Reserved, matched by id"},
+          {"id": 102, "subnetId": 20, "ip": "10.42.0.11", "hostname": "offline-tag.lab.example", "mac": "aa:bb:cc:dd:ee:02", "tag": 1, "description": "tag Offline, excluded"},
+          {"id": 103, "subnetId": 20, "ip": "10.42.0.12", "hostname": "dhcp-tag.lab.example", "mac": "aa:bb:cc:dd:ee:03", "tag": 4, "description": "tag DHCP, excluded"}
+        ], "time": 0.002}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/subnets/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": [
+          {"id": 5, "subnet": "10.10.1.0", "mask": "24", "sectionId": 1, "description": "Customers subnet, excluded section", "isFolder": 0, "location": []},
+          {"id": 20, "subnet": "10.42.0.0", "mask": "24", "sectionId": 10, "description": "Lab user subnet", "vlanId": 0, "isFolder": 0, "location": []}
+        ], "time": 0.004}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/api/runzero/subnets/"},
+      "responses": [{"status": 404, "json": {"code": 404, "success": false, "message": "No addresses found", "time": 0.001}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "phpipam:$HOST:address:100"
+    ],
+    "ids_absent": [
+      "phpipam:$HOST:address:101",
+      "phpipam:$HOST:address:102",
+      "phpipam:$HOST:address:103",
+      "phpipam:$HOST:device:50"
+    ],
+    "assets": [
+      {
+        "id": "phpipam:$HOST:address:100",
+        "comment": "Section matched by numeric ID 10; tag matched by NAME, case-insensitively, from the configured lower-case 'used' against phpIPAM's 'Used'.",
+        "fields": {"phpipam_tag": "Used", "phpipam_section": "Lab Campus"}
+      }
+    ],
+    "requests_include": [
+      {"path_contains": "/api/runzero/subnets/20/addresses/"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/runzero/subnets/5/addresses/"}
+    ],
+    "log_contains": [
+      "phpipam: reported 1 addresses"
+    ]
+  },
+
+  "check_determinism": true
+}

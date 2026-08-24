@@ -1,0 +1,31 @@
+{
+  "name": "malformed",
+  "integration": "tailscale",
+  "description": "The documented response is an object with a devices array. Calling .get on a list aborts a Starlark script outright, so the API answering with a bare array (which is what an error document or a proxy rewrite looks like) would take the whole import down with no diagnostic. The script shape-checks first; this proves it logs and exits cleanly with zero assets instead of crashing, and that no partial estate is emitted.",
+  "kwargs": {
+    "url": "$BASE",
+    "tailnet": "example.org",
+    "api_key_or_client_secret": "tskey-api-fixture-000001"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v2/tailnet/example.org/devices"},
+      "responses": [
+        {"status": 200, "json": [{"error": "this endpoint answered with a bare array"}]}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "tailscale: unexpected response shape from",
+      "tailscale: no devices found, or the API call failed"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

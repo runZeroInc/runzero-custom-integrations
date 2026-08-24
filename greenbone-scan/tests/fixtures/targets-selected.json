@@ -1,0 +1,61 @@
+{
+  "name": "targets-selected",
+  "integration": "greenbone-scan",
+  "script": "greenbone-scan/greenbone-scan.star",
+  "description": "Covers this integration's runZero half -- the target-selection stage -- and stops deliberately at the GMP boundary: the stop is made deterministic rather than left to a connection timeout by using transport=ssh with neither ssh_password nor ssh_private_key set, which gmp_connect rejects up front, so the run ends on a guard and never opens a socket. (The GMP leg itself is exercised by the scan-started, task-rejected, and hangup-rollback scenarios beside this one, over the harness's GMP TLS responder.) Everything before that boundary is real and asserted. The CSV body is the genuine /api/v1.0/export/org/assets.csv output -- all 57 columns in the order runzero/csvwriter/asset.go writes them, CRLF line endings, and a leading UTF-8 BOM, which the writer really does emit and which makes the first header literally '\\ufeffid'. That the walk still finds its column proves the reader tolerates it. `address` is GetFirstAddress(), ONE primary address per row, while `addresses_scope` beside it is every address space-joined; four of the five rows are deliberately multi-homed so those columns differ, and reading the wrong one selects nothing at all rather than coincidentally the same count. The five rows exercise the whole selection: two rows share 10.42.0.11 and must dedupe to one target; an IPv6 row is written fully expanded and must be selected in its canonical short form, since the script keys on str(ip_address(addr)) rather than on the raw text; and the last row is a hostname-only asset whose `address` is empty, which is ordinary for anything discovered without a network observation and must be skipped rather than sent to Greenbone as an empty target. '3 target address(es) selected' is therefore the assertion that all three of those happened -- 4 would mean the duplicate survived, 5 would mean the empty address did.",
+  "kwargs": {
+    "runzero_url": "$BASE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "export_filter": "alive:t",
+    "transport": "ssh",
+    "ssh_host": "127.0.0.1",
+    "ssh_username": "fixture",
+    "gmp_username": "admin",
+    "gmp_password": "fixture-gmp-password"
+  },
+  "routes": [
+    {
+      "name": "runzero asset CSV export",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.csv"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "text/csv; charset=utf-8"
+          },
+          "text": "\ufeffid,organization,site,detected_by,type,os,os_version,hw,address,addresses_scope,addresses_extra,newest_mac,newest_mac_vendor,newest_mac_age,macs,mac_vendors,hostname,hostnames,risk,risk_rank,criticality,criticality_rank,owners,tags,domains,service_count,service_count_tcp,service_count_udp,service_count_arp,service_count_icmp,lowest_ttl,lowest_rtt,services,alive,first_seen_unix,first_seen_iso,last_updated_unix,last_updated_iso,last_seen_unix,last_seen_iso,comments,service_ports_tcp,service_ports_udp,service_protocols,service_products,last_agent_name,last_task_id,source_ids,sources,custom_integration_ids,eol_os,eol_os_ext,serialNumbers,fp.os.cpe23,category,functions,vlan,purdue_level\r\n6f1b0a5e-2c48-4d1a-9f30-8c2b7a1d4e55,Fixture Org,HQ,arp,Server,Ubuntu Linux 24.04,24.04,,10.42.0.11,10.42.0.11 10.42.0.12,,,,,00:50:56:12:34:56,,app-01.corp.example.com,app-01.corp.example.com app-01,low,1,medium,2,,,,,,,,,,,,true,,,,,,,,,,,,,,,,,,,,,,,,\r\n7a2c1b6f-3d59-4e2b-8041-9d3c8b2e5f66,Fixture Org,HQ,arp,Server,Ubuntu Linux 24.04,,,10.42.0.11,10.42.0.11 10.42.0.13,,,,,,,app-01-second-nic.corp.example.com,,,,,,,,,,,,,,,,,true,,,,,,,,,,,,,,,,,,,,,,,,\r\n8b3d2c70-4e6a-4f3c-9152-ae4d9c3f6077,Fixture Org,HQ,syn,Network Printer,,,,192.168.7.31,192.168.7.31 192.168.7.32,,,,,3c:2a:f4:aa:bb:cc,,printer-lobby,,,,,,,,,,,,,,,,,true,,,,,,,,,,,,,,,,,,,,,,,,\r\n9c4e3d81-5f7b-4a4d-a263-bf5eadaf7188,Fixture Org,HQ,icmp6,Server,,,,2001:0db8:0000:0000:0000:0000:0000:0001,2001:db8::1 2001:db8::2,,,,,,,v6-only.corp.example.com,,,,,,,,,,,,,,,,,true,,,,,,,,,,,,,,,,,,,,,,,,\r\nad5f4e92-6a8c-4b5e-b374-c06fbeb08299,Fixture Org,HQ,custom-integration,Cloud Resource,,,,,,,,,,,,queue-consumer,,,,,,,,,,,,,,,,,true,,,,,,,,,,,,,,,,,,,,,,,,\r\n"
+        }
+      ]
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.csv",
+        "query_contains": "search=alive%3At",
+        "header_contains": "Bearer ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.csv",
+        "header": {
+          "Accept": "text/csv"
+        }
+      }
+    ],
+    "log_contains": [
+      "greenbone-scan: 3 target address(es) selected",
+      "connection failed: SSH transport requires ssh_password or ssh_private_key"
+    ]
+  }
+}

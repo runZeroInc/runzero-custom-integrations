@@ -1,0 +1,108 @@
+{
+  "name": "auth-refresh",
+  "integration": "nexthink",
+  "description": "The Nexthink token is short-lived, so the export call can be rejected with a 401 in the middle of a run. Proves the 401 is turned into a re-authentication rather than an abort: a second token is minted, the export is started again with it (as the documented POST with a JSON queryId body), and the run continues. The export then reports FAILED, which must be logged by name and end the run with zero assets rather than looping until the poll budget is spent.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "query_id": "custom_devices_query",
+    "scope": "service:integration"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "expired-token",
+            "token_type": "Bearer"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "access_token": "refreshed-token",
+            "token_type": "Bearer"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export-401-then-ok",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/nql/export"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "json": {
+            "message": "token expired"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "exportId": "exp-0002"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status-failed",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/nql/status/exp-0002"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "RUNNING"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "FAILED",
+            "errorMessage": "query exceeded the row budget"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 6,
+    "log_contains": [
+      "NQL export failed with status: FAILED",
+      "No rows returned from Nexthink export workflow"
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/v1/nql/export",
+        "body_contains": "\"queryId\":\"custom_devices_query\""
+      },
+      {
+        "header_contains": "expired-token"
+      },
+      {
+        "header_contains": "refreshed-token"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

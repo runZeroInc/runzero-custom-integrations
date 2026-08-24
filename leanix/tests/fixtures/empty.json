@@ -1,0 +1,47 @@
+{
+  "name": "empty",
+  "integration": "leanix",
+  "description": "A workspace with no fact sheets of the requested types. Must report zero assets and finish cleanly, not fail.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "fact_sheet_types": "ITComponent",
+    "page_size": 100
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/services/mtm/v1/oauth2/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "bearer-tok-1", "token_type": "bearer", "expires_in": 3599}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 0,
+                "pageInfo": {"hasNextPage": false, "endCursor": null},
+                "edges": []
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "log_contains": ["leanix: reported 0 assets"]
+  },
+  "check_determinism": false
+}

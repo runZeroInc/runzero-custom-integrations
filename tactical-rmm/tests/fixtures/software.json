@@ -1,0 +1,125 @@
+{
+  "name": "software",
+  "integration": "tactical-rmm",
+  "description": "Software import enabled against two agents. The first answers with the documented {id, agent, software:[...]} object; the second answers 200 with a bare [], which is what Tactical RMM's own test suite asserts for an agent that has no software record. Proves both shapes are handled, that the per-agent request goes to /software/{agent_id}/ rather than /agents/{agent_id}/software/, and that a run continues when one agent has nothing. Software rows are taken from the project's own test_data/software1.json fixture.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-tactical-key",
+    "extract_software": "true"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/agents/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "agent_id": "kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+              "hostname": "VNVMHOSTSRV4",
+              "site_name": "Main Office",
+              "client_name": "Acme Corp",
+              "monitoring_type": "server",
+              "status": "online",
+              "last_seen": "2026-06-15T12:55:15.110723Z",
+              "boot_time": 1750000000.0,
+              "plat": "windows",
+              "goarch": "amd64",
+              "version": "2.9.0",
+              "operating_system": "Windows 10 Pro, 64 bit v22H2 (build 19045.3324)",
+              "public_ip": "203.0.113.10",
+              "local_ips": "192.0.2.121",
+              "make_model": "Dell Inc. OptiPlex 7090",
+              "serial_number": "ABCD123456"
+            },
+            {
+              "agent_id": "zYxWvUtSrQpOnMlKjIhGfEdCbAzYxWvUtSrQpOnM",
+              "hostname": "kiosk01",
+              "site_name": "Lobby",
+              "client_name": "Acme Corp",
+              "monitoring_type": "workstation",
+              "status": "online",
+              "last_seen": "2026-06-15T12:50:00.000000Z",
+              "plat": "windows",
+              "goarch": "amd64",
+              "version": "2.9.0",
+              "operating_system": "Windows 10 Pro, 64 bit v22H2 (build 19045.3324)",
+              "local_ips": "192.0.2.122",
+              "make_model": "Dell Inc. OptiPlex 3080"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/software/kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 42,
+            "agent": 17,
+            "software": [
+              {
+                "name": "7-Zip 19.00 (x64)",
+                "size": "5.2 MB",
+                "source": "",
+                "version": "19.00",
+                "location": "C:\\Program Files\\7-Zip\\",
+                "publisher": "Igor Pavlov",
+                "uninstall": "C:\\Program Files\\7-Zip\\Uninstall.exe",
+                "install_date": "0001-01-01 00:00:00 +0000 UTC"
+              },
+              {
+                "name": "Git version 2.22.0.windows.1",
+                "size": "262.0 MB",
+                "source": "",
+                "version": "2.22.0.windows.1",
+                "location": "C:\\Program Files\\Git\\",
+                "publisher": "The Git Development Community",
+                "uninstall": "\"C:\\Program Files\\Git\\unins000.exe\"",
+                "install_date": "2019-06-09 00:00:00 +0000 UTC"
+              },
+              {
+                "name": "",
+                "version": "1.0",
+                "publisher": "Nameless Vendor"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/software/zYxWvUtSrQpOnMlKjIhGfEdCbAzYxWvUtSrQpOnM/"},
+      "responses": [{"status": 200, "json": []}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 2,
+    "request_count": 3,
+    "min_software_total": 2,
+    "assets": [
+      {
+        "id": "tacticalrmm:$HOST:kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+        "fields": {
+          "os": "Windows 10 Pro",
+          "osVersion": "22H2 (build 19045.3324)"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/agents/"},
+      {"method": "GET", "path": "/software/kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB/"},
+      {"method": "GET", "path": "/software/zYxWvUtSrQpOnMlKjIhGfEdCbAzYxWvUtSrQpOnM/"}
+    ],
+    "requests_absent": [{"path_contains": "/agents/kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB/software"}]
+  },
+
+  "check_determinism": true
+}

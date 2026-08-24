@@ -1,0 +1,115 @@
+{
+  "name": "packages",
+  "integration": "puppetdb",
+  "description": "Puppet Enterprise package inventory plus the optional deactivated-node pass. Proves the package-inventory endpoint is queried once per node page rather than once per node, that its rows become Software keyed by provider/name/version with duplicates folded, that a package row for an unknown certname is ignored, and that enabling the inactive pass makes the package query state-agnostic so a deactivated node still gets its inventory. The inactive pass must send an explicit node_state predicate, because the plain routes restrict themselves to active nodes; the active pass must not send one.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_token": "fixture-rbac-token",
+    "include_packages": "true",
+    "include_inactive": "true",
+    "page_size": "500",
+    "fact_page_size": "2000"
+  },
+  "routes": [
+    {
+      "name": "facts-inactive-pass",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "inactive"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "retired.corp.example.com", "name": "networking", "value": {"fqdn": "retired.corp.example.com", "hostname": "retired", "domain": "corp.example.com", "ip": "10.83.0.9", "mac": "00:50:56:cc:00:09", "interfaces": {"eth0": {"mac": "00:50:56:cc:00:09", "bindings": [{"address": "10.83.0.9"}]}}}}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "facts-active-pass",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "app01.corp.example.com", "name": "networking", "value": {"fqdn": "app01.corp.example.com", "hostname": "app01", "domain": "corp.example.com", "ip": "10.83.0.1", "mac": "00:50:56:cc:00:01", "interfaces": {"eth0": {"mac": "00:50:56:cc:00:01", "bindings": [{"address": "10.83.0.1"}]}}}},
+            {"certname": "app01.corp.example.com", "name": "os", "value": {"name": "Ubuntu", "family": "Debian", "release": {"full": "22.04", "major": "22"}}}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "package-inventory",
+      "match": {"method": "GET", "path": "/pdb/query/v4/package-inventory"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "app01.corp.example.com", "package_name": "openssl", "version": "3.0.2-0ubuntu1.15", "provider": "apt"},
+            {"certname": "app01.corp.example.com", "package_name": "nginx", "version": "1.22.0-1", "provider": "apt"},
+            {"certname": "app01.corp.example.com", "package_name": "openssl", "version": "3.0.2-0ubuntu1.15", "provider": "apt"},
+            {"certname": "app01.corp.example.com", "package_name": "", "version": "9.9", "provider": "apt"},
+            {"certname": "", "package_name": "orphan-package", "version": "1.0", "provider": "apt"},
+            {"certname": "not-in-this-page.corp.example.com", "package_name": "ignored", "version": "1.0", "provider": "apt"}
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {"certname": "retired.corp.example.com", "package_name": "openssh-server", "version": "8.9p1-3", "provider": "apt"}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "nodes-inactive-pass",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "inactive"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "retired.corp.example.com", "facts_environment": "production", "deactivated": "2026-01-15T00:00:00.000Z", "report_timestamp": "2026-01-14T22:00:00.000Z"}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "nodes-active-pass",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "app01.corp.example.com", "facts_environment": "production", "latest_report_status": "unchanged", "report_timestamp": "2026-02-03T08:00:00.000Z"}
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "puppetdb:$HOST:app01.corp.example.com",
+      "puppetdb:$HOST:retired.corp.example.com"
+    ],
+    "min_software_total": 3,
+    "log_contains": [
+      "reported 1 active nodes",
+      "reported 1 inactive nodes"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/pdb/query/v4/package-inventory", "query_contains": "app01.corp.example.com"},
+      {"method": "GET", "path": "/pdb/query/v4/package-inventory", "query_contains": "retired.corp.example.com"},
+      {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "inactive"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

@@ -1,0 +1,101 @@
+{
+ "name": "future-timestamp",
+ "integration": "extrahop",
+ "description": "REGRESSION LOCK for unclamped timestamps. last_seen_time/mod_time/discover_time went through from_timestamp with no clamp-to-now, and the platform drops an ENTIRE ImportAsset whose lastSeen is ahead of the importing clock -- so a sensor with a fast clock silently lost every recently-active device. Device 701 carries permanently-future values (year 2999) in discover_time, last_seen_time, and mod_time, all of which must now be capped at the current time so the asset imports; device 702 is a sane-clock control on the same page. Also covers the numeric-string delivery of mod_time and a zero last_seen_time meaning never-set.",
+ "kwargs": {
+  "url": "$BASE",
+  "deployment": "enterprise",
+  "api_key": "fixture-api-key",
+  "require_ip_address": "false",
+  "include_software": "false"
+ },
+ "routes": [
+  {
+   "name": "networks",
+   "match": {
+    "method": "GET",
+    "path": "/api/v1/networks"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": [
+      {
+       "node_id": null,
+       "appliance_uuid": "appl-uuid-ft"
+      }
+     ]
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "device-search",
+   "match": {
+    "method": "POST",
+    "path": "/api/v1/devices/search"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": [
+      {
+       "id": 701,
+       "discovery_id": "fastclock01",
+       "node_id": null,
+       "is_l3": false,
+       "macaddr": "00:11:22:33:99:01",
+       "ipaddr4": "10.42.0.7",
+       "dns_name": "fastclock01.corp.example.com",
+       "role": "pc",
+       "discover_time": 32472144000000,
+       "last_seen_time": 32475000000000,
+       "mod_time": 32475000000000
+      },
+      {
+       "id": 702,
+       "discovery_id": "saneclock02",
+       "node_id": null,
+       "is_l3": false,
+       "macaddr": "00:11:22:33:99:02",
+       "ipaddr4": "10.42.0.8",
+       "dns_name": "saneclock02.corp.example.com",
+       "role": "pc",
+       "discover_time": 1780000000000,
+       "last_seen_time": 0,
+       "mod_time": "1786000000000"
+      }
+     ]
+    }
+   ],
+   "when_exhausted": "empty"
+  }
+ ],
+ "expect": {
+  "asset_count": 2,
+  "ids": [
+   "extrahop:appl-uuid-ft:fastclock01",
+   "extrahop:appl-uuid-ft:saneclock02"
+  ],
+  "assets": [
+   {
+    "id": "extrahop:appl-uuid-ft:fastclock01",
+    "fields": {
+     "hostnames": "fastclock01.corp.example.com"
+    }
+   },
+   {
+    "id": "extrahop:appl-uuid-ft:saneclock02",
+    "fields": {
+     "hostnames": "saneclock02.corp.example.com"
+    }
+   }
+  ],
+  "log_contains": [
+   "extrahop: reported 2 devices"
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

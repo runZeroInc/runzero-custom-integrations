@@ -1,0 +1,62 @@
+{
+  "name": "minimal-fallback",
+  "integration": "leanix",
+  "description": "A workspace whose customized meta model rejects a standard field. The first GraphQL request (whose body contains the word lifecycle) is answered with a GraphQL error; the retry uses the minimal field set, no longer matches the lifecycle route, and succeeds. Proves a customized meta model degrades to a smaller import instead of importing nothing.\n\nInvariant has_correlator is skipped by design: logical inventory records without addressing are the normal case, per the README.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "fact_sheet_types": "ITComponent",
+    "page_size": 100
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/services/mtm/v1/oauth2/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "bearer-tok-1", "token_type": "bearer", "expires_in": 3599}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql-full-rejected",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql", "body_contains": "lifecycle"},
+      "responses": [
+        {"status": 200, "json": {"errors": [{"message": "Validation error: Field 'lifecycle' in type 'BaseFactSheet' is undefined"}], "data": null}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql-minimal",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 1,
+                "pageInfo": {"hasNextPage": false, "endCursor": "END"},
+                "edges": [
+                  {"node": {"id": "33333333-3333-4333-8333-333333333333", "name": "HAProxy", "displayName": "HAProxy", "type": "ITComponent", "description": "Load balancer", "tags": []}}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["leanix:$HOST:33333333-3333-4333-8333-333333333333"],
+    "request_count": 3,
+    "log_contains": [
+      "leanix: full query rejected",
+      "leanix: reported 1 assets"
+    ]
+  },
+  "invariants": {"skip": ["has_correlator"]},
+  "check_determinism": true
+}

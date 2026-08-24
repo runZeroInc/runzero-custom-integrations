@@ -1,0 +1,473 @@
+{
+ "name": "paged-compliance",
+ "integration": "drata",
+ "description": "The compliance-check mapping, the owner block, and a genuine two-page advance -- the three paths no other scenario exercised, which is exactly where a real tenant's shape could diverge unobserved (real Drata devices virtually always carry compliance checks). Page 1 is exactly the page size (50 rows) so the walk must genuinely advance to page 2 and stop on the short page; requests_absent proves no page 3. Asset 601 carries all six known check types plus a seventh (SCREEN_RECORDING_BLOCKED) Drata could introduce tomorrow: the unknown type must be LOGGED, not abort the run -- the historical defect here concatenated the Starlark builtin `type` into the message and took the whole import down. Asset 602 carries a present-but-null complianceChecks (a .get default does not defend a null), 604 carries a bare string inside the checks list, 605 a null device block, and one row in the data array is a bare string; each costs itself, never the run. namespaced_ids is skipped: the id is the bare numeric Drata id, un-namespaced (reported defect, acknowledged in the README -- one credential can only see one workspace).",
+ "kwargs": {
+  "url": "$BASE",
+  "api_token": "fixture-token"
+ },
+ "routes": [
+  {
+   "name": "assets-page-2",
+   "match": {
+    "method": "GET",
+    "path": "/public/assets",
+    "query_contains": "page=2&"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "total": 52,
+      "data": [
+       {
+        "id": 701,
+        "name": "syn-drata-page2-a",
+        "device": {
+         "osVersion": "macOS 14.5",
+         "macAddress": [
+          "00:11:22:33:77:71"
+         ],
+         "complianceChecks": [
+          {
+           "id": 9301,
+           "type": "LOCK_SCREEN",
+           "status": "FAIL",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          }
+         ]
+        }
+       },
+       {
+        "id": 702,
+        "name": "syn-drata-page2-b",
+        "owner": {
+         "id": 43,
+         "email": "sam@example.com",
+         "firstName": "Sam",
+         "lastName": "Rey"
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "assets-page-1",
+   "match": {
+    "method": "GET",
+    "path": "/public/assets"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "total": 52,
+      "data": [
+       {
+        "id": 601,
+        "name": "syn-drata-full",
+        "description": "laptop with the full compliance surface",
+        "assetType": "DEVICE",
+        "assetProvider": "AGENT",
+        "employmentStatus": "CURRENT_EMPLOYEE",
+        "createdAt": "2026-01-10T08:00:00.000Z",
+        "updatedAt": "2026-08-01T08:00:00.000Z",
+        "device": {
+         "osVersion": "macOS 14.5",
+         "serialNumber": "C02SYN601",
+         "model": "MacBook Pro 14",
+         "agentVersion": "3.9.1",
+         "macAddress": [
+          "00:11:22:33:77:01"
+         ],
+         "encryptionEnabled": true,
+         "firewallEnabled": true,
+         "gateKeeperEnabled": true,
+         "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+         "sourceType": "AGENT",
+         "appsCount": 118,
+         "isDeviceCompliant": true,
+         "complianceChecks": [
+          {
+           "id": 9101,
+           "type": "AGENT_INSTALLED",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          },
+          {
+           "id": 9102,
+           "type": "PASSWORD_MANAGER",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          },
+          {
+           "id": 9103,
+           "type": "HDD_ENCRYPTION",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          },
+          {
+           "id": 9104,
+           "type": "ANTIVIRUS",
+           "status": "FAIL",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          },
+          {
+           "id": 9105,
+           "type": "AUTO_UPDATES",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          },
+          {
+           "id": 9106,
+           "type": "LOCK_SCREEN",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          },
+          {
+           "id": 9107,
+           "type": "SCREEN_RECORDING_BLOCKED",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          }
+         ]
+        },
+        "owner": {
+         "id": 42,
+         "email": "jane@example.com",
+         "firstName": "Jane",
+         "lastName": "Doe",
+         "drataTermsAgreedAt": "2025-11-01T08:00:00.000Z",
+         "createdAt": "2025-11-01T08:00:00.000Z",
+         "updatedAt": "2026-08-01T08:00:00.000Z",
+         "roles": [
+          "EMPLOYEE"
+         ]
+        }
+       },
+       {
+        "id": 602,
+        "name": "syn-drata-null-checks",
+        "device": {
+         "osVersion": "Windows 11",
+         "serialNumber": "SYN602",
+         "macAddress": "00:11:22:33:77:02",
+         "complianceChecks": null
+        }
+       },
+       "not-an-object",
+       {
+        "id": 604,
+        "name": "syn-drata-string-check",
+        "device": {
+         "osVersion": "Ubuntu 24.04",
+         "macAddress": [
+          "00:11:22:33:77:04"
+         ],
+         "complianceChecks": [
+          "oops-a-string",
+          {
+           "id": 9204,
+           "type": "ANTIVIRUS",
+           "status": "PASS",
+           "createdAt": "2026-01-10T08:00:00.000Z",
+           "updatedAt": "2026-08-01T08:00:00.000Z",
+           "lastCheckedAt": "2026-08-20T08:00:00.000Z",
+           "expiresAt": "2026-09-01T08:00:00.000Z"
+          }
+         ]
+        }
+       },
+       {
+        "id": 605,
+        "name": "syn-drata-null-device",
+        "device": null
+       },
+       {
+        "id": 6105,
+        "name": "syn-drata-filler-05"
+       },
+       {
+        "id": 6106,
+        "name": "syn-drata-filler-06"
+       },
+       {
+        "id": 6107,
+        "name": "syn-drata-filler-07"
+       },
+       {
+        "id": 6108,
+        "name": "syn-drata-filler-08"
+       },
+       {
+        "id": 6109,
+        "name": "syn-drata-filler-09"
+       },
+       {
+        "id": 6110,
+        "name": "syn-drata-filler-10"
+       },
+       {
+        "id": 6111,
+        "name": "syn-drata-filler-11"
+       },
+       {
+        "id": 6112,
+        "name": "syn-drata-filler-12"
+       },
+       {
+        "id": 6113,
+        "name": "syn-drata-filler-13"
+       },
+       {
+        "id": 6114,
+        "name": "syn-drata-filler-14"
+       },
+       {
+        "id": 6115,
+        "name": "syn-drata-filler-15"
+       },
+       {
+        "id": 6116,
+        "name": "syn-drata-filler-16"
+       },
+       {
+        "id": 6117,
+        "name": "syn-drata-filler-17"
+       },
+       {
+        "id": 6118,
+        "name": "syn-drata-filler-18"
+       },
+       {
+        "id": 6119,
+        "name": "syn-drata-filler-19"
+       },
+       {
+        "id": 6120,
+        "name": "syn-drata-filler-20"
+       },
+       {
+        "id": 6121,
+        "name": "syn-drata-filler-21"
+       },
+       {
+        "id": 6122,
+        "name": "syn-drata-filler-22"
+       },
+       {
+        "id": 6123,
+        "name": "syn-drata-filler-23"
+       },
+       {
+        "id": 6124,
+        "name": "syn-drata-filler-24"
+       },
+       {
+        "id": 6125,
+        "name": "syn-drata-filler-25"
+       },
+       {
+        "id": 6126,
+        "name": "syn-drata-filler-26"
+       },
+       {
+        "id": 6127,
+        "name": "syn-drata-filler-27"
+       },
+       {
+        "id": 6128,
+        "name": "syn-drata-filler-28"
+       },
+       {
+        "id": 6129,
+        "name": "syn-drata-filler-29"
+       },
+       {
+        "id": 6130,
+        "name": "syn-drata-filler-30"
+       },
+       {
+        "id": 6131,
+        "name": "syn-drata-filler-31"
+       },
+       {
+        "id": 6132,
+        "name": "syn-drata-filler-32"
+       },
+       {
+        "id": 6133,
+        "name": "syn-drata-filler-33"
+       },
+       {
+        "id": 6134,
+        "name": "syn-drata-filler-34"
+       },
+       {
+        "id": 6135,
+        "name": "syn-drata-filler-35"
+       },
+       {
+        "id": 6136,
+        "name": "syn-drata-filler-36"
+       },
+       {
+        "id": 6137,
+        "name": "syn-drata-filler-37"
+       },
+       {
+        "id": 6138,
+        "name": "syn-drata-filler-38"
+       },
+       {
+        "id": 6139,
+        "name": "syn-drata-filler-39"
+       },
+       {
+        "id": 6140,
+        "name": "syn-drata-filler-40"
+       },
+       {
+        "id": 6141,
+        "name": "syn-drata-filler-41"
+       },
+       {
+        "id": 6142,
+        "name": "syn-drata-filler-42"
+       },
+       {
+        "id": 6143,
+        "name": "syn-drata-filler-43"
+       },
+       {
+        "id": 6144,
+        "name": "syn-drata-filler-44"
+       },
+       {
+        "id": 6145,
+        "name": "syn-drata-filler-45"
+       },
+       {
+        "id": 6146,
+        "name": "syn-drata-filler-46"
+       },
+       {
+        "id": 6147,
+        "name": "syn-drata-filler-47"
+       },
+       {
+        "id": 6148,
+        "name": "syn-drata-filler-48"
+       },
+       {
+        "id": 6149,
+        "name": "syn-drata-filler-49"
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 51,
+  "ids": [
+   "601",
+   "602",
+   "604",
+   "605",
+   "701",
+   "702"
+  ],
+  "request_count": 2,
+  "assets": [
+   {
+    "id": "601",
+    "fields": {
+     "macAddresses": "00:11:22:33:77:01",
+     "device.complianceCheckDiskEncryptionStatus": "PASS",
+     "device.complianceCheckAntivirusStatus": "FAIL",
+     "device.complianceCheckLockScreenType": "LOCK_SCREEN",
+     "owner.email": "jane@example.com",
+     "device.serialNumber": "C02SYN601"
+    }
+   },
+   {
+    "id": "602",
+    "fields": {
+     "macAddresses": "00:11:22:33:77:02"
+    }
+   },
+   {
+    "id": "604",
+    "fields": {
+     "device.complianceCheckAntivirusStatus": "PASS"
+    }
+   },
+   {
+    "id": "702",
+    "fields": {
+     "owner.email": "sam@example.com"
+    }
+   }
+  ],
+  "requests_include": [
+   {
+    "path": "/public/assets",
+    "query_contains": "page=1&"
+   },
+   {
+    "path": "/public/assets",
+    "query_contains": "page=2&"
+   },
+   {
+    "path": "/public/assets",
+    "query_contains": "assetClassType=HARDWARE"
+   }
+  ],
+  "requests_absent": [
+   {
+    "path": "/public/assets",
+    "query_contains": "page=3&"
+   }
+  ],
+  "log_contains": [
+   "drata: unrecognized compliance check: SCREEN_RECORDING_BLOCKED",
+   "drata: skipping non-object asset row",
+   "drata: skipping malformed compliance check entry"
+  ]
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
+}

@@ -1,0 +1,132 @@
+{
+  "name": "malformed-details",
+  "integration": "bitsight",
+  "description": "REGRESSION LOCK on the .get-default-vs-null class inside build_vuln and build_asset. Every field here is PRESENT but null or re-typed, which .get defaults do not cover: a finding with 'dest_port': null used to die in int(None), an explicit-null cvss died in None.get('base'), a null remediation message died in string concatenation, and a non-string threat_groups member died in '\\n'.join. On the asset side a null hosted_by/findings/threats block, a non-string tag, a non-dict product, a non-dict row, and a row with no asset name are all served together. One record like any of these used to end the run with zero assets imported; now the malformed row is skipped with a count and every finding still becomes a vulnerability.\n\nno_placeholder_hostnames is skipped for the reason the happy scenario records.",
+  "kwargs": {
+    "url": "$BASE",
+    "company_id": "co-fixture",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 3,
+            "links": {"next": null, "previous": null},
+            "results": [
+              {
+                "asset": "198.51.100.30",
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "high",
+                "tags": [null, "Guest Wifi", 42],
+                "hosted_by": null,
+                "origin_subsidiary": null,
+                "cloud_context": null,
+                "findings": null,
+                "threats": null,
+                "products": [null, "bare-string", {"name": "nginx"}]
+              },
+              "a-row-the-api-degraded-into-a-string",
+              {
+                "asset_type": "ip",
+                "is_ip": true,
+                "importance": "low"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "findings",
+      "match": {
+        "method": "GET",
+        "path": "/ratings/v1/companies/co-fixture/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 4,
+            "links": {"next": null, "previous": null},
+            "results": [
+              {
+                "risk_vector_label": "Patching Cadence",
+                "severity": 7.0,
+                "first_seen": "2026-01-05",
+                "details": {
+                  "dest_port": null,
+                  "cvss": null,
+                  "observed_ips": null,
+                  "diligence_annotations": {
+                    "message": "SYN-NULL-PORT-AND-CVSS",
+                    "Title": "A diligence finding without a socket",
+                    "transport": "tcp"
+                  }
+                }
+              },
+              {
+                "risk_vector_label": "Open Ports",
+                "severity": "high",
+                "details": {
+                  "dest_port": "not-a-number",
+                  "cvss": {"base": null},
+                  "observed_ips": ["198.51.100.30:8443"],
+                  "diligence_annotations": null
+                }
+              },
+              {
+                "risk_vector_label": "SSL Configurations",
+                "severity": 5.0,
+                "first_seen": "2026-02-01",
+                "threat_groups": ["APT-1", 42, null, {"name": "not-a-string"}],
+                "details": {
+                  "dest_port": 443,
+                  "cvss": {"base": [5.8]},
+                  "observed_ips": ["198.51.100.30:443"],
+                  "remediation": [null, {"message": null, "help_text": null}, {"message": "Fix", "help_text": "Update the service"}],
+                  "diligence_annotations": {
+                    "message": "SYN-NULL-REMEDIATION",
+                    "Title": "Null remediation members and mixed threat groups",
+                    "transport": "tcp"
+                  }
+                }
+              },
+              {
+                "risk_vector_label": "Web Application Headers",
+                "severity": 2.0,
+                "details": null
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["bitsight:co-fixture:198.51.100.30"],
+    "min_vulnerabilities_total": 4,
+    "request_count": 2,
+    "log_contains": [
+      "bitsight: skipped 1 records with no asset field",
+      "bitsight: reported 1 assets"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_placeholder_hostnames"
+    ]
+  }
+}

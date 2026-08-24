@@ -1,0 +1,53 @@
+{
+  "name": "paged",
+  "description": "Two-page cursor walk driven by links.pages.next. Page 1 hands back an absolute next URL, which the run must follow, and page 2 omits it, which must end the walk. This is the regression test for the truncation defect: the integration used to fetch /v2/droplets once and ignore links.pages.next, so any account with more than 20 droplets was silently cut off. namespaced_ids is skipped: the id is the bare droplet number with no account scope (reported defect).",
+  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "routes": [
+    {
+      "name": "droplets-page-2",
+      "match": {"method": "GET", "path": "/v2/droplets", "query_contains": "page=2&per_page=2"},
+      "responses": [
+        {"status": 200, "json": {
+          "droplets": [
+            {"id": 3200003, "name": "fixture-page2-a", "image": {"distribution": "Ubuntu"},
+             "networks": {"v4": [{"ip_address": "192.0.2.23", "type": "public"}]}},
+            {"id": 3200004, "name": "fixture-page2-b", "image": {"distribution": "Ubuntu"},
+             "networks": {"v4": [{"ip_address": "192.0.2.24", "type": "public"}]}}
+          ],
+          "links": {"pages": {"prev": "$BASE/v2/droplets?page=1&per_page=2"}},
+          "meta": {"total": 4}
+        }}
+      ]
+    },
+    {
+      "name": "droplets-page-1",
+      "match": {"method": "GET", "path": "/v2/droplets"},
+      "responses": [
+        {"status": 200, "json": {
+          "droplets": [
+            {"id": 3200001, "name": "fixture-page1-a", "image": {"distribution": "Debian"},
+             "networks": {"v4": [{"ip_address": "192.0.2.21", "type": "public"}]}},
+            {"id": 3200002, "name": "fixture-page1-b", "image": {"distribution": "Debian"},
+             "networks": {"v4": [{"ip_address": "192.0.2.22", "type": "public"}]}}
+          ],
+          "links": {"pages": {"next": "$BASE/v2/droplets?page=2&per_page=2",
+                              "last": "$BASE/v2/droplets?page=2&per_page=2"}},
+          "meta": {"total": 4}
+        }}
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": ["3200001", "3200002", "3200003", "3200004"],
+    "assets": [
+      {"id": "3200004", "fields": {"hostnames": "fixture-page2-b", "ipAddresses": "192.0.2.24"}}
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"path": "/v2/droplets", "query_contains": "per_page=200"},
+      {"path": "/v2/droplets", "query_contains": "page=2&per_page=2"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

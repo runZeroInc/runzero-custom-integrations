@@ -1,0 +1,98 @@
+{
+  "name": "malformed-cve",
+  "integration": "cyberwatch",
+  "description": "Cyberwatch records non-CVE advisory codes in cve_announcements (vendor bulletins, its own CW- identifiers). Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and a miss fails the whole ImportAsset, aborting the run and losing every asset already parsed -- .strip().upper() does not screen the shape. The finding must still be imported, named by the raw code with the code kept as an attribute, and only the cve field dropped.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_access_key": "fixture-access",
+    "api_secret_key": "fixture-secret",
+    "include_details": "true"
+  },
+  "routes": [
+    {
+      "name": "server-list",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 201,
+              "hostname": "ot-hmi-01",
+              "category": "industrial_device",
+              "status": "active",
+              "analyzed_at": "2026-08-14T09:30:00.000Z",
+              "addresses": ["10.71.4.21"],
+              "os": {"name": "VxWorks 6.9", "type": "Os::Vxworks"},
+              "cve_announcements_count": 3
+            },
+            {
+              "id": 202,
+              "hostname": "ot-hmi-02",
+              "category": "server",
+              "status": "active",
+              "analyzed_at": "2026-08-14T09:35:00.000Z",
+              "addresses": ["10.71.4.22"],
+              "os": {"name": "Windows Server 2019", "type": "Os::Windows"},
+              "cve_announcements_count": 0
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vuln-detail-201",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers/201"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": 201,
+            "addresses": ["10.71.4.21"],
+            "analyzed_at": "2026-08-14T09:30:00.000Z",
+            "cve_announcements": [
+              {"cve_code": "CW-2026-0001", "score": 8.1, "active": true},
+              {"cve_code": "cve-2026-44444", "score": 6.5, "active": true},
+              {"cve_code": "CVE-2026-44445", "score": 9.0, "active": true}
+            ],
+            "updates": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-detail-201",
+      "match": {"method": "GET", "path": "/api/v3/assets/servers/201"},
+      "responses": [
+        {"status": 200, "json": {"id": 201, "packages": [], "ports": [], "services": [], "metadata": []}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vuln-detail-202",
+      "match": {"method": "GET", "path": "/api/v3/vulnerabilities/servers/202"},
+      "responses": [
+        {"status": 200, "json": {"id": 202, "addresses": ["10.71.4.22"], "cve_announcements": [], "updates": []}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-detail-202",
+      "match": {"method": "GET", "path": "/api/v3/assets/servers/202"},
+      "responses": [
+        {"status": 200, "json": {"id": 202, "packages": [], "ports": [], "services": [], "metadata": []}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["cyberwatch:127.0.0.1:201", "cyberwatch:127.0.0.1:202"],
+    "min_vulnerabilities_total": 3
+  },
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,736 @@
+{
+  "name": "happy",
+  "integration": "nautobot",
+  "description": "A Nautobot 2.x estate with three DCIM devices and one virtual machine. Payload keys and nesting follow a real depth=1 capture from demo.nautobot.com published as a test fixture by the gonautobot client, with synthetic identifiers and RFC 5737 addressing substituted. Proves the four things that distinguish Nautobot from NetBox and from a naive DRF client: status and role are related objects carrying a name rather than {value,label} choice dicts; interface type IS a {value,label} choice dict and a 'virtual' one is pooled rather than emitted as a second endpoint; device_type.manufacturer collapses to an {id,object_type,url} triple at depth=1 and so has to be joined from the manufacturers table; and software_version names its field 'version', not 'name'. Also proves the primary IP rides on the first physical interface, that an ip-only device still gets an interface, and that a disabled interface is skipped.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "0123456789abcdef0123456789abcdef01234567",
+    "api_version": "2.4",
+    "page_size": "100"
+  },
+  "routes": [
+    {
+      "name": "manufacturers",
+      "match": {"method": "GET", "path": "/api/dcim/manufacturers/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "next": null,
+            "previous": null,
+            "results": [
+              {
+                "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                "object_type": "dcim.manufacturer",
+                "display": "Cisco",
+                "url": "$BASE/api/dcim/manufacturers/b329ec0d-5ee7-47d8-b4a7-3951c28e2979/",
+                "natural_slug": "cisco_b329",
+                "name": "Cisco",
+                "description": "",
+                "created": "2023-09-21T00:00:00Z",
+                "last_updated": "2023-09-21T19:46:47.125611Z",
+                "custom_fields": {}
+              },
+              {
+                "id": "c1d2e3f4-0000-4000-8000-000000000042",
+                "object_type": "dcim.manufacturer",
+                "display": "Dell",
+                "url": "$BASE/api/dcim/manufacturers/c1d2e3f4-0000-4000-8000-000000000042/",
+                "natural_slug": "dell_c1d2",
+                "name": "Dell",
+                "description": "",
+                "created": "2023-09-21T00:00:00Z",
+                "last_updated": "2023-09-21T19:46:47.125611Z",
+                "custom_fields": {}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/dcim/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 3,
+            "next": null,
+            "previous": null,
+            "results": [
+              {
+                "id": "89b2ac3b-1853-4eeb-9ea6-6a081999bd3c",
+                "object_type": "dcim.device",
+                "display": "ams01-dist-01",
+                "url": "$BASE/api/dcim/devices/89b2ac3b-1853-4eeb-9ea6-6a081999bd3c/",
+                "natural_slug": "ams01-dist-01_ams01_89b2",
+                "name": "ams01-dist-01",
+                "serial": "FDO12345678",
+                "asset_tag": "ASSET-0001",
+                "face": {"value": "front", "label": "Front"},
+                "position": 14,
+                "vc_position": null,
+                "comments": "",
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "object_type": "dcim.devicetype",
+                  "display": "Cisco Catalyst 6509-E",
+                  "url": "$BASE/api/dcim/device-types/4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1/",
+                  "natural_slug": "cisco_catalyst-6509-e_4bf2",
+                  "model": "Catalyst 6509-E",
+                  "part_number": "WS-C6509-E",
+                  "u_height": 14,
+                  "is_full_depth": true,
+                  "comments": "",
+                  "manufacturer": {
+                    "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                    "object_type": "dcim.manufacturer",
+                    "url": "$BASE/api/dcim/manufacturers/b329ec0d-5ee7-47d8-b4a7-3951c28e2979/"
+                  },
+                  "device_family": null,
+                  "created": "2023-09-21T00:00:00Z",
+                  "last_updated": "2023-09-21T19:51:28.744582Z",
+                  "custom_fields": {}
+                },
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "display": "Active",
+                  "url": "$BASE/api/extras/statuses/9f38bab4-4b47-4e77-b50c-fda62817b2db/",
+                  "natural_slug": "active_9f38",
+                  "name": "Active",
+                  "color": "4caf50",
+                  "description": "Unit is active",
+                  "custom_fields": {}
+                },
+                "role": {
+                  "id": "40567487-6328-4dac-b7b5-b789d1154bf0",
+                  "object_type": "extras.role",
+                  "display": "Switch",
+                  "url": "$BASE/api/extras/roles/40567487-6328-4dac-b7b5-b789d1154bf0/",
+                  "natural_slug": "switch_4056",
+                  "name": "Switch",
+                  "color": "2196f3",
+                  "description": "",
+                  "weight": null,
+                  "custom_fields": {}
+                },
+                "platform": {
+                  "id": "aa07ca99-b973-4870-9b44-e1ea48c23cc9",
+                  "object_type": "dcim.platform",
+                  "display": "Cisco IOS",
+                  "url": "$BASE/api/dcim/platforms/aa07ca99-b973-4870-9b44-e1ea48c23cc9/",
+                  "natural_slug": "cisco-ios_aa07",
+                  "name": "Cisco IOS",
+                  "network_driver": "cisco_ios",
+                  "napalm_driver": "ios",
+                  "napalm_args": null,
+                  "description": "",
+                  "manufacturer": {
+                    "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                    "object_type": "dcim.manufacturer",
+                    "url": "$BASE/api/dcim/manufacturers/b329ec0d-5ee7-47d8-b4a7-3951c28e2979/"
+                  },
+                  "custom_fields": {}
+                },
+                "software_version": {
+                  "id": "7a1b2c3d-0000-4000-8000-00000000c0de",
+                  "object_type": "dcim.softwareversion",
+                  "display": "Cisco IOS - 15.2(7)E6",
+                  "url": "$BASE/api/dcim/software-versions/7a1b2c3d-0000-4000-8000-00000000c0de/",
+                  "version": "15.2(7)E6",
+                  "release_date": "2023-04-01",
+                  "end_of_support_date": null,
+                  "long_term_support": false,
+                  "pre_release": false,
+                  "custom_fields": {}
+                },
+                "location": {
+                  "id": "9e39051b-e968-4016-b0cf-63a5607375de",
+                  "object_type": "dcim.location",
+                  "display": "Europe → Netherlands → AMS01",
+                  "url": "$BASE/api/dcim/locations/9e39051b-e968-4016-b0cf-63a5607375de/",
+                  "natural_slug": "ams01_netherlands_europe_9e39",
+                  "name": "AMS01",
+                  "description": "",
+                  "facility": "Amsterdam Airport Schiphol",
+                  "parent": {
+                    "id": "06d24511-0000-4000-8000-000000000001",
+                    "object_type": "dcim.location",
+                    "url": "$BASE/api/dcim/locations/06d24511-0000-4000-8000-000000000001/"
+                  },
+                  "custom_fields": {"site_type": "POP"}
+                },
+                "rack": {
+                  "id": "1a2b3c4d-0000-4000-8000-0000000000aa",
+                  "object_type": "dcim.rack",
+                  "display": "AMS01-R14",
+                  "url": "$BASE/api/dcim/racks/1a2b3c4d-0000-4000-8000-0000000000aa/",
+                  "name": "AMS01-R14",
+                  "custom_fields": {}
+                },
+                "tenant": null,
+                "cluster": null,
+                "virtual_chassis": null,
+                "device_redundancy_group": null,
+                "primary_ip4": {
+                  "id": "50476c26-4349-4669-bc40-fa3baedd72fb",
+                  "object_type": "ipam.ipaddress",
+                  "display": "192.0.2.11/24",
+                  "url": "$BASE/api/ipam/ip-addresses/50476c26-4349-4669-bc40-fa3baedd72fb/",
+                  "address": "192.0.2.11/24",
+                  "host": "192.0.2.11",
+                  "mask_length": 24,
+                  "type": "host",
+                  "ip_version": 4,
+                  "dns_name": "ams01-dist-01.example.com",
+                  "custom_fields": {}
+                },
+                "primary_ip6": null,
+                "created": "2023-09-21T00:00:00Z",
+                "last_updated": "2026-08-14T19:51:28.755228Z",
+                "custom_fields": {"support_contract": "SC-99213"},
+                "tags": [
+                  {
+                    "id": "aaaa1111-0000-4000-8000-000000000001",
+                    "object_type": "extras.tag",
+                    "display": "production",
+                    "url": "$BASE/api/extras/tags/aaaa1111-0000-4000-8000-000000000001/",
+                    "name": "production",
+                    "color": "607d8b"
+                  }
+                ]
+              },
+              {
+                "id": "2c9f0e11-0000-4000-8000-00000000d002",
+                "object_type": "dcim.device",
+                "display": "ams01-srv-02",
+                "url": "$BASE/api/dcim/devices/2c9f0e11-0000-4000-8000-00000000d002/",
+                "name": "ams01-srv-02",
+                "serial": "",
+                "asset_tag": null,
+                "face": null,
+                "position": null,
+                "comments": "",
+                "device_type": {
+                  "id": "7d8e9f00-0000-4000-8000-000000000003",
+                  "object_type": "dcim.devicetype",
+                  "display": "Dell PowerEdge R750",
+                  "url": "$BASE/api/dcim/device-types/7d8e9f00-0000-4000-8000-000000000003/",
+                  "model": "PowerEdge R750",
+                  "part_number": "R750",
+                  "u_height": 2,
+                  "is_full_depth": true,
+                  "manufacturer": {
+                    "id": "c1d2e3f4-0000-4000-8000-000000000042",
+                    "object_type": "dcim.manufacturer",
+                    "url": "$BASE/api/dcim/manufacturers/c1d2e3f4-0000-4000-8000-000000000042/"
+                  },
+                  "custom_fields": {}
+                },
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "display": "Active",
+                  "url": "$BASE/api/extras/statuses/9f38bab4-4b47-4e77-b50c-fda62817b2db/",
+                  "name": "Active",
+                  "color": "4caf50",
+                  "custom_fields": {}
+                },
+                "role": {
+                  "id": "5a6b7c8d-0000-4000-8000-000000000004",
+                  "object_type": "extras.role",
+                  "display": "Server",
+                  "url": "$BASE/api/extras/roles/5a6b7c8d-0000-4000-8000-000000000004/",
+                  "name": "Server",
+                  "color": "9c27b0",
+                  "custom_fields": {}
+                },
+                "platform": null,
+                "software_version": null,
+                "location": {
+                  "id": "9e39051b-e968-4016-b0cf-63a5607375de",
+                  "object_type": "dcim.location",
+                  "display": "Europe → Netherlands → AMS01",
+                  "url": "$BASE/api/dcim/locations/9e39051b-e968-4016-b0cf-63a5607375de/",
+                  "name": "AMS01",
+                  "facility": "Amsterdam Airport Schiphol",
+                  "custom_fields": {}
+                },
+                "rack": null,
+                "tenant": null,
+                "primary_ip4": {
+                  "id": "60586d37-0000-4000-8000-0000000000f1",
+                  "object_type": "ipam.ipaddress",
+                  "display": "192.0.2.12/24",
+                  "url": "$BASE/api/ipam/ip-addresses/60586d37-0000-4000-8000-0000000000f1/",
+                  "address": "192.0.2.12/24",
+                  "host": "192.0.2.12",
+                  "mask_length": 24,
+                  "type": "host",
+                  "ip_version": 4,
+                  "dns_name": "",
+                  "custom_fields": {}
+                },
+                "primary_ip6": null,
+                "created": "2024-03-11T00:00:00Z",
+                "last_updated": "2026-08-14T09:12:00.100000Z",
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "3d0a1f22-0000-4000-8000-00000000d003",
+                "object_type": "dcim.device",
+                "display": "ams01-fw-03",
+                "url": "$BASE/api/dcim/devices/3d0a1f22-0000-4000-8000-00000000d003/",
+                "name": "ams01-fw-03",
+                "serial": "PA9876543",
+                "asset_tag": null,
+                "face": null,
+                "position": null,
+                "device_type": {
+                  "id": "8e9f0011-0000-4000-8000-000000000005",
+                  "object_type": "dcim.devicetype",
+                  "display": "Cisco ASA 5525-X",
+                  "url": "$BASE/api/dcim/device-types/8e9f0011-0000-4000-8000-000000000005/",
+                  "model": "ASA 5525-X",
+                  "part_number": "ASA5525-X",
+                  "manufacturer": {
+                    "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                    "object_type": "dcim.manufacturer",
+                    "url": "$BASE/api/dcim/manufacturers/b329ec0d-5ee7-47d8-b4a7-3951c28e2979/"
+                  },
+                  "custom_fields": {}
+                },
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "display": "Active",
+                  "url": "$BASE/api/extras/statuses/9f38bab4-4b47-4e77-b50c-fda62817b2db/",
+                  "name": "Active",
+                  "custom_fields": {}
+                },
+                "role": {
+                  "id": "6b7c8d9e-0000-4000-8000-000000000006",
+                  "object_type": "extras.role",
+                  "display": "Firewall",
+                  "url": "$BASE/api/extras/roles/6b7c8d9e-0000-4000-8000-000000000006/",
+                  "name": "Firewall",
+                  "custom_fields": {}
+                },
+                "platform": null,
+                "software_version": null,
+                "location": {
+                  "id": "9e39051b-e968-4016-b0cf-63a5607375de",
+                  "object_type": "dcim.location",
+                  "display": "Europe → Netherlands → AMS01",
+                  "url": "$BASE/api/dcim/locations/9e39051b-e968-4016-b0cf-63a5607375de/",
+                  "name": "AMS01",
+                  "custom_fields": {}
+                },
+                "rack": null,
+                "tenant": null,
+                "primary_ip4": null,
+                "primary_ip6": null,
+                "created": "2024-05-02T00:00:00Z",
+                "last_updated": "2026-08-13T00:00:00.000000Z",
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-interfaces",
+      "match": {"method": "GET", "path": "/api/dcim/interfaces/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 5,
+            "next": null,
+            "previous": null,
+            "results": [
+              {
+                "id": "1ce0df0c-5221-4b4e-a7e5-d52810828041",
+                "object_type": "dcim.interface",
+                "display": "GigabitEthernet1/0/1",
+                "url": "$BASE/api/dcim/interfaces/1ce0df0c-5221-4b4e-a7e5-d52810828041/",
+                "name": "GigabitEthernet1/0/1",
+                "label": "",
+                "description": "uplink",
+                "type": {"value": "1000base-t", "label": "1000BASE-T (1GE)"},
+                "mode": null,
+                "mac_address": "00:11:22:AA:00:01",
+                "ip_address_count": 1,
+                "enabled": true,
+                "mtu": 1500,
+                "mgmt_only": false,
+                "device": {
+                  "id": "89b2ac3b-1853-4eeb-9ea6-6a081999bd3c",
+                  "object_type": "dcim.device",
+                  "url": "$BASE/api/dcim/devices/89b2ac3b-1853-4eeb-9ea6-6a081999bd3c/",
+                  "display": "ams01-dist-01",
+                  "name": "ams01-dist-01"
+                },
+                "lag": null,
+                "untagged_vlan": null,
+                "ip_addresses": [
+                  {
+                    "id": "aabbccdd-0000-4000-8000-000000000101",
+                    "object_type": "ipam.ipaddress",
+                    "display": "198.51.100.11/24",
+                    "url": "$BASE/api/ipam/ip-addresses/aabbccdd-0000-4000-8000-000000000101/",
+                    "address": "198.51.100.11/24",
+                    "host": "198.51.100.11",
+                    "mask_length": 24,
+                    "type": "host",
+                    "ip_version": 4,
+                    "dns_name": "",
+                    "custom_fields": {}
+                  }
+                ],
+                "tagged_vlans": [],
+                "created": "2024-08-30T18:03:29.915239Z",
+                "last_updated": "2024-08-30T18:03:29.915257Z",
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "2df1e01d-0000-4000-8000-000000000102",
+                "object_type": "dcim.interface",
+                "display": "GigabitEthernet1/0/2",
+                "url": "$BASE/api/dcim/interfaces/2df1e01d-0000-4000-8000-000000000102/",
+                "name": "GigabitEthernet1/0/2",
+                "type": {"value": "1000base-t", "label": "1000BASE-T (1GE)"},
+                "mac_address": "00:11:22:AA:00:02",
+                "enabled": true,
+                "mtu": null,
+                "mgmt_only": false,
+                "device": {
+                  "id": "89b2ac3b-1853-4eeb-9ea6-6a081999bd3c",
+                  "object_type": "dcim.device",
+                  "url": "$BASE/api/dcim/devices/89b2ac3b-1853-4eeb-9ea6-6a081999bd3c/",
+                  "name": "ams01-dist-01"
+                },
+                "ip_addresses": [],
+                "tagged_vlans": [],
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "3ea2f12e-0000-4000-8000-000000000103",
+                "object_type": "dcim.interface",
+                "display": "Vlan100",
+                "url": "$BASE/api/dcim/interfaces/3ea2f12e-0000-4000-8000-000000000103/",
+                "name": "Vlan100",
+                "type": {"value": "virtual", "label": "Virtual"},
+                "mac_address": null,
+                "enabled": true,
+                "mgmt_only": false,
+                "device": {
+                  "id": "89b2ac3b-1853-4eeb-9ea6-6a081999bd3c",
+                  "object_type": "dcim.device",
+                  "url": "$BASE/api/dcim/devices/89b2ac3b-1853-4eeb-9ea6-6a081999bd3c/",
+                  "name": "ams01-dist-01"
+                },
+                "ip_addresses": [
+                  {
+                    "id": "bbccddee-0000-4000-8000-000000000104",
+                    "object_type": "ipam.ipaddress",
+                    "display": "203.0.113.11/24",
+                    "url": "$BASE/api/ipam/ip-addresses/bbccddee-0000-4000-8000-000000000104/",
+                    "address": "203.0.113.11/24",
+                    "host": "203.0.113.11",
+                    "mask_length": 24,
+                    "type": "host",
+                    "ip_version": 4,
+                    "custom_fields": {}
+                  }
+                ],
+                "tagged_vlans": [],
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "4fb30230-0000-4000-8000-000000000105",
+                "object_type": "dcim.interface",
+                "display": "GigabitEthernet1/0/48",
+                "url": "$BASE/api/dcim/interfaces/4fb30230-0000-4000-8000-000000000105/",
+                "name": "GigabitEthernet1/0/48",
+                "type": {"value": "1000base-t", "label": "1000BASE-T (1GE)"},
+                "mac_address": "00:11:22:AA:00:48",
+                "enabled": false,
+                "mgmt_only": false,
+                "device": {
+                  "id": "89b2ac3b-1853-4eeb-9ea6-6a081999bd3c",
+                  "object_type": "dcim.device",
+                  "url": "$BASE/api/dcim/devices/89b2ac3b-1853-4eeb-9ea6-6a081999bd3c/",
+                  "name": "ams01-dist-01"
+                },
+                "ip_addresses": [],
+                "tagged_vlans": [],
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "50c41341-0000-4000-8000-000000000106",
+                "object_type": "dcim.interface",
+                "display": "GigabitEthernet0/0",
+                "url": "$BASE/api/dcim/interfaces/50c41341-0000-4000-8000-000000000106/",
+                "name": "GigabitEthernet0/0",
+                "type": {"value": "1000base-t", "label": "1000BASE-T (1GE)"},
+                "mac_address": "00:11:22:CC:00:03",
+                "enabled": true,
+                "mgmt_only": false,
+                "device": {
+                  "id": "3d0a1f22-0000-4000-8000-00000000d003",
+                  "object_type": "dcim.device",
+                  "url": "$BASE/api/dcim/devices/3d0a1f22-0000-4000-8000-00000000d003/",
+                  "name": "ams01-fw-03"
+                },
+                "ip_addresses": [
+                  {
+                    "id": "ccddeeff-0000-4000-8000-000000000107",
+                    "object_type": "ipam.ipaddress",
+                    "display": "192.0.2.13/24",
+                    "url": "$BASE/api/ipam/ip-addresses/ccddeeff-0000-4000-8000-000000000107/",
+                    "address": "192.0.2.13/24",
+                    "host": "192.0.2.13",
+                    "mask_length": 24,
+                    "type": "host",
+                    "ip_version": 4,
+                    "custom_fields": {}
+                  }
+                ],
+                "tagged_vlans": [],
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "virtual-machines",
+      "match": {"method": "GET", "path": "/api/virtualization/virtual-machines/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "next": null,
+            "previous": null,
+            "results": [
+              {
+                "id": "9f8e7d6c-0000-4000-8000-0000000d0001",
+                "object_type": "virtualization.virtualmachine",
+                "display": "app-vm-01",
+                "url": "$BASE/api/virtualization/virtual-machines/9f8e7d6c-0000-4000-8000-0000000d0001/",
+                "name": "app-vm-01",
+                "vcpus": 4,
+                "memory": 8192,
+                "disk": 100,
+                "comments": "",
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "object_type": "extras.status",
+                  "display": "Active",
+                  "url": "$BASE/api/extras/statuses/9f38bab4-4b47-4e77-b50c-fda62817b2db/",
+                  "name": "Active",
+                  "custom_fields": {}
+                },
+                "role": null,
+                "cluster": {
+                  "id": "abcdef01-0000-4000-8000-0000000000c1",
+                  "object_type": "virtualization.cluster",
+                  "display": "AMS01 vSphere",
+                  "url": "$BASE/api/virtualization/clusters/abcdef01-0000-4000-8000-0000000000c1/",
+                  "name": "AMS01 vSphere",
+                  "cluster_type": {
+                    "id": "abcdef02-0000-4000-8000-0000000000c2",
+                    "object_type": "virtualization.clustertype",
+                    "url": "$BASE/api/virtualization/cluster-types/abcdef02-0000-4000-8000-0000000000c2/"
+                  },
+                  "custom_fields": {}
+                },
+                "tenant": null,
+                "platform": {
+                  "id": "12341234-0000-4000-8000-00000000d0a1",
+                  "object_type": "dcim.platform",
+                  "display": "Ubuntu Linux",
+                  "url": "$BASE/api/dcim/platforms/12341234-0000-4000-8000-00000000d0a1/",
+                  "name": "Ubuntu Linux",
+                  "network_driver": "linux",
+                  "custom_fields": {}
+                },
+                "software_version": {
+                  "id": "56785678-0000-4000-8000-00000000d0b1",
+                  "object_type": "dcim.softwareversion",
+                  "display": "Ubuntu Linux - 24.04",
+                  "url": "$BASE/api/dcim/software-versions/56785678-0000-4000-8000-00000000d0b1/",
+                  "version": "24.04",
+                  "custom_fields": {}
+                },
+                "primary_ip4": {
+                  "id": "7788aabb-0000-4000-8000-00000000d0c1",
+                  "object_type": "ipam.ipaddress",
+                  "display": "198.51.100.50/24",
+                  "url": "$BASE/api/ipam/ip-addresses/7788aabb-0000-4000-8000-00000000d0c1/",
+                  "address": "198.51.100.50/24",
+                  "host": "198.51.100.50",
+                  "mask_length": 24,
+                  "type": "host",
+                  "ip_version": 4,
+                  "custom_fields": {}
+                },
+                "primary_ip6": null,
+                "created": "2025-01-05T00:00:00Z",
+                "last_updated": "2026-08-15T00:00:00.000000Z",
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vm-interfaces",
+      "match": {"method": "GET", "path": "/api/virtualization/interfaces/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 1,
+            "next": null,
+            "previous": null,
+            "results": [
+              {
+                "id": "aa11bb22-0000-4000-8000-00000000d0d1",
+                "object_type": "virtualization.vminterface",
+                "display": "eth0",
+                "url": "$BASE/api/virtualization/interfaces/aa11bb22-0000-4000-8000-00000000d0d1/",
+                "name": "eth0",
+                "description": "",
+                "enabled": true,
+                "mac_address": "00:50:56:AB:00:11",
+                "mtu": 1500,
+                "mode": null,
+                "virtual_machine": {
+                  "id": "9f8e7d6c-0000-4000-8000-0000000d0001",
+                  "object_type": "virtualization.virtualmachine",
+                  "url": "$BASE/api/virtualization/virtual-machines/9f8e7d6c-0000-4000-8000-0000000d0001/",
+                  "name": "app-vm-01"
+                },
+                "ip_addresses": [
+                  {
+                    "id": "7788aabb-0000-4000-8000-00000000d0c1",
+                    "object_type": "ipam.ipaddress",
+                    "display": "198.51.100.50/24",
+                    "url": "$BASE/api/ipam/ip-addresses/7788aabb-0000-4000-8000-00000000d0c1/",
+                    "address": "198.51.100.50/24",
+                    "host": "198.51.100.50",
+                    "mask_length": 24,
+                    "type": "host",
+                    "ip_version": 4,
+                    "custom_fields": {}
+                  }
+                ],
+                "tagged_vlans": [],
+                "custom_fields": {},
+                "tags": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "assets": [
+      {
+        "id": "nautobot:$HOST:device:89b2ac3b-1853-4eeb-9ea6-6a081999bd3c",
+        "fields": {
+          "hostnames": "ams01-dist-01",
+          "macAddresses": "00:11:22:aa:00:01\t00:11:22:aa:00:02",
+          "ipAddresses": "192.0.2.11\t198.51.100.11\t203.0.113.11",
+          "deviceType": "Switch",
+          "os": "Cisco IOS",
+          "osVersion": "15.2(7)E6",
+          "nautobot_manufacturer": "Cisco",
+          "nautobot_device_type": "Catalyst 6509-E",
+          "nautobot_location": "AMS01",
+          "nautobot_location_path": "Europe → Netherlands → AMS01",
+          "nautobot_status": "Active",
+          "nautobot_custom_field_support_contract": "SC-99213",
+          "nautobot_serial": "FDO12345678",
+          "nautobot_asset_tag": "ASSET-0001"
+        }
+      },
+      {
+        "id": "nautobot:$HOST:device:2c9f0e11-0000-4000-8000-00000000d002",
+        "fields": {
+          "hostnames": "ams01-srv-02",
+          "ipAddresses": "192.0.2.12",
+          "deviceType": "Server",
+          "nautobot_manufacturer": "Dell",
+          "nautobot_device_type": "PowerEdge R750"
+        },
+        "fields_absent": ["macAddresses", "os"]
+      },
+      {
+        "id": "nautobot:$HOST:device:3d0a1f22-0000-4000-8000-00000000d003",
+        "fields": {
+          "hostnames": "ams01-fw-03",
+          "macAddresses": "00:11:22:cc:00:03",
+          "ipAddresses": "192.0.2.13",
+          "deviceType": "Firewall",
+          "nautobot_manufacturer": "Cisco"
+        }
+      },
+      {
+        "id": "nautobot:$HOST:virtual_machine:9f8e7d6c-0000-4000-8000-0000000d0001",
+        "fields": {
+          "hostnames": "app-vm-01",
+          "macAddresses": "00:50:56:ab:00:11",
+          "ipAddresses": "198.51.100.50",
+          "deviceType": "Virtual Machine",
+          "os": "Ubuntu Linux",
+          "osVersion": "24.04",
+          "nautobot_cluster": "AMS01 vSphere",
+          "nautobot_vcpus": "4"
+        }
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/dcim/manufacturers/", "query_contains": "depth=0&limit=1000"},
+      {"method": "GET", "path": "/api/dcim/devices/", "query_contains": "depth=1&limit=100"},
+      {"method": "GET", "path": "/api/dcim/interfaces/", "query_contains": "device=89b2ac3b-1853-4eeb-9ea6-6a081999bd3c"},
+      {"method": "GET", "path": "/api/dcim/interfaces/", "query_contains": "device=3d0a1f22-0000-4000-8000-00000000d003"},
+      {"method": "GET", "path": "/api/virtualization/virtual-machines/"},
+      {"method": "GET", "path": "/api/virtualization/interfaces/", "query_contains": "virtual_machine=9f8e7d6c-0000-4000-8000-0000000d0001"},
+      {"header_contains": "Token 0123456789abcdef0123456789abcdef01234567"},
+      {"header_contains": "application/json; version=2.4"}
+    ],
+    "requests_absent": [
+      {"query_contains": "device_id="},
+      {"query_contains": "virtual_machine_id="}
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

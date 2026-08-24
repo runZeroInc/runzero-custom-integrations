@@ -1,0 +1,85 @@
+{
+  "name": "k3s",
+  "integration": "kubernetes",
+  "description": "Imports the node and a LoadBalancer service from a real k3s API server.",
+  "compose": "compose.yml",
+  "service": "k3s",
+  "port": 6443,
+  "scheme": "https",
+  "ready": [
+    {
+      "name": "apiserver port published",
+      "http": {
+        "path": "/livez",
+        "status": [
+          200,
+          401,
+          403
+        ],
+        "insecure": true
+      },
+      "timeout": 300,
+      "interval": 3
+    },
+    {
+      "name": "node reports Ready",
+      "exec": [
+        "kubectl",
+        "get",
+        "nodes",
+        "-o",
+        "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"
+      ],
+      "contains": "True",
+      "timeout": 300,
+      "interval": 3
+    }
+  ],
+  "seed": "seed.py",
+  "kwargs": {
+    "url": "$BASE",
+    "bearer_token": "${seed.token}",
+    "include_loadbalancer_services": "true",
+    "tls_disable_validation": "true"
+  },
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "k8s-node-${seed.node_uid}",
+        "fields": {
+          "hostnames": "rz-k3s-node",
+          "deviceType": "Kubernetes Node",
+          "os": "linux",
+          "ipAddresses": "${seed.node_ip}",
+          "k8s.node.name": "rz-k3s-node",
+          "k8s.node.uid": "${seed.node_uid}",
+          "manufacturer": "k3s"
+        }
+      },
+      {
+        "id": "k8s-svc-${seed.service_uid}",
+        "fields": {
+          "deviceType": "Kubernetes Service",
+          "hostnames": "rz-edge.default.svc",
+          "ipAddresses": "${seed.service_ingress_ip}",
+          "k8s.service.type": "LoadBalancer",
+          "k8s.service.namespace": "default"
+        }
+      }
+    ],
+    "log_contains": [
+      "kubernetes: imported 1 nodes",
+      "kubernetes: imported 1 services"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  },
+  "_invariants_skip_reason": "Kubernetes object UIDs are RFC 4122 UUIDs, globally unique by construction, so `k8s-node-<uid>` cannot collide across clusters. The invariant looks for a ':' separator that this id scheme has no need of.",
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

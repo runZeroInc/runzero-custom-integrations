@@ -1,0 +1,118 @@
+{
+  "name": "happy",
+  "integration": "lima-charlie",
+  "description": "Proves the new url and jwt_url parameters both reach the fixture server, that the JWT from the token exchange is what the sensor call carries as a bearer, and that a sensor row parses into an asset. Also covers the two filters: the ARCHITECTURE map drops a chromium sensor, and mac_addr is dash-separated on the wire and must be normalised to colons.\n\nIds are asserted in the scoped form lima-charlie:<oid>:<sid>: the organization id is the tenant identity the API itself keys on (it sits in every request path and the JWT is minted for it), so two LimaCharlie organizations imported into one runZero org cannot collide.\n\nAlso pins ext_ip off the interface: sensor a reports int_ip 192.0.2.10 and ext_ip 198.51.100.10, and only the internal address may reach ipAddresses. ext_ip is the NAT egress address of the gateway the sensor sits behind -- LimaCharlie documents it as the \"External (public-facing) IP address of the endpoint\" -- so every endpoint in one office reports the same value, and attaching it to an interface beside the endpoint's own MAC correlates unrelated machines onto one address. It is carried as a custom attribute.",
+  "kwargs": {
+    "url": "$BASE",
+    "jwt_url": "$BASE",
+    "organization_id": "8bd1f0e2-0000-4000-8000-000000000001",
+    "api_token": "fixture-lc-secret"
+  },
+  "routes": [
+    {
+      "name": "jwt-exchange",
+      "match": {
+        "method": "POST",
+        "path": "/",
+        "query_contains": "oid=8bd1f0e2-0000-4000-8000-000000000001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jwt": "fixture-lc-jwt"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors",
+      "match": {
+        "method": "GET",
+        "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "sensors": [
+              {
+                "sid": "aaaa0001-0000-4000-8000-000000000001",
+                "hostname": "syn-lc-a.example.com",
+                "arch": 2,
+                "plat": 268435456,
+                "int_ip": "192.0.2.10",
+                "ext_ip": "198.51.100.10",
+                "mac_addr": "00-11-22-33-44-01",
+                "is_isolated": false,
+                "alive": "2026-01-02 03:04:05",
+                "organization_name": "syn-org"
+              },
+              {
+                "sid": "aaaa0002-0000-4000-8000-000000000002",
+                "hostname": "syn-lc-b.example.com",
+                "arch": 4,
+                "int_ip": "192.0.2.11",
+                "ext_ip": "",
+                "mac_addr": "",
+                "organization_name": "syn-org"
+              },
+              {
+                "sid": "aaaa0003-0000-4000-8000-000000000003",
+                "hostname": "syn-lc-chromium.example.com",
+                "arch": 6,
+                "int_ip": "192.0.2.12",
+                "mac_addr": "00-11-22-33-44-03",
+                "organization_name": "syn-org"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0001-0000-4000-8000-000000000001",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0002-0000-4000-8000-000000000002"
+    ],
+    "ids_absent": [
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0003-0000-4000-8000-000000000003"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/",
+        "header": {
+          "x-lc-secret": "fixture-lc-secret"
+        }
+      },
+      {
+        "method": "GET",
+        "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001",
+        "header_contains": "fixture-lc-jwt"
+      }
+    ],
+    "log_contains": [
+      "Skipping sensor because sensor architecture 6"
+    ],
+    "assets": [
+      {
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0001-0000-4000-8000-000000000001",
+        "fields": {
+          "hostnames": "syn-lc-a.example.com",
+          "macAddresses": "00:11:22:33:44:01",
+          "ipAddresses": "192.0.2.10",
+          "ext_ip": "198.51.100.10"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

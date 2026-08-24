@@ -1,0 +1,63 @@
+{
+  "name": "basic-auth-fallback",
+  "integration": "nozomi-networks",
+  "description": "An appliance whose sign_in route answers 200 but sets no Authorization response header. The Open API accepts the same key pair over HTTP Basic, so the run must fall back to it and still import. The first assets query is then rate limited with a 429 and a Retry-After, which the shared helper's default three retries must absorb without the integration hand-rolling any backoff.",
+  "kwargs": {
+    "url": "$BASE",
+    "key_name": "fixture-key-name",
+    "key_token": "fixture-key-token",
+    "include_cves": "false"
+  },
+  "routes": [
+    {
+      "name": "sign-in-without-a-token",
+      "match": {"method": "POST", "path": "/api/open/sign_in"},
+      "responses": [
+        {"status": 200, "json": {"authenticated": true}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/api/open/query/do", "query_contains": "query=assets%20"},
+      "responses": [
+        {"status": 429, "json": {"error": "rate limited"}, "headers": {"Retry-After": "1"}},
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "id": "basic-asset-0001",
+                "name": "hmi-panel-1",
+                "ip": ["10.120.0.10"],
+                "mac_address": ["00:11:22:66:00:10"],
+                "type": "HMI",
+                "vendor": "Fixture Automation",
+                "product_name": "PanelView Fixture",
+                "firmware_version": "9.1.0"
+              }
+            ],
+            "total": 1,
+            "error": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["nozomi-networks:$HOST:basic-asset-0001"],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/api/open/sign_in"},
+      {"method": "GET", "path": "/api/open/query/do", "header_contains": "Basic "}
+    ],
+    "log_contains": [
+      "nozomi-networks: sign_in returned no Authorization header, falling back to basic authentication",
+      "nozomi-networks: reported 1 assets"
+    ],
+    "min_software_total": 1
+  },
+  "invariants": {"skip": []}
+}

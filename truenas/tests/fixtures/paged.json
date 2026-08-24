@@ -1,0 +1,139 @@
+{
+  "name": "paged",
+  "integration": "truenas",
+  "description": "Exercises fetch_collection's limit/offset walk across TWO pages, which no other scenario reaches - TrueNAS returns a bare array with no total, so a short page is the only end signal. page_size=2 against three VMs: the first request carries limit=2&offset=0, the second limit=2&offset=2, and the one-row second page ends the walk. The offset arithmetic and the short-page stop are both pinned by request assertions; the walk itself is now guarded by pager() rather than a hand-rolled range() bound, so a server that ignored offset would fail loudly instead of silently. Apps and storage are disabled to keep the walk to the one collection under test.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1-fixtureapikeyabcdef0123456789abcdef0123456789abcdef0123456789ab",
+    "page_size": "2",
+    "collect_apps": "false",
+    "collect_storage": "false"
+  },
+  "routes": [
+    {
+      "name": "system-info",
+      "match": {"method": "GET", "path": "/api/v2.0/system/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "TrueNAS-SCALE-24.04.2.2",
+            "hostname": "nas02.example.com",
+            "system_serial": "S0987654321",
+            "system_product": "Super Server",
+            "system_manufacturer": "Supermicro",
+            "physmem": 34359738368,
+            "cores": 8,
+            "uptime_seconds": 100000.0
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-configuration",
+      "match": {"method": "GET", "path": "/api/v2.0/network/configuration"},
+      "responses": [
+        {"status": 200, "json": {"hostname": "nas02", "domain": "example.com"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interfaces",
+      "match": {"method": "GET", "path": "/api/v2.0/interface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "eno1",
+              "name": "eno1",
+              "type": "PHYSICAL",
+              "state": {
+                "link_address": "3c:ec:ef:aa:bb:02",
+                "aliases": [
+                  {"type": "INET", "address": "10.77.0.5", "netmask": 24},
+                  {"type": "LINK", "address": "3c:ec:ef:aa:bb:02"}
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vm-page-1",
+      "match": {"method": "GET", "path": "/api/v2.0/vm", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1,
+              "name": "vm-alpha",
+              "status": {"state": "RUNNING"},
+              "devices": [
+                {"id": 11, "vm": 1, "attributes": {"dtype": "NIC", "type": "VIRTIO", "mac": "00:a0:98:aa:bb:01"}}
+              ]
+            },
+            {
+              "id": 2,
+              "name": "vm-beta",
+              "status": {"state": "RUNNING"},
+              "devices": [
+                {"id": 21, "vm": 2, "attributes": {"dtype": "NIC", "type": "VIRTIO", "mac": "00:a0:98:aa:bb:02"}}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vm-page-2",
+      "match": {"method": "GET", "path": "/api/v2.0/vm", "query_contains": "offset=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 3,
+              "name": "vm-gamma",
+              "status": {"state": "STOPPED"},
+              "devices": [
+                {"id": 31, "vm": 3, "attributes": {"dtype": "NIC", "type": "VIRTIO", "mac": "00:a0:98:aa:bb:03"}}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "truenas:$HOST:system",
+      "truenas:$HOST:vm:1",
+      "truenas:$HOST:vm:2",
+      "truenas:$HOST:vm:3"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2.0/vm", "query_contains": "limit=2&offset=0"},
+      {"method": "GET", "path": "/api/v2.0/vm", "query_contains": "limit=2&offset=2"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v2.0/vm", "query_contains": "offset=4"},
+      {"path_contains": "/api/v2.0/app"},
+      {"path_contains": "/api/v2.0/pool"}
+    ],
+    "assets": [
+      {
+        "id": "truenas:$HOST:vm:3",
+        "fields": {"macAddresses": "00:a0:98:aa:bb:03"}
+      }
+    ]
+  }
+}

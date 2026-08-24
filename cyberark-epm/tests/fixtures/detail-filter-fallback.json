@@ -1,0 +1,93 @@
+{
+  "name": "detail-filter-fallback",
+  "integration": "cyberark-epm",
+  "description": "The inventoryType filter grammar hedge. The primary DETAIL_FILTER quotes all four inventory types inside ONE string; this tenant rejects that with a 400, and the script must retry the same endpoint once with per-value quoting and then STICK with the working grammar for every later endpoint. The 400 route matches only the one-string spelling, so the exact request count (logon, sets, endpoints page, then 2 detail calls for the first endpoint and 1 for the second) is the assertion that the fallback fired once and did not pay a rejected request per endpoint. Both assets must carry their inventory enrichment, and the budget message must not appear -- a failed grammar probe does not burn the detail cap.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_details": "true"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "66e6a666-0006-4006-8006-000000000006", "Name": "Grammar"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-one-string-rejected",
+      "match": {"method": "POST", "path_regex": "/Endpoints/[a-f0-9-]+/search$", "body_contains": "OsInfo, Hardware"},
+      "responses": [
+        {"status": 400, "json": {"ErrorCode": "EPM000004E", "ErrorMessage": "Invalid filter."}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "detail-per-value",
+      "match": {"method": "POST", "path_regex": "/Endpoints/[a-f0-9-]+/search$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "inventory": {
+              "osInfo": {"os": {"version": "Windows 10", "build": "19045.4412"}},
+              "hardware": {"machineInfo": {"vendor": "Dell Inc.", "model": "Latitude 5440", "serialNumber": "GRMR123"}},
+              "network": {"networkAdapters": [{"macAddress": "00:50:56:cc:dd:01", "ipSubnets": [{"ipAddress": "10.66.1.10"}]}]},
+              "domainInfo": {"domainDnsName": "corp.example.com", "computerNameDnsFullyQualified": "ws-grammar-01.corp.example.com"}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/66e6a666-0006-4006-8006-000000000006/Endpoints/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 2,
+            "returnedCount": 2,
+            "endpoints": [
+              {"id": "abcd0001-0000-4000-8000-000000000001", "legacyId": "dcba0001-0000-4000-8000-000000000001", "setId": "66e6a666-0006-4006-8006-000000000006", "name": "WS-GRAMMAR-01", "platform": "Windows", "version": "24.1.0.100", "connectionStatus": "Connected", "platformType": "Desktop", "installTime": "2025-05-01T00:00:00Z", "lastConnected": "2026-08-20T00:00:00Z", "ip": "10.66.1.10"},
+              {"id": "abcd0002-0000-4000-8000-000000000002", "legacyId": "dcba0002-0000-4000-8000-000000000002", "setId": "66e6a666-0006-4006-8006-000000000006", "name": "WS-GRAMMAR-02", "platform": "Windows", "version": "24.1.0.100", "connectionStatus": "Connected", "platformType": "Desktop", "installTime": "2025-05-02T00:00:00Z", "lastConnected": "2026-08-20T00:00:00Z", "ip": "10.66.1.11"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "cyberark-epm:$HOST:dcba0001-0000-4000-8000-000000000001",
+        "fields": {"os": "Windows 10", "serialNumber": "GRMR123", "domain": "corp.example.com"}
+      },
+      {
+        "id": "cyberark-epm:$HOST:dcba0002-0000-4000-8000-000000000002",
+        "fields": {"os": "Windows 10", "serialNumber": "GRMR123"}
+      }
+    ],
+    "request_count": 6,
+    "log_contains": [
+      "cyberark-epm: detail filter rejected; retrying with per-value quoting",
+      "cyberark-epm: reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,117 @@
+{
+  "name": "azure-sql-edge",
+  "integration": "mssql-databases",
+  "description": "Runs the integration against a real Microsoft SQL Server engine over real TDS -- the first non-HTTP stack in the suite -- and asserts the six databases it reports, including two seeded with different recovery models and collations.",
+  "compose": "compose.yml",
+  "service": "sqlclient",
+  "scheme": "tcp",
+
+  "_scheme_reason": "There is no HTTP here at all. `scheme` only builds the $BASE string, which this manifest never uses; the integration takes a host and a port as separate parameters, so kwargs use $HOST and ${seed.port} instead. Recorded as `tcp` so nothing reads the manifest and assumes a URL.",
+
+  "ready": [
+    {
+      "name": "engine accepting TDS logins",
+      "service": "sqlclient",
+      "exec": ["/opt/mssql-tools18/bin/sqlcmd", "-S", "sqledge", "-U", "sa",
+               "-P", "runZero-Test-Pw-2026!", "-C", "-l", "5", "-b",
+               "-Q", "SET NOCOUNT ON; SELECT 'rz-tds-ready'"],
+      "contains": "rz-tds-ready",
+      "timeout": 420,
+      "interval": 3
+    }
+  ],
+
+  "_ready_reason": "A SQL Server publishes its port well before it will accept a login -- it still has recovery to finish -- so a port check would hand a half-started engine to the seed script and fail there instead of here. This gate is a real login and a real query, which is the only thing that proves the next step can run. 420s because a cold engine on a loaded host takes a while; it passes in about ten seconds on an idle one.",
+
+  "seed": "seed.py",
+  "seed_timeout": 300,
+
+  "kwargs": {
+    "host": "$HOST",
+    "port": "${seed.port}",
+    "username": "sa",
+    "password": "runZero-Test-Pw-2026!",
+    "database": "master",
+    "encrypt": "false",
+    "timeout": "60"
+  },
+
+  "_kwargs_encrypt_reason": "CONFIG now declares a trust_server_certificate boolean that threads trustservercertificate=true into the DSN, which is the supported way to connect to a stock server's self-signed certificate (every self-hosted SQL Server generates one at first boot; with encrypt=true and trust off, the handshake fails with `x509: \\\"SSL_Self_Signed_Fallback\\\" certificate is not standards compliant` and zero assets, as this container demonstrated). This manifest still runs with encrypt=false because that is the configuration the case was verified under; the next verified container run should switch to encrypt=true plus trust_server_certificate=true to pin the encrypted path end-to-end.",
+
+  "_kwargs_port_reason": "The harness allocates the published port at run time, and the integration takes host and port as separate parameters rather than a URL, so neither $BASE nor $BASE_HOST fits. The seed script echoes RZ_HOST_PORT back as ${seed.port}, which is the documented way to get a run-time value into kwargs.",
+
+  "expect": {
+    "asset_count": 6,
+    "assets": [
+      {
+        "id": "mssql://$HOST:${seed.port}/master",
+        "fields": {
+          "hostnames": "${seed.server_name}",
+          "os": "Microsoft SQL Server",
+          "database.id": "1",
+          "database.name": "master",
+          "database.recovery_model": "SIMPLE",
+          "database.state": "ONLINE",
+          "database.collation": "SQL_Latin1_General_CP1_CI_AS",
+          "server.host": "$HOST",
+          "server.port": "${seed.port}"
+        },
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "mssql://$HOST:${seed.port}/msdb",
+        "fields": {
+          "database.id": "4",
+          "database.name": "msdb",
+          "database.created": "2023-01-25T11:15:47.897Z"
+        }
+      },
+      {
+        "id": "mssql://$HOST:${seed.port}/${seed.inventory_db}",
+        "fields": {
+          "hostnames": "${seed.server_name}",
+          "database.id": "${seed.inventory_id}",
+          "database.name": "${seed.inventory_db}",
+          "database.recovery_model": "FULL",
+          "database.state": "ONLINE",
+          "database.collation": "${seed.inventory_collation}",
+          "server.port": "${seed.port}"
+        }
+      },
+      {
+        "id": "mssql://$HOST:${seed.port}/${seed.metrics_db}",
+        "fields": {
+          "database.id": "${seed.metrics_id}",
+          "database.name": "${seed.metrics_db}",
+          "database.recovery_model": "SIMPLE",
+          "database.state": "ONLINE",
+          "database.collation": "SQL_Latin1_General_CP1_CI_AS"
+        }
+      }
+    ],
+    "ids": [
+      "mssql://$HOST:${seed.port}/model",
+      "mssql://$HOST:${seed.port}/tempdb"
+    ]
+  },
+
+  "_expect_reason": {
+    "asset_count": "Four system databases the image ships with plus the two the seed creates. The system four are asserted by id rather than by field because they are the server's, not the test's -- but they are asserted, because a script that silently dropped or duplicated them would otherwise pass.",
+    "collation": "rz_inventory is created CS_AS on purpose, against a server whose default is CI_AS. Two different collations across the emitted assets is what proves the script reads collation_name per row instead of once per server.",
+    "recovery_model": "Same argument: FULL on one seeded database and SIMPLE on the other and on every system database.",
+    "database.created": "msdb's create_date is baked into the image, identical in every container from this pinned tag, so it is the one datetime here that can be asserted exactly. The catalog holds `2023-01-25 11:15:47.897`; the asset carries `2023-01-25T11:15:47.897Z`, because the driver hands Starlark a real timestamp and it renders as RFC 3339 with trailing zeros trimmed -- `.390` on master would emit as `.39`, which is why msdb rather than master is the row asserted. Nothing else in the suite pins that conversion. The seed echoes the raw catalog value as ${seed.msdb_created_raw} so a failure shows both halves side by side."
+  },
+
+  "invariants": {
+    "skip": []
+  },
+
+  "_no_mac_or_ip_reason": "The integration emits no network interfaces at all: a database is not a host, and the only address it knows is the one the operator dialled. matchBehavior is `no-name-match no-name-break` by design -- every database on an instance necessarily reports the same @@SERVERNAME, so name matching would collapse all six of these into one asset and lose exactly the per-database granularity the integration exists for. That is intentional, not a defect, and the six distinct mssql:// ids here are what makes it safe.",
+
+  "heavy": true,
+  "heavy_reason": "a ~1.5GB SQL Server engine plus a ~580MB client image, and on an arm64 host the client runs under QEMU",
+
+  "check_determinism": true,
+  "startup_timeout": 600,
+  "timeout": 300
+}

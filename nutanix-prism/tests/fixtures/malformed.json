@@ -1,0 +1,113 @@
+{
+  "name": "malformed",
+  "integration": "nutanix-prism",
+  "description": "Junk rows mixed into good ones. A string where an entity object is documented, a null uuid, a dict where an address string is documented, vm_nics typed as a string, and a NIC entry that is a bare string must each be skipped with a log line while the run continues. Also proves the microsecond boot-time clamp: a node claiming it booted in 2100 is still imported, with the timestamp pulled back to now, rather than having the whole asset rejected for a future timestamp.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-viewer",
+    "password": "fixture-password",
+    "import_vms": "true",
+    "page_size": "250"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/cluster"},
+      "responses": [
+        {"status": 200, "json": {"uuid": "00000000-0000-4000-8000-c1u57e40000a", "name": "fixture-cluster", "version": "6.5.3.5"}}
+      ]
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 5},
+            "entities": [
+              "this-row-is-a-string-not-an-object",
+              {
+                "uuid": null,
+                "name": "node-with-no-uuid",
+                "hypervisor_address": "10.55.0.90"
+              },
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000001",
+                "name": "NTNX-SYN01-A",
+                "hypervisor_address": "10.55.0.11",
+                "hypervisor_type": "kKvm",
+                "hypervisor_full_name": "Nutanix 20190916.321",
+                "block_model": "NX-3060-G7",
+                "boot_time_in_usecs": 4102444800000000
+              },
+              {
+                "uuid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "name": "NTNX-SYN01-B",
+                "hypervisor_address": {"address": "10.55.0.12", "prefix": 24},
+                "backplane_ip": "10.66.0.12",
+                "hypervisor_type": "kNotAHypervisorType",
+                "hypervisor_full_name": "SomeHypervisorWithNoVersion",
+                "boot_time_in_usecs": "not-a-number"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "GET", "path": "/PrismGateway/services/rest/v2.0/vms"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"grand_total_entities": 4},
+            "entities": [
+              12345,
+              {"uuid": "", "name": "vm-with-blank-uuid", "vm_nics": []},
+              {
+                "uuid": "bbbbbbbb-0000-4000-8000-000000000001",
+                "name": "syn-app-01",
+                "power_state": "on",
+                "vm_nics": "eth0",
+                "host_uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+              },
+              {
+                "uuid": "bbbbbbbb-0000-4000-8000-000000000002",
+                "name": "syn-db-01",
+                "power_state": "on",
+                "host_uuid": "aaaaaaaa-0000-4000-8000-000000000002",
+                "vm_nics": [
+                  "50:6b:8d:00:00:99",
+                  {"mac_address": "50:6b:8d:00:00:02", "ip_addresses": ["10.55.10.22", "not-an-ip-at-all"]},
+                  {"network_uuid": "cccccccc-0000-4000-8000-000000000001"}
+                ]
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"metadata": {}, "entities": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000001",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:host:aaaaaaaa-0000-4000-8000-000000000002",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-000000000001",
+      "nutanix:00000000-0000-4000-8000-c1u57e40000a:vm:bbbbbbbb-0000-4000-8000-000000000002"
+    ],
+    "log_contains": [
+      "skipping a host entry that is not an object",
+      "skipping host with no uuid",
+      "skipping a VM entry that is not an object",
+      "skipping VM with no uuid: name=vm-with-blank-uuid"
+    ]
+  },
+  "invariants": {"skip": []}
+}

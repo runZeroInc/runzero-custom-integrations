@@ -1,0 +1,117 @@
+{
+  "name": "stuck-pagination",
+  "integration": "aruba-clearpass",
+  "description": "A ClearPass that ignores `offset` and answers every endpoint read with the same full page. The walk's own exits are an empty page, a short page, and a missing next link, and this shape produces none of them: before the repeated-page check it re-imported page one until the ceiling, which at a ten-million-record target is not a guard at all.\n\npage_size is 1 so a single-row page is a FULL page -- the walk continues on any page that fills the requested limit and still advertises a next link, which is exactly what this server does. The repeated-page check settles it in two requests, and can never truncate genuine data because it only fires on a page whose length and end ids are identical to the previous page's.\n\nThe offset=2 route is a regression terminator: without it a walk that lost the check would run to the 20,000-page ceiling and fail this scenario by TIMING OUT rather than by failing an assertion. With it, an unguarded walk ends one request later on an empty page and fails on request_count and the missing log line instead.\n\nClearPass is asked for no row total (calculate_count=false is a full table scan on an appliance that is also authenticating the network), so the truncation line says 'total not reported' rather than inventing a denominator -- which log_contains pins.\n\nno_mac_in_id is skipped for the reason recorded in happy: ClearPass identifies an endpoint by its MAC and that is the only stable id it has.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret",
+    "page_size": "1"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {
+        "method": "POST",
+        "path": "/api/oauth"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-access-token",
+            "expires_in": 28800
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/api/endpoint",
+        "query_contains": "offset=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "endpoints-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/api/endpoint"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "_embedded": {
+              "items": [
+                {
+                  "id": 7001,
+                  "mac_address": "00:11:22:77:00:01",
+                  "status": "Known",
+                  "added_at": "2026-05-01 10:00:00",
+                  "updated_at": "2026-08-15 06:01:00",
+                  "profile": {
+                    "ipv4_address": "10.77.0.1",
+                    "host_name": "cppm-cap-1",
+                    "device_category": "Computer",
+                    "last_profiled_at": "2026-08-15 05:00:00"
+                  }
+                }
+              ]
+            },
+            "_links": {
+              "next": {
+                "href": "/api/endpoint?offset=next"
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/endpoint",
+        "query_contains": "offset=0"
+      },
+      {
+        "method": "GET",
+        "path": "/api/endpoint",
+        "query_contains": "offset=1"
+      }
+    ],
+    "requests_absent": [
+      {
+        "method": "GET",
+        "path": "/api/endpoint",
+        "query_contains": "offset=2"
+      }
+    ],
+    "log_contains": [
+      "aruba-clearpass: paging stopped after 2 pages (API returned the same page twice walking endpoints, retrieved 1 assets, total not reported)"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  }
+}

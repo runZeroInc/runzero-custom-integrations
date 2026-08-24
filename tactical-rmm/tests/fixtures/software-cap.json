@@ -1,0 +1,96 @@
+{
+  "name": "software-cap",
+  "integration": "tactical-rmm",
+  "description": "Three agents with software import enabled and the per-run software limit set to 1. Proves the N+1 enrichment cap is honoured -- exactly one /software/ request is made -- that the remaining agents are still imported without software, and that the number skipped is logged. Also exercises the retry budget: the one software request is answered 429 with Retry-After before it succeeds, which get_json retries by default.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-tactical-key",
+    "extract_software": "true",
+    "software_agent_limit": "1"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/agents/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "agent_id": "kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB",
+              "hostname": "VNVMHOSTSRV4",
+              "client_name": "Acme Corp",
+              "site_name": "Main Office",
+              "monitoring_type": "server",
+              "plat": "windows",
+              "operating_system": "Windows 10 Pro, 64 bit v22H2 (build 19045.3324)",
+              "local_ips": "192.0.2.121"
+            },
+            {
+              "agent_id": "zYxWvUtSrQpOnMlKjIhGfEdCbAzYxWvUtSrQpOnM",
+              "hostname": "kiosk01",
+              "client_name": "Acme Corp",
+              "site_name": "Lobby",
+              "monitoring_type": "workstation",
+              "plat": "windows",
+              "operating_system": "Windows 10 Pro, 64 bit v22H2 (build 19045.3324)",
+              "local_ips": "192.0.2.122"
+            },
+            {
+              "agent_id": "qQqQwWwWeEeErRrRtTtTyYyYuUuUiIiIoOoOpPpP",
+              "hostname": "kiosk02",
+              "client_name": "Acme Corp",
+              "site_name": "Lobby",
+              "monitoring_type": "workstation",
+              "plat": "windows",
+              "operating_system": "Windows 10 Pro, 64 bit v22H2 (build 19045.3324)",
+              "local_ips": "192.0.2.123"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/software/kSMmSJoLLmAuLKemDXpuNrhSHDBcvcnLmHnKSPCB/"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"detail": "Request was throttled."}},
+        {
+          "status": 200,
+          "json": {
+            "id": 42,
+            "agent": 17,
+            "software": [
+              {
+                "name": "7-Zip 19.00 (x64)",
+                "size": "5.2 MB",
+                "source": "",
+                "version": "19.00",
+                "location": "C:\\Program Files\\7-Zip\\",
+                "publisher": "Igor Pavlov",
+                "uninstall": "C:\\Program Files\\7-Zip\\Uninstall.exe",
+                "install_date": "0001-01-01 00:00:00 +0000 UTC"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "min_software_total": 1,
+    "requests_absent": [
+      {"path_contains": "/software/zYxWvUtSrQpOnMlKjIhGfEdCbAzYxWvUtSrQpOnM/"},
+      {"path_contains": "/software/qQqQwWwWeEeErRrRtTtTyYyYuUuUiIiIoOoOpPpP/"}
+    ],
+    "log_contains": [
+      "software limit of 1 reached, 2 agents imported without software"
+    ]
+  },
+
+  "check_determinism": true
+}

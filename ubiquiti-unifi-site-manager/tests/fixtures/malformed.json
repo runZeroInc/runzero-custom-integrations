@@ -1,0 +1,130 @@
+{
+  "name": "malformed",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "The shapes Ubiquiti's own spec permits and its own guidance warns about: null array elements (the spec marks data items nullable on both /v1/sites and /v1/devices, and the nested devices list too), an empty-string registrationTime where a date-time is declared, reportedState set to null, a host with no id, a device with no id, and a device group whose devices key is null. The good device group's updatedAt is an IMPOSSIBLE date (month 13, day 39) that is digit-shaped enough to fool a naive regex screen; it must cost the lastSeen field only, never the run. Nothing here may abort the run, and the one good device must still be imported. Ubiquiti's own words: design the integration to handle unfamiliar properties, null values, and missing attributes.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              null,
+              "not-a-host",
+              {
+                "hardwareId": "e5bf13cd-98a7-5a96-9463-0d65d78cd3a4",
+                "type": "ucore",
+                "ipAddress": "203.0.113.99",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "",
+                "lastConnectionStateChange": "2026-04-16T02:52:54.193Z",
+                "latestBackupTime": "",
+                "reportedState": null
+              },
+              {
+                "id": "GOODHOST:555555555",
+                "hardwareId": "f5bf13cd-98a7-5a96-9463-0d65d78cd3a4",
+                "type": "console",
+                "ipAddress": "203.0.113.50",
+                "owner": true,
+                "isBlocked": false,
+                "registrationTime": "",
+                "latestBackupTime": "",
+                "lastConnectionStateChange": "2099-01-01T00:00:00Z",
+                "reportedState": {
+                  "hardware": {"mac": "AABBCC000005", "name": "UniFi Dream Machine SE", "serialno": "aabbcc000005", "shortname": "UDMPROSE", "firmwareVersion": "4.0.6"},
+                  "hostname": "skewed.example.com",
+                  "ip": "192.0.2.50",
+                  "ipAddrs": ["192.0.2.50", "fe80::5", "169.254.9.9"],
+                  "state": "connected",
+                  "version": "4.0.180"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-hosts"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              null,
+              {"siteId": "no-host-id-site", "meta": {"name": "orphan"}},
+              {"siteId": "661de833b6b2463f0c20b319", "hostId": "GOODHOST:555555555", "meta": "meta-should-be-an-object", "statistics": null, "permission": "admin", "isOwner": true}
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-sites"
+          }
+        }
+      ]
+    },
+    {
+      "match": {"method": "GET", "path": "/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              null,
+              {"hostId": "GOODHOST:555555555", "hostName": "skewed.example.com", "devices": null, "updatedAt": "2026-06-23T07:21:27Z"},
+              {
+                "hostId": "GOODHOST:555555555",
+                "hostName": "skewed.example.com",
+                "devices": [
+                  null,
+                  {"mac": "AABBCC0000FF", "name": "No-Id-Device", "model": "USW Lite 8 PoE", "shortname": "USWLITE8POE", "ip": "192.0.2.77", "productLine": "network", "status": "online"},
+                  {"id": "AABBCC000005", "mac": "AABBCC000005", "name": "skewed.example.com", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "192.0.2.50", "productLine": "network", "status": "online", "version": "4.1.13", "firmwareStatus": "upToDate", "isConsole": true, "isManaged": true},
+                  {"id": "AABBCC000005", "mac": "AABBCC000005", "name": "Duplicate-Row", "model": "UDM SE", "shortname": "UDMPROSE", "ip": "192.0.2.50", "productLine": "network", "status": "online", "isConsole": true}
+                ],
+                "updatedAt": "2026-13-39T25:61:61Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-devices"
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"code": "not_found", "httpStatusCode": 404, "message": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 1,
+    "ids": ["unifi-site-manager:$HOST:device:AABBCC000005"],
+    "assets": [
+      {
+        "id": "unifi-site-manager:$HOST:device:AABBCC000005",
+        "fields": {
+          "hostnames": "skewed.example.com",
+          "unifi_site_id": "661de833b6b2463f0c20b319",
+          "unifi_console_serial": "aabbcc000005"
+        },
+        "fields_absent": ["unifi_site_name"]
+      }
+    ],
+    "log_contains": [
+      "skipping host row that is not an object",
+      "skipping host with no id",
+      "skipping device row that is not an object",
+      "skipping device with no id under host GOODHOST:555555555",
+      "skipping duplicate device id AABBCC000005"
+    ]
+  },
+
+  "check_determinism": true
+}

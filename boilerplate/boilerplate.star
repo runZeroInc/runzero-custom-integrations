@@ -1,12 +1,25 @@
-# Copyright 2026 runZero, Inc. Available under the MIT License
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
 
 CONFIG = {
     "id": "runzero-boilerplate",
     "name": "Product Name",
     "type": "inbound",
     "description": "Replace with your integration description.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    # Bump by one whenever this script changes. This is the SCRIPT's revision
+    # and is informational only; minVersion below is a different thing --
+    # the minimum runZero platform version required to run it.
+    "maturity": "alpha",
+    # alpha: new or unproven. beta: in use and broadly working.
+    # stable: promoted deliberately after real-world validation.
+    "minVersion": "5.1.260818.0",
+    # How runZero reconciles these records with the assets it already knows,
+    # declared once for the whole integration. Omit it for the default, which
+    # matches and breaks on all four dimensions. The preset below suits a source
+    # with a stable vendor id whose addresses and names drift; a source that only
+    # emits per-run ids wants "no-id-match no-id-break" instead. Say WHY in a
+    # comment here -- the reasoning is what a future reader needs.
+    "matchBehavior": "no-mac-break no-ip-break no-name-break",
     "validationMode": "compile",
     "params": [
         {
@@ -42,7 +55,7 @@ CONFIG = {
 #   5. http          (http_post="post", http_get="get", get_json, post_json,
 #                     url_encode, bearer, basic, oauth2_token)
 #   6. uuid          (new_uuid)
-#   7. time          (now, parse_time, parse_duration)
+#   7. time          (now, parse_ts, parse_time, parse_duration)
 #   8. re            (find_all, sub)
 #   9. csv           (read_all)
 #  10. runzero.progress (report, info)
@@ -62,7 +75,7 @@ load("json", json_encode="encode", json_decode="decode")
 load("net", "ip_address", "network_interface", "normalize_mac", "resolve")
 load("http", http_post="post", http_get="get", "get_json", "post_json", "url_encode", "bearer", "basic", "oauth2_token")
 load("uuid", "new_uuid")
-load("time", "now", "parse_time", "parse_duration")
+load("time", "now", "parse_time", "parse_ts", "parse_duration")
 load("re", re_find_all="find_all", re_sub="sub")
 load("csv", csv_read="read_all")
 load("runzero.progress", progress_report="report", progress_info="info")
@@ -91,13 +104,18 @@ def create_asset_example():
         mac="AA:BB:CC:DD:EE:FF",
         ips=["192.168.1.10", "fe80::1%eth0", "[2001:db8::1]:443"],
     )
+    # Always guard the result like this. network_interface returns None when
+    # nothing usable survives -- a record with no parseable MAC and no routable
+    # address -- and passing [None] to ImportAsset does not skip that one record,
+    # it aborts the ENTIRE run with "network_interfaces must be an iterable of
+    # NetworkInterface objects", losing everything already parsed.
+    interfaces = [netif] if netif else []
     return ImportAsset(
         id="asset-12345",
-        networkInterfaces=[netif],
+        networkInterfaces=interfaces,
         hostnames=["sample-device"],
         os="ExampleOS",
         osVersion="1.0",
-        matchBehavior="no-mac-break no-ip-break no-name-break",
         # match_behavior tells the runZero cruncher how aggressively
         # to merge this asset with existing records. The default is
         # full matching on id+mac+ip+name. When your source provides
@@ -204,11 +222,19 @@ def example_ip_usage():
 # --------------
 # time library
 # --------------
-def example_time_usage():
+def example_time_usage(api_value):
     """
     Parse timestamps and durations; do arithmetic with them.
+
+    Use parse_ts for anything an API supplied: it returns the default on a
+    value it cannot read, and clamps a future timestamp to now. parse_time
+    RAISES instead, and a raise from a builtin ends the whole import -- so one
+    malformed timestamp on one record loses every asset still unreported.
+    parse_time is safe only for a literal you control, as below.
     """
-    t = parse_time("2023-10-27T10:00:00Z")
+    seen = parse_ts(api_value)                 # None when absent or malformed
+    print("last seen:", seen)
+    t = parse_time("2023-10-27T10:00:00Z")     # a literal, so it cannot raise
     print("unix:", t.unix, "year:", t.year)
     window = parse_duration("24h")
     print("cutoff:", (now() - window).unix)

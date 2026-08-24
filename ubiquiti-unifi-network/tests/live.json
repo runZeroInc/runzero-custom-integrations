@@ -1,0 +1,21 @@
+{
+  "env_prefix": "UNIFI",
+  "aliases": {
+    "TLS_INSECURE": "tls_disable_validation"
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id", "namespaced_ids"]
+  },
+  "_comment": [
+    "env_prefix shortens UBIQUITI_UNIFI_NETWORK_* to UNIFI_*, which is what a",
+    "controller is called in practice. TLS_INSECURE is an alias for the shared",
+    "option set's tls_disable_validation, because a self-signed controller",
+    "certificate is the normal case on a LAN and nobody types the long name.",
+    "",
+    "The two invariant skips match this integration's fixture scenarios: the",
+    "UniFi API's stable identifier for a client IS its MAC, so the script has",
+    "no tenant-scoped id to use and no_mac_in_id/namespaced_ids cannot hold.",
+    "Remove both skips if the id scheme is ever revisited -- a live controller",
+    "is where a randomized-MAC collision would first show up."
+  ]
+}

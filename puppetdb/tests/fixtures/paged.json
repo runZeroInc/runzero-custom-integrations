@@ -1,0 +1,108 @@
+{
+  "name": "paged",
+  "integration": "puppetdb",
+  "description": "PuppetDB pages the facts endpoint by individual fact ROW, not by node, so one node's facts routinely straddle a page boundary. With fact_page_size=2 the five fact rows arrive over three pages and no single page names all three nodes; treating a page as a complete fact set would silently drop facts, so the merged node count in the log is the assertion. The node walk pages by offset with no cursor at all, so page 2 must carry offset=1 and page 3 offset=2; each route matches on its offset, so a walk that failed to advance would starve rather than loop. A 429 is served once on the second node page to prove get_json's default retries carry the walk through it.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_token": "fixture-rbac-token",
+    "page_size": "1",
+    "fact_page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "facts-offset-0",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "alpha.corp.example.com", "name": "networking", "value": {"fqdn": "alpha.corp.example.com", "hostname": "alpha", "domain": "corp.example.com", "ip": "10.82.0.1", "mac": "00:50:56:bb:00:01", "interfaces": {"eth0": {"mac": "00:50:56:bb:00:01", "bindings": [{"address": "10.82.0.1"}]}}}},
+            {"certname": "alpha.corp.example.com", "name": "os", "value": {"name": "Ubuntu", "family": "Debian", "release": {"full": "24.04", "major": "24"}}}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "facts-offset-2",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "beta.corp.example.com", "name": "networking", "value": {"fqdn": "beta.corp.example.com", "hostname": "beta", "domain": "corp.example.com", "ip": "10.82.0.2", "mac": "00:50:56:bb:00:02", "interfaces": {"eth0": {"mac": "00:50:56:bb:00:02", "bindings": [{"address": "10.82.0.2"}]}}}},
+            {"certname": "beta.corp.example.com", "name": "os", "value": {"name": "Ubuntu", "family": "Debian", "release": {"full": "24.04", "major": "24"}}}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "facts-offset-4-short-page",
+      "match": {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=4"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"certname": "gamma.corp.example.com", "name": "networking", "value": {"fqdn": "gamma.corp.example.com", "hostname": "gamma", "domain": "corp.example.com", "ip": "10.82.0.3", "mac": "00:50:56:bb:00:03", "interfaces": {"eth0": {"mac": "00:50:56:bb:00:03", "bindings": [{"address": "10.82.0.3"}]}}}}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "nodes-offset-0",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=0"},
+      "responses": [
+        {"status": 200, "json": [{"certname": "alpha.corp.example.com", "facts_environment": "production", "report_timestamp": "2026-02-02T10:00:00.000Z"}]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "nodes-offset-1-rate-limited-then-served",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=1"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "too many requests"}},
+        {"status": 200, "json": [{"certname": "beta.corp.example.com", "facts_environment": "production", "report_timestamp": "2026-02-02T10:01:00.000Z"}]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "nodes-offset-2",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=2"},
+      "responses": [
+        {"status": 200, "json": [{"certname": "gamma.corp.example.com", "facts_environment": "production", "report_timestamp": "2026-02-02T10:02:00.000Z"}]}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "nodes-offset-3-empty",
+      "match": {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=3"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "puppetdb:$HOST:alpha.corp.example.com",
+      "puppetdb:$HOST:beta.corp.example.com",
+      "puppetdb:$HOST:gamma.corp.example.com"
+    ],
+    "log_contains": [
+      "indexed 5 active fact rows for 3 nodes",
+      "reported 3 active nodes"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=2"},
+      {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=4"},
+      {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=1"},
+      {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=2"},
+      {"method": "GET", "path": "/pdb/query/v4/nodes", "query_contains": "offset=3"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/pdb/query/v4/facts", "query_contains": "offset=6"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

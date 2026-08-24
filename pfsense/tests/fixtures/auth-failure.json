@@ -1,0 +1,60 @@
+{
+  "name": "auth-failure",
+  "integration": "pfsense",
+  "description": "A revoked or mistyped API key. All four v2 endpoints answer 401 in pfrest's error envelope. Proves the run reports ZERO assets with a printed credential diagnostic, rather than emitting a placeholder asset whose id falls back to the sanitized base URL with an empty hostname, no interfaces, and osVersion 'unknown' stamped as trusted - the uncorrelatable junk asset that used to be created on every auth failure and became a permanent duplicate once the credential was fixed and the id flipped to the netgate_id form.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token": "revoked-token"
+  },
+  "routes": [
+    {
+      "name": "hostname",
+      "match": {"method": "GET", "path": "/api/v2/system/hostname"},
+      "responses": [
+        {"status": 401, "json": {"code": 401, "status": "unauthorized", "response_id": "AUTH_AUTHENTICATION_FAILED", "message": "Authentication failed", "data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "version",
+      "match": {"method": "GET", "path": "/api/v2/system/version"},
+      "responses": [
+        {"status": 401, "json": {"code": 401, "status": "unauthorized", "response_id": "AUTH_AUTHENTICATION_FAILED", "message": "Authentication failed", "data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "status-interfaces",
+      "match": {"method": "GET", "path": "/api/v2/status/interfaces"},
+      "responses": [
+        {"status": 401, "json": {"code": 401, "status": "unauthorized", "response_id": "AUTH_AUTHENTICATION_FAILED", "message": "Authentication failed", "data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "status-system",
+      "match": {"method": "GET", "path": "/api/v2/status/system"},
+      "responses": [
+        {"status": 401, "json": {"code": 401, "status": "unauthorized", "response_id": "AUTH_AUTHENTICATION_FAILED", "message": "Authentication failed", "data": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/system/hostname"},
+      {"method": "GET", "path": "/api/v2/system/version"},
+      {"method": "GET", "path": "/api/v2/status/interfaces"},
+      {"method": "GET", "path": "/api/v2/status/system"}
+    ],
+    "log_contains": [
+      "pfsense: no usable response from /api/v2/system/hostname: status 401",
+      "every endpoint refused the credential (401/403)",
+      "Reported 0 assets"
+    ]
+  },
+  "check_determinism": true
+}

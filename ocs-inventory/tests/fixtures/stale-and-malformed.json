@@ -1,0 +1,78 @@
+{
+  "name": "stale-and-malformed",
+  "integration": "ocs-inventory",
+  "description": "The stale filter together with the record shapes the DBI-rendered API actually produces. Computer 501 last contacted the server eight years ago -- the abandoned record a reimage leaves behind -- and is dropped by stale_days with a logged count. Computer 502 has no hardware section and 503 is a bare string; both are skipped with a reason. 504's hardware row carries no ID, which is deliberately NOT fatal -- the collection is keyed by the same id the row would have carried, so the key is a faithful fallback and 504 keeps the id 504 -- while the entry under an empty key has no id from either source and is skipped instead of being given an invented one. 505 also proves the numeric columns are read whether DBI hands them back as strings or as numbers, that a MySQL DATETIME with no offset is shape-checked before parse_time sees it (an unscreened value aborts the whole script), and that a LASTCOME dated in the future is clamped instead of losing the record: runZero rejects an ImportAsset whose last-seen time is ahead of now.",
+  "kwargs": {
+    "url": "$BASE",
+    "include_software": "false",
+    "stale_days": "30"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/ocsapi/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "501": {
+              "hardware": {"ID": "501", "DEVICEID": "gone-2018-01-01-00-00-00", "NAME": "gone", "IPADDR": "10.63.0.31", "LASTCOME": "2018-02-01 09:00:00", "LASTDATE": "2018-02-01 09:00:00"},
+              "networks": [{"DESCRIPTION": "eth0", "MACADDR": "00:11:55:00:00:01", "IPADDRESS": "10.63.0.31", "STATUS": "Up"}]
+            },
+            "502": {"networks": [{"DESCRIPTION": "eth0", "MACADDR": "00:11:55:00:00:02"}]},
+            "503": "not-a-record",
+            "504": {
+              "hardware": {"DEVICEID": "keyed-504-2026-06-06-06-06-06", "NAME": "keyed-504", "IPADDR": "10.63.0.34", "LASTCOME": "2026-08-15 06:00:00"},
+              "accountinfo": [{"TAG": "NA"}]
+            },
+            "": {
+              "hardware": {"DEVICEID": "", "NAME": "noid", "IPADDR": "10.63.0.36", "LASTCOME": "2026-08-15 06:30:00"}
+            },
+            "505": {
+              "hardware": {
+                "ID": 505,
+                "DEVICEID": "ok-505-2026-05-05-05-05-05",
+                "NAME": "ok-505",
+                "OSNAME": "Ubuntu 24.04.1 LTS",
+                "IPADDR": "10.63.0.35",
+                "MEMORY": 8192,
+                "PROCESSORN": 2,
+                "LASTCOME": "2099-01-01 00:00:00",
+                "LASTDATE": "not a timestamp"
+              },
+              "bios": [{"SSN": "Not Specified", "SMANUFACTURER": "QEMU", "SMODEL": "Standard PC (Q35 + ICH9, 2009)", "TYPE": "1"}],
+              "networks": [{"DESCRIPTION": "enp1s0", "TYPE": "Ethernet", "MACADDR": "00:11:55:00:00:05", "IPADDRESS": "10.63.0.35", "STATUS": "Up", "VIRTUALDEV": 0}],
+              "cpus": [{"TYPE": "QEMU Virtual CPU", "CORES": 2}],
+              "memories": [{"CAPACITY": 8192, "TYPE": "RAM"}]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["ocs-inventory:127.0.0.1:504", "ocs-inventory:127.0.0.1:505"],
+    "ids_absent": [
+      "ocs-inventory:127.0.0.1:501",
+      "ocs-inventory:127.0.0.1:502",
+      "ocs-inventory:127.0.0.1:503"
+    ],
+    "assets": [
+      {
+        "id": "ocs-inventory:127.0.0.1:504",
+        "fields_absent": ["ocs_inventory_tag"],
+        "fields": {"tags": "ocs-inventory"}
+      }
+    ],
+    "request_count": 1,
+    "log_contains": [
+      "ocs-inventory: skipping computer 502 with no hardware section",
+      "ocs-inventory: skipping computer with no id: name=noid",
+      "ocs-inventory: skipped 1 computers not seen in 30 days",
+      "ocs-inventory: reported 2 computers"
+    ]
+  },
+  "invariants": {"skip": []}
+}

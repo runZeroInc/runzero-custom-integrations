@@ -1,0 +1,95 @@
+{
+  "name": "no-address",
+  "integration": "netskope",
+  "description": "REGRESSION LOCK for the hardcoded loopback placeholder. build_assets used to open every iteration with `ips = [\"127.0.0.1\"]` and pass it to every network_interface call, so each Netskope asset was built with an interface carrying the loopback address. Verified against the scanner: network_interface(ips=[\"127.0.0.1\"], mac=None) really does return NetworkInterface(ipv4_addresses=[\"127.0.0.1\"], mac_address=None) -- the placeholder was on the interface, and it disappeared only because the platform's NormalizeAddress rejects loopback one layer later. Correctness that rests on a filter in another component is not correctness.\n\nRemoving the literal exposes two aborts this scenario pins. network_interface returns None when nothing usable survives, and networkInterfaces=[None] aborts the entire run: DEV-0002 reports no MAC at all, and DEV-0003 reports a MAC string the platform cannot read, so both must produce an asset with NO interface rather than a None one. DEV-0004 sends mac_addresses as an explicit null, which .get(k, []) returns as None and which only `or []` survives. DEV-0005 comes last and must still be emitted, which is what proves nothing aborted along the way.\n\nSkips namespaced_ids: netskope uses the bare nsdeviceuid as the foreign id, with no tenant scope, so two Netskope tenants imported into one runZero instance would collide. Not this scenario's defect.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-netskope-token"
+  },
+  "routes": [
+    {
+      "name": "clientstatus",
+      "match": {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus"},
+      "responses": [{
+        "status": 200,
+        "json": {
+          "ok": 1,
+          "status": 200,
+          "result": [
+            {
+              "_id": {"nsdeviceuid": "NSDEV-ADDR-0001"},
+              "hostname": "has-mac-01",
+              "mac_addresses": ["00:1A:2B:3C:4D:5E"],
+              "os": "Windows",
+              "ns_tenant_id": "fixture-tenant"
+            },
+            {
+              "_id": {"nsdeviceuid": "NSDEV-ADDR-0002"},
+              "hostname": "no-mac-02",
+              "mac_addresses": [],
+              "os": "Windows",
+              "ns_tenant_id": "fixture-tenant"
+            },
+            {
+              "_id": {"nsdeviceuid": "NSDEV-ADDR-0003"},
+              "hostname": "unreadable-mac-03",
+              "mac_addresses": ["not-a-mac"],
+              "os": "Windows",
+              "ns_tenant_id": "fixture-tenant"
+            },
+            {
+              "_id": {"nsdeviceuid": "NSDEV-ADDR-0004"},
+              "hostname": "null-mac-list-04",
+              "mac_addresses": null,
+              "os": "Windows",
+              "ns_tenant_id": "fixture-tenant"
+            },
+            {
+              "_id": {"nsdeviceuid": "NSDEV-ADDR-0005"},
+              "hostname": "last-record-05",
+              "mac_addresses": ["00:1A:2B:3C:4D:60"],
+              "os": "Windows",
+              "ns_tenant_id": "fixture-tenant"
+            }
+          ]
+        }
+      },
+      {"status": 200, "json": {"ok": 1, "status": 200, "result": []}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "assets": [
+      {
+        "id": "NSDEV-ADDR-0001",
+        "fields": {"macAddresses": "00:1a:2b:3c:4d:5e", "hostnames": "has-mac-01"},
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "NSDEV-ADDR-0002",
+        "fields": {"hostnames": "no-mac-02"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "NSDEV-ADDR-0003",
+        "fields": {"hostnames": "unreadable-mac-03"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "NSDEV-ADDR-0004",
+        "fields": {"hostnames": "null-mac-list-04"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "NSDEV-ADDR-0005",
+        "fields": {"macAddresses": "00:1a:2b:3c:4d:60", "hostnames": "last-record-05"},
+        "fields_absent": ["ipAddresses"]
+      }
+    ],
+    "asset_count": 5,
+    "request_count": 2
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

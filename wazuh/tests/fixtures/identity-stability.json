@@ -1,0 +1,199 @@
+{
+  "name": "identity-stability",
+  "integration": "wazuh",
+  "description": "The regression test for the recycled composite id. The foreign id used to be \"{environment}-{agent_id}\", where `environment` was node_name.split('-')[-3]. Both halves were wrong.\n\n`node_name` is the cluster node an agent is CURRENTLY reporting to -- Wazuh documents it as topology, not as an agent property -- so an agent that rebalances onto another worker changed its own identity and forked a second asset. Agent 005 here sits on wazuh3-worker-prod-sc2-03, which the old rule rendered as `prod-005`; agent 006 sits on node01, which has too few segments and rendered as the bare `006`. Both spellings are asserted absent, and neither node name appears anywhere in the emitted ids -- node_name survives only as an attribute, which is where a mutable field belongs.\n\nThe ordinal is recycled. Wazuh seeds its agent-id counter from the highest id in client.keys, so once the top-numbered agent is purged -- and <auth><purge> defaults to yes -- the next enrollment receives that id and inherits the old agent's runZero asset, its history, its hostname, and its interfaces. `dateAdd`, the registration timestamp, is what separates them, so it is part of the id: `wazuh:<manager>:agent:005:20260301100000` rather than `wazuh:<manager>:agent:005`. Both the bare-ordinal form and the undated form are asserted absent.\n\nAgent 007 pins the rendering: Wazuh has shipped dateAdd both as `2026-03-02T11:15:00Z` and as `2026-03-02 11:15:00`, and only the digits are kept, so an API upgrade that changes the rendering does not re-key the estate. Agent 008 has no id at all and must be skipped and logged rather than reaching ImportAsset.\n\nIds are also namespaced on the manager hostname. An agent id is a small per-manager ordinal, so `001` means nothing outside one manager and two Wazuh deployments imported into one runZero account would otherwise collide on every agent.\n\nAgent 009 is the exception that keeps the break flags honest. With a dateAdd in the id the ordinal can no longer be inherited, so the id is safe to merge on and the addressing must not veto it -- hence no-mac-break no-ip-break no-name-break on the other three. Agent 009 reports no dateAdd, so its id CAN be inherited by a later agent reusing the ordinal, and a disagreeing MAC is then the only thing that can stop an unrelated host being merged onto its asset. It keeps the platform default, and this scenario asserts both resolved policies side by side.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "token": "fixture-wazuh-jwt"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=0"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 5,
+              "affected_items": [
+                {
+                  "id": "005",
+                  "name": "rebalancing-host",
+                  "status": "active",
+                  "ip": "10.30.0.5",
+                  "manager": "wazuh3-worker-prod-sc2-03",
+                  "node_name": "wazuh3-worker-prod-sc2-03",
+                  "dateAdd": "2026-03-01T10:00:00Z",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "24.04"
+                  }
+                },
+                {
+                  "id": "006",
+                  "name": "single-node-host",
+                  "status": "active",
+                  "ip": "10.30.0.6",
+                  "manager": "node01",
+                  "node_name": "node01",
+                  "dateAdd": "2026-03-01T12:45:00Z",
+                  "os": {
+                    "name": "Debian",
+                    "platform": "debian",
+                    "version": "12"
+                  }
+                },
+                {
+                  "id": "007",
+                  "name": "space-rendered-dateadd",
+                  "status": "active",
+                  "ip": "10.30.0.7",
+                  "node_name": "wazuh3-worker-pp-rs-01",
+                  "dateAdd": "2026-03-02 11:15:00",
+                  "os": {
+                    "name": "Rocky Linux",
+                    "platform": "rocky",
+                    "version": "9.3"
+                  }
+                },
+                {
+                  "name": "agent-with-no-id",
+                  "status": "active",
+                  "ip": "10.30.0.8",
+                  "node_name": "node01",
+                  "dateAdd": "2026-03-03T09:00:00Z",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04"
+                  }
+                },
+                {
+                  "id": "009",
+                  "name": "no-registration-date",
+                  "status": "active",
+                  "ip": "10.30.0.9",
+                  "node_name": "node01",
+                  "os": {
+                    "name": "Alpine Linux",
+                    "platform": "alpine",
+                    "version": "3.20"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "agents-page-2-empty",
+      "match": {
+        "method": "GET",
+        "path": "/agents"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "syscollector",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/syscollector/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "wazuh:$HOST:agent:005:20260301100000",
+      "wazuh:$HOST:agent:006:20260301124500",
+      "wazuh:$HOST:agent:007:20260302111500",
+      "wazuh:$HOST:agent:009"
+    ],
+    "ids_absent": [
+      "prod-005",
+      "005",
+      "006",
+      "worker-007",
+      "pp-007",
+      "wazuh:$HOST:agent:005",
+      "wazuh:$HOST:agent:006",
+      "wazuh:$HOST:agent:007"
+    ],
+    "assets": [
+      {
+        "id": "wazuh:$HOST:agent:005:20260301100000",
+        "fields": {
+          "_attrType": "agent",
+          "hostnames": "rebalancing-host",
+          "wazuh_agent_id": "005",
+          "wazuh_node_name": "wazuh3-worker-prod-sc2-03",
+          "wazuh_date_add": "2026-03-01T10:00:00Z"
+        }
+      },
+      {
+        "id": "wazuh:$HOST:agent:009",
+        "fields": {
+          "_attrType": "agent-unpinned",
+          "hostnames": "no-registration-date"
+        }
+      }
+    ],
+    "log_contains": [
+      "wazuh: skipping agent with no id: name=agent-with-no-id",
+      "wazuh: agent 009 reports no dateAdd; keeping default match behavior, since its ordinal could be reused",
+      "Successfully processed 4 Wazuh agents into RunZero assets"
+    ]
+  }
+}

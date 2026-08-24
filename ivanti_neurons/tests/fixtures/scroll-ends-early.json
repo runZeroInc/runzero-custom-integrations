@@ -1,0 +1,97 @@
+{
+  "name": "scroll-ends-early",
+  "integration": "ivanti_neurons",
+  "script": "ivanti_neurons/ivanti_neurons.star",
+  "description": "REGRESSION LOCK on the missing @odata.nextLink. The scroll reports an @odata.count of 9 but stops handing out next links after three devices -- what a permission-trimmed result set or an expired five-minute scrollID produces, and Ivanti's own instruction is to keep calling the next link until the response is empty rather than to count rows.\n\nThe walk had no guard for the link being absent: url became None while the row count still said more existed, and the next iteration requested it, aborting the script and losing all three devices. Now the absent link ends the walk and everything collected so far is imported.",
+  "kwargs": {
+    "url": "$BASE",
+    "tenant_id": "fixture-tenant",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-jwt-token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices", "query_contains": "scrollID=page2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "@odata.count": 9,
+            "value": [
+              {
+                "DiscoveryId": "33330000-4a11-4c31-9c31-1a2b3c4d5e03",
+                "DeviceID": "device-0003",
+                "DeviceName": "server-03.example.com",
+                "DisplayName": "Server 03",
+                "OS": {"Name": "Windows Server 2022", "Version": "10.0.20348"},
+                "System": {"Model": "PowerEdge R650"},
+                "Network": {"TCPIP": {"IPAddress": "192.0.2.23"}}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "@odata.count": 9,
+            "value": [
+              {
+                "DiscoveryId": "33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+                "DeviceID": "device-0001",
+                "DeviceName": "workstation-01.example.com",
+                "DisplayName": "Workstation 01",
+                "OS": {"Name": "Windows 11 Pro", "Version": "10.0.22631"},
+                "System": {"Model": "OptiPlex 7090"},
+                "Network": {"TCPIP": {"IPAddress": "192.0.2.21"}}
+              },
+              {
+                "DiscoveryId": "33330000-4a11-4c31-9c31-1a2b3c4d5e02",
+                "DeviceID": "device-0002",
+                "DeviceName": "laptop-02.example.com",
+                "DisplayName": "Laptop 02",
+                "OS": {"Name": "Windows 10 Enterprise", "Version": "10.0.19045"},
+                "System": {"Model": "Latitude 5420"},
+                "Network": {"TCPIP": {"IPAddress": "192.0.2.22"}}
+              }
+            ],
+            "@odata.nextLink": "$BASE/api/apigatewaydataservices/v1/devices?$scrollID=page2"
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e02",
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e03"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"},
+      {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices", "query_contains": "scrollID=page2"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

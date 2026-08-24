@@ -1,0 +1,189 @@
+{
+  "name": "happy",
+  "description": "Proves the new url parameter reaches every Automox endpoint, that the org lookup runs before the device list, that /orgs/<id>/packages is indexed onto the right server, and that both the detail.NICS interface shape and the ip_addrs fallback parse. Ids are scoped by the Automox organization id -- automox:<org id>:<device id> -- resolved from /api/orgs when the row carries no organization_id of its own, so two Automox tenants no longer collide; the namespaced_ids invariant enforces the scheme.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "packages",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 90001,
+              "server_id": 1001,
+              "display_name": "Mozilla Firefox",
+              "version": "126.0",
+              "repo": "winget",
+              "installed": true,
+              "severity": "critical",
+              "cves": [
+                "CVE-2026-0001"
+              ]
+            },
+            {
+              "id": 90002,
+              "server_id": 1001,
+              "display_name": "7-Zip",
+              "version": "23.01",
+              "repo": "winget",
+              "installed": true
+            },
+            {
+              "id": 90003,
+              "display_name": "orphan-no-server-id",
+              "version": "1.0"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "orgs",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 4242,
+              "name": "Fixture Org"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "servers",
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1001,
+              "name": "fixture-win-01",
+              "os_family": "Windows",
+              "os_name": "Windows 10 Pro",
+              "os_version": "10.0.19045",
+              "agent_version": "1.44.0",
+              "compliant": true,
+              "serial_number": "SN-FIXTURE-1001",
+              "last_logged_in_user": "svc-fixture",
+              "status": {
+                "agent_status": "connected"
+              },
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:aa:00:01",
+                    "IPS": [
+                      "192.0.2.11"
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "id": 1002,
+              "name": "fixture-lnx-02",
+              "os_family": "Linux",
+              "os_name": "Ubuntu 22.04",
+              "os_version": "22.04.4",
+              "agent_version": "1.44.0",
+              "compliant": false,
+              "serial_number": "SN-FIXTURE-1002",
+              "status": {
+                "agent_status": "disconnected"
+              },
+              "ip_addrs": [
+                "203.0.113.22"
+              ],
+              "ip_addrs_private": [
+                "192.0.2.12"
+              ]
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "automox:4242:1001",
+      "automox:4242:1002"
+    ],
+    "assets": [
+      {
+        "id": "automox:4242:1001",
+        "fields": {
+          "hostnames": "fixture-win-01",
+          "ipAddresses": "192.0.2.11",
+          "macAddresses": "00:11:22:aa:00:01",
+          "os": "Windows Windows 10 Pro",
+          "serial_number": "SN-FIXTURE-1001",
+          "agent_status": "connected"
+        }
+      },
+      {
+        "id": "automox:4242:1002",
+        "fields": {
+          "hostnames": "fixture-lnx-02",
+          "ipAddresses": "192.0.2.12\t203.0.113.22",
+          "os": "Linux Ubuntu 22.04"
+        },
+        "fields_absent": [
+          "macAddresses"
+        ]
+      }
+    ],
+    "min_software_total": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
+      {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      {
+        "method": "GET",
+        "path": "/api/servers",
+        "query_contains": "include_details=1"
+      },
+      {
+        "header_contains": "fixture-token"
+      }
+    ]
+  }
+}

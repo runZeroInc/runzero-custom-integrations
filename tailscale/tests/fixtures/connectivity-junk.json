@@ -1,0 +1,75 @@
+{
+  "name": "connectivity-junk",
+  "integration": "tailscale",
+  "description": "Junk inside clientConnectivity and the list-valued fields, each of which used to be an abort: a latency value that is a LIST instead of an object map (the .items() call aborted the run), a clientConnectivity that is a bare string, endpoints holding null and numeric elements, tags present-but-null, and a device row that is a bare string. Every record must degrade to skipping just the junk while the run imports everything else - and because assets now stream per device, the good device that arrives BEFORE the junk survives even in the worst case. namespaced_ids is skipped for the reason recorded in happy.",
+  "kwargs": {
+    "url": "$BASE",
+    "tailnet": "example.net",
+    "api_key_or_client_secret": "tskey-api-fixture-000002"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v2/tailnet/example.net/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "id": "90212000000001",
+                "name": "good-node.example.ts.net",
+                "hostname": "good-node",
+                "os": "linux",
+                "addresses": ["100.103.30.1"],
+                "clientConnectivity": {
+                  "endpoints": ["203.0.113.10:41641", null, 41641],
+                  "latency": ["not", "a", "map"]
+                },
+                "tags": null
+              },
+              "this row should have been an object",
+              {
+                "id": "90212000000002",
+                "name": "string-conn.example.ts.net",
+                "hostname": "string-conn",
+                "os": "linux",
+                "addresses": ["100.103.30.2"],
+                "clientConnectivity": "unexpectedly a string",
+                "advertisedRoutes": [42, "192.0.2.0/24"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["tailscale-90212000000001", "tailscale-90212000000002"],
+    "assets": [
+      {
+        "id": "tailscale-90212000000001",
+        "fields": {
+          "ipAddresses": "100.103.30.1",
+          "tailscale_client_endpoints": "203.0.113.10:41641"
+        }
+      },
+      {
+        "id": "tailscale-90212000000002",
+        "fields": {
+          "ipAddresses": "100.103.30.2",
+          "tailscale_advertisedRoutes": "192.0.2.0/24"
+        }
+      }
+    ],
+    "log_contains": [
+      "tailscale: skipped 1 device rows that were not objects",
+      "tailscale: reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "name": "stuck-page",
+  "integration": "wazuh",
+  "description": "A Wazuh manager that stops advancing and answers every `offset` with the same page of agents. The walk's ONLY exit is a page with no affected_items, so this shape produces no exit at all: the script used to collect the same agents until the task timed out or the Explorer ran out of memory, with nothing in the log to say why. Offset arithmetic is no defence here -- the offset advances perfectly on the client side while the server ignores it, which is exactly why the guard compares what came BACK rather than what was asked for.\n\nThe no-progress check is the working guard -- the max_pages ceiling behind it defaults to ten million records deep (20,000 pages of the 500 Wazuh caps `limit` at) and exists only so an adversarially rotating manager still terminates. A page whose agent ids match the previous page's means the manager ignored `offset` or a proxy replayed a cached response, and the walk stops on the first repeat and says so, which is what log_contains pins. The stop happens BEFORE the page is collected, so the two agents are imported once.\n\nPages are two rows rather than a full five hundred because this walk continues on ANY non-empty page, so page fullness is irrelevant to it and a full page would only make the fixture bigger. total_affected_items is served so the message exercises its 'retrieved x/y available assets' form, with a denominator far larger than what was retrieved so the line reads as the truncation it is.\n\nwhen_exhausted is `error` ONLY as a terminator for a regression, and it has to be `error` rather than `empty`: the harness's empty response is a bare JSON array, and this script calls .get on the decoded body, which ABORTS the run on a list rather than failing an assertion. A 500 instead takes the existing status check, and raw http.get carries no retry budget, so a regression costs exactly one extra request and fails on request_count and the missing log line.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "token": "fixture-wazuh-jwt"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "agents",
+      "match": {
+        "method": "GET",
+        "path": "/agents"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 12400000,
+              "affected_items": [
+                {
+                  "id": "001",
+                  "name": "host-001",
+                  "status": "active",
+                  "ip": "10.20.1.1",
+                  "registerIP": "10.20.1.1",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                },
+                {
+                  "id": "002",
+                  "name": "host-002",
+                  "status": "active",
+                  "ip": "10.20.1.2",
+                  "registerIP": "10.20.1.2",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "total_affected_items": 12400000,
+              "affected_items": [
+                {
+                  "id": "001",
+                  "name": "host-001",
+                  "status": "active",
+                  "ip": "10.20.1.1",
+                  "registerIP": "10.20.1.1",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                },
+                {
+                  "id": "002",
+                  "name": "host-002",
+                  "status": "active",
+                  "ip": "10.20.1.2",
+                  "registerIP": "10.20.1.2",
+                  "manager": "wazuh-manager-01",
+                  "node_name": "wazuh-manager-01",
+                  "dateAdd": "2026-01-15T09:00:00Z",
+                  "lastKeepAlive": "2026-08-15T12:00:00Z",
+                  "version": "Wazuh v4.9.0",
+                  "os": {
+                    "name": "Ubuntu",
+                    "platform": "ubuntu",
+                    "version": "22.04.4 LTS",
+                    "arch": "x86_64"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "syscollector",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/syscollector/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "error": 0,
+            "data": {
+              "affected_items": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 7,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=0"
+      },
+      {
+        "method": "GET",
+        "path": "/agents",
+        "query_contains": "offset=500"
+      }
+    ],
+    "requests_absent": [
+      {
+        "query_contains": "offset=1000"
+      }
+    ],
+    "log_contains": [
+      "wazuh: paging stopped after 2 pages (API returned the same page twice, retrieved 2/12400000 available assets)",
+      "Retrieved 2 agents from Wazuh"
+    ]
+  }
+}

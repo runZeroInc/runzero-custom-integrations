@@ -1,0 +1,109 @@
+{
+  "name": "malformed-os-system",
+  "integration": "ivanti_neurons",
+  "script": "ivanti_neurons/ivanti_neurons.star",
+  "description": "Present-but-null nested objects and non-object rows must degrade, never abort. The first device carries \"OS\": null and \"System\": null -- the shape .get('OS', {}) does not defend, because the default only applies when the key is absent -- and it must import with its address and hostname, carrying no os and no model. The second element of value[] is a bare string where an object is documented, and must be counted and skipped. The third device is the control: fully-formed, and must import typed from its server OS. One abort here would lose the whole page.",
+  "kwargs": {
+    "url": "$BASE",
+    "tenant_id": "fixture-tenant",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {
+        "method": "GET",
+        "path": "/api/apigatewaydataservices/v1/token"
+      },
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-jwt-token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/api/apigatewaydataservices/v1/devices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "value": [
+              {
+                "DiscoveryId": "33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+                "DeviceID": "device-null-os-0001",
+                "DeviceName": "neurons-null-os.example.com",
+                "DisplayName": "Neurons Null OS",
+                "OS": null,
+                "System": null,
+                "Network": {
+                  "TCPIP": {
+                    "IPAddress": "192.0.2.31"
+                  }
+                }
+              },
+              "a bare string where a device object is documented",
+              {
+                "DiscoveryId": "33330000-4a11-4c31-9c31-1a2b3c4d5e02",
+                "DeviceID": "device-control-0002",
+                "DeviceName": "neurons-control.example.com",
+                "DisplayName": "Neurons Control",
+                "OS": {
+                  "Name": "Windows Server 2022",
+                  "Version": "10.0.20348"
+                },
+                "System": {
+                  "Model": "PowerEdge R650"
+                },
+                "Network": {
+                  "TCPIP": {
+                    "IPAddress": "192.0.2.32"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e02"
+    ],
+    "request_count": 2,
+    "assets": [
+      {
+        "id": "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+        "fields": {
+          "hostnames": "neurons-null-os.example.com",
+          "ipAddresses": "192.0.2.31"
+        },
+        "fields_absent": [
+          "os",
+          "deviceType"
+        ]
+      },
+      {
+        "id": "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e02",
+        "fields": {
+          "deviceType": "Server",
+          "ipAddresses": "192.0.2.32"
+        }
+      }
+    ],
+    "log_contains": [
+      "ivanti-neurons: skipped 1 non-object records in the device list",
+      "ivanti-neurons: reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

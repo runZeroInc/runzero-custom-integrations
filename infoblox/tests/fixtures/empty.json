@@ -1,0 +1,38 @@
+{
+  "name": "empty",
+  "integration": "infoblox",
+  "description": "A Grid view with no managed networks. The configured network_view skips the view enumeration, leases are disabled, and the network read returns an empty result: the run must report zero assets and log cleanly rather than failing the task or issuing address reads for networks that do not exist.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "wapi_version": "v2.13.1",
+    "network_view": "default",
+    "include_leases": "false"
+  },
+  "routes": [
+    {
+      "name": "networks-empty",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/network"},
+      "responses": [
+        {"status": 200, "json": {"result": []}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "ipv4address"},
+      {"path_contains": "lease"}
+    ],
+    "log_contains": [
+      "infoblox: view default: 0 networks, 0 leases, 0 host addresses",
+      "infoblox: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

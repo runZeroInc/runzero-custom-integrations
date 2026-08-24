@@ -1,0 +1,129 @@
+{
+  "name": "detail-cap",
+  "integration": "workspace-one-uem",
+  "description": "Applications and OS updates are per-device fetches, so detail_device_limit caps them. With two devices and detail_device_limit=1, only the first device may be queried; the second must still be imported, without software or patch attributes, and counted in the skipped log line. Also covers the two Accept-header schemas (the apps endpoint is version 1 and returns the lower-case app_items envelope while the search endpoint is version 2) and the applications paginator stopping once (page+1)*pagesize reaches TotalResults. check_determinism is off because the id is scoped by the tenant host, which under the fixture server carries an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-admin",
+    "password": "fixture-password",
+    "api_key": "fixture-tenant-code",
+    "include_software": "true",
+    "include_os_updates": "true",
+    "detail_device_limit": "1",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "apps-device-1",
+      "match": {"method": "GET", "path": "/api/mdm/devices/3c2d0000-0000-4000-8000-000000000001/apps/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "TotalResults": 3,
+            "app_items": [
+              {"name": "Corporate VPN", "bundle_id": "com.example.vpn", "installed_version": "6.2.1", "assigned_version": "6.2.1"},
+              {"name": "Secure Mail", "bundle_id": "com.example.mail", "installed_version": "", "assigned_version": "4.0.9"},
+              {"name": "", "bundle_id": "com.example.nameless", "installed_version": "1.0"},
+              {"name": "Asset Agent", "bundle_id": "com.example.agent", "installed_version": "2.11.0"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "osupdate-device-1",
+      "match": {"method": "GET", "path": "/api/mdm/devices/3c2d0000-0000-4000-8000-000000000001/osupdate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "OSUpdateList": [
+              {"deviceUpdateName": "macOS Sonoma", "deviceUpdateVersion": "14.5", "isCritical": true, "restartRequired": true},
+              {"deviceUpdateName": "Safari", "deviceUpdateVersion": "17.5", "isCritical": false, "restartRequired": false},
+              "this row should have been an object"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "detail-over-budget",
+      "match": {"method": "GET", "path_prefix": "/api/mdm/devices/3c2d0000-0000-4000-8000-000000000002/"},
+      "responses": [
+        {"status": 500, "text": "this device is past the detail limit and must never be queried"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/mdm/devices/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "Total": 2,
+            "Devices": [
+              {
+                "Id": {"Value": 6001},
+                "Uuid": "3c2d0000-0000-4000-8000-000000000001",
+                "SerialNumber": "DETAILFIXTURE01",
+                "MacAddress": "00:17:42:00:02:01",
+                "Platform": "AppleMacOs",
+                "Model": "MacBook Air (15-inch, M3)",
+                "OperatingSystem": "14.4.1",
+                "HostName": "air-detail-01",
+                "Ownership": "C",
+                "EnrollmentStatus": "Enrolled",
+                "LastSeen": "2026-08-12T00:00:00Z",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "00:17:42:00:02:01", "IPAddress": "10.120.2.1"}
+                ]
+              },
+              {
+                "Id": {"Value": 6002},
+                "Uuid": "3c2d0000-0000-4000-8000-000000000002",
+                "SerialNumber": "DETAILFIXTURE02",
+                "MacAddress": "00:17:42:00:02:02",
+                "Platform": "AppleIos",
+                "Model": "iPad Pro 11-inch",
+                "OperatingSystem": "iPadOS 17.4",
+                "HostName": "ipad-detail-02",
+                "Ownership": "C",
+                "EnrollmentStatus": "Enrolled",
+                "LastSeen": "2026-08-12T01:00:00Z",
+                "DeviceNetworkInfo": [
+                  {"MACAddress": "00:17:42:00:02:02", "IPAddress": "10.120.2.2"}
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "min_software_total": 3,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/mdm/devices/3c2d0000-0000-4000-8000-000000000001/apps/search", "query_contains": "pagesize=100"},
+      {"method": "GET", "path": "/api/mdm/devices/3c2d0000-0000-4000-8000-000000000001/osupdate"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/3c2d0000-0000-4000-8000-000000000002/"},
+      {"path_contains": "/apps/search", "query_contains": "page=1"}
+    ],
+    "log_contains": [
+      "workspace-one-uem: fetched per-device detail for 1 devices",
+      "workspace-one-uem: skipped per-device detail for 1 devices; raise the per-device detail limit (1) to cover more"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

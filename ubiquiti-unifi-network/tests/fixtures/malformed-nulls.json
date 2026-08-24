@@ -1,0 +1,91 @@
+{
+  "name": "malformed-nulls",
+  "integration": "ubiquiti-unifi-network",
+  "description": "Present-but-null and junk-element fields on device records, each of which used to abort the whole run: a null `features`/`interfaces` (the ', '.join aborted), a null `model` (the 'USW' in model check aborted), a junk element inside a features list, a null `name`, and a bare-string device row. Every record must degrade to losing just the malformed field while the run imports everything, and the null-model device leaves deviceType unset rather than asserting anything.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "Default",
+    "extract_clients": "false",
+    "page_limit": "100"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 25, "count": 1, "totalCount": 1, "data": [
+            {"id": "site-uuid-default", "name": "Default"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 100, "count": 4, "totalCount": 4, "data": [
+            {
+              "id": "device-null-01",
+              "name": null,
+              "model": null,
+              "macAddress": "00:11:22:ee:11:01",
+              "ipAddress": "10.97.0.2",
+              "state": "ONLINE",
+              "features": null,
+              "interfaces": null
+            },
+            "this row should have been an object",
+            {
+              "id": "device-junk-02",
+              "name": "sw-junk-02",
+              "model": "USW-Lite-8-PoE",
+              "macAddress": "00:11:22:ee:11:02",
+              "ipAddress": "10.97.0.3",
+              "state": "ONLINE",
+              "features": ["poe", null, 42],
+              "interfaces": "ports"
+            }
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "unifi:site-uuid-default:device:device-null-01",
+      "unifi:site-uuid-default:device:device-junk-02"
+    ],
+    "assets": [
+      {
+        "id": "unifi:site-uuid-default:device:device-null-01",
+        "fields": {
+          "model": "UniFi Device",
+          "ipAddresses": "10.97.0.2"
+        },
+        "fields_absent": ["deviceType", "hostnames", "unifi_features", "unifi_interfaces", "unifi_name"]
+      },
+      {
+        "id": "unifi:site-uuid-default:device:device-junk-02",
+        "fields": {
+          "deviceType": "Switch",
+          "hostnames": "sw-junk-02",
+          "unifi_features": "poe"
+        },
+        "fields_absent": ["unifi_interfaces"]
+      }
+    ],
+    "log_contains": [
+      "unifi: skipping non-object device row",
+      "unifi: reported 2 device assets"
+    ]
+  }
+}

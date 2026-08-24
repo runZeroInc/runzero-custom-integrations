@@ -1,0 +1,137 @@
+{
+  "name": "service-entry-trackers",
+  "integration": "home-assistant",
+  "description": "REGRESSION LOCK for entities claimed by a registry row that is then skipped. collect_devices marked every entity of a device registry row `claimed` BEFORE deciding whether to skip the row, so an entry_type=\"service\" row -- the cloud account or hub an integration creates -- took its entities down with it. Router-style integrations register exactly that way: the hub is a service entry and it OWNS the device_tracker entities for every client on the network, so the whole client list was claimed by an asset that was never emitted and then skipped by the tracker pass as \"already covered\". An install whose only network visibility is a router integration imported nothing at all.\n\nThe registry here holds two rows. The service row owns device_tracker.client_a and client_b, which must survive as tracker assets because nothing represents them otherwise. The printer row is a real device that owns device_tracker.printer_x, and that claim must still hold -- emitting both the device and its tracker would be two foreign ids for one printer, which can never merge back together. The log line counts are asserted so a fix that stops claiming altogether fails here too.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-long-lived-token",
+    "device_page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "states",
+      "match": {"method": "GET", "path": "/api/states"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "entity_id": "device_tracker.client_a",
+              "state": "home",
+              "attributes": {
+                "source_type": "router",
+                "mac": "00:11:22:33:55:01",
+                "ip": "192.0.2.201",
+                "host_name": "client-a",
+                "friendly_name": "Client A"
+              },
+              "last_changed": "2026-08-15T11:00:00.000000+00:00",
+              "last_updated": "2026-08-15T12:01:00.000000+00:00",
+              "context": {"id": "01J00000000000000000000021", "parent_id": null, "user_id": null}
+            },
+            {
+              "entity_id": "device_tracker.client_b",
+              "state": "home",
+              "attributes": {
+                "source_type": "router",
+                "mac": "00:11:22:33:55:02",
+                "ip": "192.0.2.202",
+                "host_name": "client-b",
+                "friendly_name": "Client B"
+              },
+              "last_changed": "2026-08-15T11:05:00.000000+00:00",
+              "last_updated": "2026-08-15T12:02:00.000000+00:00",
+              "context": {"id": "01J00000000000000000000022", "parent_id": null, "user_id": null}
+            },
+            {
+              "entity_id": "device_tracker.printer_x",
+              "state": "home",
+              "attributes": {
+                "source_type": "router",
+                "mac": "00:11:22:33:55:10",
+                "ip": "192.0.2.210",
+                "host_name": "printer-x",
+                "friendly_name": "Printer X"
+              },
+              "last_changed": "2026-08-15T09:00:00.000000+00:00",
+              "last_updated": "2026-08-15T12:03:00.000000+00:00",
+              "context": {"id": "01J00000000000000000000023", "parent_id": null, "user_id": null}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "config-entries",
+      "match": {"method": "GET", "path": "/api/config/config_entries/entry"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "entry_id": "ce0000000000000000000000000rout",
+              "domain": "opnsense",
+              "title": "Router",
+              "source": "user",
+              "state": "loaded",
+              "disabled_by": null
+            },
+            {
+              "entry_id": "ce0000000000000000000000000brot",
+              "domain": "brother",
+              "title": "HL-L2350DW",
+              "source": "zeroconf",
+              "state": "loaded",
+              "disabled_by": null
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-registry",
+      "match": {"method": "POST", "path": "/api/template"},
+      "responses": [
+        {
+          "status": 200,
+          "text": "[{\"id\": \"aa11bb22cc33dd44ee55ff6677889900\", \"name\": \"Router\", \"name_by_user\": null, \"manufacturer\": \"Deciso\", \"model\": \"OPNsense\", \"model_id\": null, \"sw_version\": \"25.1\", \"hw_version\": null, \"serial_number\": null, \"area_id\": null, \"entry_type\": \"service\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"None\", \"config_entry_id\": \"ce0000000000000000000000000rout\", \"connections\": [], \"identifiers\": [[\"opnsense\", \"router\"]], \"entities\": [\"device_tracker.client_a\", \"device_tracker.client_b\"]}, {\"id\": \"bb22cc33dd44ee55ff667788990011aa\", \"name\": \"printer01\", \"name_by_user\": null, \"manufacturer\": \"Brother\", \"model\": \"HL-L2350DW series\", \"model_id\": null, \"sw_version\": \"1.62\", \"hw_version\": null, \"serial_number\": \"U63877K1N654321\", \"area_id\": \"office\", \"entry_type\": \"None\", \"disabled_by\": \"None\", \"via_device_id\": null, \"configuration_url\": \"None\", \"config_entry_id\": \"ce0000000000000000000000000brot\", \"connections\": [[\"mac\", \"00:11:22:33:55:10\"]], \"identifiers\": [[\"brother\", \"U63877K1N654321\"]], \"entities\": [\"device_tracker.printer_x\"]}]"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "home-assistant:$HOST:entity:device_tracker.client_a",
+        "fields": {"macAddresses": "00:11:22:33:55:01", "ipAddresses": "192.0.2.201", "hostnames": "client-a"}
+      },
+      {
+        "id": "home-assistant:$HOST:entity:device_tracker.client_b",
+        "fields": {"macAddresses": "00:11:22:33:55:02", "ipAddresses": "192.0.2.202", "hostnames": "client-b"}
+      },
+      {
+        "id": "home-assistant:$HOST:device:bb22cc33dd44ee55ff667788990011aa",
+        "fields": {"macAddresses": "00:11:22:33:55:10", "ipAddresses": "192.0.2.210", "manufacturer": "Brother"}
+      }
+    ],
+    "ids_absent": [
+      "home-assistant:$HOST:device:aa11bb22cc33dd44ee55ff6677889900",
+      "home-assistant:$HOST:entity:device_tracker.printer_x"
+    ],
+    "request_count": 3,
+    "log_contains": [
+      "home-assistant: read 3 entities, 3 of which carry an address (3 device trackers)",
+      "home-assistant: imported 1 devices from the registry; skipped 0 with no MAC or IP and 1 service entries",
+      "home-assistant: imported 2 device trackers; 1 already covered by a registry device, 0 not on the network"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "name": "no-uuid-and-device-type",
+  "integration": "scale-computing",
+  "description": "Two things this integration got wrong about its own records.\n\n(1) A VirDomain row with no uuid killed the entire run. There was no `if not vid: continue` guard, so vid went straight to ImportAsset(id=None) and the runtime rejected it -- \"id must be a string\" -- with no exception to catch. Every VM already built was lost and NOTHING was reported. The row is the shape HC3 returns for a domain it is still writing or has partly deleted. vm-uuid-0201 is listed FIRST and the broken row second, so the failure cannot be mistaken for the run simply stopping early: under the old code 0201 was already built and was thrown away with the rest, and 0202 was never reached.\n\n(2) Every asset here is a virtual machine, and none of them said so. /rest/v1/VirDomain is the only source of records and an HC3 VirDomain IS a guest VM, so the type is carried by the resource rather than guessed -- there is no case in which one of these assets is something else. It now matches what the other hypervisor sources in this repository emit for a guest (nutanix-prism, truenas, synology-dsm), so one search finds VMs across all of them.\n\nnamespaced_ids is skipped for the same reason as the happy scenario: the id is the bare HC3 VirDomain UUID with no cluster scope.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "cluster",
+      "match": {"method": "GET", "path": "/rest/v1/Cluster"},
+      "responses": [{"status": 200, "json": [{"uuid": "cluster-uuid-0200", "clusterName": "HC3 Cluster C"}]}]
+    },
+    {
+      "name": "virdomain",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomain"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "uuid": "vm-uuid-0201",
+              "name": "vm-app-01",
+              "operatingSystem": "os_windows_server_2022",
+              "state": "RUNNING",
+              "nodeUUID": "node-uuid-0201",
+              "mem": 8589934592,
+              "numVCPU": 4
+            },
+            {
+              "name": "vm-half-created",
+              "operatingSystem": "os_other",
+              "state": "SHUTOFF",
+              "nodeUUID": "node-uuid-0201"
+            },
+            {
+              "uuid": "vm-uuid-0202",
+              "name": "vm-app-02",
+              "operatingSystem": "os_other",
+              "state": "RUNNING",
+              "nodeUUID": "node-uuid-0202",
+              "mem": 4294967296,
+              "numVCPU": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "virdomain-netdevice",
+      "match": {"method": "GET", "path": "/rest/v1/VirDomainNetDevice"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"uuid": "nic-uuid-0201", "virDomainUUID": "vm-uuid-0201", "macAddress": "00:11:26:00:02:01", "ipv4Addresses": ["10.122.0.11"], "vlan": 10, "connected": true},
+            {"uuid": "nic-uuid-0202", "virDomainUUID": "vm-uuid-0202", "macAddress": "00:11:26:00:02:02", "ipv4Addresses": ["10.122.0.12"], "vlan": 10, "connected": true}
+          ]
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["vm-uuid-0201", "vm-uuid-0202"],
+    "assets": [
+      {
+        "id": "vm-uuid-0201",
+        "fields": {
+          "hostnames": "vm-app-01",
+          "deviceType": "Virtual Machine",
+          "ipAddresses": "10.122.0.11",
+          "macAddresses": "00:11:26:00:02:01",
+          "clusterName": "HC3 Cluster C"
+        }
+      },
+      {
+        "id": "vm-uuid-0202",
+        "fields": {"deviceType": "Virtual Machine", "ipAddresses": "10.122.0.12"}
+      }
+    ],
+    "request_count": 3,
+    "log_contains": [
+      "scale-computing: skipped 1 VMs with no uuid (first name: vm-half-created)",
+      "scale-computing: reported 2 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]},
+  "check_determinism": true
+}

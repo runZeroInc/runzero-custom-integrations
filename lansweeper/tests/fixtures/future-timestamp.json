@@ -1,0 +1,103 @@
+{
+  "name": "future-timestamp",
+  "integration": "lansweeper",
+  "description": "One scanned asset reports firstSeen and lastSeen in 2099, which is what a workstation with a wrong BIOS clock produces after a Lansweeper scan. runZero rejects an ImportAsset whose first- or last-seen time is ahead of now by failing the whole record, and the rejection aborts main, so an unclamped value costs the healthy asset beside it and every remaining site rather than just the skewed row. parse_timestamp caps the value at now, so both assets import and the value as reported survives in the lansweeper_first_seen / lansweeper_last_seen attributes.",
+  "kwargs": {
+    "url": "$BASE",
+    "application_identity_code": "fixture-identity-code",
+    "import_software": "false",
+    "page_size": "200"
+  },
+  "routes": [
+    {
+      "name": "authorized-sites",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "authorizedSites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "authorizedSites": {
+                "sites": [{"id": "site-bbb222", "name": "Depot"}]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-page-first",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "\"page\":\"FIRST\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "site": {
+                "assetResources": {
+                  "total": 2,
+                  "pagination": {"limit": 200, "current": "cursor-0", "next": null, "page": "FIRST"},
+                  "items": [
+                    {
+                      "key": "asset-key-0101",
+                      "assetBasicInfo": {
+                        "name": "WKS-0101",
+                        "fqdn": "wks-0101.corp.example.com",
+                        "domain": "corp.example.com",
+                        "type": "Windows",
+                        "mac": "00:1A:2B:3C:4E:01",
+                        "ipAddress": "10.92.0.11",
+                        "firstSeen": "2099-01-10T08:00:00Z",
+                        "lastSeen": "2099-02-05T18:30:00Z"
+                      },
+                      "assetCustom": {"serialNumber": "SN-LS-0101", "manufacturer": "Dell Inc."},
+                      "operatingSystem": {"caption": "Microsoft Windows 11 Enterprise"},
+                      "softwares": []
+                    },
+                    {
+                      "key": "asset-key-0102",
+                      "assetBasicInfo": {
+                        "name": "SRV-0102",
+                        "fqdn": "srv-0102.corp.example.com",
+                        "domain": "corp.example.com",
+                        "type": "Windows Server",
+                        "mac": "00:1A:2B:3C:4E:02",
+                        "ipAddress": "10.92.0.12",
+                        "firstSeen": "2026-01-10T08:00:00Z",
+                        "lastSeen": "2026-02-05T19:00:00Z"
+                      },
+                      "assetCustom": {"serialNumber": "SN-LS-0102", "manufacturer": "HPE"},
+                      "operatingSystem": {"caption": "Microsoft Windows Server 2022 Standard"},
+                      "softwares": []
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "lansweeper:site-bbb222:asset-key-0101",
+      "lansweeper:site-bbb222:asset-key-0102"
+    ],
+    "assets": [
+      {
+        "id": "lansweeper:site-bbb222:asset-key-0101",
+        "fields": {
+          "lansweeper_first_seen": "2099-01-10T08:00:00Z",
+          "lansweeper_last_seen": "2099-02-05T18:30:00Z"
+        }
+      }
+    ],
+    "request_count": 2,
+    "log_contains": ["reported 2 of 2 assets from site Depot (site-bbb222)"]
+  },
+  "invariants": {"skip": []}
+}

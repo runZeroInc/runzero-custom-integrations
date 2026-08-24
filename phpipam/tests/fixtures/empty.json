@@ -1,0 +1,55 @@
+{
+  "name": "empty",
+  "integration": "phpipam",
+  "description": "phpIPAM represents an EMPTY COLLECTION AS HTTP 404, not as a 200 with an empty array - 'No devices configured', 'No addresses found', 'No custom fields defined' all arrive that way, with the real bodies captured from phpIPAM 1.8.1. A fresh install must therefore report zero assets and exit cleanly rather than logging a wall of errors or failing the task.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "app_id": "runzero",
+    "username": "fixture-user",
+    "password": "fixture-pass"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/api/runzero/user/"},
+      "responses": [
+        {"status": 200, "json": {"code": 200, "success": true, "data": {"token": "emptytoken00000000000001", "expires": "2036-08-16 11:03:55"}, "time": 0.005}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/devices/"},
+      "responses": [
+        {"status": 404, "json": {"code": 404, "success": false, "message": "No devices configured", "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path": "/api/runzero/subnets/"},
+      "responses": [
+        {"status": 404, "json": {"code": 404, "success": false, "message": "No subnets found", "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/api/runzero/"},
+      "responses": [
+        {"status": 404, "json": {"code": 404, "success": false, "message": "No custom fields defined", "time": 0.001}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "phpipam: no subnets are readable by this API app",
+      "phpipam: no assets retrieved"
+    ]
+  },
+
+  "check_determinism": true
+}

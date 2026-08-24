@@ -1,0 +1,61 @@
+{
+  "name": "auth-refresh",
+  "integration": "cyberark-epm",
+  "description": "An EPM session that times out mid-run. The first endpoints search answers 401, and the script must log on again at the dispatcher and retry the same request with the fresh token instead of abandoning the set with a printed error. The exact request count (logon, sets, rejected search, second logon, retried search) is the assertion that the retry happens exactly once, and the second search is proven to carry the new token.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}},
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-2"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "55e5a555-0005-4005-8005-000000000005", "Name": "Refreshed"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/55e5a555-0005-4005-8005-000000000005/Endpoints/search"},
+      "responses": [
+        {"status": 401, "json": {"error": "session expired"}},
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 1,
+            "returnedCount": 1,
+            "endpoints": [
+              {"id": "abab0001-0000-4000-8000-000000000001", "legacyId": "cdcd0001-0000-4000-8000-000000000001", "setId": "55e5a555-0005-4005-8005-000000000005", "name": "WS-REFRESH-01", "platform": "Windows", "version": "24.1.0.100", "connectionStatus": "Connected", "platformType": "Desktop", "installTime": "2025-05-01T00:00:00Z", "lastConnected": "2026-08-20T00:00:00Z", "ip": "10.55.1.10"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["cyberark-epm:$HOST:cdcd0001-0000-4000-8000-000000000001"],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/Endpoints/search", "header_contains": "basic session-tok-2"}
+    ],
+    "log_contains": [
+      "cyberark-epm: session rejected, logging on again",
+      "cyberark-epm: reported 1 assets"
+    ]
+  },
+  "check_determinism": true
+}

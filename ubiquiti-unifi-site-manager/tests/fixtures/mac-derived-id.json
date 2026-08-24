@@ -1,0 +1,173 @@
+{
+  "name": "mac-derived-id",
+  "integration": "ubiquiti-unifi-site-manager",
+  "description": "REGRESSION LOCK for a MAC-derived foreign id that was allowed to drive merges. Both `devices[].id` and the orphan-console fallback `reportedState.hardware.mac` produce an id of the form unifi-site-manager:<ns>:device:<MAC with separators stripped>, and the assets carried `no-mac-break no-ip-break no-name-break` -- which leaves id-match and id-break ON, so an address-derived value could both drive and veto a merge. normalize_mac clears the locally administered bit for cross-source matching, so two distinct endpoints can fold onto one value: correct for an interface, wrong for identity. It escaped the no_mac_in_id invariant only because that check deliberately matches separator-bearing MACs, since a bare twelve-hex run cannot be told apart from a legitimate opaque id.\n\nThe id itself is kept -- an offline console imported under its host id and then under its device id the week it returns would be two assets for one appliance, which is worse -- so the fix is the one aruba-clearpass and forescout-counteract use for this identifier class: `no-id-match no-id-break`, with correlation falling back to the MAC, the address, and the name. The sibling ubiquiti-unifi-protect avoided the problem outright by keying on a Mongo ObjectId; the Site Manager API publishes no comparable non-MAC id.\n\nThree id shapes are asserted in one run, because the distinction is the whole point: a device row (MAC-derived), an orphan console with a hardware MAC (MAC-derived), and a self-hosted Network Server that has no MAC and therefore keeps its opaque host UUID. Only the third may still drive a merge, and _match.behavior is the only place that decision is observable.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-site-manager-key",
+    "extract_sites": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/v1/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "COVEREDCONSOLE:555555555",
+                "hardwareId": "e1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "198.51.100.5",
+                "owner": true,
+                "isBlocked": false,
+                "lastConnectionStateChange": "2026-06-22T08:00:00Z",
+                "reportedState": {
+                  "hardware": {
+                    "mac": "AABBCC000005",
+                    "name": "UniFi Dream Machine SE",
+                    "serialno": "aabbcc000005",
+                    "shortname": "UDMPROSE",
+                    "firmwareVersion": "4.0.6"
+                  },
+                  "hostname": "hq.example.com",
+                  "ip": "198.51.100.5",
+                  "ipAddrs": ["198.51.100.5"],
+                  "state": "connected",
+                  "version": "4.0.180"
+                }
+              },
+              {
+                "id": "OFFLINECONSOLE:666666666",
+                "hardwareId": "f1111111-0000-5111-b111-f833f56eade5",
+                "type": "console",
+                "ipAddress": "203.0.113.30",
+                "owner": true,
+                "isBlocked": false,
+                "lastConnectionStateChange": "2026-02-11T08:00:00Z",
+                "reportedState": {
+                  "hardware": {
+                    "mac": "AABBCC000006",
+                    "name": "UniFi Cloud Key Gen2 Plus",
+                    "serialno": "aabbcc000006",
+                    "shortname": "UCKP",
+                    "firmwareVersion": "3.1.15"
+                  },
+                  "hostname": "shed.example.com",
+                  "ip": "192.0.2.90",
+                  "ipAddrs": ["192.0.2.90"],
+                  "state": "disconnected",
+                  "version": "3.1.15"
+                }
+              },
+              {
+                "id": "2d9cf3ee-0c0f-466e-933c-9af829f09b51",
+                "hardwareId": "c000b21e-0000-1111-add9-c1eed3897602",
+                "type": "network-server",
+                "ipAddress": "192.0.2.124",
+                "owner": true,
+                "isBlocked": false,
+                "lastConnectionStateChange": "2026-06-10T07:52:23.382Z",
+                "reportedState": {
+                  "controller_uuid": "c000b21e-0000-1111-add9-c1eed3897602",
+                  "deviceId": "2d9cf3ee-0c0f-466e-933c-9af829f09b51",
+                  "hostname": "unifi-server.example.com",
+                  "ipAddrs": ["192.0.2.124"],
+                  "name": "Self-Hosted Site",
+                  "state": "connected",
+                  "version": "8.3.11"
+                }
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-hosts"
+          }
+        }
+      ]
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "hostId": "COVEREDCONSOLE:555555555",
+                "hostName": "hq.example.com",
+                "devices": [
+                  {
+                    "id": "AABBCC000005",
+                    "mac": "AABBCC000005",
+                    "name": "hq.example.com",
+                    "model": "UDM SE",
+                    "shortname": "UDMPROSE",
+                    "ip": "198.51.100.5",
+                    "productLine": "network",
+                    "status": "online",
+                    "version": "4.1.13",
+                    "isConsole": true,
+                    "isManaged": true
+                  },
+                  {
+                    "id": "687251A1B2D4",
+                    "mac": "68:72:51:A1:B2:D4",
+                    "name": "Floor3-Switch",
+                    "model": "USW-24-PoE",
+                    "shortname": "US24P250",
+                    "ip": "198.51.100.20",
+                    "productLine": "network",
+                    "status": "online",
+                    "version": "7.0.50",
+                    "isConsole": false,
+                    "isManaged": true
+                  }
+                ],
+                "updatedAt": "2026-06-23T07:21:27Z"
+              }
+            ],
+            "httpStatusCode": 200,
+            "traceId": "trace-devices"
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "assets": [
+      {
+        "id": "unifi-site-manager:$HOST:device:687251A1B2D4",
+        "fields": {
+          "macAddresses": "68:72:51:a1:b2:d4",
+          "hostnames": "Floor3-Switch"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:device:AABBCC000005",
+        "fields": {
+          "hostnames": "hq.example.com"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:device:AABBCC000006",
+        "fields": {
+          "hostnames": "shed.example.com"
+        }
+      },
+      {
+        "id": "unifi-site-manager:$HOST:host:2d9cf3ee-0c0f-466e-933c-9af829f09b51",
+        "fields": {
+          "hostnames": "unifi-server.example.com"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

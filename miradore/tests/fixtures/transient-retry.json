@@ -1,0 +1,52 @@
+{
+  "name": "transient-retry",
+  "integration": "miradore",
+  "description": "A 502 blip mid-walk. Three devices at rows=2: the probe and page 1 succeed, page 2 answers 502 once and then serves its real body. The raw XML client carries its own transient retry (v1 cannot use the shared JSON helper), so the blip costs one logged retry rather than truncating the import at page 1. The short final page ends the loop, and all three devices import.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme",
+    "page_size": "2",
+    "include_software": "false"
+  },
+  "routes": [
+    {
+      "name": "page-1",
+      "match": {"method": "GET", "path": "/acme/API/Device", "query_contains": "page%3D1"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/xml"},
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"3\"><Device><ID>1</ID><Platform>iOS</Platform><LocalIPAddress>10.31.0.1</LocalIPAddress><MACAddress>00:11:22:CC:00:01</MACAddress><Status>Active</Status><InvDevice><DeviceName>blip-01</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device><Device><ID>2</ID><Platform>iOS</Platform><LocalIPAddress>10.31.0.2</LocalIPAddress><MACAddress>00:11:22:CC:00:02</MACAddress><Status>Active</Status><InvDevice><DeviceName>blip-02</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "page-2-blip-then-ok",
+      "match": {"method": "GET", "path": "/acme/API/Device", "query_contains": "page%3D2"},
+      "responses": [
+        {"status": 502, "text": "bad gateway"},
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/xml"},
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"3\"><Device><ID>3</ID><Platform>iOS</Platform><LocalIPAddress>10.31.0.3</LocalIPAddress><MACAddress>00:11:22:CC:00:03</MACAddress><Status>Active</Status><InvDevice><DeviceName>blip-03</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "miradore:acme:1",
+      "miradore:acme:2",
+      "miradore:acme:3"
+    ],
+    "request_count": 4,
+    "log_contains": [
+      "miradore: transient failure (status 502); retrying"
+    ]
+  }
+}

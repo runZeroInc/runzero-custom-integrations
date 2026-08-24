@@ -1,0 +1,66 @@
+{
+  "name": "download-results",
+  "integration": "nexthink",
+  "description": "The full four-step workflow, including the CSV fetch the other scenarios could not reach: $BASE is expanded inside route response bodies as well as kwargs, so resultsFileUrl can point back at the fixture server. Proves the pre-signed download is made without an Authorization header, that a 406 is retried with Accept: text/csv, and that the CSV becomes assets -- so the guard added around the download cannot pass by refusing every URL. The ::ffff: prefixed address must be imported as its IPv4 form.\n\nThe CSV also carries device.hardware.type, which Nexthink documents as the device form factor and which takes exactly three values. `laptop` becomes a runZero Laptop; `virtual` names a hypervisor guest rather than a chassis and has no counterpart in runZero's device-type vocabulary, so it must leave deviceType UNSET while still travelling as a custom attribute. Asserting the absence is the point: mapping `virtual` to something would override runZero's own fingerprinting of the guest with a value Nexthink never claimed.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/oauth2/default/v1/token"},
+      "responses": [{"status": 200, "json": {"access_token": "nexthink-token-5"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export",
+      "match": {"method": "POST", "path": "/api/v1/nql/export"},
+      "responses": [{"status": 200, "json": {"exportId": "exp-0005"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status",
+      "match": {"method": "GET", "path": "/api/v1/nql/status/exp-0005"},
+      "responses": [
+        {"status": 200, "json": {"status": "COMPLETED", "resultsFileUrl": "$BASE/exports/exp-0005.csv"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "results-csv",
+      "match": {"method": "GET", "path": "/exports/exp-0005.csv"},
+      "responses": [
+        {"status": 406, "text": "not acceptable"},
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/csv"},
+          "text": "device.uid,device.name,device.operating_system.name,device.operating_system.build,device.hardware.manufacturer,device.hardware.model,device.hardware.type,device.hardware.chassis_serial_number,device.first_seen,device.last_seen,device.collector.local_ip\nnx-device-0001,LAPTOP-NX01,Windows 11,\"[22631, 4169]\",Dell Inc.,Latitude 7440,laptop,SN-NX-0001,2026-01-04T09:15:00Z,2026-08-01T09:00:00Z,10.95.1.11\nnx-device-0002,LAPTOP-NX02,Windows 11,\"[22631, 4169]\",LENOVO,ThinkPad X1,virtual,SN-NX-0002,2026-02-04T09:15:00Z,2026-08-02T09:00:00Z,::ffff:10.95.1.12\n,NO-UID-03,Windows 10,,Dell Inc.,,,,,,10.95.1.13\n"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["nx-device-0001", "nx-device-0002"],
+    "assets": [
+      {
+        "id": "nx-device-0001",
+        "fields": {"ipAddresses": "10.95.1.11", "deviceType": "Laptop", "nexthink.hardware.type": "laptop"}
+      },
+      {
+        "id": "nx-device-0002",
+        "fields": {"ipAddresses": "10.95.1.12", "osVersion": "22631.4169", "nexthink.hardware.type": "virtual"},
+        "fields_absent": ["deviceType"]
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/exports/exp-0005.csv"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

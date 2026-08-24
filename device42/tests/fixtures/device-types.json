@@ -1,0 +1,153 @@
+{
+ "name": "device-types",
+ "integration": "device42",
+ "description": "Device42's raw `type` used to be handed straight to deviceType. Its values are physical / virtual / blade / cluster / other / unknown, which say how a device is REALIZED, not what kind of device it is -- and none of them is a runZero device type. The platform does not reject an unknown value: IdentifyTypeFromCustomIntegration tries its exact-match list, then normalize.DeviceType(), which title-cases whatever it does not recognise and returns it. It does not recognise \"physical\" or \"virtual\", so those became device types in their own right -- displacing the type runZero would otherwise fingerprint from hw_model and manufacturer, and making a type search over these assets useless.\n\n9201 (type=physical) and 9202 (type=virtual) must therefore carry NO deviceType at all, which is what this scenario mainly locks. 9203 is a cluster, equally unmapped -- a Device42 cluster is a logical grouping and not a device.\n\nWhat IS mapped stays inside the exact-match list. 9204's blade is a blade SERVER in Device42's vocabulary and becomes Server. 9205 shows the more specific field winning: device_sub_type spells a runZero type exactly (\"Switch\"), so it is honoured even though `type` beside it is the unmappable \"physical\".\n\nAll three raw fields survive as custom attributes rather than being dropped with the mapping -- they used to be in exclude_keys precisely because deviceType consumed them, and losing them along with the bad type would have been a second defect.\n\nnamespaced_ids is skipped as in the other device42 scenarios: the id is the bare Device42 id with no appliance scope. NOTE: the served page size is learned from the first response (so a server-side row cap cannot silently truncate the import), which means a single-page inventory is confirmed with one extra request that must return an empty Devices array.",
+ "kwargs": {
+  "url": "$BASE",
+  "auth_scheme": "basic",
+  "credential": "Zml4dHVyZTpmaXh0dXJl"
+ },
+ "routes": [
+  {
+   "match": {
+    "method": "GET",
+    "path": "/api/1.0/devices/all/"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "code": 0,
+      "msg": "ok",
+      "Devices": [
+       {
+        "id": 9201,
+        "name": "syn-d42-physical",
+        "type": "physical",
+        "hw_model": "PowerEdge R640",
+        "manufacturer": "Dell",
+        "ip_addresses": [
+         {
+          "ip": "10.92.0.1",
+          "macaddress": "00:11:22:33:92:01"
+         }
+        ]
+       },
+       {
+        "id": 9202,
+        "name": "syn-d42-virtual",
+        "type": "virtual",
+        "virtual_subtype": "vmware",
+        "ip_addresses": [
+         {
+          "ip": "10.92.0.2",
+          "macaddress": "00:11:22:33:92:02"
+         }
+        ]
+       },
+       {
+        "id": 9203,
+        "name": "syn-d42-cluster",
+        "type": "cluster",
+        "ip_addresses": [
+         {
+          "ip": "10.92.0.3",
+          "macaddress": "00:11:22:33:92:03"
+         }
+        ]
+       },
+       {
+        "id": 9204,
+        "name": "syn-d42-blade",
+        "type": "blade",
+        "hw_model": "PowerEdge MX750c",
+        "manufacturer": "Dell",
+        "ip_addresses": [
+         {
+          "ip": "10.92.0.4",
+          "macaddress": "00:11:22:33:92:04"
+         }
+        ]
+       },
+       {
+        "id": 9205,
+        "name": "syn-d42-switch",
+        "type": "physical",
+        "device_sub_type": "Switch",
+        "manufacturer": "Arista",
+        "ip_addresses": [
+         {
+          "ip": "10.92.0.5",
+          "macaddress": "00:11:22:33:92:05"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "status": 200,
+     "json": {
+      "Devices": []
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 5,
+  "assets": [
+   {
+    "id": "9201",
+    "fields": {
+     "type": "physical"
+    },
+    "fields_absent": [
+     "deviceType"
+    ]
+   },
+   {
+    "id": "9202",
+    "fields": {
+     "type": "virtual",
+     "virtual_subtype": "vmware"
+    },
+    "fields_absent": [
+     "deviceType"
+    ]
+   },
+   {
+    "id": "9203",
+    "fields": {
+     "type": "cluster"
+    },
+    "fields_absent": [
+     "deviceType"
+    ]
+   },
+   {
+    "id": "9204",
+    "fields": {
+     "deviceType": "Server",
+     "type": "blade"
+    }
+   },
+   {
+    "id": "9205",
+    "fields": {
+     "deviceType": "Switch",
+     "device_sub_type": "Switch",
+     "type": "physical"
+    }
+   }
+  ],
+  "request_count": 2
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ },
+ "check_determinism": true
+}

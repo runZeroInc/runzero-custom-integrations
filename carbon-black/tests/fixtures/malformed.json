@@ -1,0 +1,104 @@
+{
+  "name": "malformed",
+  "integration": "carbon-black",
+  "description": "Thin device rows the integration does survive: a device with no MAC, one with no address, one with an empty-string MAC, one whose id is a string rather than a number, and one with no name. Each still produces a usable asset and the scroll walk keeps going.\n\nAlso pins the loopback rule: device 5003 reports 127.0.0.1 as its only address, and the emitted asset must carry the MAC with no address at all rather than putting loopback on an interface, which would merge every such endpoint onto one runZero asset.\n\nIds are emitted in the scoped carbon-black:<org_key>:<device id> form, which the namespaced_ids invariant now enforces. Rows that abort the run outright (a non-dict entry in results, an explicit null risk_meter_score) are deliberately NOT in this fixture; they are reported as bugs because the integration cannot currently survive them.",
+  "kwargs": {
+    "url": "$BASE",
+    "organization_key": "SYNORG01",
+    "api_id": "SYNAPIID01",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "scroll-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "\"criteria\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 5,
+            "results": [
+              {
+                "id": 5001,
+                "name": "syn-no-mac",
+                "os": "LINUX",
+                "last_internal_ip_address": "10.30.5.1"
+              },
+              {
+                "id": 5002,
+                "name": "syn-no-ip",
+                "os": "WINDOWS",
+                "mac_address": "00:50:56:00:05:02"
+              },
+              {
+                "id": 5003,
+                "name": "syn-loopback-only",
+                "os": "LINUX",
+                "last_internal_ip_address": "127.0.0.1",
+                "mac_address": "00:50:56:00:05:03"
+              },
+              {
+                "id": "STR-5004",
+                "name": "syn-string-id",
+                "os": "MAC",
+                "last_internal_ip_address": "10.30.5.4"
+              },
+              {
+                "id": 5006,
+                "name": "syn-empty-mac",
+                "os": "LINUX",
+                "last_internal_ip_address": "10.30.5.6",
+                "mac_address": ""
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "num_found": 5,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns",
+      "match": {
+        "method": "POST",
+        "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 0,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "carbon-black:SYNORG01:5001",
+      "carbon-black:SYNORG01:5002",
+      "carbon-black:SYNORG01:5003",
+      "carbon-black:SYNORG01:STR-5004",
+      "carbon-black:SYNORG01:5006"
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/STR-5004/vulnerabilities/_search"
+      }
+    ]
+  }
+}

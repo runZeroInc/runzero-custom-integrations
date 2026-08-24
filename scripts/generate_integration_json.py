@@ -16,8 +16,18 @@ def find_matching_brace(text, open_idx):
     depth = 0
     quote = None
     escape = False
+    comment = False
     for idx in range(open_idx, len(text)):
         ch = text[idx]
+        # A `#` comment runs to the end of the line, and an apostrophe inside one
+        # ("the account's handle") is prose, not the start of a string literal.
+        # Without this the scan would treat the rest of the file as one string,
+        # never find the closing brace, and silently drop the integration's
+        # metadata from the catalog.
+        if comment:
+            if ch == "\n":
+                comment = False
+            continue
         if quote:
             if escape:
                 escape = False
@@ -26,7 +36,9 @@ def find_matching_brace(text, open_idx):
             elif ch == quote:
                 quote = None
             continue
-        if ch in {"'", '"'}:
+        if ch == "#":
+            comment = True
+        elif ch in {"'", '"'}:
             quote = ch
         elif ch == "{":
             depth += 1
@@ -76,11 +88,15 @@ for entry in sorted(os.listdir(".")):
     # Defaults
     friendly_name = entry
     integration_type = "inbound"
+    maturity = "alpha"
 
     try:
         config = load_embedded_config(os.path.join(folder_path, integration_file))
         friendly_name = config.get("name", entry)
         integration_type = config.get("type", "inbound")
+        # Absent maturity means the script predates the field; treat it as the
+        # least-proven value rather than implying a promotion nobody made.
+        maturity = str(config.get("maturity", "alpha")).lower()
     except Exception as e:
         print(f"⚠️  Failed to read embedded CONFIG in {entry}: {e}")
 
@@ -94,10 +110,17 @@ for entry in sorted(os.listdir(".")):
         )
         integration_type = "inbound"
 
+    if maturity not in {"alpha", "beta", "stable"}:
+        print(
+            f"⚠️  Unknown maturity '{maturity}' in {entry}, defaulting to alpha."
+        )
+        maturity = "alpha"
+
     integration_details.append(
         {
             "name": friendly_name,
             "type": integration_type,
+            "maturity": maturity,
             "readme": f"{BASE_REPO_URL}/{entry}/README.md",
             "integration": f"{BASE_REPO_URL}/{entry}/{integration_file}",
         }

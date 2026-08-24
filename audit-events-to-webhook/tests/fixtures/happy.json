@@ -1,0 +1,140 @@
+{
+  "name": "happy",
+  "integration": "audit-events-to-webhook",
+  "script": "audit-events-to-webhook/audit-events-to-webhook.star",
+  "description": "The full outbound path, asserted on the RECEIVER: this integration emits no assets, so the only evidence it ran is the request that arrived at the webhook. Events come from /api/v1.0/account/events.json with the fixed `created:<1h` search and an account-token bearer; they are then POSTed to dst_url. Rows carry the real models.Event shape -- created_at/processed_at are unix ints not RFC3339 strings, id/client_id/organization_id/site_id/source_id/target_id are always present as UUID strings (the zero UUID for an account-scoped event, not null or omitted), success is a bool, and details is a free-form object whose web-request enricher fills ip/ua/path/method/user_id/user_email. Three assertions carry the weight. First, dst_url must be POSTed to VERBATIM: unlike src_url it is not a console base, and a webhook is almost always path-plus-token, so reading it with get_url_base() would drop the path and deliver every event to the wrong place -- requests_absent on POST / catches that. Second, the body is NEWLINE-DELIMITED JSON, one event object per line, which is what the script actually builds; the `}\\n{` assertion pins the separator so a change to a JSON array cannot pass silently as a receiver-breaking change. Third, and most important, the runZero ACCOUNT TOKEN must never reach the third-party webhook: the script builds a fresh header map for the destination leg, and requests_absent on a POST carrying that token is the regression test for anyone who later reuses the source headers to save a line.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/hooks/runzero-audit",
+    "rz_account_token": "CT7f3a91c4e0b84d26a5c8f1e7d09b3a42",
+    "external_api_key": "whk-fixture-webhook-key"
+  },
+
+  "routes": [
+    {
+      "name": "account event log",
+      "match": {"method": "GET", "path": "/api/v1.0/account/events.json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "3f6c1d20-9a4e-4b7c-8f11-2d5e6a7b8c90",
+              "created_at": 1755331200,
+              "client_id": "11111111-2222-3333-4444-555555555555",
+              "organization_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "site_id": "00000000-0000-0000-0000-000000000000",
+              "action": "login",
+              "source_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
+              "source_name": "jdoe@example.com",
+              "source_type": "user",
+              "target_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
+              "target_name": "jdoe@example.com",
+              "target_type": "user",
+              "success": true,
+              "details": {
+                "ip": "203.0.113.24",
+                "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+                "path": "/login",
+                "method": "POST",
+                "user_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
+                "user_email": "jdoe@example.com"
+              },
+              "state": "",
+              "processor_id": "00000000-0000-0000-0000-000000000000",
+              "processed_at": 0
+            },
+            {
+              "id": "4a7d2e31-0b5f-4c8d-9022-3e6f7b8c9d01",
+              "created_at": 1755332400,
+              "client_id": "11111111-2222-3333-4444-555555555555",
+              "organization_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "site_id": "99999999-8888-7777-6666-555555555555",
+              "action": "credential-created",
+              "source_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
+              "source_name": "jdoe@example.com",
+              "source_type": "user",
+              "target_id": "d2e3f4a5-b6c7-4899-aabb-ccddeeff0011",
+              "target_name": "greenbone-appliance",
+              "target_type": "credential",
+              "success": true,
+              "details": {
+                "ip": "203.0.113.24",
+                "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+                "path": "/credentials/new",
+                "method": "POST",
+                "user_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
+                "user_email": "jdoe@example.com"
+              },
+              "state": "",
+              "processor_id": "00000000-0000-0000-0000-000000000000",
+              "processed_at": 0
+            },
+            {
+              "id": "5b8e3f42-1c60-4d9e-a133-4f708c9dae12",
+              "created_at": 1755333000,
+              "client_id": "11111111-2222-3333-4444-555555555555",
+              "organization_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "site_id": "99999999-8888-7777-6666-555555555555",
+              "action": "asset-removed-multiple",
+              "source_id": "00000000-0000-0000-0000-000000000000",
+              "source_name": "",
+              "source_type": "task",
+              "target_id": "00000000-0000-0000-0000-000000000000",
+              "target_name": "",
+              "target_type": "",
+              "success": false,
+              "details": {},
+              "state": "",
+              "processor_id": "00000000-0000-0000-0000-000000000000",
+              "processed_at": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "destination webhook",
+      "match": {"method": "POST", "path": "/hooks/runzero-audit"},
+      "responses": [{"status": 202, "json": {"accepted": 3}}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1.0/account/events.json",
+        "query_contains": "search=created",
+        "header_contains": "Bearer CT7f3a91c4e0b84d26a5c8f1e7d09b3a42"
+      },
+      {
+        "method": "POST",
+        "path": "/hooks/runzero-audit",
+        "header": {"Authorization": "Bearer whk-fixture-webhook-key"}
+      },
+      {
+        "method": "POST",
+        "path": "/hooks/runzero-audit",
+        "header": {"Content-Type": "application/json"}
+      },
+      {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"action\":\"login\""},
+      {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"action\":\"asset-removed-multiple\""},
+      {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"user_email\":\"jdoe@example.com\""},
+      {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "}\n{"}
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/"},
+      {"method": "POST", "header_contains": "CT7f3a91c4e0b84d26a5c8f1e7d09b3a42"}
+    ],
+    "log_contains": [
+      "Sending 3 events to Webhook",
+      "Response code from Webhook: 202"
+    ]
+  }
+}

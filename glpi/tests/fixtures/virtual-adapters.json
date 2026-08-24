@@ -1,0 +1,130 @@
+{
+  "name": "virtual-adapters",
+  "integration": "glpi",
+  "description": "An agent running on a Docker host or a workstation with a hypervisor installed reports its software adapters to GLPI, which files them under NetworkPortEthernet exactly like a real NIC - the port class does not distinguish them, only the name does. Every one of these must be dropped. The docker0 bridge is the case that matters most: its MAC is derived from a fixed prefix, so after runZero clears the locally-administered bit it is byte-for-byte identical on every Docker host, and importing it merges unrelated estates onto one asset. Also covers the kernel-generated suffixes (veth, br-) that force prefix rather than exact matching, and a Windows adapter named by product description rather than device name.",
+  "kwargs": {
+    "url": "$BASE",
+    "user_token": "fixture-user-token",
+    "app_token": "fixture-app-token",
+    "include_software": "false",
+    "include_network_devices": "false"
+  },
+  "routes": [
+    {
+      "name": "init-session",
+      "match": {"method": "GET", "path": "/apirest.php/initSession"},
+      "responses": [{"status": 200, "json": {"session_token": "fixture-session-token"}}]
+    },
+    {
+      "name": "item-operating-system",
+      "match": {"method": "GET", "path": "/apirest.php/Item_OperatingSystem"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "software-catalog",
+      "match": {"method": "GET", "path": "/apirest.php/Software"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computer-collection",
+      "match": {"method": "GET", "path": "/apirest.php/Computer"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 12,
+              "name": "docker-host-12",
+              "serial": "SN-0012",
+              "computertypes_id": "Desktop",
+              "is_template": 0,
+              "date_creation": "2024-05-01 08:00:00",
+              "last_inventory_update": "2026-08-10 09:00:00",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {
+                    "id": 61,
+                    "name": "eth0",
+                    "mac": "b4:2e:99:1c:0a:12",
+                    "NetworkName": {
+                      "id": 71,
+                      "name": "docker-host-12",
+                      "IPAddress": [{"id": 81, "name": "10.60.0.12"}]
+                    }
+                  },
+                  {
+                    "id": 62,
+                    "name": "docker0",
+                    "mac": "02:42:9d:3b:11:22",
+                    "NetworkName": {
+                      "id": 72,
+                      "name": "docker-host-12",
+                      "IPAddress": [{"id": 82, "name": "172.17.0.1"}]
+                    }
+                  },
+                  {
+                    "id": 63,
+                    "name": "veth1a2b3c4",
+                    "mac": "9c:11:22:33:44:55",
+                    "NetworkName": {"id": 73, "IPAddress": []}
+                  },
+                  {
+                    "id": 64,
+                    "name": "br-9f3c2e1a0b7d",
+                    "mac": "02:42:aa:bb:cc:dd",
+                    "NetworkName": {
+                      "id": 74,
+                      "IPAddress": [{"id": 84, "name": "172.18.0.1"}]
+                    }
+                  },
+                  {
+                    "id": 65,
+                    "name": "VMware Virtual Ethernet Adapter for VMnet8",
+                    "mac": "00:50:56:c0:00:08",
+                    "NetworkName": {
+                      "id": 75,
+                      "IPAddress": [{"id": 85, "name": "192.168.148.1"}]
+                    }
+                  }
+                ],
+                "NetworkPortLocal": [
+                  {
+                    "id": 66,
+                    "name": "lo",
+                    "mac": "",
+                    "NetworkName": {"IPAddress": [{"id": 86, "name": "127.0.0.1"}]}
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "kill-session",
+      "match": {"method": "GET", "path": "/apirest.php/killSession"},
+      "responses": [{"status": 200, "json": {}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["glpi:$HOST:Computer:12"],
+    "assets": [
+      {
+        "id": "glpi:$HOST:Computer:12",
+        "fields": {
+          "macAddresses": "b4:2e:99:1c:0a:12",
+          "ipAddresses": "10.60.0.12",
+          "glpi_port_count": "1",
+          "glpi_port_names": "eth0"
+        }
+      }
+    ],
+    "log_contains": ["glpi: reported 1 assets from Computer"]
+  },
+  "invariants": {"skip": []}
+}

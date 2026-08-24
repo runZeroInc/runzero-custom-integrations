@@ -1,0 +1,72 @@
+{
+  "name": "future-timestamp",
+  "integration": "fleet-osquery",
+  "description": "A host whose osquery agent has a skewed clock reports seen_time in 2099. runZero rejects an ImportAsset whose last-seen time is ahead of now by failing the whole record, and the rejection aborts main, so an unclamped value costs the healthy host beside it and every page still to come rather than just the skewed row. _parse_ts caps the value at now, so both hosts import and the value as reported survives in the fleet_seen_time / fleet_created_at attributes.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_software": "false",
+    "include_vulnerabilities": "false",
+    "include_labels": "false",
+    "include_policies": "false",
+    "page_size": "10"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v1/fleet/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {
+                "id": 31,
+                "hostname": "skew01.corp.example.com",
+                "computer_name": "skew01",
+                "platform": "ubuntu",
+                "os_version": "Ubuntu 22.04.3 LTS",
+                "primary_ip": "10.41.0.31",
+                "primary_mac": "3c:22:fb:10:00:31",
+                "hardware_serial": "SN-SKEW-0031",
+                "status": "online",
+                "created_at": "2099-01-04T09:15:00Z",
+                "seen_time": "2099-02-01T18:30:00Z"
+              },
+              {
+                "id": 32,
+                "hostname": "clean02.corp.example.com",
+                "computer_name": "clean02",
+                "platform": "ubuntu",
+                "os_version": "Ubuntu 22.04.3 LTS",
+                "primary_ip": "10.41.0.32",
+                "primary_mac": "3c:22:fb:10:00:32",
+                "hardware_serial": "SN-CLEAN-0032",
+                "status": "online",
+                "created_at": "2026-01-04T09:15:00Z",
+                "seen_time": "2026-02-01T18:30:00Z"
+              }
+            ]
+          }
+        },
+        {"status": 200, "json": {"hosts": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": ["fleet-osquery:$HOST:31", "fleet-osquery:$HOST:32"],
+    "assets": [
+      {
+        "id": "fleet-osquery:$HOST:31",
+        "fields": {
+          "fleet_seen_time": "2099-02-01T18:30:00Z",
+          "fleet_created_at": "2099-01-04T09:15:00Z"
+        }
+      }
+    ]
+  },
+  "invariants": {"skip": []}
+}

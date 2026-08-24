@@ -1,0 +1,64 @@
+{
+  "name": "auth-fallback",
+  "integration": "stairwell",
+  "description": "Stairwell's quickstart shows `Authorization: Bearer <token>` while its own OpenAPI declares the raw token with no prefix; a tenant enforcing the OpenAPI form answers 401 to the Bearer spelling. The script must retry the SAME request once with the raw token and keep that form for the rest of the run rather than failing the import. The first route matches only the Bearer form and answers 401 twice (get_json does not retry 401, but the route stays deterministic if that changes); the fallthrough route answers the raw form with a real page.",
+  "kwargs": {
+    "url": "$BASE",
+    "environment_id": "env-1",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "bearer-rejected",
+      "match": {
+        "method": "GET",
+        "path": "/v1/environments/env-1/assets",
+        "header": {"Authorization": "Bearer "}
+      },
+      "responses": [
+        {"status": 401, "json": {"error": "invalid authorization header"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "raw-accepted",
+      "match": {
+        "method": "GET",
+        "path": "/v1/environments/env-1/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "assets": [
+              {
+                "name": "environments/env-1/assets/4001",
+                "label": "syn-raw-auth",
+                "ipAddress": "10.70.2.1",
+                "macAddress": "00:11:22:33:51:aa",
+                "os": "Linux",
+                "state": "ACTIVE"
+              }
+            ],
+            "nextPageToken": ""
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["stairwell:env-1:4001"],
+    "request_count": 2,
+    "requests_include": [
+      {"header_contains": "Bearer fixture-token"},
+      {"header": {"Authorization": "fixture-token"}}
+    ],
+    "log_contains": [
+      "stairwell: Bearer authorization rejected (401), retrying with the raw token form"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

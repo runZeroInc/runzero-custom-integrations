@@ -1,0 +1,343 @@
+{
+  "name": "happy",
+  "integration": "opnsense",
+  "description": "One firewall plus five discovered hosts across ARP, NDP, and both Kea lease pools. Row shapes are copied from the OPNsense collectors themselves: scripts/interfaces/list_arp.py emits {mac, ip, intf, expired, expires, permanent, type, manufacturer, hostname} and the controller adds intf_description; list_ndp.py emits {mac, ip, intf, manufacturer}; scripts/kea/get_kea_leases.py emits {address, prefix_len, type, hwaddr, duid, client_id, iaid, valid_lifetime, expire, hostname, state, if, if_descr, is_reserved} and Kea/Api/LeasesController.php adds if_name and mac_info before wrapping everything as {total, rowCount, current, rows}. Proves: the ARP/NDP/lease views of one MAC (aa:bb:cc:00:11:01) collapse into a single asset carrying both its v4 and its v6 address and its DHCP hostname; the firewall's own permanent ARP entry and its own interface MAC are excluded so its addresses do not land on a second asset; a link-local-only NDP neighbor still imports on its MAC alone; loopback on lo0 and fe80::/10 everywhere are dropped from interfaces; and the dnsmasq backend answering 404 while Kea answers is not an error. no_mac_in_id is skipped for every opnsense scenario: OPNsense issues no device identifier of any kind, the MAC is the key of all three tables, and the id is deliberately paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "api_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "system-information",
+      "match": {"method": "GET", "path": "/api/diagnostics/system/systemInformation"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "name": "fw01.example.com",
+            "versions": [
+              "OPNsense 25.7.1-amd64",
+              "FreeBSD 14.3-RELEASE-p2",
+              "OpenSSL 3.0.18"
+            ],
+            "updates": "Click to check for updates."
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "interface-config",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getInterfaceConfig"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "igb0": {
+              "device": "igb0",
+              "flags": ["up", "broadcast", "running", "simplex", "multicast"],
+              "macaddr": "00:0d:b9:41:2a:10",
+              "is_physical": true,
+              "mtu": 1500,
+              "status": "active",
+              "media": "Ethernet autoselect (1000baseT <full-duplex>)",
+              "ipv4": [{"ipaddr": "198.51.100.10", "subnetbits": 24, "tunnel": false}],
+              "ipv6": [{"ipaddr": "fe80::20d:b9ff:fe41:2a10", "subnetbits": 64, "tunnel": false, "link-local": true, "autoconf": false, "deprecated": false, "tentative": false}]
+            },
+            "igb1": {
+              "device": "igb1",
+              "flags": ["up", "broadcast", "running", "simplex", "multicast"],
+              "macaddr": "00:0d:b9:41:2a:11",
+              "is_physical": true,
+              "mtu": 1500,
+              "status": "active",
+              "media": "Ethernet autoselect (1000baseT <full-duplex>)",
+              "ipv4": [{"ipaddr": "192.0.2.1", "subnetbits": 24, "tunnel": false}],
+              "ipv6": [{"ipaddr": "2001:db8:100::1", "subnetbits": 64, "tunnel": false, "link-local": false, "autoconf": false, "deprecated": false, "tentative": false}]
+            },
+            "lo0": {
+              "device": "lo0",
+              "flags": ["up", "loopback", "running", "multicast"],
+              "macaddr": "",
+              "is_physical": false,
+              "mtu": 16384,
+              "status": "active",
+              "ipv4": [{"ipaddr": "127.0.0.1", "subnetbits": 8, "tunnel": false}],
+              "ipv6": [{"ipaddr": "::1", "subnetbits": 128, "tunnel": false, "link-local": false, "autoconf": false, "deprecated": false, "tentative": false}]
+            },
+            "pflog0": {
+              "device": "pflog0",
+              "flags": ["up", "running"],
+              "macaddr": "",
+              "is_physical": false,
+              "mtu": 33160,
+              "status": "active",
+              "ipv4": [],
+              "ipv6": []
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getArp"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "mac": "00:0d:b9:41:2a:11",
+              "ip": "192.0.2.1",
+              "intf": "igb1",
+              "expired": false,
+              "expires": -1,
+              "permanent": true,
+              "type": "ethernet",
+              "manufacturer": "PC Engines GmbH",
+              "hostname": "fw01.example.com",
+              "intf_description": "LAN"
+            },
+            {
+              "mac": "aa:bb:cc:00:11:01",
+              "ip": "192.0.2.51",
+              "intf": "igb1",
+              "expired": false,
+              "expires": 1189,
+              "permanent": false,
+              "type": "ethernet",
+              "manufacturer": "",
+              "hostname": "",
+              "intf_description": "LAN"
+            },
+            {
+              "mac": "00:50:56:9a:1b:2c",
+              "ip": "192.0.2.52",
+              "intf": "igb1",
+              "expired": false,
+              "expires": 1200,
+              "permanent": false,
+              "type": "ethernet",
+              "manufacturer": "VMware, Inc.",
+              "hostname": "app01.example.com",
+              "intf_description": "LAN"
+            },
+            {
+              "mac": "b8:27:eb:44:55:66",
+              "ip": "192.0.2.53",
+              "intf": "igb1",
+              "expired": true,
+              "expires": -8,
+              "permanent": false,
+              "type": "ethernet",
+              "manufacturer": "Raspberry Pi Foundation",
+              "hostname": "",
+              "intf_description": "LAN"
+            },
+            {
+              "mac": "ff:ff:ff:ff:ff:ff",
+              "ip": "192.0.2.255",
+              "intf": "igb1",
+              "expired": false,
+              "expires": -1,
+              "permanent": true,
+              "type": "ethernet",
+              "manufacturer": "",
+              "hostname": "",
+              "intf_description": "LAN"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ndp",
+      "match": {"method": "GET", "path": "/api/diagnostics/interface/getNdp"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "mac": "aa:bb:cc:00:11:01",
+              "ip": "2001:db8:100::51",
+              "intf": "igb1",
+              "manufacturer": "",
+              "intf_description": "LAN"
+            },
+            {
+              "mac": "3c:22:fb:aa:bb:cc",
+              "ip": "fe80::3e22:fbff:feaa:bbcc%igb1",
+              "intf": "igb1",
+              "manufacturer": "Apple, Inc.",
+              "intf_description": "LAN"
+            },
+            {
+              "mac": "33:33:00:00:00:01",
+              "ip": "ff02::1",
+              "intf": "igb1",
+              "manufacturer": "",
+              "intf_description": "LAN"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "kea4",
+      "match": {"method": "POST", "path": "/api/kea/leases4/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "rowCount": 2,
+            "current": 1,
+            "rows": [
+              {
+                "address": "192.0.2.51",
+                "prefix_len": 128,
+                "type": "IA_NA",
+                "hwaddr": "aa:bb:cc:00:11:01",
+                "duid": "",
+                "client_id": "01:aa:bb:cc:00:11:01",
+                "iaid": "",
+                "valid_lifetime": 7200,
+                "expire": 1786700000,
+                "hostname": "laptop-01.example.com",
+                "state": 0,
+                "if": "igb1",
+                "if_descr": "LAN",
+                "if_name": "lan",
+                "is_reserved": [],
+                "mac_info": "Private"
+              },
+              {
+                "address": "192.0.2.61",
+                "prefix_len": 128,
+                "type": "IA_NA",
+                "hwaddr": "f0:9f:c2:11:22:33",
+                "duid": "",
+                "client_id": "01:f0:9f:c2:11:22:33",
+                "iaid": "",
+                "valid_lifetime": 7200,
+                "expire": 1786700000,
+                "hostname": "*",
+                "state": 0,
+                "if": "igb1",
+                "if_descr": "LAN",
+                "if_name": "lan",
+                "is_reserved": ["hwaddr"],
+                "mac_info": "Ubiquiti Networks Inc."
+              }
+            ],
+            "stats": {"active": 2, "inactive": 0, "total": 2},
+            "interfaces": {"lan": "LAN"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "kea6",
+      "match": {"method": "POST", "path": "/api/kea/leases6/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 0,
+            "rowCount": 0,
+            "current": 1,
+            "rows": [],
+            "stats": {"active": 0, "inactive": 0, "total": 0},
+            "interfaces": {}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dnsmasq-absent",
+      "match": {"method": "POST", "path": "/api/dnsmasq/leases/search"},
+      "responses": [
+        {"status": 404, "text": "Not Found"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "opnsense:$HOST:appliance",
+      "opnsense:$HOST:host:aa:bb:cc:00:11:01",
+      "opnsense:$HOST:host:00:50:56:9a:1b:2c",
+      "opnsense:$HOST:host:3c:22:fb:aa:bb:cc",
+      "opnsense:$HOST:host:f0:9f:c2:11:22:33"
+    ],
+    "ids_absent": [
+      "opnsense:$HOST:host:00:0d:b9:41:2a:11",
+      "opnsense:$HOST:host:ff:ff:ff:ff:ff:ff",
+      "opnsense:$HOST:host:33:33:00:00:00:01",
+      "opnsense:$HOST:host:b8:27:eb:44:55:66"
+    ],
+    "assets": [
+      {
+        "id": "opnsense:$HOST:appliance",
+        "fields": {
+          "_attrType": "firewall",
+          "deviceType": "Firewall",
+          "os": "OPNsense",
+          "osVersion": "25.7.1",
+          "hostnames": "fw01",
+          "opnsense_interface_count": "2"
+        }
+      },
+      {
+        "id": "opnsense:$HOST:host:aa:bb:cc:00:11:01",
+        "fields": {
+          "_attrType": "host",
+          "hostnames": "laptop-01.example.com",
+          "opnsense_sources": "arp,ndp,kea4",
+          "opnsense_dhcp_backend": "kea4"
+        }
+      },
+      {
+        "id": "opnsense:$HOST:host:3c:22:fb:aa:bb:cc",
+        "fields": {
+          "_attrType": "host",
+          "macAddresses": "3c:22:fb:aa:bb:cc",
+          "opnsense_sources": "ndp"
+        },
+        "fields_absent": ["ipAddresses"]
+      },
+      {
+        "id": "opnsense:$HOST:host:f0:9f:c2:11:22:33",
+        "fields": {
+          "opnsense_sources": "kea4",
+          "opnsense_dhcp_reserved": "hwaddr"
+        },
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path_contains": "/api/diagnostics/system/systemInformation"},
+      {"method": "GET", "path_contains": "/api/diagnostics/interface/getArp"},
+      {"method": "GET", "path_contains": "/api/diagnostics/interface/getNdp"},
+      {"method": "POST", "path_contains": "/api/kea/leases4/search", "body_contains": "\"rowCount\":-1"},
+      {"method": "POST", "path_contains": "/api/dnsmasq/leases/search"},
+      {"header_contains": "Basic"}
+    ],
+    "log_contains": [
+      "reported 1 firewall and 4 discovered hosts",
+      "DHCP backend dnsmasq is not available"
+    ]
+  },
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "check_determinism": true
+}

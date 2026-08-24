@@ -1,0 +1,118 @@
+{
+  "name": "container",
+  "integration": "glpi",
+  "description": "Runs the integration against a real GLPI 10.0.19 on MariaDB. A fresh GLPI has its REST API switched off and one API client bound to 127.0.0.1, so the seed performs the operator's own fix before anything else. Three records settle three claims the offline fixtures only assert: a computer imported through GLPI's NATIVE INVENTORY carries the container's own eth0 and its loopback, and GLPI files the loopback as a NetworkPortLocal that the integration must drop; a computer stamped with 2027 timestamps that GLPI stores verbatim must survive the platform's future-timestamp rejection because the script clamps; and a NetworkEquipment takes an id a Computer already holds, because GLPI runs a separate auto-increment per item type. glpi_software_count is asserted as 2 for a single seeded package because GLPI's native inventory also registers the operating system itself as a software title -- a real behaviour no hand-written fixture contains.",
+  "compose": "compose.yml",
+  "service": "glpi",
+  "scheme": "http",
+
+  "_platform_note": "The GLPI project publishes an amd64-only image, so an arm64 host runs Apache and PHP 8.4 under emulation. Measured end to end -- pull excluded, two scanner runs included -- that costs about a minute, the same order as the other LAMP stacks here, so this is deliberately not marked heavy.",
+
+  "ready": [
+    {
+      "name": "apache answering",
+      "http": {"path": "/", "status": [200, 302]},
+      "timeout": 600,
+      "interval": 3
+    },
+    {
+      "name": "database:install finished",
+      "exec": ["sh", "-c", "mysql -N -s -h db -uglpi -pglpi glpi -e \"select count(*) from information_schema.tables where table_schema='glpi' and table_name='glpi_logs'\""],
+      "contains": "1",
+      "timeout": 600,
+      "interval": 4
+    }
+  ],
+
+  "seed": "seed.py",
+  "seed_timeout": 900,
+
+  "ready_after_seed": [
+    {
+      "name": "REST API enabled",
+      "http": {"path": "/apirest.php/initSession", "status": [400],
+               "body_contains": "ERROR_APP_TOKEN_PARAMETERS_MISSING"},
+      "timeout": 120,
+      "interval": 3
+    }
+  ],
+
+  "kwargs": {
+    "url": "$BASE",
+    "app_token": "${seed.app_token}",
+    "user_token": "${seed.user_token}",
+    "include_software": "true",
+    "include_network_devices": "true"
+  },
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "glpi:$HOST:Computer:${seed.inventory_id}",
+      "glpi:$HOST:Computer:${seed.future_id}",
+      "glpi:$HOST:NetworkEquipment:${seed.switch_id}"
+    ],
+    "assets": [
+      {
+        "id": "glpi:$HOST:Computer:${seed.inventory_id}",
+        "fields": {
+          "hostnames": "rz-inv-01",
+          "ipAddresses": "${seed.agent_ip}",
+          "macAddresses": "${seed.agent_mac_normalized}",
+          "os": "Debian GNU/Linux 12 (bookworm)",
+          "osVersion": "12",
+          "manufacturer": "Dell Inc.",
+          "model": "PowerEdge R650",
+          "glpi_serial": "SVC-INV-01",
+          "glpi_autoupdatesystem": "GLPI Native Inventory",
+          "glpi_is_dynamic": "1",
+          "glpi_os_architecture": "x86_64",
+          "glpi_os_kernel_version": "6.1.0",
+          "glpi_port_count": "1",
+          "glpi_port_names": "eth0",
+          "glpi_port_classes": "NetworkPortEthernet",
+          "glpi_software_enriched": "true",
+          "glpi_software_count": "2"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "glpi:$HOST:Computer:${seed.future_id}",
+        "fields": {
+          "hostnames": "rz-future-02",
+          "ipAddresses": "10.77.0.12",
+          "macAddresses": "00:11:22:33:44:55",
+          "deviceType": "Server",
+          "glpi_serial": "SVC-FUT-02",
+          "glpi_inventory_number": "INV-0002",
+          "glpi_comment": "HQ > Floor 2 & \"lab\"",
+          "glpi_date_creation": "2027-03-01 12:00:00",
+          "glpi_last_inventory_update": "2027-03-02 12:00:00"
+        }
+      },
+      {
+        "id": "glpi:$HOST:NetworkEquipment:${seed.switch_id}",
+        "fields": {
+          "hostnames": "rz-switch-01",
+          "ipAddresses": "10.77.0.13",
+          "macAddresses": "00:11:22:33:44:66",
+          "deviceType": "Network Device",
+          "glpi_serial": "SN-SW-01",
+          "glpi_sysdescr": "Cisco IOS Software, Catalyst L3 Switch Software",
+          "glpi_item_type": "NetworkEquipment"
+        }
+      }
+    ],
+    "min_software_total": 2,
+    "log_contains": [
+      "glpi: reported 2 assets from Computer",
+      "glpi: reported 1 assets from NetworkEquipment",
+      "glpi: reported 0 assets from Printer"
+    ]
+  },
+
+  "invariants": {"skip": []},
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

@@ -1,0 +1,90 @@
+{
+  "name": "detail-cap",
+  "integration": "forescout-counteract",
+  "description": "The per-host property document is an N+1 call, so detail_limit caps it. With the limit at 1 and three hosts in the index, only the first host may be enriched, the other two must still be imported from the index alone, and the skip count must be reported.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password",
+    "detail_limit": "1"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXAifQ.Y2FwLXNpZ25hdHVyZS1maXh0dXJl"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {"status": 200, "json": {"hostFields": [{"name": "hostname"}, {"name": "prim_classification"}]}}
+      ]
+    },
+    {
+      "name": "host-detail-3001",
+      "match": {"method": "GET", "path": "/api/hosts/3001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 3001,
+              "fields": {
+                "hostname": {"value": "capped-first"},
+                "prim_classification": {"value": "Computer/Server"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-any",
+      "match": {"method": "GET", "path_regex": "^/api/hosts/[0-9]+$"},
+      "responses": [
+        {"status": 500, "text": "the detail limit should have prevented this call"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-index",
+      "match": {"method": "GET", "path": "/api/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"hostId": 3001, "ip": "10.60.0.11", "mac": "00:11:22:bb:00:11"},
+              {"hostId": 3002, "ip": "10.60.0.12", "mac": "00:11:22:bb:00:12"},
+              {"hostId": 3003, "ip": "10.60.0.13", "mac": "00:11:22:bb:00:13"}
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "forescout-counteract:$HOST:3001",
+      "forescout-counteract:$HOST:3002",
+      "forescout-counteract:$HOST:3003"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/hosts/3001"}
+    ],
+    "requests_absent": [
+      {"path": "/api/hosts/3002"},
+      {"path": "/api/hosts/3003"}
+    ],
+    "log_contains": [
+      "forescout-counteract: detail limit of 1 reached; classification, services, and software were not imported for 2 of 3 hosts"
+    ]
+  },
+  "invariants": {"skip": []}
+}

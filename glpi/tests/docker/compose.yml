@@ -1,0 +1,45 @@
+# A real GLPI backed by a real MariaDB, serving the same /apirest.php the
+# hosted product serves.
+#
+# Both tags are pinned. GLPI reshapes its REST payloads between majors -- 10.0
+# moved the operating system off the Computer row into the Item_OperatingSystem
+# relation, and 11.0 introduces a second, incompatible API under /api.php -- so
+# the version under test has to be a deliberate choice rather than whatever
+# :latest resolved to.
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_ROOT_PASSWORD: glpi
+      MARIADB_DATABASE: glpi
+      MARIADB_USER: glpi
+      MARIADB_PASSWORD: glpi
+    # GLPI's installer writes several hundred tables in one transaction and
+    # rolls the whole install back if the server is still warming up.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  glpi:
+    image: ghcr.io/glpi-project/glpi:10.0.19
+    # The GLPI project publishes amd64 only, so an arm64 host emulates it. See
+    # the manifest's heavy_reason.
+    platform: linux/amd64
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # The image's own startup/install.sh runs `console database:install` with
+      # exactly these five variables when it finds no config_db.php, which is
+      # what takes a blank container to a working GLPI with no setup wizard.
+      GLPI_DB_HOST: db
+      GLPI_DB_PORT: "3306"
+      GLPI_DB_NAME: glpi
+      GLPI_DB_USER: glpi
+      GLPI_DB_PASSWORD: glpi
+      GLPI_SKIP_AUTOINSTALL: "false"
+      GLPI_SKIP_AUTOUPDATE: "false"
+    ports:
+      - "${RZ_HOST_PORT}:80"

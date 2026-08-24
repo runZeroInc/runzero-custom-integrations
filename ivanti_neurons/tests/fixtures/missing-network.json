@@ -1,0 +1,106 @@
+{
+  "name": "missing-network",
+  "integration": "ivanti_neurons",
+  "script": "ivanti_neurons/ivanti_neurons.star",
+  "description": "A device with no Network.TCPIP block, and one whose Network key is present but null, alongside a healthy device. The token route answers with the documented JSON object, so the Bearer assertion below also locks in that the access_token field is unwrapped rather than the whole document being sent. network_interface returns None when no address survives, and ImportAsset(networkInterfaces=[None]) aborts the entire run -- so a single agent that has checked in without reporting an adapter used to lose every device already parsed. All three must import, the addressless pair correlating on hostname alone.\n\nThe three also bracket the device-type hint. The documented device object carries no chassis or asset-class field, so OS.Name is the only statement of role there is: server-03 reports 'Windows Server 2022' and must come out typed Server, while the Windows 11 and Windows 10 hosts must carry NO deviceType, because a client OS says nothing about desktop versus laptop.",
+  "kwargs": {
+    "url": "$BASE",
+    "tenant_id": "fixture-tenant",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-jwt-token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "@odata.count": 3,
+            "value": [
+              {
+                "DiscoveryId": "11110000-4a11-4c31-9c31-1a2b3c4d5e01",
+                "DeviceID": "device-0001",
+                "DeviceName": "workstation-01.example.com",
+                "DisplayName": "Workstation 01",
+                "OS": {"Name": "Windows 11 Pro", "Version": "10.0.22631"},
+                "System": {"Model": "OptiPlex 7090"},
+                "Network": {
+                  "TCPIP": {
+                    "IPAddress": "192.0.2.10",
+                    "IPAddressV6": "2001:db8::10"
+                  }
+                }
+              },
+              {
+                "DiscoveryId": "11110000-4a11-4c31-9c31-1a2b3c4d5e02",
+                "DeviceID": "device-0002",
+                "DeviceName": "laptop-02.example.com",
+                "DisplayName": "Laptop 02",
+                "OS": {"Name": "Windows 10 Enterprise", "Version": "10.0.19045"},
+                "System": {"Model": "Latitude 5420"}
+              },
+              {
+                "DiscoveryId": "11110000-4a11-4c31-9c31-1a2b3c4d5e03",
+                "DeviceID": "device-0003",
+                "DeviceName": "server-03.example.com",
+                "DisplayName": "Server 03",
+                "OS": {"Name": "Windows Server 2022", "Version": "10.0.20348"},
+                "System": {"Model": "PowerEdge R650"},
+                "Network": null
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e02",
+      "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e03"
+    ],
+    "assets": [
+      {
+        "id": "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e01",
+        "fields": {
+          "hostnames": "workstation-01.example.com",
+          "os": "Windows 11 Pro 10.0.22631",
+          "ipAddresses": "192.0.2.10\t2001:db8::10"
+        },
+        "fields_absent": ["deviceType"]
+      },
+      {
+        "id": "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e02",
+        "fields": {"hostnames": "laptop-02.example.com"},
+        "fields_absent": ["ipAddresses", "macAddresses", "deviceType"]
+      },
+      {
+        "id": "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e03",
+        "fields": {"hostnames": "server-03.example.com", "deviceType": "Server"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      }
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/apigatewaydataservices/v1/token"},
+      {"method": "GET", "path": "/api/apigatewaydataservices/v1/devices", "header_contains": "Bearer fixture-jwt-token"}
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

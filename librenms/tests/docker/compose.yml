@@ -1,0 +1,117 @@
+# A real LibreNMS, polling a real SNMP agent over a real network.
+#
+# The third service is the interesting one. LibreNMS only knows what SNMP tells
+# it: a device row created without a working agent has no ports, no addresses,
+# no ifPhysAddress and no ARP table, which would leave the half of this
+# integration that exists to read those completely untested. So the stack runs
+# an actual net-snmp agent and lets LibreNMS discover and poll it the way it
+# polls a switch.
+#
+# That agent is the SAME pinned librenms image rather than a second one: the
+# LibreNMS container ships /usr/sbin/snmpd along with the snmpwalk/snmpget
+# client tools it needs for polling. Reusing it costs no extra pull, adds no
+# second tag to keep pinned, and needs no package installed at container start
+# -- an `apk add` in an entrypoint would make this test depend on Alpine's
+# package mirror being up, which is exactly the kind of flakiness that stops a
+# suite from being run.
+services:
+  db:
+    image: mariadb:11.4
+    command:
+      # LibreNMS requires all four. lower_case_table_names in particular: its
+      # schema uses mixed-case table names and the migrations fail outright on a
+      # server that folds them.
+      - "mariadbd"
+      - "--innodb-file-per-table=1"
+      - "--lower-case-table-names=0"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    environment:
+      MARIADB_ROOT_PASSWORD: librenms
+      MARIADB_DATABASE: librenms
+      MARIADB_USER: librenms
+      MARIADB_PASSWORD: librenms
+      TZ: UTC
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -ulibrenms -plibrenms"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    networks:
+      lan:
+        ipv4_address: 10.221.9.3
+
+  snmpagent:
+    image: librenms/librenms:26.6.1
+    hostname: rz-snmp-target
+    entrypoint: ["/bin/sh", "-c"]
+    # -C -c means "use ONLY this file", so nothing the image happens to ship in
+    # /etc/snmp can change what this agent answers. The persistent directory is
+    # redirected to /tmp because snmpd otherwise writes its engine boots counter
+    # into a path this container has no business keeping.
+    command:
+      - >
+        printf 'rocommunity rzpublic\nsysLocation Rack 4, Lab\nsysContact runzero@example.com\nsysName rz-snmp-target\n'
+        > /tmp/snmpd.conf &&
+        exec env SNMP_PERSISTENT_DIR=/tmp snmpd -f -Lo -C -c /tmp/snmpd.conf udp:161
+    networks:
+      lan:
+        ipv4_address: 10.221.9.5
+    # Pinned so the port MAC this agent publishes over IF-MIB is a constant the
+    # manifest can assert. Docker otherwise mints a random one per container.
+    #
+    # 02:42:... is Docker's own conventional prefix and is kept deliberately: 02
+    # sets the locally-administered bit, and the platform's network_interface()
+    # helper clears it on the way out, so the emitted MAC is 00:42:0a:dd:09:05.
+    # LibreNMS's own copy of the value, read straight off ifPhysAddress, keeps
+    # the 02. Asserting both sides makes the transformation visible.
+    mac_address: "02:42:0a:dd:09:05"
+
+  librenms:
+    image: librenms/librenms:26.6.1
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: UTC
+      PUID: "1000"
+      PGID: "1000"
+      DB_HOST: db
+      DB_NAME: librenms
+      DB_USER: librenms
+      DB_PASSWORD: librenms
+      DB_TIMEOUT: "60"
+      # LibreNMS builds absolute URLs from this. It has no bearing on the API
+      # responses the integration reads, but an unset value makes the container
+      # log a warning on every request.
+      APP_URL: "http://127.0.0.1:${RZ_HOST_PORT}"
+      # Laravel refuses to construct its encrypter unless this decodes to
+      # exactly 32 bytes, and answers 500 to every request when it does not --
+      # including, confusingly, requests the API would otherwise serve, because
+      # the failure happens in terminating middleware. A fixed key keeps the
+      # container reproducible; it protects nothing, and the instance is
+      # destroyed at the end of the test.
+      APP_KEY: "base64:cnVuemVyby1saWJyZW5tcy1jb250YWluZXItdGVzdDA="
+    networks:
+      lan:
+        ipv4_address: 10.221.9.4
+    mac_address: "02:42:0a:dd:09:04"
+    ports:
+      - "${RZ_HOST_PORT}:8000"
+
+networks:
+  lan:
+    # Fixed rather than left to Docker's address pool, for the same reason the
+    # MACs are fixed: the addresses LibreNMS learns from the agent -- both the
+    # agent's own 10.221.9.5 and the ARP entry it holds for the poller --
+    # otherwise differ on every run and every host, and could not be asserted.
+    #
+    # 10.221.9.0/24 sits well clear of Docker's default pools (172.17-172.31,
+    # 192.168) so it will not collide with unrelated networks on a shared
+    # machine. If it ever does, `compose up` fails loudly rather than starting a
+    # subtly misconfigured stack.
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.221.9.0/24
+          gateway: 10.221.9.1

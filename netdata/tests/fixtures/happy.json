@@ -1,0 +1,259 @@
+{
+  "name": "happy",
+  "integration": "netdata",
+  "description": "A Netdata Parent with two children streaming to it. Proves the /api/v3/nodes listing is parsed into one asset per node, that the agent's own node (hops 0) is enriched from the unprefixed /api/v1/info while each child is enriched from /host/<node name>/api/v1/info, and that the machine GUID becomes the foreign id. Node and info bodies follow the nodeFull and info schemas in Netdata's own netdata-swagger.yaml.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "collect_node_details": "true",
+    "attach_agent_address": "true"
+  },
+
+  "routes": [
+    {
+      "name": "nodes-v3",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api": 3,
+            "agents": [
+              {
+                "mg": "5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+                "nd": "9f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+                "nm": "netdata-parent",
+                "ai": 0,
+                "now": 1786000000
+              }
+            ],
+            "versions": {
+              "nodes_hard_hash": 4,
+              "contexts_hard_hash": 118,
+              "contexts_soft_hash": 4021,
+              "alerts_hard_hash": 61,
+              "alerts_soft_hash": 12
+            },
+            "nodes": [
+              {
+                "mg": "5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+                "nd": "9f1c2d3e-4a5b-4c6d-8e9f-0a1b2c3d4e5f",
+                "nm": "netdata-parent",
+                "ni": 0,
+                "st": {"ai": 0, "code": 200, "msg": "", "ms": 0.4},
+                "version": "v2.3.2",
+                "hops": 0,
+                "state": "reachable"
+              },
+              {
+                "mg": "a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+                "nd": "11112222-3333-4444-5555-666677778888",
+                "nm": "web-01",
+                "ni": 1,
+                "st": {"ai": 0, "code": 200, "msg": "", "ms": 1.8},
+                "version": "v2.3.2",
+                "hops": 1,
+                "state": "reachable"
+              },
+              {
+                "mg": "b2c3d4e5-f607-4819-a2b3-c4d5e6f70819",
+                "nm": "db-01",
+                "ni": 2,
+                "st": {"ai": 0, "code": 200, "msg": "", "ms": 2.1},
+                "version": "v1.47.5",
+                "hops": 1,
+                "state": "stale"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "info-local",
+      "match": {"method": "GET", "path": "/api/v1/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v2.3.2",
+            "uid": "5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+            "mirrored_hosts": ["netdata-parent", "web-01", "db-01"],
+            "mirrored_hosts_status": [
+              {"guid": "5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70", "reachable": true, "claim_id": null},
+              {"guid": "a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071", "reachable": true, "claim_id": null},
+              {"guid": "b2c3d4e5-f607-4819-a2b3-c4d5e6f70819", "reachable": false, "claim_id": null}
+            ],
+            "os_name": "Debian GNU/Linux",
+            "os_id": "debian",
+            "os_id_like": "",
+            "os_version": "12",
+            "os_version_id": "12",
+            "os_detection": "/etc/os-release",
+            "kernel_name": "Linux",
+            "kernel_version": "6.1.0-21-amd64",
+            "is_k8s_node": false,
+            "architecture": "x86_64",
+            "virtualization": "kvm",
+            "virt_detection": "systemd-detect-virt",
+            "container": "none",
+            "container_detection": "none",
+            "stream_compression": true,
+            "labels": {
+              "_hostname": "netdata-parent",
+              "_os_name": "Debian GNU/Linux",
+              "_architecture": "x86_64",
+              "_install_type": "binpkg-deb",
+              "environment": "production",
+              "site": "hq"
+            },
+            "collectors": [
+              {"plugin": "proc.plugin", "module": "/proc/stat"},
+              {"plugin": "python.d.plugin", "module": "dockerd"}
+            ],
+            "alarms": {"normal": 61, "warning": 0, "critical": 0}
+          }
+        }
+      ]
+    },
+    {
+      "name": "info-web-01",
+      "match": {"method": "GET", "path": "/host/web-01/api/v1/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v2.3.2",
+            "uid": "a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+            "mirrored_hosts": ["web-01"],
+            "os_name": "Ubuntu",
+            "os_id": "ubuntu",
+            "os_id_like": "debian",
+            "os_version": "24.04.1 LTS (Noble Numbat)",
+            "os_version_id": "24.04",
+            "os_detection": "/etc/os-release",
+            "kernel_name": "Linux",
+            "kernel_version": "6.8.0-45-generic",
+            "is_k8s_node": false,
+            "architecture": "x86_64",
+            "virtualization": "none",
+            "virt_detection": "systemd-detect-virt",
+            "container": "docker",
+            "container_detection": "dockerenv",
+            "stream_compression": true,
+            "labels": {
+              "_hostname": "web-01",
+              "_os_name": "Ubuntu",
+              "_architecture": "x86_64",
+              "_virtualization": "none",
+              "_container": "docker",
+              "_cloud_provider_type": "AWS",
+              "_cloud_instance_type": "t3.medium",
+              "_cloud_instance_region": "us-east-1",
+              "tier": "web"
+            },
+            "alarms": {"normal": 44, "warning": 1, "critical": 0}
+          }
+        }
+      ]
+    },
+    {
+      "name": "info-db-01",
+      "match": {"method": "GET", "path": "/host/db-01/api/v1/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v1.47.5",
+            "uid": "b2c3d4e5-f607-4819-a2b3-c4d5e6f70819",
+            "mirrored_hosts": ["db-01"],
+            "os_name": "Rocky Linux",
+            "os_id": "rocky",
+            "os_id_like": "rhel centos fedora",
+            "os_version": "9.4",
+            "os_version_id": "9.4",
+            "os_detection": "/etc/os-release",
+            "kernel_name": "Linux",
+            "kernel_version": "5.14.0-427.el9.x86_64",
+            "is_k8s_node": false,
+            "architecture": "aarch64",
+            "virtualization": "vmware",
+            "virt_detection": "systemd-detect-virt",
+            "container": "none",
+            "container_detection": "none",
+            "labels": {
+              "_hostname": "db-01",
+              "_os_name": "Rocky Linux",
+              "_architecture": "aarch64",
+              "role": "postgres"
+            },
+            "alarms": {"normal": 39, "warning": 0, "critical": 0}
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "netdata:$HOST:5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+      "netdata:$HOST:a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+      "netdata:$HOST:b2c3d4e5-f607-4819-a2b3-c4d5e6f70819"
+    ],
+    "assets": [
+      {
+        "id": "netdata:$HOST:5c9a1f2e-6b7d-4c88-9a10-2f3b4c5d6e70",
+        "fields": {
+          "hostnames": "netdata-parent",
+          "os": "Debian GNU/Linux",
+          "osVersion": "12",
+          "netdata.hops": "0",
+          "netdata.role": "parent-or-standalone",
+          "netdata.architecture": "x86_64",
+          "netdata.virtualization": "kvm",
+          "netdata.label_auto.install_type": "binpkg-deb",
+          "netdata.label.environment": "production"
+        }
+      },
+      {
+        "id": "netdata:$HOST:a1b2c3d4-e5f6-4708-9a1b-2c3d4e5f6071",
+        "fields": {
+          "hostnames": "web-01",
+          "os": "Ubuntu",
+          "osVersion": "24.04.1 LTS (Noble Numbat)",
+          "netdata.role": "child",
+          "netdata.container": "docker",
+          "netdata.label_auto.cloud_instance_type": "t3.medium",
+          "netdata.label.tier": "web"
+        },
+        "fields_absent": ["macAddresses", "ipAddresses"]
+      },
+      {
+        "id": "netdata:$HOST:b2c3d4e5-f607-4819-a2b3-c4d5e6f70819",
+        "fields": {
+          "hostnames": "db-01",
+          "os": "Rocky Linux",
+          "netdata.state": "stale",
+          "netdata.architecture": "aarch64"
+        }
+      }
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v3/nodes"},
+      {"method": "GET", "path": "/api/v1/info"},
+      {"method": "GET", "path": "/host/web-01/api/v1/info"},
+      {"method": "GET", "path": "/host/db-01/api/v1/info"}
+    ],
+    "requests_absent": [{"path_contains": "/api/v2/nodes"}],
+    "log_contains": [
+      "listed 3 node(s) from /api/v3/nodes",
+      "netdata: import complete"
+    ]
+  },
+
+  "check_determinism": true
+}

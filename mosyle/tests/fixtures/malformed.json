@@ -1,0 +1,107 @@
+{
+  "name": "malformed",
+  "integration": "mosyle",
+  "description": "Rows the schema does not promise. The ios devices array carries a bare string and a null alongside two real devices -- dicts() must drop them with a logged count, never raise on d.get and abort the run. One surviving device's device_name arrives as a number, which must not reach .replace in collect_hostnames; its hostname comes from the string 'hostname' key instead. Another row has no deviceudid and no serial_number and is skipped for lack of an id. The mac family answers 200 with a non-JSON body (a maintenance page), which post_json surfaces as an err rather than a decode raise: that family's walk stops with a printed diagnostic and the remaining families still run.\n\nnamespaced_ids is skipped: the id is the bare Mosyle deviceudid with no tenant scope, matching the other Mosyle scenarios.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-access-token",
+    "email": "fixture@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/login"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Authorization": "Bearer fixture-jwt-token"},
+          "json": {"status": "OK"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-ios",
+      "match": {"method": "POST", "path": "/listdevices", "body_contains": "\"os\":\"ios\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "OK",
+            "response": {
+              "devices": [
+                {
+                  "deviceudid": "FIXTURE-UDID-GOOD",
+                  "serial_number": "FIXSERGOOD",
+                  "device_name": "fixture good ipad",
+                  "os": "iOS",
+                  "osversion": "17.5.1",
+                  "device_model_name": "iPad Air (5th generation)",
+                  "wifi_mac_address": "00:11:22:aa:0f:01",
+                  "last_ip_beat": "10.60.0.21"
+                },
+                "just-a-string-row",
+                null,
+                {
+                  "deviceudid": "FIXTURE-UDID-NUMERIC-NAME",
+                  "device_name": 12345,
+                  "hostname": "fixture-numeric-name",
+                  "os": "iOS",
+                  "osversion": "17.5.1",
+                  "device_model_name": "iPhone 15"
+                },
+                {
+                  "deviceudid": null,
+                  "serial_number": null,
+                  "device_name": "fixture-no-id"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {"status": "OK", "response": {"devices": []}}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-mac-non-json",
+      "match": {"method": "POST", "path": "/listdevices", "body_contains": "\"os\":\"mac\""},
+      "responses": [
+        {"status": 200, "text": "<html><body>scheduled maintenance</body></html>"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "listdevices-empty-families",
+      "match": {"method": "POST", "path": "/listdevices"},
+      "responses": [
+        {"status": 200, "json": {"status": "OK", "response": {"devices": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["FIXTURE-UDID-GOOD", "FIXTURE-UDID-NUMERIC-NAME"],
+    "assets": [
+      {
+        "id": "FIXTURE-UDID-GOOD",
+        "fields": {"hostnames": "fixture-good-ipad", "deviceType": "Tablet"}
+      },
+      {
+        "id": "FIXTURE-UDID-NUMERIC-NAME",
+        "fields": {"hostnames": "fixture-numeric-name", "deviceType": "Mobile"}
+      }
+    ],
+    "request_count": 6,
+    "log_contains": [
+      "mosyle: skipped 2 non-object device rows on ios page 0",
+      "Device list request failed on page 0: status 200: invalid JSON response"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

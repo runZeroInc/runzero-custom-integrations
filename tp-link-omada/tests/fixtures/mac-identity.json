@@ -1,0 +1,78 @@
+{
+  "name": "mac-identity",
+  "integration": "tp-link-omada",
+  "description": "Two clients whose MACs differ only in the locally-administered bit of the first octet -- 02:1A:2B:3C:4D:5E and 00:1A:2B:3C:4D:5E -- plus the same client seen again with a changed IP and hostname. Proves the script canonicalises MACs losslessly instead of using net.normalize_mac, which clears that bit and would fold two genuinely different endpoints onto one asset; every randomized phone MAC sets it. Also proves the identifier does not move when the address or the name does.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
+    "client_id": "fixture-omada-client",
+    "client_secret": "fixture-omada-secret",
+    "extract_devices": "false",
+    "site_ids": "660293f1ae766909a69251d4"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "POST", "path": "/openapi/authorize/token"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Open API Get Access Token successfully.",
+            "result": {"accessToken": "AT-macid", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT-macid"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "match": {"method": "GET", "path_prefix": "/openapi/v1/a5df88fd23ca87e694ceabac309add4b/sites/660293f1ae766909a69251d4/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errorCode": 0,
+            "msg": "Success.",
+            "result": {
+              "totalRows": 3,
+              "currentPage": 1,
+              "currentSize": 3,
+              "data": [
+                {"mac": "02-1A-2B-3C-4D-5E", "name": "randomized-phone", "ip": "192.0.2.150", "wireless": true, "ssid": "Guest-WiFi", "active": true},
+                {"mac": "00-1A-2B-3C-4D-5E", "name": "burned-in-nic", "ip": "192.0.2.151", "wireless": false, "networkName": "LAN", "active": true},
+                {"mac": "3C-22-FB-11-22-33", "name": "moved-and-renamed", "ip": "198.51.100.77", "wireless": true, "ssid": "Corp-WiFi", "active": true}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "json": {"errorCode": -1600, "msg": "no fixture route"}},
+
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:02:1A:2B:3C:4D:5E",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:00:1A:2B:3C:4D:5E",
+      "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:3C:22:FB:11:22:33"
+    ],
+    "assets": [
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:02:1A:2B:3C:4D:5E",
+        "fields": {"hostnames": "randomized-phone", "omada_ssid": "Guest-WiFi"}
+      },
+      {
+        "id": "tp-link-omada:a5df88fd23ca87e694ceabac309add4b:client:00:1A:2B:3C:4D:5E",
+        "fields": {"hostnames": "burned-in-nic"}
+      }
+    ]
+  },
+
+  "invariants": {"skip": ["no_mac_in_id"]},
+  "check_determinism": true
+}

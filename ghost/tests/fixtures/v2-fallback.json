@@ -1,0 +1,125 @@
+{
+  "name": "v2-fallback",
+  "integration": "ghost",
+  "description": "Ghost's own OpenAPI documents /v2 while this script's primary contract is the undocumented /v1. When /v1/repos answers 404 -- the vendor retiring the superseded surface -- the run must switch to /v2 for both collections and finish, instead of failing with an unexplained 404. The /v1 route answers exactly once (when_exhausted:error) so the fallback may not loop; requests_absent proves /v1/findings is never tried once the prefix has switched.\n\nnamespaced_ids is skipped because the foreign id is the bare repository name with no tenant scope -- a known defect outside the scope of this change.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-ghost-token"
+  },
+  "routes": [
+    {
+      "name": "v1-repos-gone",
+      "match": {
+        "method": "GET",
+        "path": "/v1/repos"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "detail": "Not Found"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "v2-repos",
+      "match": {
+        "method": "GET",
+        "path": "/v2/repos"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              {
+                "id": "repo-v2",
+                "name": "modern-service",
+                "projects": [
+                  {
+                    "deployments": {
+                      "production": [
+                        "https://modern.example.com"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "v2-findings",
+      "match": {
+        "method": "GET",
+        "path": "/v2/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              {
+                "id": "finding-v2",
+                "name": "Exposed debug endpoint",
+                "repo_id": "repo-v2",
+                "repo_url": "https://git.example.com/example/modern",
+                "severity": "medium",
+                "description": "The /debug route is reachable unauthenticated."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "modern-service"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/v1/repos"
+      },
+      {
+        "method": "GET",
+        "path": "/v2/repos",
+        "query_contains": "size=100"
+      },
+      {
+        "method": "GET",
+        "path": "/v2/findings",
+        "query_contains": "size=100"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/v1/findings"
+      }
+    ],
+    "min_vulnerabilities_total": 1,
+    "log_contains": [
+      "ghost: /v1/repos is gone (404); retrying against the documented /v2 API"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

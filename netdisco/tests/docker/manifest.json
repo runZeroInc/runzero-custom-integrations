@@ -1,0 +1,145 @@
+{
+  "name": "netdisco",
+  "integration": "netdisco",
+  "description": "Imports two devices and two located nodes from a real Netdisco 2.10, over the real /login handshake and the real /api/v1 routes. Proves offset paging, that loopback and link-local device_ip aliases are dropped while the real addresses survive, that a node last seen 90 days ago is aged out, and that a locally-administered node MAC keeps its own bit in the foreign id while the emitted interface has it cleared.",
+  "compose": "compose.yml",
+  "service": "web",
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "web answering",
+      "http": {"path": "/", "status": [200, 302]},
+      "timeout": 600,
+      "interval": 4
+    }
+  ],
+  "_ready_note": "One gate is enough here only because the compose file does the layering: the web tier depends on the one-shot deploy service completing, and without the schema and the Dancer cookie key it aborts at compile time and restarts forever rather than answering anything. So a 200 from / already implies a deployed database.",
+
+  "seed": "seed.py",
+  "seed_timeout": 900,
+
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero",
+    "password": "RunZeroContainerTest123!",
+    "page_size": "1",
+    "ip_inventory_subnets": "10.99.7.0/24"
+  },
+  "_kwargs_note": "page_size is 1 against two devices on purpose, so /api/v1/search/device is really called with limit=1 and offset=0, then offset=1, then a third time for the short page that ends the walk. Netdisco documents q as optional when limit and offset are both given, and this is what proves that against the server rather than against the documentation. ip_inventory_subnets is set because the IP inventory report is the ONLY route that joins a node MAC to an address -- without it the node assets would carry no IP at all. device_fields is deliberately NOT passed: its default is a comma-separated column list and the runZero CLI would split it into a fabricated second parameter.",
+
+  "expect": {
+    "asset_count": 4,
+
+    "assets": [
+      {
+        "id": "netdisco:$HOST:device:${seed.core_ip}",
+        "fields": {
+          "hostnames": "core-sw-01\tcore-sw-01-mgmt.lab.example.com\tcore-sw-01.lab.example.com",
+          "ipAddresses": "10.99.7.11\t10.99.7.211",
+          "macAddresses": "00:1b:21:00:00:11",
+          "macPairs": "10.99.7.11=00:1b:21:00:00:11\t10.99.7.211=00:1b:21:00:00:11",
+          "deviceType": "Switch",
+          "os": "ios",
+          "osVersion": "15.2(4)E7",
+          "manufacturer": "cisco",
+          "model": "WS-C2960X-24TS-L",
+          "tags": "netdisco\tnetdisco-device\tnetdisco-pseudo-device\tserial:FDO1234X5YZ",
+          "netdisco_netdisco_host": "$HOST",
+          "netdisco_management_ip": "${seed.core_ip}",
+          "netdisco_sys_name": "core-sw-01",
+          "netdisco_dns": "core-sw-01.lab.example.com",
+          "netdisco_layers": "01001010",
+          "netdisco_layer_names": "7-application,4-transport,2-datalink",
+          "netdisco_num_ports": "4",
+          "netdisco_serial": "FDO1234X5YZ",
+          "netdisco_chassis_id": "FDO1234X5YZ",
+          "netdisco_snmp_version": "2",
+          "netdisco_snmp_class": "SNMP::Info::Layer3::C3550",
+          "netdisco_location": "Rack 4, Lab",
+          "netdisco_contact": "netops@lab.example.com"
+        }
+      },
+
+      {
+        "id": "netdisco:$HOST:device:${seed.edge_ip}",
+        "fields": {
+          "hostnames": "edge-sw-02",
+          "ipAddresses": "10.99.7.12",
+          "deviceType": "Router",
+          "os": "netdisco",
+          "osVersion": "2.103.0",
+          "manufacturer": "netdisco",
+          "model": "pseudodevice",
+          "netdisco_layers": "00000100",
+          "netdisco_layer_names": "3-network",
+          "netdisco_num_ports": "2",
+          "netdisco_is_pseudo": "1",
+          "tags": "netdisco\tnetdisco-device\tnetdisco-pseudo-device"
+        },
+        "fields_absent": ["macAddresses", "netdisco_serial", "netdisco_location"]
+      },
+
+      {
+        "id": "netdisco:$HOST:node:${seed.node_current}",
+        "fields": {
+          "macAddresses": "00:1b:21:aa:bb:01",
+          "ipAddresses": "${seed.node_ip}",
+          "macPairs": "${seed.node_ip}=00:1b:21:aa:bb:01",
+          "hostnames": "host-a.lab.example.com",
+          "netdisco_mac": "${seed.node_current}",
+          "netdisco_switch": "${seed.core_ip}",
+          "netdisco_switch_name": "core-sw-01.lab.example.com",
+          "netdisco_port": "Port1",
+          "netdisco_vlan": "10",
+          "netdisco_active": "1",
+          "netdisco_sightings": "${seed.core_ip}/Port1",
+          "netdisco_sighting_count": "1",
+          "_match.behavior": "no-id-match no-id-break mac-match mac-break ip-match ip-break name-match name-break",
+          "tags": "netdisco\tnetdisco-node\tnetdisco-switch:${seed.core_ip}"
+        }
+      },
+
+      {
+        "id": "netdisco:$HOST:node:${seed.node_local_admin}",
+        "fields": {
+          "macAddresses": "00:42:ac:11:00:99",
+          "netdisco_mac": "${seed.node_local_admin}",
+          "netdisco_port": "Port2",
+          "netdisco_vlan": "20"
+        },
+        "fields_absent": ["hostnames", "ipAddresses"]
+      }
+    ],
+
+    "ids_absent": ["netdisco:$HOST:node:${seed.node_stale}"],
+
+    "log_contains": [
+      "netdisco: reported 2 devices",
+      "netdisco: attached 1 addresses to located nodes from the IP inventory report",
+      "netdisco: reported 2 located nodes",
+      "netdisco: 1 node sightings older than 30 days were dropped"
+    ]
+  },
+
+  "_expect_notes": {
+    "addresses": "core-sw-01 has FOUR device_ip aliases in the database and exactly two reach the asset. 127.0.0.1 the platform would filter anyway, but 169.254.1.1 it would NOT -- IsUnicast deliberately keeps link-local -- so an integration that failed to drop APIPA would emit it here and correlate this switch with every other host that failed to get a DHCP lease. Asserting ipAddresses as the exact surviving pair is what makes that a real test rather than a decorative one.",
+    "hostnames": "Three names survive and a fourth does not: the 127.0.0.1 alias carries the DNS name 'localhost', which is a placeholder rather than an identity and must not become a hostname. Netdisco really does store a name per alias, so this is the shape the API returns rather than one invented for the test.",
+    "local_admin_mac": "The clearest demonstration in this suite of why the id and the interface are normalized differently. The node MAC is 02:42:ac:11:00:99. The foreign id keeps the 02, because normalize_mac would clear the locally-administered bit and two randomized client MACs differing only in that bit would collapse onto one asset. The emitted macAddresses shows 00:42:ac:11:00:99, because network_interface() clears it for cross-source matching -- which is correct for an interface and wrong for identity. Both are asserted so the difference is visible instead of surprising.",
+    "aged_out": "The third node was last seen 90 days ago. /api/v1/object/device/{ip}/nodes accepts active_only and nothing else -- Netdisco's age filtering lives on the search endpoints, not this one -- so the API returns all three rows and the script drops one. ids_absent plus the log line are the two halves of that assertion.",
+    "edge_device": "Left exactly as `netdisco-do addpseudodevice` created it, so every field asserted on it is a Netdisco default rather than a value this test chose: vendor and os both literally 'netdisco', model 'pseudodevice', os_ver the product version, and layers 00000100. That last one is worth noticing -- a pseudo device advertises layer 3 only, so this integration classifies it as a Router. No fixture author would have guessed that.",
+    "pseudo_caveat": "Both devices carry netdisco-pseudo-device and is_pseudo=1, and that is a limitation of the seeding rather than of the integration. Netdisco has no write API and will not record a device that does not answer SNMP, so addpseudodevice is the only supported way to create one without standing up an SNMP agent. The columns an SNMP walk would fill are then written with SQL into Netdisco's real schema, and the API still serves them through the real routes and the real serialization -- which is the half this case exists to test.",
+    "not_asserted": "Every timestamp is left unasserted: creation, last_discover, last_macsuck, last_arpnip, time_first, time_last, and the firstSeenTS/lastSeenTS the script derives from them all move with the clock."
+  },
+
+  "invariants": {
+    "skip": ["no_mac_in_id"]
+  },
+  "_invariants_skip_reason": {
+    "no_mac_in_id": "Deliberate design, matching the netdisco fixture scenarios. A located node has no identifier but its MAC, which is the leading column of the node table's composite primary key. The id is paired with no-id-match no-id-break precisely so it can never drive a merge, and that pairing is asserted above rather than assumed."
+  },
+
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

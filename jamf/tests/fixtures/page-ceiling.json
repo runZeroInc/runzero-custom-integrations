@@ -1,0 +1,142 @@
+{
+  "name": "page-ceiling",
+  "integration": "jamf",
+  "description": "A Jamf Pro that ignores `page` and answers both inventory listings with the same non-empty page forever. The only exit either walk had was an empty results array, so this shape used to spin until the task timed out with nothing in the log to say why. MAX_PAGES stops each walk at 2000 pages and prints the truncation, which is what the two log_contains lines pin -- one per walk, because a ceiling on one says nothing about the other.\n\nThe routes matching page=2000 exist ONLY as terminators for a regression. Serving the stuck page with when_exhausted=repeat_last alone would make an uncapped walk run forever and fail this scenario by timing out rather than by failing an assertion; with them, an uncapped walk stops one request later per walk and fails on request_count, requests_absent and the missing log lines instead. Jamf pages are 0-based, so page 2000 is the first past the ceiling.\n\nEvery page carries a single row with no id. That is deliberate: the walk continues on any non-empty page, and a row with no id is skipped before the per-device detail call, so the scenario costs 4000 requests rather than 400,000 and emits no asset to collide with itself. asset_count is 0 for that reason, and the two skip counters in the run summary are what prove the rows were seen.\n\ncheck_determinism is off: the scenario already costs 4000 requests, and there is no id here to re-assert.\n\nnamespaced_ids and the other id invariants are vacuous with no assets; they are left on because they cost nothing.\n\nREQUEST COUNT. Same arithmetic as detail-progress: the 2000 computer pages and 2000 mobile pages are 4000 API calls, and jamf.star's MAX_REQUESTS (100) token refresh adds 40 token POSTs, for 4040. The old expectation of 4001 assumed one token for the whole run.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {
+        "method": "POST",
+        "path": "/api/oauth/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-token-1",
+            "expires_in": 3600,
+            "token_type": "Bearer"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/computers-inventory",
+        "query_contains": "page=2000"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 999999,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/computers-inventory"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 999999,
+            "results": [
+              {
+                "name": "jamf-stuck-computer-no-id"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/mobile-devices/detail",
+        "query_contains": "page=2000"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 999999,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/mobile-devices/detail"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 999999,
+            "results": [
+              {
+                "name": "jamf-stuck-mobile-no-id"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 4040,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1/computers-inventory",
+        "query_contains": "page=1999"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/mobile-devices/detail",
+        "query_contains": "page=1999"
+      }
+    ],
+    "requests_absent": [
+      {
+        "method": "GET",
+        "path": "/api/v1/computers-inventory",
+        "query_contains": "page=2000"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/mobile-devices/detail",
+        "query_contains": "page=2000"
+      }
+    ],
+    "log_contains": [
+      "jamf: stopped reading computer inventory at the 2000 page ceiling with 2000 computers read",
+      "jamf: stopped reading mobile inventory at the 2000 page ceiling with 2000 mobile devices read"
+    ]
+  },
+  "check_determinism": false,
+  "timeout": 600
+}

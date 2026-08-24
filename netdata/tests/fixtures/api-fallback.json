@@ -1,0 +1,77 @@
+{
+  "name": "api-fallback",
+  "integration": "netdata",
+  "description": "An agent predating /api/v3. Netdata's OpenAPI marks /api/v2/nodes deprecated but agents before Netdata v2 serve only that path, so the default api_version of 'auto' must try v3, accept the 404, and continue on v2 rather than failing the run. Per-node detail is disabled so the scenario asserts the endpoint negotiation alone.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_version": "auto",
+    "collect_node_details": "false"
+  },
+
+  "routes": [
+    {
+      "name": "nodes-v3-absent",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {"status": 404, "text": "Unknown API endpoint"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "nodes-v2",
+      "match": {"method": "GET", "path": "/api/v2/nodes"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "api": 2,
+            "agents": [
+              {"mg": "3d4e5f60-7182-4934-a5b6-c7d8e9f00112", "nm": "legacy-agent", "ai": 0, "now": 1786000000}
+            ],
+            "versions": {"nodes_hard_hash": 1},
+            "nodes": [
+              {
+                "mg": "3d4e5f60-7182-4934-a5b6-c7d8e9f00112",
+                "nm": "legacy-agent",
+                "ni": 0,
+                "st": {"ai": 0},
+                "version": "v1.44.3",
+                "hops": 0,
+                "state": "reachable"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 1,
+    "ids": ["netdata:$HOST:3d4e5f60-7182-4934-a5b6-c7d8e9f00112"],
+    "assets": [
+      {
+        "id": "netdata:$HOST:3d4e5f60-7182-4934-a5b6-c7d8e9f00112",
+        "fields": {
+          "hostnames": "legacy-agent",
+          "netdata.agent_version": "v1.44.3"
+        },
+        "fields_absent": ["os", "osVersion"]
+      }
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v3/nodes"},
+      {"method": "GET", "path": "/api/v2/nodes"}
+    ],
+    "requests_absent": [{"path_contains": "/api/v1/info"}],
+    "log_contains": [
+      "listed 1 node(s) from /api/v2/nodes"
+    ]
+  },
+
+  "check_determinism": true
+}

@@ -1,0 +1,40 @@
+{
+  "name": "stale-skip",
+  "integration": "greenbone",
+  "script": "greenbone/greenbone.star",
+  "description": "A task whose latest report predates the age window must be skipped without fetching it -- the expensive get_reports walk is the whole point of the check, so 'skipped' has to mean 'no report request was ever issued', not 'fetched and then discarded'. The fixture is the recorded get_tasks response with one value changed: scan_end is moved back to 2020-01-02T03:04:05Z, keeping gvmd's real UTC format so parse_time still sees a shape the appliance actually produces. A fixed date in the past keeps this stable as the recording ages, which a real recent timestamp could not do. The counted-and-summarised wording is asserted too, because the importer deliberately reports stale tasks as a count plus one example rather than one line each.",
+  "kwargs": {
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "fixture-user",
+    "gmp_password": "fixture-password",
+    "tls_disable_validation": "true",
+    "max_age_days": "30"
+  },
+  "gmp": {
+    "routes": [
+      {"name": "authenticate", "match": {"command": "authenticate"},
+       "responses": [{"xml_file": "authenticate-ok.xml"}]},
+      {"name": "get-tasks", "match": {"command": "get_tasks"},
+       "responses": [{"xml_file": "tasks-stale.xml"}]},
+      {"name": "get-reports-must-not-be-called", "match": {"command": "get_reports"},
+       "responses": [{"xml": "<get_reports_response status=\"400\" status_text=\"fixture: stale task must not be fetched\"/>"}]}
+    ]
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GMP", "path": "authenticate"},
+      {"method": "GMP", "path": "get_tasks"}
+    ],
+    "requests_absent": [
+      {"path": "get_reports"}
+    ],
+    "log_contains": [
+      "greenbone: skipped 1 tasks whose last report is older than 30 days (first: Lab All (last report 2020-01-02T03:04:05Z))",
+      "greenbone: imported 0 assets from 0 report(s)"
+    ]
+  }
+}

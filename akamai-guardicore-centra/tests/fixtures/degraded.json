@@ -1,0 +1,109 @@
+{
+  "name": "degraded",
+  "integration": "akamai-guardicore-centra",
+  "script": "akamai-guardicore-centra/centra-v4-api.star",
+  "description": "Three defects that each end the run on data Centra really returns. (1) A label the API user cannot read: /api/v4.0/labels/<guid> answers 404, get_labels logs and returns {}, the name resolves to '' and ''.split(':')[1] raises 'list index out of range' -- the failure is logged first and the script dies anyway. (2) A timestamp that is not exactly 'YYYY-MM-DD HH:MM:SS': an RFC 3339 value has no space to split on, so split(' ')[1] raises the same error; asset 0102 carries one in first_seen, last_seen and agent_last_seen. (3) instance_id was read from the misspelt key 'instance_is', so the instanceId attribute was always empty. All three assets must import, the unreadable label must be skipped rather than fatal, and the RFC 3339 asset must still carry its timestamps.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {"method": "POST", "path": "/api/v3.0/authenticate"},
+      "responses": [{"status": 200, "json": {"access_token": "fixture-centra-token", "2fa_required": false}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-on",
+      "match": {"method": "GET", "path": "/api/v4.0/assets", "query_contains": "status=on"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 3,
+            "objects": [
+              {
+                "id": "asset-guid-0101",
+                "name": "syn-centra-101",
+                "status": "on",
+                "asset_type": "Server",
+                "instance_id": "i-0abc0101",
+                "first_seen": "2026-01-05 08:15:00",
+                "last_seen": "2026-08-01 09:00:00",
+                "os_info": {"type": "Linux"},
+                "agent": {"id": "agent-0101", "agent_version": "5.2.0", "agent_last_seen": "2026-08-01 09:05:00"},
+                "nics": [{"mac_address": "00:50:56:00:c1:01", "ip_addresses": ["10.93.1.11"]}],
+                "labels": [{"id": "label-guid-readable"}, {"id": "label-guid-forbidden"}]
+              },
+              {
+                "id": "asset-guid-0102",
+                "name": "syn-centra-102",
+                "status": "on",
+                "instance_id": "i-0abc0102",
+                "first_seen": "2026-02-05T08:15:00Z",
+                "last_seen": "2026-08-02T09:00:00Z",
+                "os_info": {"type": "Windows"},
+                "agent": {"id": "agent-0102", "agent_version": "5.2.0", "agent_last_seen": "2026-08-02T09:05:00Z"},
+                "nics": [{"mac_address": "00:50:56:00:c1:02", "ip_addresses": ["10.93.1.12"]}],
+                "labels": [{"id": "label-guid-readable"}]
+              },
+              {
+                "id": "asset-guid-0103",
+                "name": "syn-centra-103",
+                "status": "on",
+                "instance_id": "i-0abc0103",
+                "first_seen": "2026-03-05 08:15:00",
+                "last_seen": "2026-08-03 09:00:00",
+                "os_info": {"type": "Linux"},
+                "agent": {"id": "agent-0103", "agent_version": "5.2.0"},
+                "nics": [{"mac_address": "00:50:56:00:c1:03", "ip_addresses": ["10.93.1.13"]}],
+                "labels": [{"id": "label-guid-nocolon"}]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-off",
+      "match": {"method": "GET", "path": "/api/v4.0/assets", "query_contains": "status=off"},
+      "responses": [{"status": 200, "json": {"total_count": 0, "objects": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "label-readable",
+      "match": {"method": "GET", "path": "/api/v4.0/labels/label-guid-readable"},
+      "responses": [{"status": 200, "json": {"objects": [{"key": "Environment", "value": "Production"}]}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "label-forbidden",
+      "match": {"method": "GET", "path": "/api/v4.0/labels/label-guid-forbidden"},
+      "responses": [{"status": 404, "json": {"error": "label not found"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "label-without-a-value",
+      "match": {"method": "GET", "path": "/api/v4.0/labels/label-guid-nocolon"},
+      "responses": [{"status": 200, "json": {"objects": [{"key": "Standalone", "value": ""}]}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["asset-guid-0101", "asset-guid-0102", "asset-guid-0103"],
+    "assets": [
+      {
+        "id": "asset-guid-0101",
+        "fields": {"instanceId": "i-0abc0101"}
+      }
+    ],
+    "log_contains": ["failed to retrieve label info for label-guid-forbidden"]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "name": "puppetdb",
+  "integration": "puppetdb",
+  "description": "Imports two nodes whose Facter facts were stored by a real PuppetDB, asserting that loopback, the all-zero MAC, and an APIPA address are all dropped from the interfaces.",
+  "compose": "compose.yml",
+  "service": "puppetdb",
+  "port": 8080,
+  "scheme": "http",
+
+  "ready": [
+    {
+      "name": "puppetdb service running",
+      "http": {"path": "/status/v1/services", "status": [200], "body_contains": "running"},
+      "timeout": 600,
+      "interval": 4
+    },
+    {
+      "name": "query api answering",
+      "http": {"path": "/pdb/query/v4/nodes", "status": [200]},
+      "timeout": 120,
+      "interval": 2
+    }
+  ],
+
+  "seed": "seed.py",
+
+  "ready_after_seed": [
+    {
+      "name": "seeded facts are queryable",
+      "http": {"path": "/pdb/query/v4/facts?query=%5B%22%3D%22%2C%22name%22%2C%22networking%22%5D",
+               "status": [200], "body_contains": "db01.corp.example.com"},
+      "timeout": 180,
+      "interval": 2
+    }
+  ],
+
+  "kwargs": {
+    "url": "$BASE",
+    "include_packages": "false"
+  },
+
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "puppetdb:$HOST:web01.corp.example.com",
+        "fields": {
+          "hostnames": "web01,web01.corp.example.com",
+          "ipAddresses": "10.20.0.10",
+          "macAddresses": "00:11:22:33:44:55",
+          "deviceType": "Server",
+          "os": "Ubuntu",
+          "osVersion": "22.04",
+          "manufacturer": "Dell Inc.",
+          "model": "PowerEdge R640",
+          "puppetdb_certname": "web01.corp.example.com",
+          "puppetdb_fact_serial_number": "SVC-WEB01",
+          "puppetdb_facts_environment": "production",
+          "puppetdb_interface_identifiers": "eth0",
+          "puppetdb_interface_count": "1"
+        }
+      },
+      {
+        "id": "puppetdb:$HOST:db01.corp.example.com",
+        "fields": {
+          "ipAddresses": "10.20.0.11",
+          "macAddresses": "00:11:22:33:44:66",
+          "puppetdb_certname": "db01.corp.example.com",
+          "puppetdb_fact_serial_number": "SVC-DB01"
+        }
+      }
+    ],
+    "ids": [
+      "puppetdb:$HOST:web01.corp.example.com",
+      "puppetdb:$HOST:db01.corp.example.com"
+    ],
+    "log_contains": ["reported 2 active nodes"]
+  },
+
+  "invariants": {"skip": []},
+
+  "heavy": true,
+  "heavy_reason": "puppet/puppetdb publishes an amd64-only image, so on an arm64 host it runs under emulation -- a JVM plus a PostgreSQL, emulated. It is excluded from the default run to keep the suite something people are willing to run on a working machine, not because it is unsupported.",
+
+  "check_determinism": true,
+  "startup_timeout": 900,
+  "timeout": 600
+}

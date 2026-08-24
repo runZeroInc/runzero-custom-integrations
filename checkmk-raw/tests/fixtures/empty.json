@@ -1,0 +1,59 @@
+{
+  "name": "empty",
+  "integration": "checkmk-raw",
+  "description": "A Checkmk site with no hosts, which is what a freshly created site or a Livestatus filter matching nothing looks like. Checkmk answers both collections with a well-formed envelope carrying an empty value array rather than an error, so the run must report zero assets and exit cleanly instead of treating the empty collection as a failure. This is also the regression test for the streaming guard: jsonstream.iter_array aborts the entire script when its path is missing, so an empty-but-present value array has to survive the VALUE_ARRAY_RE check and yield nothing. Envelope shape is Checkmk 2.3 constructors.collection_object with an empty value list.",
+  "kwargs": {
+    "url": "$BASE",
+    "site": "mysite",
+    "username": "automation",
+    "password": "fixture-automation-secret"
+  },
+  "routes": [
+    {
+      "name": "host_config",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host_config/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host_config",
+            "links": [{"rel": "self", "href": "https://checkmk.example.com/mysite/check_mk/api/1.0/domain-types/host_config/collections/all", "method": "GET", "type": "application/json", "domainType": "link"}],
+            "extensions": {},
+            "value": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host_status",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host",
+            "links": [{"rel": "self", "href": "https://checkmk.example.com/mysite/check_mk/api/1.0/domain-types/host/collections/all", "method": "GET", "type": "application/json", "domainType": "link"}],
+            "extensions": {},
+            "value": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "log_contains": [
+      "checkmk: read configuration for 0 hosts",
+      "checkmk: reported 0 hosts",
+      "checkmk: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

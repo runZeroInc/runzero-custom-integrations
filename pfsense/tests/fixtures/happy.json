@@ -1,0 +1,76 @@
+{
+  "name": "happy",
+  "integration": "pfsense",
+  "description": "The firewall itself is the only asset this integration emits, assembled from four independent v2 endpoints. Covers both response envelopes the script accepts - a payload wrapped in a top-level data object (system/hostname, system/version, status/system) and one whose data is a list (status/interfaces) - and proves the identity comes from the Netgate ID rather than the configured URL, which is what keeps it stable when the console is re-addressed.\n\nnamespaced_ids is skipped because this integration's id is 'pfsense-<netgate id>': the Netgate ID does scope it to one appliance, but the id carries no colon-delimited scope, and _sanitize_identifier strips colons out of the URL fallback as well, so the invariant can never pass. Reported rather than accepted - see the report.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token": "fixture-api-token",
+    "auth_header": "X-API-Key"
+  },
+  "routes": [
+    {
+      "name": "hostname",
+      "match": {"method": "GET", "path": "/api/v2/system/hostname"},
+      "responses": [{"status": 200, "json": {"code": 200, "data": {"hostname": "fw01", "domain": "corp.example.com"}}}]
+    },
+    {
+      "name": "version",
+      "match": {"method": "GET", "path": "/api/v2/system/version"},
+      "responses": [{"status": 200, "json": {"code": 200, "data": {"product_name": "pfSense Plus", "version": "24.03", "release": "24.03"}}}]
+    },
+    {
+      "name": "status-interfaces",
+      "match": {"method": "GET", "path": "/api/v2/status/interfaces"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "code": 200,
+            "data": [
+              {"name": "wan", "descr": "WAN", "macaddr": "00:11:25:00:00:01", "ipaddr": "203.0.113.10", "ipaddrv6": "2001:db8:113::10"},
+              {"name": "lan", "descr": "LAN", "macaddr": "00:11:25:00:00:02", "ipaddr": "10.110.0.1"},
+              {"name": "opt1", "descr": "DMZ", "macaddr": "00:11:25:00:00:03"},
+              "this-row-is-a-string-not-an-object"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "status-system",
+      "match": {"method": "GET", "path": "/api/v2/status/system"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "code": 200,
+            "data": {
+              "netgate_id": "aabbcc112233",
+              "product_name": "Netgate 6100",
+              "serial": "SN-6100-0001",
+              "build_time": "Mon Mar 04 12:00:00 UTC 2026"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["pfsense-aabbcc112233"],
+    "assets": [
+      {
+        "id": "pfsense-aabbcc112233",
+        "fields": {"deviceType": "Firewall"}
+      }
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/system/hostname"},
+      {"method": "GET", "path": "/api/v2/system/version"},
+      {"method": "GET", "path": "/api/v2/status/interfaces"},
+      {"method": "GET", "path": "/api/v2/status/system"}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

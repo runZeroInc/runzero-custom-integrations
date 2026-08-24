@@ -1,0 +1,49 @@
+{
+  "name": "auth-failure",
+  "integration": "openwrt",
+  "description": "A wrong password. This is the single most important negative case for ubus, because the failure does NOT arrive as a JSON-RPC error object: a real OpenWrt 24.10.8 answers a bad session.login with {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":[6]} - HTTP 200, no error key, and a result array with ONE element carrying ubus status 6 (permission denied). A script that reads result[1] without checking the length aborts the whole run on an index error, and one that only inspects the error key reports success while collecting nothing. Proves the status is decoded to a named reason, that no assets are emitted, and that the operator is told what to check.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-root",
+    "password": "wrong-password"
+  },
+  "routes": [
+    {
+      "name": "login-refused",
+      "match": {
+        "method": "POST",
+        "path": "/ubus",
+        "body_contains": "\"session\",\"login\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [6]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "jsonrpc": "2.0",
+      "id": 99,
+      "error": {"code": -32002, "message": "Access denied"}
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "login failed",
+      "permission denied",
+      "uci get uhttpd.main.ubus_prefix"
+    ]
+  },
+  "check_determinism": true
+}

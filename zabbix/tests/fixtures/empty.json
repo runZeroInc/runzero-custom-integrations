@@ -1,0 +1,35 @@
+{
+  "name": "empty",
+  "integration": "zabbix",
+  "description": "A named host group filter that matches nothing. hostgroup.get answers with an empty result, the run must say so and must NOT go on to issue an unfiltered host.get that would import the whole server - an empty filter result means 'nothing selected', not 'no filter'. Zero assets, no failure.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-api-token",
+    "host_groups": "Nonexistent group"
+  },
+  "routes": [
+    {
+      "name": "apiinfo",
+      "match": {"method": "POST", "body_contains": "apiinfo.version"},
+      "responses": [{"status": 200, "json": {"jsonrpc": "2.0", "result": "7.0.13", "id": 1}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostgroup-get",
+      "match": {"method": "POST", "body_contains": "hostgroup.get"},
+      "responses": [{"status": 200, "json": {"jsonrpc": "2.0", "result": [], "id": 2}}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "POST", "body_contains": "Nonexistent group"}
+    ],
+    "requests_absent": [{"body_contains": "host.get"}],
+    "log_contains": ["no host groups matched", "no assets retrieved"]
+  },
+  "check_determinism": true
+}

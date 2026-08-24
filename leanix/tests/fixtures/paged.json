@@ -1,0 +1,74 @@
+{
+  "name": "paged",
+  "integration": "leanix",
+  "description": "Two GraphQL pages. The page-2 route matches only a request whose body carries the endCursor from page 1, so the scenario proves the cursor actually rides the follow-up request; if it did not, the request would fall through to the page-1 route, whose response list is exhausted and errors.\n\nInvariant has_correlator is skipped by design: logical inventory records without addressing are the normal case, per the README.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "fact_sheet_types": "ITComponent",
+    "page_size": 1
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/services/mtm/v1/oauth2/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "bearer-tok-1", "token_type": "bearer", "expires_in": 3599}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql-page2",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql", "body_contains": "CURSOR-PAGE-2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 2,
+                "pageInfo": {"hasNextPage": false, "endCursor": "END"},
+                "edges": [
+                  {"node": {"id": "22222222-2222-4222-8222-222222222222", "name": "Apache Kafka", "displayName": "Apache Kafka", "type": "ITComponent", "description": "", "status": "ACTIVE", "updatedAt": "2026-08-02T00:00:00Z", "tags": [], "lifecycle": {"asString": "phaseIn"}}}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql-page1",
+      "match": {"method": "POST", "path": "/services/pathfinder/v1/graphql"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 2,
+                "pageInfo": {"hasNextPage": true, "endCursor": "CURSOR-PAGE-2"},
+                "edges": [
+                  {"node": {"id": "11111111-1111-4111-8111-111111111111", "name": "nginx 1.25", "displayName": "nginx 1.25", "type": "ITComponent", "description": "", "status": "ACTIVE", "updatedAt": "2026-08-01T00:00:00Z", "tags": [], "lifecycle": {"asString": "active"}}}
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "leanix:$HOST:11111111-1111-4111-8111-111111111111",
+      "leanix:$HOST:22222222-2222-4222-8222-222222222222"
+    ],
+    "request_count": 3
+  },
+  "invariants": {"skip": ["has_correlator"]},
+  "check_determinism": true
+}

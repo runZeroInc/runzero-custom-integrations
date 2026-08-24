@@ -1,0 +1,73 @@
+{
+  "name": "port-columns-rejected",
+  "integration": "librenms",
+  "description": "The ports endpoint returns only ifName unless columns are named, so this integration always names them - and a column that does not exist in the target release makes validate_column_list() throw InvalidTableColumnException and answer 400. Repeating that once per device would be 5000 pointless requests on a large estate, so the first 400 disables port collection for the rest of the run and says why. The rejected column list here is the CONFIG default rather than an override, because the runZero CLI splits a comma-bearing --kwargs value into extra parameters and the fixture harness refuses one on purpose; what is being tested is the reaction to the 400, not which column caused it. This scenario has three devices and asserts exactly ONE ports request is made, that the devices still import without their port MACs, and that the device_filter parameter reaches the server as the type query parameter.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-auth-token",
+    "device_filter": "active",
+    "collect_addresses": "false",
+    "collect_arp": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v0/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "devices": [
+              {"device_id": 11, "hostname": "sw-b01.example.com", "sysName": "sw-b01", "ip": "192.0.2.61", "os": "iosxe", "version": "17.9.4", "hardware": "C9300-48P", "type": "network", "status": 1, "status_reason": "", "serial": "FDO0011AAAA", "last_polled": "2026-08-15 03:00:00"},
+              {"device_id": 12, "hostname": "sw-b02.example.com", "sysName": "sw-b02", "ip": "192.0.2.62", "os": "iosxe", "version": "17.9.4", "hardware": "C9300-48P", "type": "network", "status": 1, "status_reason": "", "serial": "FDO0012AAAA", "last_polled": "2026-08-15 03:00:00"},
+              {"device_id": 13, "hostname": "sw-b03.example.com", "sysName": "sw-b03", "ip": "192.0.2.63", "os": "iosxe", "version": "17.9.4", "hardware": "C9300-48P", "type": "network", "status": 1, "status_reason": "", "serial": "FDO0013AAAA", "last_polled": "2026-08-15 03:00:00"}
+            ],
+            "count": 3
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ports-rejected",
+      "match": {"method": "GET", "path_regex": "/api/v0/devices/[0-9]+/ports$"},
+      "responses": [
+        {"status": 400, "json": {"status": "error", "message": "Invalid columns: ifNoSuchColumn"}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"status": "error", "message": "This API route doesn't exist."}},
+  "expect": {
+    "asset_count": 3,
+    "ids": ["librenms:$HOST:device:11", "librenms:$HOST:device:12", "librenms:$HOST:device:13"],
+    "assets": [
+      {
+        "id": "librenms:$HOST:device:11",
+        "fields": {
+          "ipAddresses": "192.0.2.61",
+          "librenms_port_count": "0"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v0/devices", "query_contains": "type=active"},
+      {"method": "GET", "path": "/api/v0/devices/11/ports"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/api/v0/devices/12/ports"},
+      {"path_contains": "/api/v0/devices/13/ports"},
+      {"path_contains": "/ip"},
+      {"path_contains": "/resources/"}
+    ],
+    "log_contains": [
+      "rejected as an invalid column list",
+      "Port collection is disabled for the rest of this run",
+      "reported 3 devices"
+    ]
+  },
+  "check_determinism": true
+}

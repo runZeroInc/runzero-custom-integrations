@@ -1,0 +1,140 @@
+{
+  "name": "happy",
+  "integration": "solarwinds-information-service",
+  "description": "Four Orion nodes through one SWIS query, using ONLY documented Orion.Nodes property names (NodeID, Caption, DNS, SysName, IPAddress, Vendor, MachineType, IOSVersion, Status, SysObjectID, SystemUpTime...). The previous default query selected columns that do not exist on Orion.Nodes (Fqdn, OsVersion, Uptime, CpuPercentUtilization, Pollers, DiscoveryProfileId), so it passed against a fixture that echoed those names while a real SWIS rejected it and imported zero assets -- the textbook fixture/reality divergence. This fixture now mirrors the published schema, and requests_include pins the real column names reaching the wire.\n\nIdentity: build_asset falls back NodeID -> DNS -> IPAddress, so node 3 carries no NodeID and must key on its DNS name, and node 4 carries neither and must key on its address. Node 5 has none of the three and must be counted, not imported: it is the only record the skip line may describe.\n\nNode 4 also pins the hostname scrubber: its DNS field holds a bare IP, which must NOT be imported as a hostname (fields_absent). network_interface returns None when nothing usable survives, so node 3's empty IPAddress proves the guard holds and the asset still imports on hostname alone.\n\nIDS ARE NAMESPACED BY THE SWIS SERVER. Orion's NodeID is a small per-install integer and DNS and IPAddress are unique only inside one installation, so a bare id collides as soon as two Orion servers are imported into one runZero account. $HOST expands to the fixture server's host so the scoped ids can still be asserted exactly against an ephemeral port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "query",
+      "match": {
+        "method": "GET",
+        "path": "/SolarWinds/InformationService/v3/Json/Query"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "results": [
+              {
+                "NodeID": 101,
+                "Caption": "core-sw01",
+                "DNS": "core-sw01.corp.example.com",
+                "SysName": "core-sw01",
+                "IPAddress": "10.60.0.11",
+                "Vendor": "Cisco",
+                "MachineType": "Catalyst 2960X",
+                "NodeDescription": "Cisco IOS Software, C2960X Software",
+                "IOSVersion": "15.2(7)E3",
+                "CPULoad": 17,
+                "PercentMemoryUsed": 42,
+                "MemoryUsed": 178956970,
+                "ResponseTime": 4,
+                "Status": 1,
+                "StatusDescription": "Node status is Up.",
+                "SysObjectID": "1.3.6.1.4.1.9.1.1208",
+                "SystemUpTime": 8812345
+              },
+              {
+                "NodeID": 102,
+                "Caption": "esx-02",
+                "DNS": "esx-02.corp.example.com",
+                "SysName": "esx-02.corp.example.com",
+                "IPAddress": "10.60.0.12",
+                "Vendor": "VMware",
+                "MachineType": "VMware ESX Server",
+                "IOSVersion": "",
+                "Status": 1
+              },
+              {
+                "Caption": "no-nodeid",
+                "DNS": "no-nodeid.corp.example.com",
+                "SysName": "",
+                "IPAddress": "",
+                "Vendor": "Red Hat",
+                "MachineType": "net-snmp - Linux",
+                "Status": 1
+              },
+              {
+                "IPAddress": "10.60.0.14",
+                "DNS": "10.60.0.14",
+                "Caption": "10.60.0.14",
+                "Vendor": "Microsoft",
+                "MachineType": "Windows Server 2022"
+              },
+              {
+                "Vendor": "Unknown",
+                "MachineType": "Unknown"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "request_count": 1,
+    "ids": [
+      "swis:$HOST:node:101",
+      "swis:$HOST:node:102",
+      "swis:$HOST:node:no-nodeid.corp.example.com",
+      "swis:$HOST:node:10.60.0.14"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/SolarWinds/InformationService/v3/Json/Query",
+        "query_contains": "FROM+Orion.Nodes"
+      },
+      {
+        "query_contains": "N.SystemUpTime"
+      },
+      {
+        "query_contains": "N.IOSVersion"
+      }
+    ],
+    "assets": [
+      {
+        "id": "swis:$HOST:node:101",
+        "fields": {
+          "hostnames": "core-sw01\tcore-sw01.corp.example.com",
+          "osVersion": "15.2(7)E3",
+          "manufacturer": "Cisco",
+          "ipAddresses": "10.60.0.11",
+          "cpuLoad": "17",
+          "machineType": "Catalyst 2960X",
+          "statusDescription": "Node status is Up.",
+          "sysObjectId": "1.3.6.1.4.1.9.1.1208",
+          "systemUpTime": "8812345"
+        }
+      },
+      {
+        "id": "swis:$HOST:node:no-nodeid.corp.example.com",
+        "fields": {
+          "hostnames": "no-nodeid\tno-nodeid.corp.example.com"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      },
+      {
+        "id": "swis:$HOST:node:10.60.0.14",
+        "comment": "DNS holds a bare IP; the hostname scrubber must reject it rather than import an IP-as-hostname.",
+        "fields": {
+          "ipAddresses": "10.60.0.14"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      }
+    ],
+    "log_contains": [
+      "swis: skipped 1 nodes with no NodeID/DNS/IPAddress",
+      "swis: reported 4 assets"
+    ]
+  }
+}

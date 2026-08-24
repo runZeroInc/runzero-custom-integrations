@@ -1,0 +1,91 @@
+{
+  "name": "session-expiry",
+  "integration": "glpi",
+  "description": "A mid-run ERROR_SESSION_TOKEN used to end the item-type walk with a partial import: on a large estate with a short PHP session lifetime the run imported the front of the inventory every time and never the tail. The first Computer page answers 401 ERROR_SESSION_TOKEN; the run must call initSession a second time, retry the same range with the fresh token, and finish. The header assertion pins that the retried request really carries the second session token, and re-authentication is limited to once per run.",
+  "kwargs": {
+    "url": "$BASE",
+    "user_token": "fixture-user-token",
+    "app_token": "fixture-app-token",
+    "include_software": "false",
+    "include_network_devices": "false"
+  },
+  "routes": [
+    {
+      "name": "initSession",
+      "match": {"method": "GET", "path": "/apirest.php/initSession"},
+      "responses": [
+        {"status": 200, "json": {"session_token": "fixture-session-token-1"}},
+        {"status": 200, "json": {"session_token": "fixture-session-token-2"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "operating systems",
+      "match": {"method": "GET", "path": "/apirest.php/Item_OperatingSystem"},
+      "responses": [
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/apirest.php/Computer"},
+      "responses": [
+        {"status": 401, "json": ["ERROR_SESSION_TOKEN", "session_token seems invalid"]},
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 21,
+              "name": "ws-0021",
+              "serial": "SN-0021",
+              "entities_id": "Root entity",
+              "is_template": 0,
+              "date_creation": "2024-05-01 08:00:00",
+              "date_mod": "2026-08-09 12:00:00",
+              "_networkports": {
+                "NetworkPortEthernet": [
+                  {
+                    "id": 61,
+                    "name": "eth0",
+                    "mac": "aa:bb:cc:00:00:21",
+                    "NetworkName": {
+                      "id": 71,
+                      "name": "ws-0021",
+                      "IPAddress": [
+                        {"id": 81, "name": "10.60.0.21"}
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "killSession",
+      "match": {"method": "GET", "path": "/apirest.php/killSession"},
+      "responses": [
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["glpi:$HOST:Computer:21"],
+    "request_count": 6,
+    "requests_include": [
+      {"method": "GET", "path": "/apirest.php/Computer", "header": {"Session-Token": "fixture-session-token-1"}},
+      {"method": "GET", "path": "/apirest.php/Computer", "header": {"Session-Token": "fixture-session-token-2"}}
+    ],
+    "log_contains": [
+      "glpi: the API session expired mid-run, re-opening it once",
+      "glpi: reported 1 assets from Computer"
+    ]
+  }
+}

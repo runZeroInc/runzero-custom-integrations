@@ -1,0 +1,45 @@
+{
+ "name": "auth-failure",
+ "integration": "extreme-cloud-iq",
+ "description": "A rejected login. The 401 must end the run with a clean message naming the credentials -- the old code decoded the login body and called .keys() on it BEFORE checking the status, so any non-JSON error body aborted the task with a decode error instead. 401 is not a retryable status, so exactly one login request may be made and no /devices request may follow.",
+ "kwargs": {
+  "url": "$BASE",
+  "username": "fixture-user",
+  "password": "fixture-wrong-password"
+ },
+ "routes": [
+  {
+   "name": "login-denied",
+   "match": {
+    "method": "POST",
+    "path": "/login"
+   },
+   "responses": [
+    {
+     "status": 401,
+     "json": {
+      "error_code": "UNAUTHORIZED",
+      "error_message": "invalid credentials"
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 0,
+  "request_count": 1,
+  "log_contains": [
+   "extreme-cloud-iq: login failed: status 401",
+   "extreme-cloud-iq: check the username and password"
+  ],
+  "requests_absent": [
+   {
+    "path": "/devices"
+   }
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

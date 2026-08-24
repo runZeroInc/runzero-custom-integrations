@@ -1,0 +1,56 @@
+# A real AdGuard Home, serving the same /control/ API a deployed instance serves.
+#
+# At ~24MB and a single static Go binary with no external dependencies, this is
+# about as cheap as a real-software test gets: it reaches a usable API in a
+# second or two and holds a few tens of megabytes while it runs.
+#
+# The tag is pinned. AdGuard reshaped /control/clients between 0.107.x point
+# releases -- runtime clients moved under `auto_clients` and grew a `source`
+# field -- so an unpinned image would change the payload under the test without
+# changing the test.
+services:
+  adguard:
+    image: adguard/adguardhome:v0.107.55
+    hostname: rz-adguard
+    # NET_ADMIN is what lets AdGuard bind and run its DHCP server, which is the
+    # only part of the API that carries MAC addresses -- and therefore the only
+    # part that produces an asset with a real layer-2 identity.
+    cap_add:
+      - NET_ADMIN
+    networks:
+      lan:
+        ipv4_address: 10.222.7.2
+    # Pinned so the appliance asset is assertable. Docker otherwise mints a
+    # random address per container, and the appliance MAC would differ on every
+    # run.
+    #
+    # 02:42:... is Docker's own conventional prefix, kept deliberately: the 02
+    # sets the locally-administered bit, and the platform's network_interface()
+    # helper clears that bit on the way out. So the emitted MAC is
+    # 00:42:0a:de:07:02, not the 02:42:0a:de:07:02 configured here. That is real
+    # platform behaviour rather than a quirk of this test, and asserting the
+    # normalised value keeps it visible instead of surprising the next reader.
+    mac_address: "02:42:0a:de:07:02"
+    ports:
+      # Only the web/API port is published. The DNS listener stays inside the
+      # container: publishing 53 on the host would collide with anything else
+      # resolving there, and the integration never queries it.
+      - "${RZ_HOST_PORT}:3000"
+
+networks:
+  lan:
+    # The subnet is fixed rather than left to Docker's address pool. AdGuard
+    # will only accept a DHCP range inside the interface's own subnet, so the
+    # seed script has to know that subnet -- and a pool-assigned one differs on
+    # every run and every host. Fixing it makes the seeded lease addresses
+    # constants the manifest can assert directly.
+    #
+    # 10.222.7.0/24 is chosen to sit well clear of Docker's default pools
+    # (172.17-172.31, 192.168) so it will not collide with unrelated networks
+    # on a shared machine. If it ever does, `compose up` fails loudly rather
+    # than starting a subtly misconfigured stack.
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.222.7.0/24
+          gateway: 10.222.7.1

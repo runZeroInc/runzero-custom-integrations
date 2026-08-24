@@ -1,0 +1,159 @@
+{
+  "name": "tenant-discovery",
+  "integration": "sophos-central",
+  "description": "Partner credential path: the Sophos ID token is exchanged, whoami reports a partner credential, and the managed tenant list is walked page by page with the X-Partner-ID header. Proves the walk terminates on pages.total rather than on a short page, that a tenant with no apiHost is skipped rather than requested, and that a tenant whose data region host is unusable is contained rather than ending the run.\n\nThis scenario imports no endpoints by design; the endpoint-import scenario covers the full import path by handing back '$BASE' as a tenant apiHost, which the harness expands inside response bodies. asset_count is 0 here, so the invariants have nothing to check. The one importable tenant's apiHost is a malformed URL, which is the only way to make a tenant-scoped call fail immediately instead of spending the widened retry backoff on a dial timeout. The tenant_ids filter is unexercised because a kwarg value cannot contain a comma.",
+  "kwargs": {
+    "url": "$BASE",
+    "auth_url": "$BASE",
+    "client_id": "fixture-client-id",
+    "client_secret": "fixture-client-secret",
+    "page_size": "100"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {
+        "method": "POST",
+        "path": "/api/v2/oauth2/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-access-token",
+            "expires_in": 3600,
+            "token_type": "bearer"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "whoami",
+      "match": {
+        "method": "GET",
+        "path": "/whoami/v1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "partner-fixture-0001",
+            "idType": "partner",
+            "apiHosts": {
+              "global": ""
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "tenants-page-1",
+      "match": {
+        "method": "GET",
+        "path": "/partner/v1/tenants",
+        "query_contains": "page=1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "tenant-aaaa",
+                "name": "Fixture Tenant A",
+                "apiHost": "://not-a-data-region-url"
+              },
+              {
+                "id": "tenant-no-host",
+                "name": "Fixture Tenant With No Data Region"
+              }
+            ],
+            "pages": {
+              "current": 1,
+              "size": 50,
+              "total": 2,
+              "items": 3
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "tenants-page-2",
+      "match": {
+        "method": "GET",
+        "path": "/partner/v1/tenants",
+        "query_contains": "page=2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "tenant-bbbb",
+                "name": "Fixture Tenant B"
+              },
+              "a bare string where a tenant object is documented"
+            ],
+            "pages": {
+              "current": 2,
+              "size": 50,
+              "total": 2,
+              "items": 3
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/v2/oauth2/token",
+        "body_contains": "grant_type=client_credentials"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v2/oauth2/token",
+        "body_contains": "scope=token"
+      },
+      {
+        "method": "GET",
+        "path": "/whoami/v1",
+        "header_contains": "Bearer fixture-access-token"
+      },
+      {
+        "method": "GET",
+        "path": "/partner/v1/tenants",
+        "query_contains": "pageTotal=true"
+      },
+      {
+        "method": "GET",
+        "path": "/partner/v1/tenants",
+        "query_contains": "page=2"
+      }
+    ],
+    "requests_absent": [
+      {
+        "query_contains": "page=3"
+      }
+    ],
+    "log_contains": [
+      "sophos-central: skipping tenant with no apiHost: id=tenant-no-host",
+      "sophos-central: skipping tenant with no apiHost: id=tenant-bbbb",
+      "sophos-central: partner credential manages 1 importable tenants",
+      "sophos-central: failed to fetch endpoints for tenant tenant-aaaa",
+      "sophos-central: no assets retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

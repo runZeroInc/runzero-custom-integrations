@@ -1,0 +1,1604 @@
+{
+  "name": "paged",
+  "integration": "cortex-xdr",
+  "description": "Cortex pages with a search_from/search_to window of a hundred, and the walk only stops on a short page, so page one has to be exactly a hundred endpoints long for the second call to happen at all. The assertion is that call two carries search_from=100/search_to=200 - the window advanced by the page size rather than being resent - and that the run stops after the short second page instead of looping.\n\nnamespaced_ids is skipped because this integration uses the bare Cortex agent_id as the foreign id with no tenant scope at all. That is reported as a defect rather than accepted - see the report.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key_id": "42",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "get-endpoint",
+      "match": {
+        "method": "POST",
+        "path": "/public_api/v1/endpoints/get_endpoint"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "reply": {
+              "total_count": 102,
+              "result_count": 100,
+              "endpoints": [
+                {
+                  "agent_id": "cx-agent-p1-0001",
+                  "endpoint_name": "cx-page1-0001",
+                  "host_name": "cx-page1-0001.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.1"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:01"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0002",
+                  "endpoint_name": "cx-page1-0002",
+                  "host_name": "cx-page1-0002.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.2"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:02"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0003",
+                  "endpoint_name": "cx-page1-0003",
+                  "host_name": "cx-page1-0003.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.3"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:03"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0004",
+                  "endpoint_name": "cx-page1-0004",
+                  "host_name": "cx-page1-0004.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.4"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:04"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0005",
+                  "endpoint_name": "cx-page1-0005",
+                  "host_name": "cx-page1-0005.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.5"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:05"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0006",
+                  "endpoint_name": "cx-page1-0006",
+                  "host_name": "cx-page1-0006.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.6"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:06"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0007",
+                  "endpoint_name": "cx-page1-0007",
+                  "host_name": "cx-page1-0007.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.7"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:07"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0008",
+                  "endpoint_name": "cx-page1-0008",
+                  "host_name": "cx-page1-0008.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.8"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:08"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0009",
+                  "endpoint_name": "cx-page1-0009",
+                  "host_name": "cx-page1-0009.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.9"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:09"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0010",
+                  "endpoint_name": "cx-page1-0010",
+                  "host_name": "cx-page1-0010.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.10"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:0a"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0011",
+                  "endpoint_name": "cx-page1-0011",
+                  "host_name": "cx-page1-0011.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.11"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:0b"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0012",
+                  "endpoint_name": "cx-page1-0012",
+                  "host_name": "cx-page1-0012.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.12"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:0c"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0013",
+                  "endpoint_name": "cx-page1-0013",
+                  "host_name": "cx-page1-0013.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.13"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:0d"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0014",
+                  "endpoint_name": "cx-page1-0014",
+                  "host_name": "cx-page1-0014.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.14"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:0e"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0015",
+                  "endpoint_name": "cx-page1-0015",
+                  "host_name": "cx-page1-0015.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.15"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:0f"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0016",
+                  "endpoint_name": "cx-page1-0016",
+                  "host_name": "cx-page1-0016.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.16"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:10"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0017",
+                  "endpoint_name": "cx-page1-0017",
+                  "host_name": "cx-page1-0017.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.17"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:11"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0018",
+                  "endpoint_name": "cx-page1-0018",
+                  "host_name": "cx-page1-0018.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.18"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:12"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0019",
+                  "endpoint_name": "cx-page1-0019",
+                  "host_name": "cx-page1-0019.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.19"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:13"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0020",
+                  "endpoint_name": "cx-page1-0020",
+                  "host_name": "cx-page1-0020.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.20"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:14"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0021",
+                  "endpoint_name": "cx-page1-0021",
+                  "host_name": "cx-page1-0021.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.21"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:15"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0022",
+                  "endpoint_name": "cx-page1-0022",
+                  "host_name": "cx-page1-0022.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.22"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:16"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0023",
+                  "endpoint_name": "cx-page1-0023",
+                  "host_name": "cx-page1-0023.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.23"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:17"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0024",
+                  "endpoint_name": "cx-page1-0024",
+                  "host_name": "cx-page1-0024.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.24"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:18"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0025",
+                  "endpoint_name": "cx-page1-0025",
+                  "host_name": "cx-page1-0025.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.25"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:19"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0026",
+                  "endpoint_name": "cx-page1-0026",
+                  "host_name": "cx-page1-0026.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.26"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:1a"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0027",
+                  "endpoint_name": "cx-page1-0027",
+                  "host_name": "cx-page1-0027.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.27"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:1b"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0028",
+                  "endpoint_name": "cx-page1-0028",
+                  "host_name": "cx-page1-0028.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.28"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:1c"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0029",
+                  "endpoint_name": "cx-page1-0029",
+                  "host_name": "cx-page1-0029.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.29"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:1d"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0030",
+                  "endpoint_name": "cx-page1-0030",
+                  "host_name": "cx-page1-0030.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.30"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:1e"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0031",
+                  "endpoint_name": "cx-page1-0031",
+                  "host_name": "cx-page1-0031.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.31"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:1f"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0032",
+                  "endpoint_name": "cx-page1-0032",
+                  "host_name": "cx-page1-0032.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.32"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:20"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0033",
+                  "endpoint_name": "cx-page1-0033",
+                  "host_name": "cx-page1-0033.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.33"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:21"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0034",
+                  "endpoint_name": "cx-page1-0034",
+                  "host_name": "cx-page1-0034.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.34"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:22"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0035",
+                  "endpoint_name": "cx-page1-0035",
+                  "host_name": "cx-page1-0035.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.35"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:23"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0036",
+                  "endpoint_name": "cx-page1-0036",
+                  "host_name": "cx-page1-0036.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.36"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:24"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0037",
+                  "endpoint_name": "cx-page1-0037",
+                  "host_name": "cx-page1-0037.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.37"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:25"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0038",
+                  "endpoint_name": "cx-page1-0038",
+                  "host_name": "cx-page1-0038.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.38"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:26"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0039",
+                  "endpoint_name": "cx-page1-0039",
+                  "host_name": "cx-page1-0039.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.39"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:27"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0040",
+                  "endpoint_name": "cx-page1-0040",
+                  "host_name": "cx-page1-0040.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.40"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:28"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0041",
+                  "endpoint_name": "cx-page1-0041",
+                  "host_name": "cx-page1-0041.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.41"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:29"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0042",
+                  "endpoint_name": "cx-page1-0042",
+                  "host_name": "cx-page1-0042.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.42"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:2a"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0043",
+                  "endpoint_name": "cx-page1-0043",
+                  "host_name": "cx-page1-0043.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.43"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:2b"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0044",
+                  "endpoint_name": "cx-page1-0044",
+                  "host_name": "cx-page1-0044.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.44"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:2c"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0045",
+                  "endpoint_name": "cx-page1-0045",
+                  "host_name": "cx-page1-0045.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.45"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:2d"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0046",
+                  "endpoint_name": "cx-page1-0046",
+                  "host_name": "cx-page1-0046.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.46"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:2e"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0047",
+                  "endpoint_name": "cx-page1-0047",
+                  "host_name": "cx-page1-0047.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.47"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:2f"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0048",
+                  "endpoint_name": "cx-page1-0048",
+                  "host_name": "cx-page1-0048.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.48"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:30"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0049",
+                  "endpoint_name": "cx-page1-0049",
+                  "host_name": "cx-page1-0049.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.49"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:31"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0050",
+                  "endpoint_name": "cx-page1-0050",
+                  "host_name": "cx-page1-0050.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.50"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:32"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0051",
+                  "endpoint_name": "cx-page1-0051",
+                  "host_name": "cx-page1-0051.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.51"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:33"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0052",
+                  "endpoint_name": "cx-page1-0052",
+                  "host_name": "cx-page1-0052.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.52"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:34"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0053",
+                  "endpoint_name": "cx-page1-0053",
+                  "host_name": "cx-page1-0053.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.53"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:35"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0054",
+                  "endpoint_name": "cx-page1-0054",
+                  "host_name": "cx-page1-0054.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.54"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:36"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0055",
+                  "endpoint_name": "cx-page1-0055",
+                  "host_name": "cx-page1-0055.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.55"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:37"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0056",
+                  "endpoint_name": "cx-page1-0056",
+                  "host_name": "cx-page1-0056.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.56"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:38"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0057",
+                  "endpoint_name": "cx-page1-0057",
+                  "host_name": "cx-page1-0057.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.57"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:39"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0058",
+                  "endpoint_name": "cx-page1-0058",
+                  "host_name": "cx-page1-0058.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.58"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:3a"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0059",
+                  "endpoint_name": "cx-page1-0059",
+                  "host_name": "cx-page1-0059.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.59"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:3b"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0060",
+                  "endpoint_name": "cx-page1-0060",
+                  "host_name": "cx-page1-0060.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.60"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:3c"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0061",
+                  "endpoint_name": "cx-page1-0061",
+                  "host_name": "cx-page1-0061.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.61"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:3d"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0062",
+                  "endpoint_name": "cx-page1-0062",
+                  "host_name": "cx-page1-0062.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.62"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:3e"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0063",
+                  "endpoint_name": "cx-page1-0063",
+                  "host_name": "cx-page1-0063.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.63"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:3f"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0064",
+                  "endpoint_name": "cx-page1-0064",
+                  "host_name": "cx-page1-0064.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.64"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:40"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0065",
+                  "endpoint_name": "cx-page1-0065",
+                  "host_name": "cx-page1-0065.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.65"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:41"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0066",
+                  "endpoint_name": "cx-page1-0066",
+                  "host_name": "cx-page1-0066.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.66"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:42"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0067",
+                  "endpoint_name": "cx-page1-0067",
+                  "host_name": "cx-page1-0067.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.67"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:43"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0068",
+                  "endpoint_name": "cx-page1-0068",
+                  "host_name": "cx-page1-0068.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.68"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:44"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0069",
+                  "endpoint_name": "cx-page1-0069",
+                  "host_name": "cx-page1-0069.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.69"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:45"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0070",
+                  "endpoint_name": "cx-page1-0070",
+                  "host_name": "cx-page1-0070.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.70"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:46"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0071",
+                  "endpoint_name": "cx-page1-0071",
+                  "host_name": "cx-page1-0071.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.71"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:47"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0072",
+                  "endpoint_name": "cx-page1-0072",
+                  "host_name": "cx-page1-0072.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.72"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:48"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0073",
+                  "endpoint_name": "cx-page1-0073",
+                  "host_name": "cx-page1-0073.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.73"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:49"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0074",
+                  "endpoint_name": "cx-page1-0074",
+                  "host_name": "cx-page1-0074.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.74"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:4a"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0075",
+                  "endpoint_name": "cx-page1-0075",
+                  "host_name": "cx-page1-0075.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.75"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:4b"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0076",
+                  "endpoint_name": "cx-page1-0076",
+                  "host_name": "cx-page1-0076.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.76"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:4c"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0077",
+                  "endpoint_name": "cx-page1-0077",
+                  "host_name": "cx-page1-0077.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.77"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:4d"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0078",
+                  "endpoint_name": "cx-page1-0078",
+                  "host_name": "cx-page1-0078.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.78"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:4e"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0079",
+                  "endpoint_name": "cx-page1-0079",
+                  "host_name": "cx-page1-0079.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.79"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:4f"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0080",
+                  "endpoint_name": "cx-page1-0080",
+                  "host_name": "cx-page1-0080.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.80"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:50"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0081",
+                  "endpoint_name": "cx-page1-0081",
+                  "host_name": "cx-page1-0081.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.81"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:51"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0082",
+                  "endpoint_name": "cx-page1-0082",
+                  "host_name": "cx-page1-0082.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.82"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:52"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0083",
+                  "endpoint_name": "cx-page1-0083",
+                  "host_name": "cx-page1-0083.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.83"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:53"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0084",
+                  "endpoint_name": "cx-page1-0084",
+                  "host_name": "cx-page1-0084.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.84"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:54"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0085",
+                  "endpoint_name": "cx-page1-0085",
+                  "host_name": "cx-page1-0085.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.85"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:55"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0086",
+                  "endpoint_name": "cx-page1-0086",
+                  "host_name": "cx-page1-0086.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.86"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:56"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0087",
+                  "endpoint_name": "cx-page1-0087",
+                  "host_name": "cx-page1-0087.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.87"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:57"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0088",
+                  "endpoint_name": "cx-page1-0088",
+                  "host_name": "cx-page1-0088.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.88"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:58"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0089",
+                  "endpoint_name": "cx-page1-0089",
+                  "host_name": "cx-page1-0089.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.89"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:59"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0090",
+                  "endpoint_name": "cx-page1-0090",
+                  "host_name": "cx-page1-0090.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.90"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:5a"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0091",
+                  "endpoint_name": "cx-page1-0091",
+                  "host_name": "cx-page1-0091.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.91"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:5b"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0092",
+                  "endpoint_name": "cx-page1-0092",
+                  "host_name": "cx-page1-0092.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.92"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:5c"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0093",
+                  "endpoint_name": "cx-page1-0093",
+                  "host_name": "cx-page1-0093.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.93"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:5d"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0094",
+                  "endpoint_name": "cx-page1-0094",
+                  "host_name": "cx-page1-0094.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.94"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:5e"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0095",
+                  "endpoint_name": "cx-page1-0095",
+                  "host_name": "cx-page1-0095.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.95"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:5f"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0096",
+                  "endpoint_name": "cx-page1-0096",
+                  "host_name": "cx-page1-0096.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.96"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:60"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0097",
+                  "endpoint_name": "cx-page1-0097",
+                  "host_name": "cx-page1-0097.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.97"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:61"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0098",
+                  "endpoint_name": "cx-page1-0098",
+                  "host_name": "cx-page1-0098.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.98"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:62"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0099",
+                  "endpoint_name": "cx-page1-0099",
+                  "host_name": "cx-page1-0099.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.99"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:63"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p1-0100",
+                  "endpoint_name": "cx-page1-0100",
+                  "host_name": "cx-page1-0100.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_WORKSTATION",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.101.0.100"
+                  ],
+                  "mac_address": [
+                    "00:11:23:01:00:64"
+                  ],
+                  "operating_system": "Windows 10 Pro",
+                  "last_seen": 1786000000000
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "reply": {
+              "total_count": 102,
+              "result_count": 2,
+              "endpoints": [
+                {
+                  "agent_id": "cx-agent-p2-0001",
+                  "endpoint_name": "cx-page2-0001",
+                  "host_name": "cx-page2-0001.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_SERVER",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.102.0.1"
+                  ],
+                  "mac_address": [
+                    "00:11:24:00:00:01"
+                  ],
+                  "operating_system": "Ubuntu 24.04",
+                  "last_seen": 1786000000000
+                },
+                {
+                  "agent_id": "cx-agent-p2-0002",
+                  "endpoint_name": "cx-page2-0002",
+                  "host_name": "cx-page2-0002.corp.example.com",
+                  "endpoint_type": "AGENT_TYPE_SERVER",
+                  "endpoint_status": "CONNECTED",
+                  "ip": [
+                    "10.102.0.2"
+                  ],
+                  "mac_address": [
+                    "00:11:24:00:00:02"
+                  ],
+                  "operating_system": "Ubuntu 24.04",
+                  "last_seen": 1786000000000
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 102,
+    "ids": [
+      "cx-agent-p1-0001",
+      "cx-agent-p1-0100",
+      "cx-agent-p2-0001",
+      "cx-agent-p2-0002"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/public_api/v1/endpoints/get_endpoint",
+        "body_contains": "\"search_from\":0,\"search_to\":100"
+      },
+      {
+        "method": "POST",
+        "path": "/public_api/v1/endpoints/get_endpoint",
+        "body_contains": "\"search_from\":100,\"search_to\":200"
+      }
+    ],
+    "log_contains": [
+      "Loaded 102 endpoints"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

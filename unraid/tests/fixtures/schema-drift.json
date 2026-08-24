@@ -1,0 +1,149 @@
+{
+  "name": "schema-drift",
+  "integration": "unraid",
+  "description": "An unraid-api release whose DockerContainer type lacks one optional field the full query names. GraphQL fails the WHOLE document at validation time on one unknown field, so without a fallback the container import is silently version-gated to nothing. The walk must notice the schema refusal ('Cannot query field'), retry with the core field set, and import the container with the enrichment attributes simply absent. The server asset is unaffected either way.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "info",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidInfo"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "info": {
+                "machineId": "77aa1c4e9b7d43a6bd0e5f1c2a3b4c88",
+                "os": {
+                  "platform": "linux",
+                  "distro": "Unraid",
+                  "release": "7.1.0",
+                  "hostname": "drift-nas",
+                  "uptime": "2026-08-01T09:12:44.000Z"
+                },
+                "system": {"manufacturer": "Supermicro", "model": "X11SCH-F", "serial": "S987654321"},
+                "versions": {"core": {"unraid": "7.1.0", "api": "4.10.0"}},
+                "networkInterfaces": [
+                  {
+                    "name": "br0",
+                    "macAddress": "ac:1f:6b:aa:99:88",
+                    "internal": false,
+                    "virtual": true,
+                    "operstate": "up",
+                    "ipv4Addresses": [{"address": "192.168.1.80", "netmask": "255.255.255.0"}],
+                    "ipAddress": "192.168.1.80"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vars",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVars"},
+      "responses": [
+        {"status": 200, "json": {"data": {"vars": null, "metrics": null}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "storage",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidStorage"},
+      "responses": [
+        {"status": 200, "json": {"data": {"array": null, "disks": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "docker-full-then-core",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidDocker"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "errors": [
+              {"message": "Cannot query field \"templatePath\" on type \"DockerContainer\". Did you mean \"projectUrl\"?"}
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "docker": {
+                "containers": [
+                  {
+                    "id": "1:aa8e9f0a1b2c",
+                    "names": ["/grafana"],
+                    "image": "grafana/grafana:11.1.0",
+                    "state": "RUNNING",
+                    "status": "Up 3 days",
+                    "ports": [
+                      {"ip": "", "privatePort": 3000, "publicPort": 3000, "type": "TCP"}
+                    ],
+                    "hostConfig": {"networkMode": "br0"},
+                    "networkSettings": {
+                      "Networks": {
+                        "br0": {
+                          "NetworkID": "c3d4e5f60718",
+                          "IPAddress": "192.168.1.82",
+                          "GlobalIPv6Address": "",
+                          "MacAddress": "02:42:c0:a8:01:52"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vms",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "RunZeroUnraidVms"},
+      "responses": [
+        {"status": 200, "json": {"data": {"vms": {"domains": []}}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "json": {"error": "no fixture route"}},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "unraid:machine:77aa1c4e9b7d43a6bd0e5f1c2a3b4c88",
+      "unraid:$HOST:container:grafana"
+    ],
+    "assets": [
+      {
+        "id": "unraid:$HOST:container:grafana",
+        "fields": {
+          "unraid_state": "RUNNING",
+          "unraid_network_mode": "br0",
+          "unraid_image": "grafana/grafana:11.1.0"
+        },
+        "fields_absent": ["unraid_template_path", "unraid_auto_start", "unraid_image_id"]
+      }
+    ],
+    "min_requests": 6,
+    "requests_include": [
+      {"method": "POST", "path_contains": "/graphql", "body_contains": "templatePath"},
+      {"method": "POST", "path_contains": "/graphql", "body_contains": "RunZeroUnraidDocker"}
+    ],
+    "log_contains": [
+      "retrying with the core field set",
+      "unraid: reported 1 containers with an address of their own",
+      "unraid: reported 1 server and 1 containers"
+    ]
+  },
+  "check_determinism": true
+}

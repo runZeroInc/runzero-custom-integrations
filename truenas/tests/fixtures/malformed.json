@@ -1,0 +1,284 @@
+{
+  "name": "malformed",
+  "integration": "truenas",
+  "description": "Every degenerate shape the eight endpoints can hand back, in one run, proving each is absorbed and that the walk reaches the good records at the end. network/configuration answers a list rather than an object, so the hostname must fall back to the one on system/info and be split into a short name and a domain. The interface list holds a bare string, an interface whose state is a string rather than an object -- which still has usable addresses on its top-level aliases -- and an interface carrying a multicast MAC and an APIPA address, neither of which identifies anything, so that interface must vanish entirely rather than become a correlator. /pool answers an object where the collection contract promises an array. A disk row is a string, another reports the SMBIOS placeholder 'To be filled by O.E.M.' as its serial and null as its model. One app has no name, one has a string where active_workloads belongs, and one publishes host port 0. Two VM rows must be dropped for different reasons: one has a null id, and one has neither a NIC nor a name that is shaped like a DNS name -- 'Windows 11 Desktop' is an operator's label, and importing it as a hostname would invite runZero to correlate two unrelated guests that happen to share it. The release is also reported as 25.04, which must raise the REST-deprecation warning. Response shapes follow the TrueNAS middleware API models; all data is synthetic.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1-fixtureapikeyabcdef0123456789abcdef0123456789abcdef0123456789ab"
+  },
+  "routes": [
+    {
+      "name": "system_info",
+      "match": {"method": "GET", "path": "/api/v2.0/system/info"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "25.04.2",
+            "buildtime": {"$date": 1740000000000},
+            "hostname": "nas03.example.com",
+            "physmem": 34359738368,
+            "model": "AMD Ryzen 5 5600G with Radeon Graphics",
+            "cores": 12,
+            "physical_cores": 6,
+            "loadavg": [0.9, 0.7, 0.5],
+            "uptime": "3 days, 1:00:00",
+            "uptime_seconds": 262800.0,
+            "system_serial": "To be filled by O.E.M.",
+            "system_product": "B550M DS3H",
+            "system_product_version": "Default string",
+            "license": null,
+            "boottime": {"$date": 1755037200000},
+            "datetime": {"$date": 1755300000000},
+            "timezone": "Etc/UTC",
+            "system_manufacturer": "Gigabyte Technology Co., Ltd.",
+            "ecc_memory": false
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "network_configuration",
+      "match": {"method": "GET", "path": "/api/v2.0/network/configuration"},
+      "responses": [{"status": 200, "json": ["unexpected", "list"]}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "interface",
+      "match": {"method": "GET", "path": "/api/v2.0/interface"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "not-an-object",
+            {
+              "id": "eno1",
+              "name": "eno1",
+              "fake": false,
+              "type": "PHYSICAL",
+              "state": {
+                "name": "eno1",
+                "link_state": "LINK_STATE_UP",
+                "link_address": "00:25:90:44:55:66",
+                "permanent_link_address": "00:25:90:44:55:66",
+                "hardware_link_address": "00:25:90:44:55:66",
+                "aliases": [
+                  {"type": "INET", "address": "198.51.100.10", "netmask": 24},
+                  {"type": "LINK", "address": "00:25:90:44:55:66"}
+                ]
+              },
+              "aliases": []
+            },
+            {
+              "id": "eno2",
+              "name": "eno2",
+              "fake": false,
+              "type": "PHYSICAL",
+              "state": "unavailable",
+              "aliases": [{"type": "INET", "address": "203.0.113.20", "netmask": 24}]
+            },
+            {
+              "id": "eno3",
+              "name": "eno3",
+              "fake": false,
+              "type": "PHYSICAL",
+              "state": {
+                "name": "eno3",
+                "link_state": "LINK_STATE_DOWN",
+                "link_address": "01:00:5e:00:00:01",
+                "permanent_link_address": null,
+                "hardware_link_address": "01:00:5e:00:00:01",
+                "aliases": [
+                  {"type": "INET", "address": "169.254.5.5", "netmask": 16},
+                  {"type": "INET", "address": "not-an-ip"}
+                ]
+              },
+              "aliases": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "pool",
+      "match": {"method": "GET", "path": "/api/v2.0/pool"},
+      "responses": [{"status": 200, "json": {"message": "an object where an array was promised"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "disk",
+      "match": {"method": "GET", "path": "/api/v2.0/disk"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "not-a-disk",
+            {"identifier": "{serial}PLACEHOLDER", "name": "sda", "subsystem": "scsi", "number": 2048, "serial": "To be filled by O.E.M.", "lunid": null, "size": null, "description": "", "transfermode": "Auto", "hddstandby": "ALWAYS ON", "advpowermgmt": "DISABLED", "expiretime": null, "model": null, "rotationrate": null, "type": null, "zfs_guid": null, "bus": "SCSI", "devname": "sda", "enclosure": null, "pool": null},
+            {"identifier": "{serial}FIXT-DISK-2", "name": "sdb", "subsystem": "scsi", "number": 2064, "serial": "FIXT-DISK-2", "lunid": null, "size": 8001563222016, "description": "", "transfermode": "Auto", "hddstandby": "ALWAYS ON", "advpowermgmt": "DISABLED", "expiretime": null, "model": "ST8000VN004-2M2101", "rotationrate": 7200, "type": "HDD", "zfs_guid": "3333333333333333333", "bus": "SCSI", "devname": "sdb", "enclosure": null, "pool": "tank"}
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "app",
+      "match": {"method": "GET", "path": "/api/v2.0/app"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"id": "", "name": "", "state": "STOPPED", "human_version": "", "version": "", "metadata": {}, "active_workloads": {}},
+            {
+              "name": "nextcloud",
+              "id": "nextcloud",
+              "state": "RUNNING",
+              "upgrade_available": false,
+              "custom_app": false,
+              "human_version": "29.0.4_1.3.1",
+              "version": "1.3.1",
+              "metadata": "broken",
+              "active_workloads": "not-an-object",
+              "notes": null,
+              "portals": {}
+            },
+            {
+              "name": "vaultwarden",
+              "id": "vaultwarden",
+              "state": "RUNNING",
+              "upgrade_available": false,
+              "custom_app": true,
+              "human_version": "1.32.0_1.0.4",
+              "version": "1.0.4",
+              "metadata": {"title": "Vaultwarden", "train": "community"},
+              "active_workloads": {
+                "containers": 1,
+                "used_ports": [
+                  {"container_port": 80, "protocol": "tcp", "host_ports": [{"host_port": 0, "host_ip": "0.0.0.0"}, {"host_port": 8443, "host_ip": "0.0.0.0"}]},
+                  "not-a-port-object"
+                ],
+                "container_details": [],
+                "volumes": [],
+                "images": ["vaultwarden/server:1.32.0"],
+                "networks": []
+              },
+              "notes": null,
+              "portals": {}
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vm",
+      "match": {"method": "GET", "path": "/api/v2.0/vm"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": null,
+              "name": "orphan",
+              "description": "",
+              "vcpus": 1,
+              "cores": 1,
+              "threads": 1,
+              "memory": 1024,
+              "bootloader": "UEFI",
+              "autostart": false,
+              "uuid": null,
+              "display_available": false,
+              "status": {"state": "STOPPED", "pid": null, "domain_state": "SHUTOFF"},
+              "devices": []
+            },
+            {
+              "id": 5,
+              "name": "Windows 11 Desktop",
+              "description": "",
+              "vcpus": 4,
+              "cores": 1,
+              "threads": 1,
+              "memory": 16384,
+              "bootloader": "UEFI",
+              "autostart": false,
+              "uuid": "8b2d9f60-3e4f-5061-ac1d-2e3f4a5b6c7d",
+              "display_available": true,
+              "status": {"state": "STOPPED", "pid": null, "domain_state": "SHUTOFF"},
+              "devices": [
+                {"id": 51, "vm": 5, "order": 1001, "attributes": {"dtype": "DISK", "path": "/dev/zvol/tank/vm-win", "type": "AHCI"}}
+              ]
+            },
+            {
+              "id": 6,
+              "name": "ok-guest",
+              "description": "",
+              "vcpus": 2,
+              "cores": 1,
+              "threads": 1,
+              "memory": 2048,
+              "bootloader": "UEFI",
+              "autostart": true,
+              "uuid": "9c3ea071-4f50-6172-bd2e-3f4a5b6c7d8e",
+              "display_available": false,
+              "status": {"state": "RUNNING", "pid": 4242, "domain_state": "RUNNING"},
+              "devices": [
+                {"id": 61, "vm": 6, "order": 1002, "attributes": {"dtype": "NIC", "type": "VIRTIO", "nic_attach": "eno1", "mac": "00:a0:98:cc:dd:ee"}}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "request_count": 7,
+    "ids": ["truenas:$HOST:system", "truenas:$HOST:vm:6"],
+    "ids_absent": ["truenas:$HOST:vm:5"],
+    "assets": [
+      {
+        "id": "truenas:$HOST:system",
+        "fields": {
+          "hostnames": "nas03",
+          "os": "TrueNAS",
+          "osVersion": "25.04.2",
+          "deviceType": "Storage",
+          "manufacturer": "Gigabyte Technology Co., Ltd.",
+          "model": "B550M DS3H",
+          "ipAddresses": "198.51.100.10\t203.0.113.20",
+          "macAddresses": "00:25:90:44:55:66"
+        },
+        "fields_absent": ["truenas_system_serial", "truenas_pools"]
+      },
+      {
+        "id": "truenas:$HOST:vm:6",
+        "fields": {
+          "deviceType": "Virtual Machine",
+          "hostnames": "ok-guest",
+          "macAddresses": "00:a0:98:cc:dd:ee",
+          "truenas_vm_state": "RUNNING"
+        }
+      }
+    ],
+    "min_software_total": 2,
+    "min_services_total": 1,
+    "requests_absent": [
+      {"path_contains": "/api/v2.0/vm/device"},
+      {"path_contains": "/api/v2.0/chart/release"}
+    ],
+    "log_contains": [
+      "truenas: the REST API is deprecated on TrueNAS 25",
+      "truenas: /pool returned dict where a list was expected",
+      "truenas: skipping VM with no id: name=orphan",
+      "truenas: skipping VM 5 with no MAC and no usable name",
+      "truenas: reported 1 virtual machines",
+      "truenas: 2 VM rows were skipped for want of an id or a correlator"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

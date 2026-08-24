@@ -1,0 +1,73 @@
+{
+  "name": "malformed-csv",
+  "integration": "nexthink",
+  "description": "Malformed and awkward CSV rows must not lose their neighbors. The export carries: a record whose quoted device.hardware.model field contains an embedded newline (the case the old hand-rolled split-on-newlines parser corrupted, taking the record AND desynchronizing the one after it), a row with fewer fields than the header (short rows pad with empty strings), a row with no device.uid (skipped, not imported), and a final well-formed record that proves nothing upstream broke the walk. The record following the quoted-newline row must come out with ITS OWN hostname and IP -- that adjacency is the regression lock. Skips namespaced_ids for consistency with download-results.json: the foreign id is Nexthink's bare device.uid.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/oauth2/default/v1/token"},
+      "responses": [{"status": 200, "json": {"access_token": "nexthink-token-7"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export",
+      "match": {"method": "POST", "path": "/api/v1/nql/export"},
+      "responses": [{"status": 200, "json": {"exportId": "exp-0007"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status",
+      "match": {"method": "GET", "path": "/api/v1/nql/status/exp-0007"},
+      "responses": [
+        {"status": 200, "json": {"status": "COMPLETED", "resultsFileUrl": "$BASE/exports/exp-0007.csv"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "results-csv",
+      "match": {"method": "GET", "path": "/exports/exp-0007.csv"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/csv"},
+          "text": "device.uid,device.name,device.operating_system.name,device.hardware.model,device.collector.local_ip\nnx-mal-0001,DESKTOP-NL01,Windows 11,\"ThinkCentre\nM90a Gen 3\",10.96.1.21\nnx-mal-0002,DESKTOP-OK02,Windows 11,Latitude 7440,10.96.1.22\nnx-mal-0003,SHORT-ROW-03\n,NO-UID-04,Windows 10,OptiPlex,10.96.1.24\nnx-mal-0005,DESKTOP-OK05,Windows 11,Precision 3680,10.96.1.25\n"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": ["nx-mal-0001", "nx-mal-0002", "nx-mal-0003", "nx-mal-0005"],
+    "assets": [
+      {
+        "id": "nx-mal-0001",
+        "fields": {"hostnames": "DESKTOP-NL01", "ipAddresses": "10.96.1.21"}
+      },
+      {
+        "id": "nx-mal-0002",
+        "fields": {"hostnames": "DESKTOP-OK02", "ipAddresses": "10.96.1.22"}
+      },
+      {
+        "id": "nx-mal-0003",
+        "fields": {"hostnames": "SHORT-ROW-03"},
+        "fields_absent": ["ipAddresses", "os"]
+      },
+      {
+        "id": "nx-mal-0005",
+        "fields": {"hostnames": "DESKTOP-OK05", "ipAddresses": "10.96.1.25"}
+      }
+    ],
+    "request_count": 4,
+    "log_contains": [
+      "nexthink: reported 4 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

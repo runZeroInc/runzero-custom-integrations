@@ -1,0 +1,97 @@
+{
+  "name": "software-cap",
+  "integration": "ocs-inventory",
+  "description": "Software enrichment costs one request per computer, so the cap that bounds it is the thing worth testing. Three computers with software_limit set to 2: the first two are enriched, the third is still imported without software, and the skip count is logged. requests_absent pins that the third computer's software route was never called. It also proves the two shapes the single-computer route answers with -- rows under the computer id's \"software\" key, and the same rows under an empty key when no section was named -- that a duplicate product/version pair is collapsed rather than imported twice, and that a row with no NAME is dropped instead of becoming a nameless Software record.",
+  "kwargs": {
+    "url": "$BASE",
+    "include_software": "true",
+    "software_limit": "2"
+  },
+  "routes": [
+    {
+      "name": "computers",
+      "match": {"method": "GET", "path": "/ocsapi/v1/computers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "401": {
+              "hardware": {"ID": "401", "DEVICEID": "sw-a-2026-04-01-09-00-00", "NAME": "sw-a", "OSNAME": "Microsoft Windows 10 Pro", "IPADDR": "10.62.0.21", "LASTCOME": "2026-08-15 05:00:00"},
+              "bios": [{"SSN": "SWA00001", "SMANUFACTURER": "Lenovo", "SMODEL": "ThinkPad T14", "TYPE": "10"}],
+              "networks": [{"DESCRIPTION": "eth0", "MACADDR": "00:11:44:00:00:01", "IPADDRESS": "10.62.0.21", "STATUS": "Up", "VIRTUALDEV": "0"}]
+            },
+            "402": {
+              "hardware": {"ID": "402", "DEVICEID": "sw-b-2026-04-02-09-00-00", "NAME": "sw-b", "OSNAME": "Ubuntu 24.04", "IPADDR": "10.62.0.22", "LASTCOME": "2026-08-15 05:01:00"},
+              "bios": [{"SSN": "SWB00002", "SMANUFACTURER": "Dell Inc.", "SMODEL": "OptiPlex 7010", "TYPE": "3"}],
+              "networks": [{"DESCRIPTION": "eth0", "MACADDR": "00:11:44:00:00:02", "IPADDRESS": "10.62.0.22", "STATUS": "Up", "VIRTUALDEV": "0"}]
+            },
+            "403": {
+              "hardware": {"ID": "403", "DEVICEID": "sw-c-2026-04-03-09-00-00", "NAME": "sw-c", "OSNAME": "Ubuntu 24.04", "IPADDR": "10.62.0.23", "LASTCOME": "2026-08-15 05:02:00"},
+              "bios": [{"SSN": "SWC00003", "SMANUFACTURER": "Dell Inc.", "SMODEL": "OptiPlex 7010", "TYPE": "3"}],
+              "networks": [{"DESCRIPTION": "eth0", "MACADDR": "00:11:44:00:00:03", "IPADDRESS": "10.62.0.23", "STATUS": "Up", "VIRTUALDEV": "0"}]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "software-401",
+      "match": {"method": "GET", "path": "/ocsapi/v1/computer/401/software"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "401": {
+              "software": [
+                {"NAME": "Mozilla Firefox", "VERSION": "128.2.0", "PUBLISHER": "Mozilla", "FOLDER": "C:\\Program Files\\Mozilla Firefox", "GUID": "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}", "INSTALLDATE": "2026-07-01"},
+                {"NAME": "Mozilla Firefox", "VERSION": "128.2.0", "PUBLISHER": "Mozilla"},
+                {"NAME": "7-Zip", "VERSION": "24.08", "PUBLISHER": "Igor Pavlov", "BITSWIDTH": "64"},
+                {"NAME": "", "VERSION": "1.0"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "software-402",
+      "match": {"method": "GET", "path": "/ocsapi/v1/computer/402/software"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "402": {
+              "": [
+                {"NAME": "openssh-server", "VERSION": "1:9.6p1-3ubuntu13", "PUBLISHER": "Ubuntu Developers"}
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "ocs-inventory:127.0.0.1:401",
+      "ocs-inventory:127.0.0.1:402",
+      "ocs-inventory:127.0.0.1:403"
+    ],
+    "min_software_total": 3,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/ocsapi/v1/computer/401/software"},
+      {"method": "GET", "path": "/ocsapi/v1/computer/402/software"}
+    ],
+    "requests_absent": [
+      {"path": "/ocsapi/v1/computer/403/software"}
+    ],
+    "log_contains": [
+      "ocs-inventory: software enrichment limit of 2 reached; software was not imported for 1 computers"
+    ]
+  },
+  "invariants": {"skip": []}
+}

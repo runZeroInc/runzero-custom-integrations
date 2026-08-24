@@ -1,0 +1,120 @@
+{
+  "name": "paged",
+  "integration": "lansweeper",
+  "description": "Lansweeper pages assetResources with an opaque cursor, and the first page is the only one allowed to select `total`. Proves the walk sends page FIRST with no cursor, then re-sends the document with page NEXT carrying exactly the cursor the first response published in pagination.next, and stops when next comes back null. The second page is rate limited once first, proving post_json's retries carry it rather than the page being lost. Two sites are authorized so the per-site loop is exercised as well; the second site's cursor is different, so a walk that reused the first site's cursor would starve on an unrouted body.",
+  "kwargs": {
+    "url": "$BASE",
+    "application_identity_code": "fixture-identity-code",
+    "import_software": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "authorized-sites",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "authorizedSites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"data": {"authorizedSites": {"sites": [
+            {"id": "site-aaa111", "name": "HQ"},
+            {"id": "site-bbb222", "name": "Branch"}
+          ]}}}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "site-a-page-2-rate-limited-then-served",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "\"cursor\":\"cursor-a-2\""},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"errors": [{"message": "rate limited"}]}},
+        {
+          "status": 200,
+          "json": {"data": {"site": {"assetResources": {
+            "pagination": {"limit": 2, "current": "cursor-a-2", "next": null, "page": "NEXT"},
+            "items": [
+              {"key": "a-0003", "assetBasicInfo": {"name": "HQ-0003", "fqdn": "hq-0003.corp.example.com", "mac": "00:1A:2B:3C:5D:03", "ipAddress": "10.91.0.3", "lastSeen": "2026-02-06T10:00:00Z"}, "assetCustom": {}, "operatingSystem": {}}
+            ]
+          }}}}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "site-b-page-2",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "\"cursor\":\"cursor-b-2\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"data": {"site": {"assetResources": {
+            "pagination": {"limit": 2, "current": "cursor-b-2", "next": null, "page": "NEXT"},
+            "items": [
+              {"key": "b-0003", "assetBasicInfo": {"name": "BR-0003", "fqdn": "br-0003.corp.example.com", "mac": "00:1A:2B:3C:6D:03", "ipAddress": "10.92.0.3", "lastSeen": "2026-02-06T10:00:00Z"}, "assetCustom": {}, "operatingSystem": {}}
+            ]
+          }}}}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "site-a-page-1",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "site(id: \\\"site-aaa111\\\")"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"data": {"site": {"assetResources": {
+            "total": 3,
+            "pagination": {"limit": 2, "current": "cursor-a-1", "next": "cursor-a-2", "page": "FIRST"},
+            "items": [
+              {"key": "a-0001", "assetBasicInfo": {"name": "HQ-0001", "fqdn": "hq-0001.corp.example.com", "mac": "00:1A:2B:3C:5D:01", "ipAddress": "10.91.0.1", "lastSeen": "2026-02-06T10:00:00Z"}, "assetCustom": {}, "operatingSystem": {}},
+              {"key": "a-0002", "assetBasicInfo": {"name": "HQ-0002", "fqdn": "hq-0002.corp.example.com", "mac": "00:1A:2B:3C:5D:02", "ipAddress": "10.91.0.2", "lastSeen": "2026-02-06T10:00:00Z"}, "assetCustom": {}, "operatingSystem": {}}
+            ]
+          }}}}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "site-b-page-1",
+      "match": {"method": "POST", "path": "/api/v2/graphql", "body_contains": "site(id: \\\"site-bbb222\\\")"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"data": {"site": {"assetResources": {
+            "total": 3,
+            "pagination": {"limit": 2, "current": "cursor-b-1", "next": "cursor-b-2", "page": "FIRST"},
+            "items": [
+              {"key": "b-0001", "assetBasicInfo": {"name": "BR-0001", "fqdn": "br-0001.corp.example.com", "mac": "00:1A:2B:3C:6D:01", "ipAddress": "10.92.0.1", "lastSeen": "2026-02-06T10:00:00Z"}, "assetCustom": {}, "operatingSystem": {}},
+              {"key": "b-0002", "assetBasicInfo": {"name": "BR-0002", "fqdn": "br-0002.corp.example.com", "mac": "00:1A:2B:3C:6D:02", "ipAddress": "10.92.0.2", "lastSeen": "2026-02-06T10:00:00Z"}, "assetCustom": {}, "operatingSystem": {}}
+            ]
+          }}}}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 6,
+    "ids": [
+      "lansweeper:site-aaa111:a-0001",
+      "lansweeper:site-aaa111:a-0003",
+      "lansweeper:site-bbb222:b-0001",
+      "lansweeper:site-bbb222:b-0003"
+    ],
+    "request_count": 6,
+    "log_contains": [
+      "reported 3 of 3 assets from site HQ (site-aaa111)",
+      "reported 3 of 3 assets from site Branch (site-bbb222)"
+    ],
+    "requests_include": [
+      {"method": "POST", "body_contains": "\"cursor\":\"cursor-a-2\""},
+      {"method": "POST", "body_contains": "\"cursor\":\"cursor-b-2\""},
+      {"method": "POST", "body_contains": "\"page\":\"FIRST\""}
+    ],
+    "requests_absent": [
+      {"body_contains": "\"cursor\":\"cursor-a-1\""},
+      {"body_contains": "\"cursor\":\"cursor-b-1\""}
+    ]
+  },
+  "invariants": {"skip": []}
+}

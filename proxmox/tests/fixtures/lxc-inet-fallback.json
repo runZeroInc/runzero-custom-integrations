@@ -1,0 +1,300 @@
+{
+  "name": "lxc-inet-fallback",
+  "integration": "proxmox",
+  "description": "Older PVE container addressing. On 7.x through 8.1 the /lxc/{vmid}/interfaces endpoint carries no ip-addresses array; each interface reports inet/inet6 as CIDR strings. Container 300 proves the fallback: its eth0 has inet 10.77.30.5/24 and a link-local inet6, and the asset must carry the parsed 10.77.30.5 with the fe80 filtered - previously the whole container imported hostname-only on these releases. Container 301 proves the MAC-only case: its eth0 reports a hardware address but no addresses at all, and the NetworkInterface must still be emitted, because a known MAC is a correlator on its own - previously the NIC was dropped unless external IPs were parsed alongside it. namespaced_ids is skipped for the same reason as the other proxmox scenarios: the cluster name IS the scope, which the invariant heuristic cannot recognize.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "runzero@pam!inventory",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "version",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/version"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "release": "8.1",
+              "version": "8.1.4",
+              "repoid": "def456"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-status",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/status"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "type": "cluster",
+                "name": "lab-cluster",
+                "id": "cluster",
+                "nodes": 1,
+                "quorate": 1,
+                "version": 1
+              },
+              {
+                "type": "node",
+                "name": "pve1",
+                "id": "node/pve1",
+                "online": 1,
+                "local": 1,
+                "nodeid": 1,
+                "ip": "10.77.0.2",
+                "level": ""
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-config",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/config/nodes"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "node": "pve1",
+                "ring0_addr": "10.77.0.2",
+                "nodeid": 1,
+                "quorum_votes": 1
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cluster-resources",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/cluster/resources"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "type": "node",
+                "node": "pve1",
+                "id": "node/pve1",
+                "status": "online",
+                "uptime": 421000,
+                "maxmem": 68719476736,
+                "maxcpu": 16
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "qemu-list",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/qemu"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "lxc-list",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "vmid": 300,
+                "name": "files01",
+                "status": "running",
+                "maxmem": 4294967296,
+                "cpus": 2,
+                "type": "lxc"
+              },
+              {
+                "vmid": 301,
+                "name": "quiet01",
+                "status": "running",
+                "maxmem": 536870912,
+                "cpus": 1,
+                "type": "lxc"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ct-300-config",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/300/config"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "hostname": "files01.lab.example.com",
+              "ostype": "debian",
+              "arch": "amd64",
+              "memory": 4096
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ct-300-interfaces",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/300/interfaces"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "name": "lo",
+                "hwaddr": "00:00:00:00:00:00",
+                "inet": "127.0.0.1/8",
+                "inet6": "::1/128"
+              },
+              {
+                "name": "eth0",
+                "hwaddr": "BC:24:11:AA:00:01",
+                "inet": "10.77.30.5/24",
+                "inet6": "fe80::be24:11ff:feaa:1/64"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ct-301-config",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/301/config"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "hostname": "quiet01.lab.example.com",
+              "ostype": "alpine",
+              "arch": "amd64",
+              "memory": 512
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "ct-301-interfaces",
+      "match": {
+        "method": "GET",
+        "path": "/api2/json/nodes/pve1/lxc/301/interfaces"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "name": "eth0",
+                "hwaddr": "BC:24:11:AA:00:02"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "data": null
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "lab-cluster-node-pve1",
+      "lab-cluster-ct-300",
+      "lab-cluster-ct-301"
+    ],
+    "assets": [
+      {
+        "id": "lab-cluster-ct-300",
+        "fields": {
+          "hostnames": "files01.lab.example.com",
+          "macAddresses": "bc:24:11:aa:00:01",
+          "ipAddresses": "10.77.30.5"
+        }
+      },
+      {
+        "id": "lab-cluster-ct-301",
+        "fields": {
+          "hostnames": "quiet01.lab.example.com",
+          "macAddresses": "bc:24:11:aa:00:02"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      }
+    ],
+    "log_contains": [
+      "reported 3 assets"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

@@ -1,12 +1,16 @@
-# Copyright 2026 runZero, Inc. Available under the MIT License
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
 
 CONFIG = {
     "id": "runzero-kubernetes",
     "name": "Kubernetes",
     "type": "inbound",
-    "description": "Imports nodes, pods, and services from a Kubernetes cluster.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "description": "Imports nodes, LoadBalancer/NodePort services, and optionally pods from a Kubernetes cluster.",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
+    # Backstop for the chunked LIST walks below: at 500 objects per page this
+    # is the repo-wide ten-million-record target per collection.
+    "maxPages": 20000,
     "params": [
         {
             "key": "url",
@@ -29,6 +33,14 @@ CONFIG = {
             "default": True,
         },
         {
+            "key": "include_pods",
+            "label": "Import pods",
+            "type": "bool",
+            "required": False,
+            "default": False,
+            "description": "Import every pod as an asset, with its container images as software. Off by default: a cluster holds far more pods than nodes, and a pod is replaced on every rollout, so each deployment mints new assets.",
+        },
+        {
             "key": "request_timeout",
             "label": "Request timeout (seconds)",
             "type": "int",
@@ -48,13 +60,15 @@ CONFIG = {
 # Pulls cluster Nodes from the Kubernetes API server and converts each
 # Node into a runZero ImportAsset. Optionally also pulls Services of
 # type LoadBalancer / NodePort and emits them as additional assets so
-# that exposed ingress IPs show up in inventory.
+# that exposed ingress IPs show up in inventory, and Pods with their
+# container images as Software.
 #
 # Credentials (runZero "Custom Integration Script Secrets"):
 #   url           : Kubernetes API server URL, e.g.
 #                   https://kubernetes.example.com:6443
 #   bearer_token  : ServiceAccount bearer token with at least
-#                   `get`/`list` on nodes (and services, if enabled).
+#                   `get`/`list` on nodes (and services and pods, if
+#                   those imports are enabled).
 #
 # To create a token:
 #   kubectl create serviceaccount runzero -n kube-system
@@ -66,21 +80,30 @@ CONFIG = {
 # Many on-prem clusters present a self-signed apiserver certificate.
 # Use the tls_disable_validation parameter only when you trust the network path.
 
-load("runzero.types", "ImportAsset", "to_custom_attributes")
+load("runzero.types", "ImportAsset", "Software", "to_custom_attributes")
 load("net", "network_interface")
 load("http", "get_json", "bearer")
 load("kwargs", "get_bool", "get_int", "get_http_options")
 
 # --- Defaults ---
 DEFAULT_INCLUDE_LOADBALANCER_SERVICES = True
+DEFAULT_INCLUDE_PODS = False
 DEFAULT_REQUEST_TIMEOUT = 300
+
+# ImportAsset caps software, services and vulnerabilities at 99 per asset.
+MAX_SOFTWARE_PER_ASSET = 99
+
+# Objects requested per LIST page. The Kubernetes API supports chunked lists
+# via limit/continue; without them the whole pod list of a large cluster
+# arrives as one decoded response and can exhaust the script's memory ceiling.
+LIST_PAGE_LIMIT = 500
 
 
 def _log(msg):
-    print("[KUBERNETES] " + msg)
+    print("kubernetes: " + msg)
 
 
-def _api_get(base_url, path, token, timeout_seconds, config_kwargs):
+def _api_get(base_url, path, token, timeout_seconds, config_kwargs, params):
     url = base_url.rstrip("/") + path
     headers = {
         "Authorization": bearer(token),
@@ -88,9 +111,72 @@ def _api_get(base_url, path, token, timeout_seconds, config_kwargs):
     }
     return get_json(
         url,
+        params=params,
         timeout=timeout_seconds,
         **get_http_options(config_kwargs, headers=headers)
     )
+
+
+def _collect(base_url, path, token, timeout_seconds, config_kwargs,
+             convert, kind, label):
+    """Walk one collection in limit/continue chunks, reporting each asset as
+    it is built so nothing accumulates, and TALLYING the drops.
+
+    A record with no metadata.uid has no stable identity, so it cannot be
+    imported. Logging each one costs a line per record on a large cluster, so
+    the count is what gets reported and one name is carried along for
+    diagnosis. Returns (imported, err); err ends the walk with whatever was
+    already reported standing.
+    """
+    imported = 0
+    skipped = 0
+    malformed = 0
+    first_skipped = ""
+    cont = ""
+    p = pager(label)
+    while p.next():
+        params = {"limit": str(LIST_PAGE_LIMIT)}
+        if cont:
+            params["continue"] = cont
+        resp, err = _api_get(base_url, path, token, timeout_seconds,
+                             config_kwargs, params)
+        if err:
+            return imported, err
+        if type(resp) != "dict":
+            resp = {}
+        items = resp.get("items")
+        if type(items) != "list":
+            items = []
+        for item in items:
+            if type(item) != "dict":
+                malformed += 1
+                continue
+            meta = item.get("metadata")
+            if type(meta) != "dict":
+                meta = {}
+            if not meta.get("uid"):
+                skipped += 1
+                if skipped == 1:
+                    first_skipped = str(meta.get("name", ""))
+                continue
+            asset = convert(item)
+            # A None from the converter here is a deliberate filter -- a
+            # ClusterIP-only Service, say -- not a defect, so it is not
+            # tallied as a skip. Only the identity gate above counts.
+            imported += report_asset(asset)
+        list_meta = resp.get("metadata")
+        if type(list_meta) != "dict":
+            list_meta = {}
+        cont = str(list_meta.get("continue") or "")
+        if not cont:
+            break
+    _log("imported {} {}".format(imported, kind))
+    if skipped > 0:
+        _log("skipped {} {} with no metadata.uid (first name: {})".format(
+            skipped, kind, first_skipped))
+    if malformed > 0:
+        _log("skipped {} non-object {} records".format(malformed, kind))
+    return imported, None
 
 
 def _node_to_asset(node):
@@ -176,14 +262,17 @@ def _service_to_asset(svc):
     ips = []
     hostnames = []
 
-    # ClusterIP(s)
-    cluster_ips = spec.get("clusterIPs") or []
-    for ip in cluster_ips:
-        if ip and ip != "None":
-            ips.append(ip)
+    # ClusterIPs are deliberately NOT placed on the network interface. They are
+    # allocated from the cluster's service CIDR, which defaults to the same
+    # range on virtually every install, so the same address identifies a
+    # different Service in every cluster: importing two clusters would IP-match
+    # kube-dns in one onto kube-dns in the other and merge them. They are also
+    # not reachable from outside the cluster, so they are of little use as a
+    # correlation signal even when unique. Both values are kept as custom
+    # attributes below. Only genuinely routable LoadBalancer ingress addresses
+    # reach the interface.
     cluster_ip = spec.get("clusterIP")
-    if cluster_ip and cluster_ip != "None" and cluster_ip not in ips:
-        ips.append(cluster_ip)
+    cluster_ips = spec.get("clusterIPs") or []
 
     # LoadBalancer ingress
     lb = status.get("loadBalancer") or {}
@@ -214,6 +303,7 @@ def _service_to_asset(svc):
         "k8s.service.type":              svc_type,
         "k8s.service.creation_timestamp": meta.get("creationTimestamp"),
         "k8s.service.cluster_ip":        cluster_ip,
+        "k8s.service.cluster_ips":       cluster_ips,
         "k8s.service.external_name":     spec.get("externalName"),
         "k8s.service.session_affinity":  spec.get("sessionAffinity"),
         "k8s.service.ports":             spec.get("ports"),
@@ -231,45 +321,192 @@ def _service_to_asset(svc):
     )
 
 
+def _pod_software(spec, status):
+    """Return the container images of one pod as Software records.
+
+    The image is the closest thing a cluster has to a software inventory and is
+    the join key against any container-image scanner, so it is the part of a Pod
+    worth importing. `status.containerStatuses` is preferred over `spec` because
+    it reports the image the kubelet actually resolved and pulled, including the
+    digest, where the spec may name only a floating tag."""
+    resolved = {}
+    for cs in (status.get("containerStatuses") or []) + (status.get("initContainerStatuses") or []):
+        if type(cs) != "dict":
+            continue
+        name = str(cs.get("name", "") or "")
+        if name:
+            resolved[name] = cs
+
+    software = []
+    containers = (spec.get("containers") or []) + (spec.get("initContainers") or [])
+    for container in containers:
+        if type(container) != "dict":
+            continue
+        name = str(container.get("name", "") or "")
+        image = str(container.get("image", "") or "")
+        cs = resolved.get(name) or {}
+        if cs.get("image"):
+            image = str(cs.get("image"))
+        if not image:
+            continue
+
+        # An image reference is <registry>/<repository>:<tag>, and the registry
+        # host may itself carry a :port -- so the tag is whatever follows the
+        # LAST colon, and only when no "/" appears after it. A digest reference
+        # (...@sha256:...) has no tag at all.
+        product = image
+        version = ""
+        at = image.rfind("@")
+        if at > 0:
+            version = image[at + 1:]
+            product = image[:at]
+        colon = product.rfind(":")
+        if colon > 0 and product.find("/", colon) < 0:
+            if not version:
+                version = product[colon + 1:]
+            product = product[:colon]
+
+        software.append(Software(
+            id=image,
+            product=product,
+            version=version,
+            customAttributes=to_custom_attributes({
+                "k8s.container.name":          name,
+                "k8s.container.image":         image,
+                "k8s.container.image_id":      cs.get("imageID"),
+                "k8s.container.ready":         cs.get("ready"),
+                "k8s.container.restart_count": cs.get("restartCount"),
+                "k8s.container.started":       cs.get("started"),
+            }),
+        ))
+        if len(software) >= MAX_SOFTWARE_PER_ASSET:
+            break
+    return software
+
+
+def _pod_to_asset(pod):
+    """Build one ImportAsset from a Pod object, or None when it must be skipped.
+
+    IDENTITY. `metadata.uid` is the documented stable key -- "a unique in time
+    and space value" minted by the API server -- and it is stable for as long as
+    the object exists, which is exactly as long as the asset it describes exists.
+    A rollout replaces the pod and therefore mints a new asset; that is
+    semantically right (it genuinely is a different pod) and is why this import
+    is off by default.
+
+    ADDRESSING. A pod IP is deliberately NOT placed on a network interface, for
+    the same reason ClusterIPs are excluded from Service assets above, only more
+    so: pod addresses come from the cluster pod CIDR, which defaults to the same
+    range on virtually every install, AND they are recycled within a single
+    cluster within minutes of a pod exiting. Importing them would IP-match a pod
+    in one cluster onto an unrelated pod in another, and a dead pod onto its
+    replacement. `status.hostIP` is worse still -- it is the NODE's address, so
+    it would merge every pod on a node into the node itself. Both are kept as
+    custom attributes.
+
+    So a pod correlates on a synthesized `<name>.<namespace>.pod` hostname, the
+    same shape the Service path uses. The pod's own `metadata.name` is
+    deliberately not imported as a bare hostname: a StatefulSet names its pods
+    `web-0`, `db-1`, which would collide with real hosts of those names."""
+    meta = pod.get("metadata") or {}
+    spec = pod.get("spec") or {}
+    status = pod.get("status") or {}
+
+    pod_uid = meta.get("uid")
+    if not pod_uid:
+        return None
+
+    name = str(meta.get("name", "") or "")
+    namespace = str(meta.get("namespace", "") or "")
+    fqdn = "{}.{}.pod".format(name, namespace) if name and namespace else name
+
+    owners = []
+    for owner in meta.get("ownerReferences") or []:
+        if type(owner) != "dict":
+            continue
+        kind = str(owner.get("kind", "") or "")
+        owner_name = str(owner.get("name", "") or "")
+        if kind and owner_name:
+            owners.append(kind + "/" + owner_name)
+
+    restarts = 0
+    for cs in status.get("containerStatuses") or []:
+        if type(cs) == "dict" and type(cs.get("restartCount")) == "int":
+            restarts += cs.get("restartCount")
+
+    attrs = to_custom_attributes({
+        "k8s.pod.name":               name,
+        "k8s.pod.namespace":          namespace,
+        "k8s.pod.uid":                pod_uid,
+        "k8s.pod.creation_timestamp": meta.get("creationTimestamp"),
+        "k8s.pod.node_name":          spec.get("nodeName"),
+        "k8s.pod.host_network":       spec.get("hostNetwork", False),
+        "k8s.pod.service_account":    spec.get("serviceAccountName"),
+        "k8s.pod.priority_class":     spec.get("priorityClassName"),
+        "k8s.pod.restart_policy":     spec.get("restartPolicy"),
+        "k8s.pod.phase":              status.get("phase"),
+        "k8s.pod.qos_class":          status.get("qosClass"),
+        "k8s.pod.start_time":         status.get("startTime"),
+        "k8s.pod.pod_ip":             status.get("podIP"),
+        "k8s.pod.pod_ips":            status.get("podIPs"),
+        "k8s.pod.host_ip":            status.get("hostIP"),
+        "k8s.pod.owners":             owners,
+        "k8s.pod.restart_count":      restarts,
+        "k8s.pod.labels":             meta.get("labels"),
+    }, list_join="json")
+
+    return ImportAsset(
+        id="k8s-pod-" + pod_uid,
+        hostnames=[fqdn],
+        networkInterfaces=[],
+        deviceType="Kubernetes Pod",
+        tags=["kubernetes", "k8s-pod"],
+        software=_pod_software(spec, status),
+        customAttributes=attrs,
+    )
+
+
 def main(*args, **kwargs):
     base_url = kwargs.get("url", "")
     token = kwargs.get("bearer_token", "")
     include_loadbalancer_services = get_bool(kwargs, "include_loadbalancer_services", DEFAULT_INCLUDE_LOADBALANCER_SERVICES)
+    include_pods = get_bool(kwargs, "include_pods", DEFAULT_INCLUDE_PODS)
     timeout_seconds = get_int(kwargs, "request_timeout", DEFAULT_REQUEST_TIMEOUT)
 
     if not base_url:
-        _log("ERROR: url (Kubernetes API server URL) is required.")
+        _log("url (Kubernetes API server URL) is required")
         return []
     if not token:
-        _log("ERROR: bearer_token (ServiceAccount bearer token) is required.")
+        _log("bearer_token (ServiceAccount bearer token) is required")
         return []
 
-    assets = []
+    # Each collection is walked in limit/continue chunks and every asset is
+    # reported as it is built, so neither a decoded LIST response nor the
+    # ImportAsset set is ever resident whole.
+    total = 0
 
-    nodes_resp, err = _api_get(base_url, "/api/v1/nodes", token, timeout_seconds, kwargs)
+    imported, err = _collect(base_url, "/api/v1/nodes", token, timeout_seconds,
+                             kwargs, _node_to_asset, "nodes", "k8s-nodes")
+    total += imported
     if err:
-        _log("ERROR: failed to list nodes: " + err)
-        return []
-    for node in (nodes_resp or {}).get("items", []):
-        a = _node_to_asset(node)
-        if a:
-            assets.append(a)
-    _log("nodes: imported {} asset(s)".format(len(assets)))
+        _log("failed to list nodes: " + err)
+        return None
 
     if include_loadbalancer_services:
-        svc_count = 0
-        svcs_resp, err = _api_get(base_url, "/api/v1/services", token, timeout_seconds, kwargs)
+        imported, err = _collect(base_url, "/api/v1/services", token,
+                                 timeout_seconds, kwargs, _service_to_asset,
+                                 "services", "k8s-services")
+        total += imported
         if err:
-            _log("WARN: failed to list services: " + err)
-        else:
-            for svc in (svcs_resp or {}).get("items", []):
-                a = _service_to_asset(svc)
-                if a:
-                    assets.append(a)
-                    svc_count += 1
-            _log("services: imported {} asset(s)".format(svc_count))
+            _log("failed to list services: " + err)
 
-    # Stream assets to runZero via report_assets instead of returning a list.
-    reported = report_assets(assets)
-    _log("SUCCESS: reported {} ImportAsset(s)".format(reported))
+    if include_pods:
+        imported, err = _collect(base_url, "/api/v1/pods", token,
+                                 timeout_seconds, kwargs, _pod_to_asset,
+                                 "pods", "k8s-pods")
+        total += imported
+        if err:
+            _log("failed to list pods: " + err)
+
+    _log("reported {} assets".format(total))
     return None

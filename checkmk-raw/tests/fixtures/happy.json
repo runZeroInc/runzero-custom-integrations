@@ -1,0 +1,350 @@
+{
+  "name": "happy",
+  "integration": "checkmk-raw",
+  "description": "The full two-request shape of a Checkmk site: the configuration collection is read first and indexed, then the monitoring query streams every host with its mk_inventory tree attached. Proves the three cases that matter and that a real site always mixes. web01.example.com is fully inventoried, so its MAC comes from hardware.nwadapter, its serial and chassis from hardware.system, its OS from software.os, and two packages from software.packages; its alias is free text and must NOT become a hostname. db01 has never produced an inventory, so its only interface is built from the address Checkmk polls, and its alias IS hostname-shaped and must become a second name. staged01 exists in the configuration and not in the monitoring core -- a host added in the Setup whose changes were never activated -- and is imported from the configuration alone rather than dropped. Payload structure is taken from Checkmk 2.3 source: the collection envelope from constructors.collection_object/domain_object, the configuration extensions from host_config.serialize_host, the monitoring extensions from host._host_object (the raw Livestatus column dict), and the inventory tree from the SDRawTree TypedDict in structured_data.py with the capitalized on-disk reserved keys. Every key name is confirmed against the display hints in inv_hints.py. All data is synthetic.",
+  "kwargs": {
+    "url": "$BASE",
+    "site": "mysite",
+    "username": "automation",
+    "password": "fixture-automation-secret",
+    "collect_inventory": "true",
+    "collect_software": "true"
+  },
+  "routes": [
+    {
+      "name": "host_config",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host_config/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host_config",
+            "links": [{"rel": "self", "href": "https://checkmk.example.com/mysite/check_mk/api/1.0/domain-types/host_config/collections/all", "method": "GET", "type": "application/json", "domainType": "link"}],
+            "extensions": {},
+            "value": [
+              {
+                "domainType": "host_config",
+                "id": "web01.example.com",
+                "title": "Web front end, rack 4",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "folder": "/servers",
+                  "attributes": {
+                    "ipaddress": "192.0.2.11",
+                    "alias": "Web front end, rack 4",
+                    "tag_criticality": "prod",
+                    "labels": {"cmk/os_family": "linux"}
+                  },
+                  "effective_attributes": {
+                    "ipaddress": "192.0.2.11",
+                    "alias": "Web front end, rack 4",
+                    "tag_criticality": "prod",
+                    "tag_agent": "cmk-agent",
+                    "tag_address_family": "ip-v4-only",
+                    "tag_snmp_ds": "no-snmp",
+                    "labels": {"cmk/os_family": "linux"},
+                    "network_scan": null,
+                    "parents": []
+                  },
+                  "is_cluster": false,
+                  "is_offline": false,
+                  "cluster_nodes": null
+                }
+              },
+              {
+                "domainType": "host_config",
+                "id": "db01",
+                "title": "db01.example.com",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "folder": "/servers",
+                  "attributes": {
+                    "ipaddress": "192.0.2.21",
+                    "alias": "db01.example.com",
+                    "tag_criticality": "prod"
+                  },
+                  "effective_attributes": {
+                    "ipaddress": "192.0.2.21",
+                    "alias": "db01.example.com",
+                    "tag_criticality": "prod",
+                    "tag_agent": "cmk-agent",
+                    "tag_address_family": "ip-v4-only",
+                    "tag_snmp_ds": "no-snmp",
+                    "labels": {},
+                    "parents": []
+                  },
+                  "is_cluster": false,
+                  "is_offline": false,
+                  "cluster_nodes": null
+                }
+              },
+              {
+                "domainType": "host_config",
+                "id": "staged01",
+                "title": "staged01",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "folder": "/staging",
+                  "attributes": {
+                    "ipaddress": "192.0.2.31",
+                    "tag_criticality": "test"
+                  },
+                  "effective_attributes": {
+                    "ipaddress": "192.0.2.31",
+                    "tag_criticality": "test",
+                    "tag_agent": "cmk-agent",
+                    "tag_address_family": "ip-v4-only",
+                    "tag_snmp_ds": "no-snmp",
+                    "labels": {},
+                    "parents": []
+                  },
+                  "is_cluster": false,
+                  "is_offline": false,
+                  "cluster_nodes": null
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "host_status",
+      "match": {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "host",
+            "domainType": "host",
+            "links": [{"rel": "self", "href": "https://checkmk.example.com/mysite/check_mk/api/1.0/domain-types/host/collections/all", "method": "GET", "type": "application/json", "domainType": "link"}],
+            "extensions": {},
+            "value": [
+              {
+                "domainType": "host",
+                "id": "web01.example.com",
+                "title": "web01.example.com",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "name": "web01.example.com",
+                  "address": "192.0.2.11",
+                  "alias": "Web front end, rack 4",
+                  "state": 0,
+                  "state_type": 1,
+                  "hard_state": 0,
+                  "has_been_checked": 1,
+                  "last_check": 1755300000,
+                  "last_state_change": 1755200000,
+                  "last_time_up": 1755300000,
+                  "check_command": "check-mk-host-ping",
+                  "filename": "/wato/servers/hosts.mk",
+                  "groups": ["linux", "web"],
+                  "labels": {"cmk/os_family": "linux", "role": "web"},
+                  "tags": {"criticality": "prod", "agent": "cmk-agent", "address_family": "ip-v4-only", "snmp_ds": "no-snmp"},
+                  "num_services": 42,
+                  "num_services_ok": 40,
+                  "num_services_crit": 1,
+                  "num_services_warn": 1,
+                  "num_services_unknown": 0,
+                  "mk_inventory": {
+                    "Attributes": {},
+                    "Table": {},
+                    "Nodes": {
+                      "hardware": {
+                        "Attributes": {},
+                        "Table": {},
+                        "Nodes": {
+                          "system": {
+                            "Attributes": {"Pairs": {"manufacturer": "Dell Inc.", "product": "PowerEdge R640", "serial": "FIXT1234", "description": "Rack Mount Chassis", "family": "PowerEdge", "expresscode": "00000000000"}},
+                            "Table": {},
+                            "Nodes": {}
+                          },
+                          "cpu": {
+                            "Attributes": {"Pairs": {"model": "Intel(R) Xeon(R) Silver 4210R CPU @ 2.40GHz", "vendor": "intel", "cores": 20, "threads": 40, "max_speed": 2400000000.0}},
+                            "Table": {},
+                            "Nodes": {}
+                          },
+                          "memory": {
+                            "Attributes": {"Pairs": {"total_ram_usable": 67430793216, "total_swap": 4294963200}},
+                            "Table": {},
+                            "Nodes": {}
+                          },
+                          "nwadapter": {
+                            "Attributes": {},
+                            "Table": {
+                              "KeyColumns": ["name"],
+                              "Rows": [
+                                {"name": "eno1", "type": "Ethernet", "macaddress": "00:0A:F7:11:22:33", "speed": 1000000000, "ipv4_address": "192.0.2.11", "ipv4_subnet": "192.0.2.0/24", "gateway": "192.0.2.1"}
+                              ]
+                            },
+                            "Nodes": {}
+                          }
+                        }
+                      },
+                      "software": {
+                        "Attributes": {},
+                        "Table": {},
+                        "Nodes": {
+                          "os": {
+                            "Attributes": {"Pairs": {"name": "Ubuntu 22.04.4 LTS", "version": "22.04", "vendor": "Canonical", "type": "linux", "arch": "x86_64", "kernel_version": "5.15.0-105-generic", "install_date": 1700000000}},
+                            "Table": {},
+                            "Nodes": {}
+                          },
+                          "bios": {
+                            "Attributes": {"Pairs": {"vendor": "Dell Inc.", "version": "2.15.1", "date": 1690000000}},
+                            "Table": {},
+                            "Nodes": {}
+                          },
+                          "packages": {
+                            "Attributes": {},
+                            "Table": {
+                              "KeyColumns": ["name"],
+                              "Rows": [
+                                {"name": "openssh-server", "version": "1:8.9p1-3ubuntu0.10", "vendor": "Ubuntu Developers", "arch": "amd64", "package_type": "deb", "summary": "secure shell (SSH) server", "install_date": 1700000000, "size": 1789952, "path": "/"},
+                                {"name": "nginx-core", "version": "1.18.0-6ubuntu14.4", "vendor": "Ubuntu Developers", "arch": "amd64", "package_type": "deb", "summary": "nginx web server", "install_date": 1700000000, "size": 4325376, "path": "/"}
+                              ]
+                            },
+                            "Nodes": {}
+                          }
+                        }
+                      },
+                      "networking": {
+                        "Attributes": {},
+                        "Table": {},
+                        "Nodes": {
+                          "addresses": {
+                            "Attributes": {},
+                            "Table": {
+                              "KeyColumns": ["address"],
+                              "Rows": [
+                                {"address": "192.0.2.11", "device": "eno1", "type": "ipv4"}
+                              ]
+                            },
+                            "Nodes": {}
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "domainType": "host",
+                "id": "db01",
+                "title": "db01",
+                "links": [],
+                "members": {},
+                "extensions": {
+                  "name": "db01",
+                  "address": "192.0.2.21",
+                  "alias": "db01.example.com",
+                  "state": 0,
+                  "state_type": 1,
+                  "hard_state": 0,
+                  "has_been_checked": 1,
+                  "last_check": 1755300060,
+                  "last_state_change": 1755200060,
+                  "last_time_up": 1755300060,
+                  "check_command": "check-mk-host-ping",
+                  "filename": "/wato/servers/hosts.mk",
+                  "groups": ["linux"],
+                  "labels": {},
+                  "tags": {"criticality": "prod", "agent": "cmk-agent"},
+                  "num_services": 12,
+                  "num_services_ok": 12,
+                  "num_services_crit": 0,
+                  "num_services_warn": 0,
+                  "num_services_unknown": 0,
+                  "mk_inventory": {}
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "request_count": 2,
+    "ids": [
+      "checkmk:$HOST:mysite:web01.example.com",
+      "checkmk:$HOST:mysite:db01",
+      "checkmk:$HOST:mysite:staged01"
+    ],
+    "assets": [
+      {
+        "id": "checkmk:$HOST:mysite:web01.example.com",
+        "fields": {
+          "hostnames": "web01.example.com",
+          "deviceType": "Server",
+          "os": "Ubuntu 22.04.4 LTS",
+          "osVersion": "22.04",
+          "manufacturer": "Dell Inc.",
+          "model": "PowerEdge R640",
+          "ipAddresses": "192.0.2.11",
+          "macAddresses": "00:0a:f7:11:22:33",
+          "checkmk_site": "mysite",
+          "checkmk_system_serial": "FIXT1234",
+          "checkmk_inventory_present": "true",
+          "checkmk_monitored": "true",
+          "checkmk_state": "up",
+          "checkmk_os_kernel_version": "5.15.0-105-generic",
+          "checkmk_cpu_vendor": "intel",
+          "checkmk_bios_version": "2.15.1",
+          "checkmk_host_tag_criticality": "prod",
+          "checkmk_folder": "/servers"
+        }
+      },
+      {
+        "id": "checkmk:$HOST:mysite:db01",
+        "fields": {
+          "hostnames": "db01\tdb01.example.com",
+          "ipAddresses": "192.0.2.21",
+          "checkmk_inventory_present": "false",
+          "checkmk_monitored": "true",
+          "checkmk_state": "up"
+        },
+        "fields_absent": ["macAddresses", "os", "manufacturer", "model"]
+      },
+      {
+        "id": "checkmk:$HOST:mysite:staged01",
+        "fields": {
+          "hostnames": "staged01",
+          "ipAddresses": "192.0.2.31",
+          "checkmk_monitored": "false",
+          "checkmk_folder": "/staging"
+        },
+        "fields_absent": ["macAddresses", "os"]
+      }
+    ],
+    "min_software_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host_config/collections/all", "query_contains": "effective_attributes=true"},
+      {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all", "query_contains": "columns=mk_inventory"},
+      {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all", "query_contains": "columns=name"},
+      {"method": "GET", "path": "/mysite/check_mk/api/1.0/domain-types/host/collections/all", "query_contains": "columns=labels"},
+      {"header_contains": "Bearer automation fixture-automation-secret"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/domain-types/service/"},
+      {"query_contains": "columns=mk_inventory&columns=mk_inventory"}
+    ],
+    "log_contains": [
+      "checkmk: read configuration for 3 hosts",
+      "checkmk: 1 hosts are configured but not yet monitored",
+      "checkmk: 1 hosts have no HW/SW inventory yet",
+      "checkmk: reported 3 hosts"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

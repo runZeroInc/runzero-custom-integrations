@@ -1,0 +1,69 @@
+{
+  "name": "auth-refresh",
+  "integration": "open-audit",
+  "description": "A CodeIgniter session that expires mid-run. Open-AudIT does not answer 401 on a data path when the session has gone: its session filter issues a redirect to /index.php/logon, the HTTP client follows it, and the login page arrives as a 200 carrying HTML. That is indistinguishable from success by status code alone, and the response struct exposes no final URL, so the only available signal is that a 200 failed to decode as JSON. This scenario serves exactly that -- an HTML login page with status 200 -- on the first collection request, and proves the run logs in again and completes rather than reporting an empty inventory. Asserts the login endpoint is called twice, that the second collection request carries the new cookie rather than the first, and that all three devices still import.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collect_interfaces": "false",
+    "collect_software": "false"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-session-first; Path=/"}, "json": {"id": "3", "name": "runzero"}},
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-session-second; Path=/"}, "json": {"id": "3", "name": "runzero"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/html; charset=UTF-8"},
+          "text": "<!DOCTYPE html><html><head><title>Open-AudIT</title></head><body><form action=\"/open-audit/index.php/logon\" method=\"post\"><input name=\"username\"><input name=\"password\" type=\"password\"></form></body></html>"
+        },
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 500, "offset": 0, "total": 3, "filtered": 3},
+            "included": [],
+            "logs": [],
+            "data": [
+              {"id": 301, "type": "devices", "attributes": {"id": 301, "name": "after-relogin-a", "ip": "203.0.113.11", "type": "computer", "class": "server", "os_name": "Rocky Linux 9.4", "last_seen": "2026-08-15 06:00:00"}},
+              {"id": 302, "type": "devices", "attributes": {"id": 302, "name": "after-relogin-b", "ip": "203.0.113.12", "type": "firewall", "manufacturer": "Fortinet", "model": "FortiGate-60F", "last_seen": "2026-08-15 06:01:00"}},
+              {"id": 303, "type": "devices", "attributes": {"id": 303, "name": "after-relogin-c", "ip": "203.0.113.13", "type": "access point", "manufacturer": "Ubiquiti Inc.", "model": "U6-Pro", "last_seen": "2026-08-15 06:02:00"}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": ["open-audit:$HOST:301", "open-audit:$HOST:302", "open-audit:$HOST:303"],
+    "assets": [
+      {"id": "open-audit:$HOST:302", "fields": {"deviceType": "Firewall"}},
+      {"id": "open-audit:$HOST:303", "fields": {"deviceType": "Wireless Access Point"}}
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path": "/open-audit/index.php/logon"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "header_contains": "fixture-session-first"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "header_contains": "fixture-session-second"}
+    ],
+    "log_contains": [
+      "open-audit: session rejected, logging in again",
+      "open-audit: imported 3 devices, 0 with detail"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

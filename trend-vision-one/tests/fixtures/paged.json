@@ -1,0 +1,88 @@
+{
+  "name": "paged",
+  "integration": "trend-vision-one",
+  "description": "Follows an ON-HOST nextLink to a second page - the one code path no other scenario exercised. nextLink is an absolute URL that already carries the paging cursor in its query string, and the follow must pass NO params: passing params (even an empty dict) replaces that query string and silently restarts pagination at page 1. The first-page route answers only requests carrying top= and errors if called twice, so a regression that clobbers the cursor fails loudly here on request_count and the missing page-2 asset rather than passing vacuously. The page-2 route matches on the skipToken the first response minted.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "api_token": "fixture-vision-one-key",
+    "import_software": "false",
+    "fetch_interfaces": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "page-2",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "skipToken=fixture-page-2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 3,
+            "items": [
+              {
+                "agentGuid": "cccccccc-3333-4000-8000-000000000003",
+                "endpointName": "LNX-DB-03",
+                "type": "server",
+                "osName": "Ubuntu Linux 22.04",
+                "osPlatform": "linux",
+                "ipAddresses": ["10.100.1.30"]
+              }
+            ],
+            "nextLink": ""
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "page-1",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "top="},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 3,
+            "items": [
+              {
+                "agentGuid": "aaaaaaaa-1111-4000-8000-000000000001",
+                "endpointName": "WIN-APP-01",
+                "type": "server",
+                "osName": "Windows Server 2022",
+                "osPlatform": "windows",
+                "ipAddresses": ["10.100.1.10"]
+              },
+              {
+                "agentGuid": "bbbbbbbb-2222-4000-8000-000000000002",
+                "endpointName": "WIN-APP-02",
+                "type": "server",
+                "osName": "Windows Server 2022",
+                "osPlatform": "windows",
+                "ipAddresses": ["10.100.1.20"]
+              }
+            ],
+            "nextLink": "$BASE/v3.0/endpointSecurity/endpoints?skipToken=fixture-page-2"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "trend-vision-one:$HOST:aaaaaaaa-1111-4000-8000-000000000001",
+      "trend-vision-one:$HOST:bbbbbbbb-2222-4000-8000-000000000002",
+      "trend-vision-one:$HOST:cccccccc-3333-4000-8000-000000000003"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "top=2"},
+      {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "skipToken=fixture-page-2"}
+    ],
+    "log_contains": [
+      "trend-vision-one: 3 endpoints reported by the API",
+      "trend-vision-one: reported 3 endpoints"
+    ]
+  }
+}

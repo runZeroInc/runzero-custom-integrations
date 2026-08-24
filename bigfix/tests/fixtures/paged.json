@@ -1,0 +1,113 @@
+{
+  "name": "paged",
+  "integration": "bigfix",
+  "description": "The root server has no cursor: the census returns every computer id and the walk cuts them into id ranges of page_size. With five computers and page_size=2 there must be three range queries, and the second and third must carry the ids the census returned rather than re-reading the first range. The route for each range matches on the upper bound embedded in the relevance, so a walk that failed to advance would starve and the run would fail.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-operator",
+    "password": "fixture-password",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "range-201-202",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "%3C%3D%20202"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Tuple><Answer type=\"string\">201</Answer><Answer type=\"string\">NODE201</Answer><Answer type=\"string\">node201.corp.example.com</Answer><Answer type=\"string\">Win2022 10.0.20348.2527</Answer><Answer type=\"string\">10.71.0.1</Answer><Answer type=\"string\">Sun, 09 Nov 2025 01:00:00 +0000</Answer><Answer type=\"string\">00:11:22:BB:00:01</Answer><Answer type=\"string\">SN-BF-201</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple><Tuple><Answer type=\"string\">202</Answer><Answer type=\"string\">NODE202</Answer><Answer type=\"string\">node202.corp.example.com</Answer><Answer type=\"string\">Win2022 10.0.20348.2527</Answer><Answer type=\"string\">10.71.0.2</Answer><Answer type=\"string\">Sun, 09 Nov 2025 01:00:00 +0000</Answer><Answer type=\"string\">00:11:22:BB:00:02</Answer><Answer type=\"string\">SN-BF-202</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "range-203-204",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "%3C%3D%20204"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Tuple><Answer type=\"string\">203</Answer><Answer type=\"string\">NODE203</Answer><Answer type=\"string\">node203.corp.example.com</Answer><Answer type=\"string\">Win2022 10.0.20348.2527</Answer><Answer type=\"string\">10.71.0.3</Answer><Answer type=\"string\">Sun, 09 Nov 2025 01:00:00 +0000</Answer><Answer type=\"string\">00:11:22:BB:00:03</Answer><Answer type=\"string\">SN-BF-203</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple><Tuple><Answer type=\"string\">204</Answer><Answer type=\"string\">NODE204</Answer><Answer type=\"string\">node204.corp.example.com</Answer><Answer type=\"string\">Win2022 10.0.20348.2527</Answer><Answer type=\"string\">10.71.0.4</Answer><Answer type=\"string\">Sun, 09 Nov 2025 01:00:00 +0000</Answer><Answer type=\"string\">00:11:22:BB:00:04</Answer><Answer type=\"string\">SN-BF-204</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "range-205",
+      "match": {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "%3C%3D%20205"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Tuple><Answer type=\"string\">205</Answer><Answer type=\"string\">NODE205</Answer><Answer type=\"string\">node205.corp.example.com</Answer><Answer type=\"string\">Win2022 10.0.20348.2527</Answer><Answer type=\"string\">10.71.0.5</Answer><Answer type=\"string\">Sun, 09 Nov 2025 01:00:00 +0000</Answer><Answer type=\"string\">00:11:22:BB:00:05</Answer><Answer type=\"string\">SN-BF-205</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\">Server</Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer><Answer type=\"string\"></Answer></Tuple></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "computer-id-census",
+      "match": {
+        "method": "GET",
+        "path": "/api/query"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<BESAPI><Query Resource=\"fixture\"><Result><Answer type=\"string\">201</Answer><Answer type=\"string\">202</Answer><Answer type=\"string\">203</Answer><Answer type=\"string\">204</Answer><Answer type=\"string\">205</Answer></Result></Query></BESAPI>"
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "bigfix:$HOST:201",
+      "bigfix:$HOST:203",
+      "bigfix:$HOST:205"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "%3E%3D%20201%20and%20id%20of%20it%20%3C%3D%20202"
+      },
+      {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "%3E%3D%20203%20and%20id%20of%20it%20%3C%3D%20204"
+      },
+      {
+        "method": "GET",
+        "path": "/api/query",
+        "query_contains": "%3E%3D%20205%20and%20id%20of%20it%20%3C%3D%20205"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

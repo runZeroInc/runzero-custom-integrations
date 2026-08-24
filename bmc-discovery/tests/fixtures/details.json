@@ -1,0 +1,171 @@
+{
+  "name": "details",
+  "integration": "bmc-discovery",
+  "description": "The enrichment half of the integration, which the paged scenario runs with include_details=false and therefore never touches. One page of two hosts with detail_limit=1: app01 is enriched and app02 is imported bare with the cap logged. The software traversal answers three rows -- two real instances plus a duplicate key that must be deduplicated -- and the port traversal exercises _port_row's shapes: an upper-case protocol that must lower-case, a 0.0.0.0 wildcard bind that must fall back to the host's own address, and a non-numeric port that must be dropped. The software listening_ports attribute (8080, 8443 on Tomcat; null on OpenSSH) must fill in behind the discovered ports as assumed-tcp services. The request assertions pin the detail queries to the WHERE #id anchor of the enriched host, and the exact request count (host page, software traversal, port traversal) is the proof that the capped host cost no detail requests. app01's last_update_success is a 100-nanosecond tick count, the on-disk shape BMC documents, which must be converted to seconds for lastSeenTS (a raw epoch that large would clamp to now) while the raw value stays on the attribute.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_details": "true",
+    "detail_limit": 1
+  },
+  "routes": [
+    {
+      "name": "software-traversal",
+      "match": {"method": "POST", "path": "/api/v1.3/data/search", "body_contains": "TRAVERSE Host:HostedSoftware:RunningSoftware:SoftwareInstance"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "kind": "SoftwareInstance",
+              "count": 3,
+              "results": [
+                {
+                  "#id": "ddddeeee0001",
+                  "key": "SIKEY0001",
+                  "name": "Apache Tomcat 9",
+                  "short_name": "tomcat9",
+                  "type": "Application Server",
+                  "instance": "tomcat9",
+                  "product": "Apache Tomcat",
+                  "publisher": "Apache Software Foundation",
+                  "version": "9.0.71",
+                  "edition": null,
+                  "install_root": "/opt/tomcat",
+                  "listening_ports": [8080, 8443]
+                },
+                {
+                  "#id": "ddddeeee0002",
+                  "key": "SIKEY0002",
+                  "name": "OpenSSH",
+                  "type": "Remote Access Service",
+                  "product": "OpenSSH",
+                  "version": "8.9",
+                  "listening_ports": null
+                },
+                {
+                  "#id": "ddddeeee0001",
+                  "key": "SIKEY0001",
+                  "name": "Apache Tomcat 9 (duplicate row)",
+                  "product": "Apache Tomcat",
+                  "version": "9.0.71"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "port-traversal",
+      "match": {"method": "POST", "path": "/api/v1.3/data/search", "body_contains": "TRAVERSE InferredElement:Inference:Primary:HostInfo"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "kind": "DiscoveredListeningPort",
+              "count": 3,
+              "results": [
+                {"#id": "ffffaaaa0001", "local_port": 443, "protocol": "TCP", "local_ip_addr": "10.20.0.10", "state": "LISTENING", "pid": 1234},
+                {"#id": "ffffaaaa0002", "local_port": "22", "protocol": "tcp", "local_ip_addr": "0.0.0.0", "state": "LISTENING", "pid": 88},
+                {"#id": "ffffaaaa0003", "local_port": "not-a-port", "protocol": "udp", "local_ip_addr": null, "state": null, "pid": null}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "host-search",
+      "match": {"method": "POST", "path": "/api/v1.3/data/search", "body_contains": "SEARCH Host"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "kind": "Host",
+              "count": 2,
+              "offset": 0,
+              "results_id": "cursor-details",
+              "results": [
+                {
+                  "#id": "aabbcc0101",
+                  "key": "HOSTKEY0101",
+                  "name": "app01",
+                  "hostname": "app01",
+                  "local_fqdn": "app01.corp.example.com",
+                  "os": "Ubuntu 22.04",
+                  "os_class": "Linux",
+                  "type": "Linux Server",
+                  "last_update_success": 17553000000000000,
+                  "__all_ip_addrs": ["10.20.0.10"],
+                  "__all_mac_addrs": ["00:11:22:33:44:99"],
+                  "__all_dns_names": ["app01.corp.example.com"]
+                },
+                {
+                  "#id": "aabbcc0102",
+                  "key": "HOSTKEY0102",
+                  "name": "app02",
+                  "hostname": "app02",
+                  "os": "Ubuntu 22.04",
+                  "os_class": "Linux",
+                  "__all_ip_addrs": ["10.20.0.11"],
+                  "__all_mac_addrs": ["00:11:22:33:44:98"],
+                  "__all_dns_names": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "bmc-discovery:$HOST:HOSTKEY0101",
+      "bmc-discovery:$HOST:HOSTKEY0102"
+    ],
+    "assets": [
+      {
+        "id": "bmc-discovery:$HOST:HOSTKEY0101",
+        "fields": {
+          "bmc_discovery_detail_enriched": "true",
+          "bmc_discovery_software_instance_count": "2",
+          "bmc_discovery_listening_port_count": "4",
+          "bmc_discovery_last_update_success": "17553000000000000",
+          "ipAddresses": "10.20.0.10",
+          "macAddresses": "00:11:22:33:44:99"
+        }
+      },
+      {
+        "id": "bmc-discovery:$HOST:HOSTKEY0102",
+        "fields": {
+          "bmc_discovery_detail_enriched": "false"
+        }
+      }
+    ],
+    "min_software_total": 2,
+    "min_services_total": 4,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1.3/data/search", "body_contains": "SEARCH Host SHOW"},
+      {"method": "POST", "body_contains": "WHERE #id = 'aabbcc0101' TRAVERSE Host:HostedSoftware:RunningSoftware:SoftwareInstance"},
+      {"method": "POST", "body_contains": "WHERE #id = 'aabbcc0101' TRAVERSE InferredElement:Inference:Primary:HostInfo"}
+    ],
+    "requests_absent": [
+      {"body_contains": "WHERE #id = 'aabbcc0102'"}
+    ],
+    "log_contains": [
+      "bmc-discovery: reported 2 assets",
+      "bmc-discovery: detail limit of 1 reached; software and listening ports were not imported for 1 of 2 assets"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

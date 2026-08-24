@@ -1,0 +1,110 @@
+{
+  "name": "happy",
+  "integration": "kenna",
+  "description": "One page of /assets/search covering the four selection rules. Assets 1002 and 1003 both carry 127.0.0.1 as their ONLY address, which is the address Kenna's own documented asset example ships. 1002 also has a hostname, so it must be imported with the loopback kept off every interface; 1003 has nothing else, so _usable_addresses must refuse to count the loopback as a correlator and drop the record rather than import a permanent duplicate carrying only a Kenna id. 1003 being absent is the load-bearing assertion here: the scanner runtime strips 127.0.0.1 from an interface on its own, so only the record-level skip proves the script's own filter ran. Also covers the url primary_locator, a null id, a non-object row, and the single-object network_ports shape the vendor's own response example uses.\n\ncheck_determinism is off because the Kenna asset id is scoped by the API host AND port, and the fixture server binds a fresh random port on each run. See the report: the exact ids cannot be asserted for the same reason.",
+  "check_determinism": false,
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-risk-token",
+    "include_vulnerabilities": "false",
+    "asset_status": "active"
+  },
+  "routes": [
+    {
+      "name": "assets-search",
+      "match": {"method": "GET", "path": "/assets/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"page": 1, "pages": 1, "total_count": 6},
+            "assets": [
+              {
+                "id": 1001,
+                "primary_locator": "ip_address",
+                "locator": "10.90.0.11",
+                "ip_address": "10.90.0.11",
+                "ipv6": "2001:db8:90::11",
+                "mac_address": "aa:bb:cc:dd:ee:11",
+                "hostname": "kenna-host-01",
+                "fqdn": "kenna-host-01.corp.example.com",
+                "netbios": "KENNA-HOST-01",
+                "operating_system": "Ubuntu Linux",
+                "os_version": "22.04",
+                "status": "active",
+                "risk_meter_score": 640,
+                "vulnerabilities_count": 3,
+                "owner": "platform-team",
+                "created_at": "2024-02-01T00:00:00Z",
+                "last_seen_time": "2026-08-10T06:15:00.000Z",
+                "tags": ["production", "pci"],
+                "asset_groups": [{"id": 5, "name": "Datacenter A"}],
+                "network_ports": {
+                  "port_number": 443,
+                  "protocol": "tcp",
+                  "state": "open",
+                  "name": "HTTPS",
+                  "product": "nginx",
+                  "version": "1.24.0"
+                }
+              },
+              {
+                "id": 1002,
+                "primary_locator": "hostname",
+                "locator": "loopback-reported-host",
+                "ip_address": "127.0.0.1",
+                "hostname": "loopback-reported-host",
+                "fqdn": "loopback-reported-host.corp.example.com",
+                "operating_system": "Windows Server",
+                "os_version": "2019",
+                "status": "active",
+                "risk_meter_score": 210,
+                "created_at": "2024-03-01T00:00:00Z",
+                "last_seen_time": "2026-08-09T22:00:00Z"
+              },
+              {
+                "id": 1003,
+                "primary_locator": "ip_address",
+                "locator": "127.0.0.1",
+                "ip_address": "127.0.0.1",
+                "status": "active"
+              },
+              {
+                "id": 1004,
+                "primary_locator": "url",
+                "locator": "https://shop.example.com/checkout",
+                "ip_address": "10.90.0.14",
+                "status": "active"
+              },
+              {
+                "id": null,
+                "primary_locator": "ip_address",
+                "locator": "10.90.0.15"
+              },
+              "this-row-is-a-string-not-an-object"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "min_services_total": 1,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/assets/search", "query_contains": "page=1"},
+      {"method": "GET", "path": "/assets/search", "query_contains": "per_page=500"},
+      {"method": "GET", "path": "/assets/search", "query_contains": "status"}
+    ],
+    "requests_absent": [{"path_contains": "/vulnerabilities/search"}],
+    "log_contains": [
+      "kenna: skipping asset with no id: locator=10.90.0.15",
+      "kenna: skipped 1 assets with no usable MAC, hostname, or routable address",
+      "kenna: skipped 1 assets whose primary locator is not a network host",
+      "kenna: skipped 1 malformed asset records"
+    ]
+  },
+  "invariants": {"skip": []}
+}

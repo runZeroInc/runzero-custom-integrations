@@ -1,0 +1,274 @@
+{
+  "name": "happy",
+  "integration": "carbon-black",
+  "description": "One scroll page of devices with the per-device vulnerability search behind it. Proves devices parse into assets, that the CVE search is issued once per device, that its own start/rows pagination is walked to exhaustion, and that the returned CVEs land as findings on the right asset.\n\nThe foreign id is scoped by the Org Key -- carbon-black:<org_key>:<device id> -- so two organizations importing device 1001 no longer collide on one runZero asset, and the namespaced_ids invariant enforces the scheme rather than being skipped.\n\nIt also pins the deployment_type -> deviceType mapping in both directions. WORKLOAD and the cloud deployment types are servers and VDI is a virtual desktop, so those three assets carry a type; the aws row is lower-case on purpose, so a case-sensitive lookup would drop it. ENDPOINT and a device reporting no deployment_type at all must carry NO deviceType: ENDPOINT covers desktops and laptops without separating them, and an empty string is still a value that would displace runZero's own hardware fingerprint.",
+  "kwargs": {
+    "url": "$BASE",
+    "organization_key": "SYNORG01",
+    "api_id": "SYNAPIID01",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "name": "scroll-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "\"criteria\""
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 5,
+            "scroll_id": "scroll-cursor-page2",
+            "results": [
+              {
+                "id": 1001,
+                "name": "SYNCORP\\syn-laptop-01",
+                "os": "WINDOWS",
+                "os_version": "Windows 10 x64 SP: 0",
+                "last_internal_ip_address": "10.30.4.11",
+                "mac_address": "005056000011",
+                "ad_domain": "syncorp.example.com",
+                "sensor_version": "3.7.0.1503",
+                "status": "REGISTERED",
+                "deployment_type": "ENDPOINT",
+                "target_priority": "MEDIUM",
+                "virtual_machine": false,
+                "organization_name": "syncorp.example.com",
+                "vulnerability_score": 7.5,
+                "vulnerability_severity": "HIGH"
+              },
+              {
+                "id": 1002,
+                "name": "syn-server-01",
+                "os": "LINUX",
+                "os_version": "Ubuntu 22.04.3 LTS",
+                "last_internal_ip_address": "10.30.4.12",
+                "mac_address": "00:50:56:00:00:12",
+                "sensor_version": "2.14.0.1234",
+                "status": "REGISTERED",
+                "deployment_type": "WORKLOAD",
+                "target_priority": "HIGH",
+                "virtual_machine": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll-page-2",
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "scroll-cursor-page2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 5,
+            "results": [
+              {
+                "id": 1003,
+                "name": "syn-mac-01",
+                "os": "MAC",
+                "os_version": "MAC OS X 14.4.1",
+                "last_internal_ip_address": "10.30.4.13",
+                "mac_address": "00:50:56:00:00:13",
+                "sensor_version": "3.7.0.99",
+                "status": "REGISTERED"
+              },
+              {
+                "id": 1004,
+                "name": "syn-vdi-01",
+                "os": "WINDOWS",
+                "os_version": "Windows 10 x64 SP: 0",
+                "last_internal_ip_address": "10.30.4.14",
+                "mac_address": "00:50:56:00:00:14",
+                "sensor_version": "3.7.0.1503",
+                "status": "REGISTERED",
+                "deployment_type": "VDI",
+                "virtual_machine": true
+              },
+              {
+                "id": 1005,
+                "name": "syn-ec2-01",
+                "os": "LINUX",
+                "os_version": "Amazon Linux 2023",
+                "last_internal_ip_address": "10.30.4.15",
+                "mac_address": "00:50:56:00:00:15",
+                "sensor_version": "2.14.0.1234",
+                "status": "REGISTERED",
+                "deployment_type": "aws",
+                "virtual_machine": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "scroll-exhausted",
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 5,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns-1001",
+      "match": {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/1001/vulnerabilities/_search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 2,
+            "results": [
+              {
+                "vuln_info": {
+                  "cve_id": "CVE-2021-44228",
+                  "cve_description": "Synthetic fixture description for a remote code execution issue in a logging library.",
+                  "severity": "CRITICAL",
+                  "risk_meter_score": 9.8,
+                  "solution": "Upgrade the affected package to a fixed release.",
+                  "fixed_by": "2.17.0",
+                  "created_at": "2021-12-10T00:00:00Z",
+                  "nvd_link": "https://nvd.example.invalid/vuln/detail/CVE-2021-44228",
+                  "cvss_score": 9.3,
+                  "cvss_v3_score": 10.0
+                },
+                "os_product_info": {
+                  "product": "syn-logging",
+                  "version": "2.14.0"
+                }
+              },
+              {
+                "vuln_info": {
+                  "cve_id": "CVE-2020-1472",
+                  "cve_description": "Synthetic fixture description for a privilege escalation issue.",
+                  "severity": "MODERATE",
+                  "risk_meter_score": 5.5,
+                  "solution": "Apply the vendor patch.",
+                  "cvss_score": 5.0,
+                  "cvss_v3_score": 5.5
+                }
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "num_found": 2,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns-none",
+      "match": {
+        "method": "POST",
+        "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 0,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "carbon-black:SYNORG01:1001",
+      "carbon-black:SYNORG01:1002",
+      "carbon-black:SYNORG01:1003",
+      "carbon-black:SYNORG01:1004",
+      "carbon-black:SYNORG01:1005"
+    ],
+    "assets": [
+      {
+        "id": "carbon-black:SYNORG01:1002",
+        "fields": {
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:1005",
+        "fields": {
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:1004",
+        "fields": {
+          "deviceType": "Desktop"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:1001",
+        "fields_absent": [
+          "deviceType"
+        ]
+      },
+      {
+        "id": "carbon-black:SYNORG01:1003",
+        "fields_absent": [
+          "deviceType"
+        ]
+      }
+    ],
+    "min_requests": 6,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "\"rows\":1000"
+      },
+      {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "scroll-cursor-page2"
+      },
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/1001/vulnerabilities/_search",
+        "query_contains": "dataForExport=true"
+      },
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/1002/vulnerabilities/_search"
+      },
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/1003/vulnerabilities/_search"
+      },
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/1004/vulnerabilities/_search"
+      }
+    ]
+  }
+}

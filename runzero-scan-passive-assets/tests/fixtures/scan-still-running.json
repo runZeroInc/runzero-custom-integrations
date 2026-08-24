@@ -1,0 +1,121 @@
+{
+  "name": "scan-still-running",
+  "integration": "runzero-scan-passive-assets",
+  "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
+  "description": "The scan is queued and has not run, which is the state every run passes through and the one the delete used to fire in. `PUT .../scan` answers with a task in status `new` -- queued, not started -- and the task keeps reporting `new` on every check. The passive asset is the ONLY record this host exists: delete it now and a device that turns out to be offline, unreachable, or whose scan errors is erased with nothing to show it was ever there. So no bulk delete may be issued, and `requests_absent` on it is the assertion this scenario exists for. `scan_wait_seconds` is 0 so the run does not sit here for the default half hour -- the parameter's own contract is 'check once, do not wait', and this is what it looks like. The two log lines are what separate this from a run that aborted or returned early: both are printed after the wait gave up, and neither is reachable any other way. The assets stay, and the next run finds them again and queues another scan; that is the cost of the safe direction, and it is far cheaper than a deleted host. delete_assets is passed explicitly because deletion now ships OFF by default (unresolved question of the scan merging onto the passive asset it supersedes).",
+  "kwargs": {
+    "url": "$BASE",
+    "site_id": "77777777-6666-5555-4444-333333333333",
+    "org_api_token": "OT9f8e7d6c5b4a39281706f5e4d3c2b1a0",
+    "scan_wait_seconds": "0",
+    "delete_assets": "true"
+  },
+  "routes": [
+    {
+      "name": "passive asset export",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.json"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "11111111-aaaa-4bbb-8ccc-000000000001",
+              "addresses": [
+                "10.42.0.11"
+              ],
+              "last_agent_id": "a0a0a0a0-1111-4222-8333-444444444444"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "create scan task",
+      "match": {
+        "method": "PUT",
+        "path": "/api/v1.0/org/sites/77777777-6666-5555-4444-333333333333/scan"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "cccccccc-1111-4222-8333-444444444444",
+            "organization_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "site_id": "77777777-6666-5555-4444-333333333333",
+            "agent_id": "a0a0a0a0-1111-4222-8333-444444444444",
+            "type": "scan",
+            "status": "new",
+            "name": "Auto Scan Sample Only Assets",
+            "created_at": 1755340000,
+            "updated_at": 1755340000,
+            "start_time": 1755340000,
+            "hidden": false,
+            "recur": false,
+            "params": {
+              "targets": "10.42.0.11",
+              "rate": "1000"
+            },
+            "stats": {}
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "scan task status, still queued",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1.0/org/tasks/cccccccc-1111-4222-8333-444444444444"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "cccccccc-1111-4222-8333-444444444444",
+            "site_id": "77777777-6666-5555-4444-333333333333",
+            "agent_id": "a0a0a0a0-1111-4222-8333-444444444444",
+            "type": "scan",
+            "status": "new",
+            "stats": {}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.json"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/v1.0/org/sites/77777777-6666-5555-4444-333333333333/scan"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1.0/org/tasks/cccccccc-1111-4222-8333-444444444444"
+      }
+    ],
+    "requests_absent": [
+      {
+        "method": "POST",
+        "path": "/api/v1.0/org/assets/bulk/delete"
+      }
+    ],
+    "log_contains": [
+      "Gave up waiting for 1 scan task(s) after 0s; keeping their assets for a later run",
+      "No scan completed in time; keeping every passive asset for a later run"
+    ]
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "name": "paged",
+  "integration": "halcyon",
+  "description": "A two-page walk driven by the response's pagination block. Page one reports totalPages=2, so the script must post a second search carrying \"page\":2 and import both pages; page two reports currentPage==totalPages and the walk stops there rather than looping. Proves the page number is advanced from the response rather than assumed, and that no third search is issued.\n\nnamespaced_ids is skipped: bare Halcyon asset uuids, as in happy.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "svc-runzero@example.com",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {
+        "method": "POST",
+        "path": "/identity/auth/login"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "accessToken": "fixture-access-token"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "search-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "body_contains": "\"page\":1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "7f0e1001-0000-4000-8000-000000001001",
+                "name": "syn-halcyon-p1.example.com",
+                "operatingSystem": "Windows 11",
+                "registeredDate": "2026-01-05T00:00:00Z"
+              }
+            ],
+            "pagination": {
+              "currentPage": 1,
+              "totalPages": 2
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "search-page-2",
+      "match": {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "body_contains": "\"page\":2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "items": [
+              {
+                "id": "7f0e1002-0000-4000-8000-000000001002",
+                "name": "syn-halcyon-p2.example.com",
+                "operatingSystem": "macOS 14",
+                "registeredDate": "2026-01-06T00:00:00Z"
+              }
+            ],
+            "pagination": {
+              "currentPage": 2,
+              "totalPages": 2
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-p1",
+      "match": {
+        "method": "GET",
+        "path": "/v2/assets/7f0e1001-0000-4000-8000-000000001001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ipAddresses": [
+              {
+                "ipAddressType": "IPv4",
+                "value": "192.0.2.51"
+              }
+            ],
+            "macAddresses": [
+              "00:11:22:33:55:51"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-p2",
+      "match": {
+        "method": "GET",
+        "path": "/v2/assets/7f0e1002-0000-4000-8000-000000001002"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ipAddresses": [
+              {
+                "ipAddressType": "IPv4",
+                "value": "192.0.2.52"
+              }
+            ],
+            "macAddresses": [
+              "00:11:22:33:55:52"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "7f0e1001-0000-4000-8000-000000001001",
+      "7f0e1002-0000-4000-8000-000000001002"
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/v2/assets/search",
+        "body_contains": "\"page\":2"
+      }
+    ],
+    "assets": [
+      {
+        "id": "7f0e1002-0000-4000-8000-000000001002",
+        "fields": {
+          "ipAddresses": "192.0.2.52"
+        }
+      }
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

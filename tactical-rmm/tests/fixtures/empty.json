@@ -1,0 +1,30 @@
+{
+  "name": "empty",
+  "integration": "tactical-rmm",
+  "description": "A server whose API key can see no agents, plus the monitoring_type filter set to server. Proves an empty estate reports zero assets rather than failing, and that the agent-type filter reaches the server as a query parameter on GET /agents/.",
+
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-tactical-key",
+    "monitoring_type": "server"
+  },
+
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/agents/", "query_contains": "monitoring_type=server"},
+      "responses": [{"status": 200, "json": []}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/agents/", "query_contains": "monitoring_type=server"}
+    ]
+  },
+
+  "check_determinism": true
+}

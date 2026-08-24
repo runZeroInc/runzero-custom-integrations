@@ -1,0 +1,91 @@
+{
+  "name": "paged",
+  "integration": "fleet-osquery",
+  "description": "No API token is configured, so the run must first exchange the email and password for a session token at /api/v1/fleet/login before it can page. Then two full pages plus a short third page, proving Fleet's zero-based page counter is advanced and that paging stops on the short page rather than looping. A rate limit is served once on page 1 to prove get_json's default three retries carry the walk through it without the integration hand-rolling a backoff.",
+  "kwargs": {
+    "url": "$BASE",
+    "email": "svc-runzero@example.com",
+    "password": "fixture-password",
+    "include_software": "false",
+    "include_labels": "false",
+    "include_policies": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/v1/fleet/login"},
+      "responses": [
+        {"status": 200, "json": {"token": "minted-session-token", "user": {"id": 1}}}
+      ]
+    },
+    {
+      "name": "hosts-page-0",
+      "match": {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"id": 101, "hostname": "node-101.corp.example.com", "platform": "ubuntu", "os_version": "Ubuntu 22.04.3 LTS", "primary_ip": "10.41.0.101", "primary_mac": "3c:22:fb:41:00:01", "seen_time": "2026-02-02T09:00:00Z"},
+              {"id": 102, "hostname": "node-102.corp.example.com", "platform": "ubuntu", "os_version": "Ubuntu 22.04.3 LTS", "primary_ip": "10.41.0.102", "primary_mac": "3c:22:fb:41:00:02", "seen_time": "2026-02-02T09:00:00Z"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts-page-1-rate-limited-then-served",
+      "match": {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=1"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"message": "rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"id": 103, "hostname": "node-103.corp.example.com", "platform": "windows", "os_version": "Windows 11 Enterprise 23H2 22631.4169", "primary_ip": "10.41.0.103", "primary_mac": "3c:22:fb:41:00:03", "seen_time": "2026-02-02T09:00:00Z"},
+              {"id": 104, "hostname": "node-104.corp.example.com", "platform": "windows", "os_version": "Windows 11 Enterprise 23H2 22631.4169", "primary_ip": "10.41.0.104", "primary_mac": "3c:22:fb:41:00:04", "seen_time": "2026-02-02T09:00:00Z"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts-page-2-short",
+      "match": {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"id": 105, "hostname": "node-105.corp.example.com", "platform": "darwin", "os_version": "macOS 15.2", "primary_ip": "10.41.0.105", "primary_mac": "3c:22:fb:41:00:05", "seen_time": "2026-02-02T09:00:00Z"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "fleet-osquery:$HOST:101",
+      "fleet-osquery:$HOST:103",
+      "fleet-osquery:$HOST:105"
+    ],
+    "min_requests": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1/fleet/login", "body_contains": "svc-runzero@example.com"},
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=0"},
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=1"},
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=2"},
+      {"header_contains": "minted-session-token"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "path": "/api/v1/fleet/hosts", "query_contains": "page=3"}
+    ]
+  },
+  "invariants": {"skip": []}
+}

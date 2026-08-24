@@ -1,0 +1,72 @@
+{
+  "name": "detail-failure-budget",
+  "integration": "cyberark-epm",
+  "description": "REGRESSION LOCK on the detail budget accounting. The budget used to be decremented BEFORE the fetch, so a tenant whose detail endpoint always fails burned the whole cap on failures and then logged a misleading 'detail cap reached' skip. Every detail call here answers 400 (under both filter grammars, so the fallback probe also fails): the first endpoint costs two calls (primary grammar plus the per-value retry), the next two cost one each, and after three consecutive failures the enrichment is dropped for the rest of the run with its own message -- the fourth endpoint gets no detail call at all. All four endpoints must still import, bare, and the 'detail cap reached' message must not be what the operator reads.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_details": "true"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "77e7a777-0007-4007-8007-000000000007", "Name": "Failing"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "detail-always-rejected",
+      "match": {"method": "POST", "path_regex": "/Endpoints/[a-f0-9-]+/search$"},
+      "responses": [
+        {"status": 400, "json": {"ErrorCode": "EPM000004E", "ErrorMessage": "Invalid filter."}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/77e7a777-0007-4007-8007-000000000007/Endpoints/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 4,
+            "returnedCount": 4,
+            "endpoints": [
+              {"id": "eeff0001-0000-4000-8000-000000000001", "legacyId": "ffee0001-0000-4000-8000-000000000001", "setId": "77e7a777-0007-4007-8007-000000000007", "name": "WS-FAIL-01", "platform": "Windows", "platformType": "Desktop", "ip": "10.77.1.10"},
+              {"id": "eeff0002-0000-4000-8000-000000000002", "legacyId": "ffee0002-0000-4000-8000-000000000002", "setId": "77e7a777-0007-4007-8007-000000000007", "name": "WS-FAIL-02", "platform": "Windows", "platformType": "Desktop", "ip": "10.77.1.11"},
+              {"id": "eeff0003-0000-4000-8000-000000000003", "legacyId": "ffee0003-0000-4000-8000-000000000003", "setId": "77e7a777-0007-4007-8007-000000000007", "name": "WS-FAIL-03", "platform": "Windows", "platformType": "Desktop", "ip": "10.77.1.12"},
+              {"id": "eeff0004-0000-4000-8000-000000000004", "legacyId": "ffee0004-0000-4000-8000-000000000004", "setId": "77e7a777-0007-4007-8007-000000000007", "name": "WS-FAIL-04", "platform": "Windows", "platformType": "Desktop", "ip": "10.77.1.13"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "cyberark-epm:$HOST:ffee0001-0000-4000-8000-000000000001",
+      "cyberark-epm:$HOST:ffee0004-0000-4000-8000-000000000004"
+    ],
+    "request_count": 7,
+    "log_contains": [
+      "cyberark-epm: detail filter rejected; retrying with per-value quoting",
+      "cyberark-epm: the detail search failed 3 times in a row; the remaining endpoints are imported without detail",
+      "cyberark-epm: reported 4 assets"
+    ]
+  },
+  "check_determinism": true
+}

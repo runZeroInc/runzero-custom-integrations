@@ -1,0 +1,115 @@
+{
+  "name": "export-workflow",
+  "integration": "nexthink",
+  "description": "The three-step NQL export: a client_credentials token exchange against the login host with grant_type and scope in the x-www-form-urlencoded BODY (Okta rejects token requests whose grant_type rides the query string), a POST to /api/v1/nql/export with a JSON {\"queryId\": ...} body -- the documented contract; the old GET-with-query-param start was rejected by the real API -- and a status poll that reports RUNNING before COMPLETED. All three steps are routed and the poll must advance past RUNNING rather than accepting the first answer. The default query id '#runzero_integration' travels inside the JSON body, so no fragment-encoding is needed.\n\nThis scenario ends with a COMPLETED export that publishes no resultsFileUrl, which proves that case is reported cleanly with zero assets. The fourth step -- the CSV fetch itself -- is covered by download-results.json, which points resultsFileUrl back at the fixture server ($BASE is expanded inside route bodies as well as kwargs), and by download-unreachable.json for a URL that cannot be fetched at all.",
+  "kwargs": {
+    "auth_url": "$BASE",
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "nexthink-token-1",
+            "token_type": "Bearer",
+            "expires_in": 3600
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "start-export",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/nql/export"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "exportId": "exp-0001"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "export-status",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/nql/status/exp-0001"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "RUNNING"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "status": "COMPLETED"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 4,
+    "log_contains": [
+      "NQL export completed but no resultsFileUrl was returned",
+      "No rows returned from Nexthink export workflow"
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token",
+        "body_contains": "grant_type=client_credentials"
+      },
+      {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token",
+        "body_contains": "scope=service%3Aintegration"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/nql/export",
+        "body_contains": "\"queryId\":\"#runzero_integration\""
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/nql/status/exp-0001"
+      },
+      {
+        "header_contains": "nexthink-token-1"
+      }
+    ],
+    "requests_absent": [
+      {
+        "method": "POST",
+        "path": "/oauth2/default/v1/token",
+        "query_contains": "grant_type"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/nql/export"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

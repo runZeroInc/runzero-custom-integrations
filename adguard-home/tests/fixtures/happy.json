@@ -1,0 +1,353 @@
+{
+  "name": "happy",
+  "integration": "adguard-home",
+  "description": "One AdGuard Home appliance plus four clients drawn from DHCP leases, static leases, and the runtime client list. Response shapes follow the project's own openapi/openapi.yaml: ServerStatus carries {version, dns_addresses, dns_port, http_port, protection_enabled, running, dhcp_available, language}; DhcpStatus carries {enabled, interface_name, v4, v6, leases, static_leases} with each lease {mac, ip, hostname, expires}; Clients carries {clients, auto_clients, supported_tags} with auto_clients elements {ip, name, source, whois_info} and clients elements {name, ids, tags, ...}. Proves: a DHCP lease and a runtime client for the same address collapse into one MAC-keyed asset; a runtime client with no lease becomes an address-keyed asset; a persistent client entry contributes its tags and its name as an attribute but never as a hostname and never copies its other ids onto the record; loopback and link-local query sources are dropped rather than imported; and a persistent client whose only id is a CIDR or a ClientID creates nothing. no_mac_in_id is skipped for every adguard-home scenario: the MAC from the DHCP server is the only durable key the API publishes, and the id is deliberately paired with no-id-match no-id-break so it never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "status",
+      "match": {
+        "method": "GET",
+        "path": "/control/status"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": "v0.107.52",
+            "language": "en",
+            "dns_addresses": [
+              "127.0.0.1",
+              "192.0.2.10",
+              "fe80::20d:b9ff:fe41:2a10"
+            ],
+            "dns_port": 53,
+            "http_port": 3000,
+            "protection_enabled": true,
+            "protection_disabled_duration": 0,
+            "dhcp_available": true,
+            "running": true
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-status",
+      "match": {
+        "method": "GET",
+        "path": "/control/dhcp/status"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "enabled": true,
+            "interface_name": "eth0",
+            "v4": {
+              "gateway_ip": "192.0.2.1",
+              "subnet_mask": "255.255.255.0",
+              "range_start": "192.0.2.50",
+              "range_end": "192.0.2.99",
+              "lease_duration": 86400
+            },
+            "v6": {
+              "range_start": "",
+              "lease_duration": 86400
+            },
+            "leases": [
+              {
+                "mac": "aa:bb:cc:00:11:01",
+                "ip": "192.0.2.51",
+                "hostname": "laptop-01",
+                "expires": "2026-08-16T10:00:00Z"
+              },
+              {
+                "mac": "00:50:56:9a:1b:2c",
+                "ip": "192.0.2.52",
+                "hostname": "",
+                "expires": "2026-08-16T11:30:00Z"
+              }
+            ],
+            "static_leases": [
+              {
+                "mac": "b8:27:eb:44:55:66",
+                "ip": "192.0.2.60",
+                "hostname": "sensor-01"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "dhcp-interfaces",
+      "match": {
+        "method": "GET",
+        "path": "/control/dhcp/interfaces"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "eth0": {
+              "name": "eth0",
+              "hardware_address": "00:15:5d:01:02:03",
+              "flags": "up|broadcast|multicast",
+              "gateway_ip": "192.0.2.1",
+              "ipv4_addresses": [
+                "192.0.2.10"
+              ],
+              "ipv6_addresses": [
+                "2001:db8:100::10",
+                "fe80::215:5dff:fe01:203"
+              ]
+            },
+            "docker0": {
+              "name": "docker0",
+              "hardware_address": "02:42:ab:cd:ef:01",
+              "flags": "up|broadcast|multicast",
+              "gateway_ip": "",
+              "ipv4_addresses": [
+                "203.0.113.1"
+              ],
+              "ipv6_addresses": []
+            },
+            "lo": {
+              "name": "lo",
+              "hardware_address": "",
+              "flags": "up|loopback",
+              "gateway_ip": "",
+              "ipv4_addresses": [
+                "127.0.0.1"
+              ],
+              "ipv6_addresses": [
+                "::1"
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "clients",
+      "match": {
+        "method": "GET",
+        "path": "/control/clients"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "clients": [
+              {
+                "name": "Work laptop",
+                "ids": [
+                  "aa:bb:cc:00:11:01"
+                ],
+                "use_global_settings": true,
+                "filtering_enabled": false,
+                "parental_enabled": false,
+                "safebrowsing_enabled": false,
+                "safe_search": {
+                  "enabled": false
+                },
+                "use_global_blocked_services": true,
+                "blocked_services": [],
+                "upstreams": [],
+                "tags": [
+                  "device_laptop",
+                  "user_regular"
+                ],
+                "ignore_querylog": false,
+                "ignore_statistics": false
+              },
+              {
+                "name": "Guest network",
+                "ids": [
+                  "192.0.2.128/25"
+                ],
+                "use_global_settings": false,
+                "filtering_enabled": true,
+                "parental_enabled": true,
+                "safebrowsing_enabled": true,
+                "use_global_blocked_services": false,
+                "blocked_services": [
+                  "facebook",
+                  "tiktok"
+                ],
+                "upstreams": [],
+                "tags": [],
+                "ignore_querylog": false,
+                "ignore_statistics": false
+              },
+              {
+                "name": "Roaming phone",
+                "ids": [
+                  "phone-doq-client"
+                ],
+                "use_global_settings": true,
+                "filtering_enabled": false,
+                "parental_enabled": false,
+                "safebrowsing_enabled": false,
+                "use_global_blocked_services": true,
+                "blocked_services": [],
+                "upstreams": [],
+                "tags": [
+                  "device_phone"
+                ],
+                "ignore_querylog": false,
+                "ignore_statistics": false
+              }
+            ],
+            "auto_clients": [
+              {
+                "ip": "192.0.2.51",
+                "name": "laptop-01.example.com",
+                "source": "DHCP",
+                "whois_info": {}
+              },
+              {
+                "ip": "192.0.2.70",
+                "name": "printer.example.com",
+                "source": "rDNS",
+                "whois_info": {}
+              },
+              {
+                "ip": "127.0.0.1",
+                "name": "localhost",
+                "source": "etc/hosts",
+                "whois_info": {}
+              },
+              {
+                "ip": "fe80::dead:beef:1",
+                "name": "",
+                "source": "rDNS",
+                "whois_info": {}
+              }
+            ],
+            "supported_tags": [
+              "device_laptop",
+              "device_phone",
+              "user_regular"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "adguard-home:$HOST:appliance",
+      "adguard-home:$HOST:client:aa:bb:cc:00:11:01",
+      "adguard-home:$HOST:client:00:50:56:9a:1b:2c",
+      "adguard-home:$HOST:client:b8:27:eb:44:55:66",
+      "adguard-home:$HOST:client-ip:192.0.2.70"
+    ],
+    "ids_absent": [
+      "adguard-home:$HOST:client-ip:127.0.0.1",
+      "adguard-home:$HOST:client-ip:fe80::dead:beef:1",
+      "adguard-home:$HOST:client-ip:192.0.2.51"
+    ],
+    "assets": [
+      {
+        "id": "adguard-home:$HOST:appliance",
+        "fields": {
+          "_attrType": "appliance",
+          "os": "AdGuard Home",
+          "osVersion": "0.107.52",
+          "deviceType": "Server",
+          "ipAddresses": "192.0.2.10\t2001:db8:100::10",
+          "macAddresses": "00:15:5d:01:02:03",
+          "adguard_interfaces": "eth0",
+          "adguard_dhcp_interface": "eth0"
+        }
+      },
+      {
+        "id": "adguard-home:$HOST:client:aa:bb:cc:00:11:01",
+        "fields": {
+          "_attrType": "client",
+          "ipAddresses": "192.0.2.51",
+          "adguard_sources": "dhcp,dns-client,persistent-client",
+          "adguard_client_source": "DHCP",
+          "adguard_persistent_client": "Work laptop",
+          "adguard_dhcp_static": "false"
+        }
+      },
+      {
+        "id": "adguard-home:$HOST:client:b8:27:eb:44:55:66",
+        "fields": {
+          "hostnames": "sensor-01",
+          "ipAddresses": "192.0.2.60",
+          "adguard_dhcp_static": "true",
+          "adguard_sources": "dhcp-static"
+        }
+      },
+      {
+        "id": "adguard-home:$HOST:client:00:50:56:9a:1b:2c",
+        "fields": {
+          "ipAddresses": "192.0.2.52"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      },
+      {
+        "id": "adguard-home:$HOST:client-ip:192.0.2.70",
+        "fields": {
+          "_attrType": "client",
+          "hostnames": "printer.example.com",
+          "adguard_sources": "dns-client",
+          "adguard_client_source": "rDNS"
+        },
+        "fields_absent": [
+          "macAddresses"
+        ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path_contains": "/control/status"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/control/dhcp/status"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/control/clients"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/control/dhcp/interfaces"
+      },
+      {
+        "header_contains": "Basic"
+      }
+    ],
+    "log_contains": [
+      "DHCP leases read: 2 dynamic, 1 static",
+      "runtime clients read: 2",
+      "reported 1 appliance and 4 clients"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "no_mac_in_id"
+    ]
+  },
+  "check_determinism": true
+}

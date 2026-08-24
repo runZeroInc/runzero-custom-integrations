@@ -1,12 +1,13 @@
-# Copyright 2026 runZero, Inc. Available under the MIT License
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
 
 CONFIG = {
     "id": "runzero-proxmox",
     "name": "Proxmox",
     "type": "inbound",
     "description": "Imports VMs, containers, and nodes from Proxmox VE.",
-    "version": "26052700",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
     "params": [
         {
             "key": "base_url",
@@ -34,15 +35,24 @@ CONFIG = {
         "http_": OPTIONS_HTTP,
     },
 }
-load('requests', 'Session')
-load('json', json_decode='decode', json_encode='encode')
-load('runzero.types', 'ImportAsset', 'NetworkInterface')
+load('http', 'get_json')
+load('json', json_decode='decode')
+load('runzero.types', 'ImportAsset', 'NetworkInterface', 'to_custom_attributes')
 load('net', 'ip_address')
-load('kwargs', 'get_bool')
+load('kwargs', 'get_http_options')
+
+# to_custom_attributes joins the prefix to each key with the separator, so the
+# separator has to be passed too or every attribute is named proxmox.<key>.
+ATTR_PREFIX = "proxmox"
+ATTR_SEPARATOR = "_"
+
+# Extra attempts for transient failures (5xx from a busy node, resets).
+# Guest-agent calls opt out: a guest without the agent answers 500 every
+# time, and retrying that on every VM would stall the whole walk.
+RETRIES = 2
 
 # Toggle debug prints on or off
 DEBUG = False
-INSECURE_ALLOWED = False
 
 def is_external_ip(ip_str):
     """Check if IP is external (not loopback, link-local, or internal k8s)"""
@@ -89,6 +99,99 @@ def extract_mac_from_config(config_val):
                     return val.upper()
     return None
 
+def _host_scope(base_url):
+    """Derive a per-deployment scope from the base URL, for standalone hosts
+    that belong to no cluster. Strips the scheme, any credentials, the port and
+    any path, leaving the bare host so the value is stable across runs even if
+    the operator later adds a port or a trailing path to the configured URL."""
+    text = base_url
+    for scheme in ["https://", "http://"]:
+        if text.startswith(scheme):
+            text = text[len(scheme):]
+            break
+    text = text.split("/")[0]
+    if "@" in text:
+        text = text.split("@")[-1]
+    # An IPv6 literal is bracketed and its colons are part of the address, so
+    # only strip a port when the colon is not inside brackets.
+    if text.startswith("["):
+        end = text.find("]")
+        if end > 0:
+            text = text[:end + 1]
+    elif ":" in text:
+        text = text.split(":")[0]
+    return text or "proxmox"
+
+
+def _describe(err):
+    """Attach a credential hint to auth-shaped errors, so a refused token reads
+    as a refused token instead of as an empty cluster."""
+    text = str(err)
+    if text.startswith("status 401"):
+        return text + " (the API token was refused; check the token id user@realm!tokenid and its secret)"
+    if text.startswith("status 403"):
+        return text + " (the token authenticated but lacks privileges; it needs PVEAuditor on /)"
+    return text
+
+
+def fetch(ctx, path, what, quick=False):
+    """GET one API path and return the envelope's 'data' member, or None.
+
+    Every Proxmox endpoint wraps its payload as {"data": ...}, and an error
+    body is {"data": null} -- present-but-null must come back as None here
+    rather than reach a .get() or an iteration in a caller. get_json supplies
+    the status check, transient-failure retries, and err-tuple transport
+    handling, so a reset or timeout mid-walk is a printed skip instead of an
+    abort. quick=True disables retries for calls whose failure is an expected
+    answer (a guest without the QEMU guest agent answers 500 every time).
+    """
+    options = ctx["http_options"]
+    if quick:
+        options = dict(options)
+        options["retries"] = 0
+    data, err = get_json(ctx["api_url"] + path, **options)
+    if err:
+        text = str(err)
+        if text.startswith("status 401") or text.startswith("status 403"):
+            ctx["auth_refused"] = True
+        print("proxmox: could not read {}: {}".format(what, _describe(err)))
+        return None
+    if type(data) != 'dict':
+        if data != None:
+            print("proxmox: unexpected response body from {}".format(path))
+        return None
+    return data.get('data')
+
+
+def fetch_list(ctx, path, what, quick=False):
+    """fetch(), coerced to a list; {"data": null} and non-lists become []."""
+    payload = fetch(ctx, path, what, quick=quick)
+    return payload if type(payload) == 'list' else []
+
+
+def fetch_dict(ctx, path, what, quick=False):
+    """fetch(), coerced to a dict; {"data": null} and non-dicts become {}."""
+    payload = fetch(ctx, path, what, quick=quick)
+    return payload if type(payload) == 'dict' else {}
+
+
+def _attrs(values):
+    """Namespace a flat attribute dict and drop the keys Proxmox left unset.
+
+    Two problems this fixes. A None value is rendered by the platform as the
+    literal string "None", so an absent uptime or memory total read back as a
+    real value. And an unprefixed key like 'cluster' or 'status' collides with
+    the same key from any other integration once the asset merges, so each one
+    is namespaced.
+    """
+    kept = {}
+    for key, value in values.items():
+        if value == None or value == "":
+            continue
+        kept[key] = value
+    return to_custom_attributes(kept, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
+
+
 def main(*args, **kwargs):
     """
     Comprehensive Proxmox integration: nodes, VMs, and LXC containers.
@@ -107,54 +210,69 @@ def main(*args, **kwargs):
             token_id     = token_id     or legacy.get('api_token_id', '')
             token_secret = legacy.get('api_token_secret', token_secret)
     if not (base_url and token_id and token_secret):
-        print("ERROR: Missing base_url or credentials")
+        print("proxmox: base_url, api_token_id, and api_token_secret are all required")
         return []
 
-    # --- 2) Setup session & fetch Proxmox version ---
+    # --- 2) Setup HTTP options & fetch Proxmox version ---
     token_header = "PVEAPIToken={}={}".format(token_id, token_secret)
-    insecure_allowed = get_bool(kwargs, 'tls_disable_validation', INSECURE_ALLOWED)
-    session      = Session(insecure_skip_verify=insecure_allowed)
-    session.headers.set('Accept', 'application/json')
-    session.headers.set('Authorization', token_header)
-    if kwargs.get('http_user_agent'):
-        session.headers.set('User-Agent', kwargs.get('http_user_agent'))
-    api_url      = base_url + "/api2/json"
+    http_options = get_http_options(kwargs, headers={
+        'Accept': 'application/json',
+        'Authorization': token_header,
+    })
+    http_options["retries"] = RETRIES
+    ctx = {
+        "api_url": base_url + "/api2/json",
+        "http_options": http_options,
+        "auth_refused": False,
+    }
 
-    ver_resp = session.get(api_url + "/version")
-    version = json_decode(ver_resp.body).get('data', {}).get('release', '')
+    ver_data = fetch_dict(ctx, "/version", "the PVE version")
+    # A refused token fails every later call the same way, so the run stops
+    # here with a credential diagnostic instead of walking the whole cluster
+    # printing the same error and ending as a plausible-looking empty import.
+    if ctx["auth_refused"]:
+        print("proxmox: authentication failed; nothing collected")
+        print("proxmox: reported 0 assets")
+        return None
+    version = ver_data.get('release', '')
 
-    # Get cluster name from cluster status
-    cluster_name = 'proxmox'  # default fallback
-    cluster_status_resp = session.get(api_url + "/cluster/status")
-    cluster_status_body = json_decode(cluster_status_resp.body) if cluster_status_resp and cluster_status_resp.body else {}
-    cluster_status = cluster_status_body.get('data', []) if cluster_status_body else []
-    if type(cluster_status) == 'list':
-        for item in cluster_status:
-            if type(item) == 'dict' and item.get('type') == 'cluster':
-                cluster_name = item.get('name', 'proxmox')
-                break
+    # Get cluster name from cluster status. This value scopes every asset id, so
+    # the fallback matters: a STANDALONE host is not in a cluster and reports no
+    # cluster entry at all, which is the common single-server deployment. A
+    # literal constant here gave every standalone host the same scope, so two of
+    # them systematically collided -- VMID 100 exists on both, and both minted
+    # "proxmox-vm-100" for different machines, merging unrelated guests onto one
+    # asset. The base URL host is unique per deployment and is used instead, the
+    # same way the other single-appliance integrations in this repo scope theirs.
+    # Clustered deployments are unaffected: they report a real cluster name and
+    # keep the ids they already have.
+    cluster_name = _host_scope(base_url)
+    for item in fetch_list(ctx, "/cluster/status", "the cluster status"):
+        if type(item) == 'dict' and item.get('type') == 'cluster':
+            name = item.get('name', '')
+            if name:
+                cluster_name = name
+            break
 
     # Get cluster config for management IPs
-    cluster_config_resp = session.get(api_url + "/cluster/config/nodes")
-    cluster_config_body = json_decode(cluster_config_resp.body) if cluster_config_resp and cluster_config_resp.body else {}
-    cluster_config = cluster_config_body.get('data', []) if cluster_config_body else []
     mgmt_ip_by_node = {}
-    if type(cluster_config) == 'list':
-        for node_cfg in cluster_config:
-            if type(node_cfg) == 'dict':
-                name = node_cfg.get('node')
-                ring0 = node_cfg.get('ring0_addr')
-                if name and ring0:
-                    mgmt_ip_by_node[name] = ring0
+    for node_cfg in fetch_list(ctx, "/cluster/config/nodes", "the cluster node config"):
+        if type(node_cfg) == 'dict':
+            name = node_cfg.get('node')
+            ring0 = node_cfg.get('ring0_addr')
+            if name and ring0:
+                mgmt_ip_by_node[name] = ring0
 
-    assets = []
+    reported = 0
 
     # --- 3) Discover cluster nodes ---
-    cluster_nodes_resp = session.get(api_url + "/cluster/resources?type=node")
-    cluster_nodes_body = json_decode(cluster_nodes_resp.body) if cluster_nodes_resp and cluster_nodes_resp.body else {}
-    cluster_nodes = cluster_nodes_body.get('data', []) if cluster_nodes_body else []
+    cluster_nodes = fetch_list(ctx, "/cluster/resources?type=node", "the node list")
+    if not cluster_nodes:
+        print("proxmox: the API answered but no nodes are visible to this token")
 
     for cn in cluster_nodes:
+        if type(cn) != 'dict':
+            continue
         node_name = cn.get('node')
         if not node_name:
             continue
@@ -188,9 +306,11 @@ def main(*args, **kwargs):
         }
 
         if DEBUG:
-            print("Node: {} | IP: {} | Status: {}".format(node_name, mgmt_ip, status_val))
+            print("proxmox: node {} at {} is {}".format(node_name, mgmt_ip, status_val))
 
-        assets.append(ImportAsset(
+        # Each asset is streamed as it is built, so one failure later in the
+        # walk cannot lose everything already collected.
+        reported += report_asset(ImportAsset(
             id                = "{}-node-{}".format(cluster_name, node_name),
             hostnames         = [node_name],
             networkInterfaces = network_ifaces,
@@ -200,25 +320,28 @@ def main(*args, **kwargs):
             model             = "Hypervisor",
             deviceType        = "Hypervisor",
             tags              = ["proxmox", "hypervisor", "node"],
-            customAttributes  = node_attrs,
+            customAttributes  = _attrs(node_attrs),
         ))
 
         # --- 4) QEMU VMs on this node ---
-        vms_resp = session.get(api_url + "/nodes/{}/qemu".format(node_name))
-        vms_body = json_decode(vms_resp.body) if vms_resp and vms_resp.body else {}
-        vms = vms_body.get('data', []) if vms_body else []
-        
+        vms = fetch_list(ctx, "/nodes/{}/qemu".format(node_name),
+                         "the QEMU guest list on " + node_name)
+
         for vm in vms:
+            if type(vm) != 'dict':
+                continue
             vmid      = vm.get('vmid')
+            if vmid == None:
+                print("proxmox: skipping a QEMU record with no vmid on " + node_name)
+                continue
             vm_name   = vm.get('name', '')
             vm_status = vm.get('status', 'unknown')
             is_running = (vm_status == 'running')
-            
+
             # Get VM config for MAC address
-            config_resp = session.get(api_url + "/nodes/{}/qemu/{}/config".format(node_name, vmid))
-            config_body = json_decode(config_resp.body) if config_resp and config_resp.body else {}
-            config = config_body.get('data', {}) if config_body else {}
-            
+            config = fetch_dict(ctx, "/nodes/{}/qemu/{}/config".format(node_name, vmid),
+                                "the config of VM {}".format(vmid))
+
             # Extract MAC from first network interface (net0)
             mac_addr = None
             net0 = config.get('net0')
@@ -228,13 +351,12 @@ def main(*args, **kwargs):
             # Get external IPs from guest agent (only if running)
             # Match IPs to the MAC from config to avoid k8s internal interfaces
             vm_ifaces = []
-            
+
             if is_running and mac_addr:
-                ga_resp = session.get(api_url + "/nodes/{}/qemu/{}/agent/network-get-interfaces".format(node_name, vmid))
-                ga_json = json_decode(ga_resp.body) if ga_resp and ga_resp.body else {}
-                ga_data = ga_json.get('data', {}) if ga_json else {}
-                ga_result = ga_data.get('result', []) if ga_data else []
-                
+                ga_data = fetch_dict(ctx, "/nodes/{}/qemu/{}/agent/network-get-interfaces".format(node_name, vmid),
+                                     "the guest agent interfaces of VM {}".format(vmid), quick=True)
+                ga_result = ga_data.get('result', [])
+
                 # Find the interface that matches our MAC address
                 matched_ips = []
                 if type(ga_result) == 'list':
@@ -285,10 +407,9 @@ def main(*args, **kwargs):
             os_name = "QEMU VM"
             os_version = ""
             if is_running:
-                os_resp = session.get(api_url + "/nodes/{}/qemu/{}/agent/get-osinfo".format(node_name, vmid))
-                os_json = json_decode(os_resp.body) if os_resp and os_resp.body else {}
-                os_data = os_json.get('data', {}) if os_json else {}
-                os_info = os_data.get('result', {}) if os_data else {}
+                os_data = fetch_dict(ctx, "/nodes/{}/qemu/{}/agent/get-osinfo".format(node_name, vmid),
+                                     "the guest agent OS info of VM {}".format(vmid), quick=True)
+                os_info = os_data.get('result', {})
                 if type(os_info) == 'dict' and 'error' not in os_info:
                     os_name = os_info.get('pretty-name') or os_info.get('name') or os_name
                     major = os_info.get('version-id') or os_info.get('major')
@@ -312,13 +433,21 @@ def main(*args, **kwargs):
                     for ip in iface.ipv6Addresses:
                         all_ips.append(str(ip))
                 ip_summary = ', '.join(all_ips[:3]) if all_ips else 'none'
-                print("VM {}: {} | MAC: {} | IPs: {} | Status: {}".format(
+                print("proxmox: VM {} ({}) mac={} ips={} status={}".format(
                     vmid, vm_name, mac_addr or 'none', ip_summary, vm_status
                 ))
 
-            assets.append(ImportAsset(
-                id                = "{}-{}-vm-{}".format(cluster_name, node_name, vmid),
-                hostnames         = [],
+            reported += report_asset(ImportAsset(
+                # VMIDs are unique across the whole cluster, not per node, so
+                # the node name adds nothing to uniqueness — and including it
+                # would change the id whenever a guest moves between nodes,
+                # which live migration and HA failover do routinely, minting a
+                # duplicate asset on every such event. The node is kept as a
+                # custom attribute instead.
+                id                = "{}-vm-{}".format(cluster_name, vmid),
+                # The VM name is the only correlator a stopped VM with no
+                # net0 MAC has; Proxmox constrains it to a DNS-name shape.
+                hostnames         = [vm_name] if vm_name else [],
                 networkInterfaces = vm_ifaces,
                 os                = os_name,
                 osVersion         = os_version,
@@ -326,83 +455,93 @@ def main(*args, **kwargs):
                 model             = "Virtual Machine",
                 deviceType        = "Virtual Machine",
                 tags              = ["proxmox", "vm", "qemu"],
-                customAttributes  = vm_attrs,
+                customAttributes  = _attrs(vm_attrs),
             ))
 
         # --- 5) LXC containers on this node ---
-        cts_resp = session.get(api_url + "/nodes/{}/lxc".format(node_name))
-        cts_body = json_decode(cts_resp.body) if cts_resp and cts_resp.body else {}
-        cts = cts_body.get('data', []) if cts_body else []
-        
+        cts = fetch_list(ctx, "/nodes/{}/lxc".format(node_name),
+                         "the LXC guest list on " + node_name)
+
         for ct in cts:
+            if type(ct) != 'dict':
+                continue
             ct_id     = ct.get('vmid')
+            if ct_id == None:
+                print("proxmox: skipping an LXC record with no vmid on " + node_name)
+                continue
             ct_name   = ct.get('name', '')
             ct_status = ct.get('status', 'unknown')
             is_running = (ct_status == 'running')
-            
+
             # Get LXC config for hostname
-            config_resp = session.get(api_url + "/nodes/{}/lxc/{}/config".format(node_name, ct_id))
-            config_body = json_decode(config_resp.body) if config_resp and config_resp.body else {}
-            config = config_body.get('data', {}) if config_body else {}
-            hostname = config.get('hostname', ct_name) if config else ct_name
+            config = fetch_dict(ctx, "/nodes/{}/lxc/{}/config".format(node_name, ct_id),
+                                "the config of container {}".format(ct_id))
+            hostname = config.get('hostname', ct_name) or ct_name
 
             # Get IPs and MACs from interfaces endpoint (only if running)
             # Only add IPs that match the first external interface's MAC
             ct_ifaces = []
-            
+
             if is_running:
-                ifaces_resp = session.get(api_url + "/nodes/{}/lxc/{}/interfaces".format(node_name, ct_id))
-                ifaces_body = json_decode(ifaces_resp.body) if ifaces_resp and ifaces_resp.body else {}
-                ifaces_data = ifaces_body.get('data', []) if ifaces_body else []
-                
+                ifaces_data = fetch_list(ctx, "/nodes/{}/lxc/{}/interfaces".format(node_name, ct_id),
+                                         "the interfaces of container {}".format(ct_id))
+
                 # Find first external interface and use its MAC + IPs together
-                if type(ifaces_data) == 'list':
-                    for iface in ifaces_data:
-                        if type(iface) != 'dict':
-                            continue
-                        iface_name = iface.get('name', '')
-                        
-                        # Skip internal interfaces
-                        if not is_external_interface(iface_name):
-                            continue
-                        
-                        # Get MAC from this interface
-                        hw = iface.get('hwaddr') or iface.get('hardware-address')
-                        if not hw or hw == '00:00:00:00:00:00':
-                            continue
-                        mac_addr = hw.upper()
-                        
-                        # Get IPs from this specific interface
-                        external_ips = []
-                        ip_addrs = iface.get('ip-addresses', [])
-                        if type(ip_addrs) == 'list':
-                            for ip_info in ip_addrs:
-                                if type(ip_info) != 'dict':
-                                    continue
-                                ip_str = ip_info.get('ip-address', '')
-                                if is_external_ip(ip_str):
-                                    external_ips.append(ip_str)
-                        
-                        # Build network interface for this external interface
-                        if mac_addr and external_ips:
-                            ipv4_addrs = []
-                            ipv6_addrs = []
-                            for ip_str in external_ips:
-                                ip_obj = ip_address(ip_str)
-                                if ip_obj:
-                                    if ip_obj.version == 4:
-                                        ipv4_addrs.append(ip_obj)
-                                    else:
-                                        ipv6_addrs.append(ip_obj)
-                            
-                            ct_ifaces.append(NetworkInterface(
-                                macAddress    = mac_addr,
-                                ipv4Addresses = ipv4_addrs,
-                                ipv6Addresses = ipv6_addrs
-                            ))
-                        
-                        # Only use first external interface
-                        break
+                for iface in ifaces_data:
+                    if type(iface) != 'dict':
+                        continue
+                    iface_name = iface.get('name', '')
+
+                    # Skip internal interfaces
+                    if not is_external_interface(iface_name):
+                        continue
+
+                    # Get MAC from this interface
+                    hw = iface.get('hwaddr') or iface.get('hardware-address')
+                    if not hw or hw == '00:00:00:00:00:00':
+                        continue
+                    mac_addr = hw.upper()
+
+                    # Get IPs from this specific interface
+                    external_ips = []
+                    ip_addrs = iface.get('ip-addresses', [])
+                    if type(ip_addrs) == 'list':
+                        for ip_info in ip_addrs:
+                            if type(ip_info) != 'dict':
+                                continue
+                            ip_str = ip_info.get('ip-address', '')
+                            if is_external_ip(ip_str):
+                                external_ips.append(ip_str)
+                    # Older PVE (7.x through 8.1) has no ip-addresses array on
+                    # this endpoint; it reports inet/inet6 CIDR strings instead.
+                    if not external_ips:
+                        for key in ['inet', 'inet6']:
+                            value = iface.get(key)
+                            if value and type(value) == 'string':
+                                addr = value.split('/')[0]
+                                if is_external_ip(addr):
+                                    external_ips.append(addr)
+
+                    ipv4_addrs = []
+                    ipv6_addrs = []
+                    for ip_str in external_ips:
+                        ip_obj = ip_address(ip_str)
+                        if ip_obj:
+                            if ip_obj.version == 4:
+                                ipv4_addrs.append(ip_obj)
+                            else:
+                                ipv6_addrs.append(ip_obj)
+
+                    # A known MAC is a correlator on its own, so the interface
+                    # is emitted even when no external address was parsed.
+                    ct_ifaces.append(NetworkInterface(
+                        macAddress    = mac_addr,
+                        ipv4Addresses = ipv4_addrs,
+                        ipv6Addresses = ipv6_addrs
+                    ))
+
+                    # Only use first external interface
+                    break
 
             ct_attrs = {
                 'cluster':    cluster_name,
@@ -413,13 +552,14 @@ def main(*args, **kwargs):
             }
 
             if DEBUG:
-                ip_summary = ', '.join(external_ips[:3]) if external_ips else 'none'
-                print("LXC {}: {} | MAC: {} | IPs: {} | Status: {}".format(
-                    ct_id, hostname, mac_addr or 'none', ip_summary, ct_status
+                print("proxmox: container {} ({}) interfaces={} status={}".format(
+                    ct_id, hostname, len(ct_ifaces), ct_status
                 ))
 
-            assets.append(ImportAsset(
-                id                = "{}-{}-ct-{}".format(cluster_name, node_name, ct_id),
+            reported += report_asset(ImportAsset(
+                # Cluster-unique, and deliberately free of the node name — see
+                # the VM id above; containers migrate for the same reasons.
+                id                = "{}-ct-{}".format(cluster_name, ct_id),
                 hostnames=[hostname],
                 networkInterfaces = ct_ifaces,
                 os                = config.get('ostype', 'LXC Container'),
@@ -428,13 +568,8 @@ def main(*args, **kwargs):
                 model             = "Container",
                 deviceType        = "Container",
                 tags              = ["proxmox", "container", "lxc"],
-                customAttributes  = ct_attrs,
+                customAttributes  = _attrs(ct_attrs),
             ))
 
-    if DEBUG:
-        print("=" * 60)
-        print("Total assets discovered: {}".format(len(assets)))
-
-    # Stream assets to runZero via report_assets instead of returning a list.
-    report_assets(assets)
+    print("proxmox: reported {} assets".format(reported))
     return None

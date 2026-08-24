@@ -1,0 +1,344 @@
+{
+  "name": "happy",
+  "integration": "redhat-insights",
+  "description": "A service account token is minted at the SSO URL and used against the inventory API. One page of systems is parsed with the full system profile, installed packages, and per-system CVE findings. Covers: the loopback interface and 127.0.0.1/fe80:: addresses being dropped, the all-zero MAC being rejected, org_id namespacing the id with a fallback to the console host, a fqdn equal to the inventory id not becoming a hostname, an unparseable NEVRA being counted rather than imported, and a non-CVE finding id being dropped. The a8:bb: MAC is the aa:bb: value with the locally administered bit cleared, which normalize_mac does deliberately. The exact address assertions are what hold the filtering in place: 127.0.0.1, ::1, fe80::, the all-zero MAC, and the public NAT address must all stay off the interfaces while remaining searchable as custom attributes. The second system's fqdn is its own inventory id, so it must end up with no hostname at all.",
+  "kwargs": {
+    "url": "$BASE",
+    "sso_url": "$BASE",
+    "client_id": "fixture-service-account",
+    "client_secret": "fixture-secret",
+    "include_software": "true",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {
+        "method": "POST",
+        "path": "/auth/realms/redhat-external/protocol/openid-connect/token"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "access_token": "fixture-access-token",
+            "expires_in": 900,
+            "token_type": "Bearer"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cves-system-1",
+      "match": {
+        "method": "GET",
+        "path": "/api/vulnerability/v1/systems/aaaa1111-0000-4000-8000-000000000001/cves"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": "CVE-2024-10001",
+                "type": "cve",
+                "attributes": {
+                  "description": "A fixture flaw in a fixture package.",
+                  "cvss3_score": "9.800",
+                  "cvss2_score": "10.0",
+                  "impact": "Critical",
+                  "public_date": "2024-03-11T00:00:00+00:00",
+                  "first_reported": "2026-07-02T09:15:00+00:00",
+                  "known_exploit": true,
+                  "advisories_list": [
+                    "RHSA-2026:0001",
+                    "RHSA-2026:0002"
+                  ],
+                  "status": "Not reviewed",
+                  "business_risk": "Not defined",
+                  "rule": {
+                    "rule_id": "CVE_2024_10001|FIXTURE_RULE",
+                    "reboot_required": true
+                  }
+                }
+              },
+              {
+                "id": "CVE-2024-10002",
+                "attributes": {
+                  "cvss3_score": "4.400",
+                  "impact": "Moderate",
+                  "public_date": "2024-05-20T00:00:00+00:00"
+                }
+              },
+              {
+                "id": "not-a-cve-identifier",
+                "attributes": {
+                  "cvss3_score": "9.900",
+                  "impact": "Critical"
+                }
+              },
+              {
+                "id": "CVE-2024-10001",
+                "attributes": {
+                  "impact": "Critical"
+                }
+              }
+            ],
+            "meta": {
+              "total_items": 4
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "cves-system-2",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/api/vulnerability/v1/systems/"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "errors": [
+              {
+                "status": 404,
+                "detail": "system not found"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {
+        "method": "GET",
+        "path": "/api/inventory/v1/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 4,
+            "count": 4,
+            "page": 1,
+            "per_page": 50,
+            "results": [
+              {
+                "id": "aaaa1111-0000-4000-8000-000000000001",
+                "org_id": "10009999",
+                "display_name": "rhel9-app-01.fixture.example",
+                "fqdn": "rhel9-app-01.fixture.example",
+                "insights_id": "bbbb2222-0000-4000-8000-000000000001",
+                "subscription_manager_id": "cccc3333-0000-4000-8000-000000000001",
+                "reporter": "puptoo",
+                "created": "2026-01-04T08:07:03.354307+00:00",
+                "updated": "2026-08-01T10:11:12.000000+00:00",
+                "last_check_in": "2026-08-01T10:11:12.000000+00:00",
+                "stale_timestamp": "2026-08-03T10:11:12.000000+00:00",
+                "ip_addresses": [
+                  "10.80.0.11",
+                  "127.0.0.1"
+                ],
+                "mac_addresses": [
+                  "aa:bb:cc:dd:ee:01",
+                  "00:00:00:00:00:00"
+                ],
+                "groups": [
+                  {
+                    "id": "dddd4444-0000-4000-8000-000000000001",
+                    "name": "Production"
+                  }
+                ],
+                "system_profile": {
+                  "arch": "x86_64",
+                  "basearch": "x86_64",
+                  "bios_vendor": "Fixture BIOS",
+                  "bios_version": "2.14.0",
+                  "cloud_provider": "aws",
+                  "cpu_model": "Fixture vCPU @ 2.50GHz",
+                  "host_type": "",
+                  "infrastructure_type": "virtual",
+                  "infrastructure_vendor": "kvm",
+                  "insights_client_version": "3.2.2",
+                  "number_of_cpus": 4,
+                  "number_of_sockets": 1,
+                  "operating_system": {
+                    "name": "RHEL",
+                    "major": 9,
+                    "minor": 4
+                  },
+                  "os_kernel_version": "5.14.0",
+                  "os_release": "9.4",
+                  "public_ipv4_addresses": [
+                    "203.0.113.10"
+                  ],
+                  "satellite_managed": false,
+                  "selinux_current_mode": "enforcing",
+                  "subscription_status": "valid",
+                  "system_memory_bytes": 16777216000,
+                  "enabled_services": [
+                    "sshd",
+                    "chronyd"
+                  ],
+                  "installed_packages": [
+                    "krb5-libs-0:1.16.1-23.fc29.i686",
+                    "kernel-core-0:5.14.0-284.el9.x86_64",
+                    "openssl-1:3.0.7-24.el9.x86_64",
+                    "this-is-not-a-nevra"
+                  ],
+                  "kernel_modules": [
+                    "ext4",
+                    "xfs"
+                  ],
+                  "network_interfaces": [
+                    {
+                      "name": "lo",
+                      "type": "loopback",
+                      "mac_address": "00:00:00:00:00:00",
+                      "ipv4_addresses": [
+                        "127.0.0.1"
+                      ],
+                      "ipv6_addresses": [
+                        "::1"
+                      ]
+                    },
+                    {
+                      "name": "eth0",
+                      "type": "ether",
+                      "mac_address": "aa:bb:cc:dd:ee:01",
+                      "ipv4_addresses": [
+                        "10.80.0.11",
+                        "127.0.0.1"
+                      ],
+                      "ipv6_addresses": [
+                        "fe80::a8bb:ccff:fedd:ee01",
+                        "2001:db8:1::11"
+                      ]
+                    },
+                    {
+                      "name": "eth1",
+                      "type": "ether",
+                      "mac_address": "00:00:00:00:00:00",
+                      "ipv4_addresses": [],
+                      "ipv6_addresses": []
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "aaaa1111-0000-4000-8000-000000000002",
+                "display_name": "aaaa1111-0000-4000-8000-000000000002",
+                "fqdn": "aaaa1111-0000-4000-8000-000000000002",
+                "reporter": "yupana",
+                "created": "2026-02-14T00:00:00+00:00",
+                "updated": "2026-07-30T23:59:59+00:00",
+                "ip_addresses": [
+                  "10.80.0.12"
+                ],
+                "mac_addresses": [
+                  "00:11:22:33:44:12"
+                ],
+                "system_profile": {
+                  "arch": "aarch64",
+                  "infrastructure_type": "physical",
+                  "operating_system": {
+                    "name": "CentOS",
+                    "major": 9,
+                    "minor": 0
+                  },
+                  "os_release": "9",
+                  "installed_packages": [
+                    "bash-0:5.1.8-6.el9.aarch64"
+                  ]
+                }
+              },
+              {
+                "display_name": "a system with no inventory id",
+                "fqdn": "orphan.fixture.example",
+                "ip_addresses": [
+                  "10.80.0.13"
+                ]
+              },
+              "a bare string where an object is documented"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "redhat-insights:10009999:aaaa1111-0000-4000-8000-000000000001",
+      "redhat-insights:$HOST:aaaa1111-0000-4000-8000-000000000002"
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/auth/realms/redhat-external/protocol/openid-connect/token",
+        "body_contains": "client_id=fixture-service-account"
+      },
+      {
+        "method": "GET",
+        "path": "/api/inventory/v1/hosts",
+        "query_contains": "per_page=50"
+      },
+      {
+        "method": "GET",
+        "path": "/api/inventory/v1/hosts",
+        "query_contains": "order_by=updated"
+      },
+      {
+        "method": "GET",
+        "path": "/api/vulnerability/v1/systems/aaaa1111-0000-4000-8000-000000000001/cves",
+        "query_contains": "sort=-cvss3_score"
+      },
+      {
+        "header_contains": "fixture-access-token"
+      }
+    ],
+    "log_contains": [
+      "redhat-insights: skipping system with no inventory id: display_name=a system with no inventory id",
+      "redhat-insights: 1 systems are not present in the vulnerability database",
+      "redhat-insights: 1 package strings did not have the documented NEVRA shape and were skipped",
+      "redhat-insights: reported 2 of 4 systems"
+    ],
+    "min_software_total": 4,
+    "assets": [
+      {
+        "id": "redhat-insights:10009999:aaaa1111-0000-4000-8000-000000000001",
+        "fields": {
+          "hostnames": "rhel9-app-01.fixture.example",
+          "ipAddresses": "10.80.0.11\t2001:db8:1::11",
+          "macAddresses": "a8:bb:cc:dd:ee:01",
+          "os": "Red Hat Enterprise Linux",
+          "osVersion": "9.4",
+          "deviceType": "Virtual Machine",
+          "redhat_insights_public_ipv4_addresses": "203.0.113.10"
+        }
+      },
+      {
+        "id": "redhat-insights:$HOST:aaaa1111-0000-4000-8000-000000000002",
+        "fields": {
+          "os": "CentOS Linux",
+          "ipAddresses": "10.80.0.12"
+        },
+        "fields_absent": [
+          "hostnames",
+          "deviceType"
+        ]
+      }
+    ],
+    "min_vulnerabilities_total": 2
+  },
+  "invariants": {
+    "skip": []
+  }
+}

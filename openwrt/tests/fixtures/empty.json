@@ -1,0 +1,128 @@
+{
+  "name": "empty",
+  "integration": "openwrt",
+  "description": "A router with nothing attached: no leases, no neighbors, no wireless. Every data call returns the EMPTY-PAYLOAD shape a real OpenWrt produces - {\"result\":[0]}, a one-element array with status 0 and no payload at all. This was captured verbatim from getWirelessDevices on a device with no radios. It is the same length-1 array as an auth failure but means the opposite, so the two are distinguished by the status rather than by the length. Proves the run completes, emits the router alone, and reports zero hosts instead of failing.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-root",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"session\",\"login\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": [0, {
+              "ubus_rpc_session": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+              "timeout": 900,
+              "expires": 900,
+              "acls": {
+                "ubus": {
+                  "iwinfo": ["assoclist", "info", "scan"],
+                  "luci-rpc": ["getBoardJSON", "getHostHints", "getNetworkDevices", "getWirelessDevices", "getDHCPLeases", "getDUIDHints"],
+                  "session": ["access", "login"],
+                  "system": ["board", "info"]
+                }
+              },
+              "data": {"username": "fixture-root"}
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "system-board",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "\"system\",\"board\""},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": [0, {
+              "kernel": "6.6.93",
+              "hostname": "spare-ap",
+              "system": "MediaTek MT7621 ver 1 eco 3",
+              "model": "Xiaomi Mi Router 4A Gigabit Edition",
+              "board_name": "xiaomi,mi-router-4a-gigabit",
+              "release": {
+                "distribution": "OpenWrt",
+                "version": "24.10.8",
+                "revision": "r29233-443ec4032a",
+                "target": "ramips/mt7621",
+                "description": "OpenWrt 24.10.8 r29233-443ec4032a",
+                "builddate": "1784877710"
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "network-devices",
+      "match": {"method": "POST", "path": "/ubus", "body_contains": "getNetworkDevices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": [0, {
+              "br-lan": {
+                "name": "br-lan",
+                "wireless": false,
+                "up": true,
+                "mtu": 1500,
+                "devtype": "bridge",
+                "mac": "34:CE:00:11:22:33",
+                "ipaddrs": [{"address": "192.168.9.1", "netmask": "255.255.255.0", "broadcast": "192.168.9.255"}],
+                "ip6addrs": [],
+                "flags": {"up": true, "broadcast": true, "promisc": false, "loopback": false, "noarp": false, "multicast": true, "pointtopoint": false}
+              }
+            }]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "everything-else-empty",
+      "match": {"method": "POST", "path": "/ubus"},
+      "responses": [
+        {"status": 200, "json": {"jsonrpc": "2.0", "id": 4, "result": [0]}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {"jsonrpc": "2.0", "id": 99, "result": [0]}
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": ["openwrt:$HOST:router"],
+    "assets": [
+      {
+        "id": "openwrt:$HOST:router",
+        "fields": {
+          "deviceType": "Router",
+          "os": "OpenWrt",
+          "model": "Xiaomi Mi Router 4A Gigabit Edition",
+          "hostnames": "spare-ap",
+          "ipAddresses": "192.168.9.1"
+        }
+      }
+    ],
+    "log_contains": [
+      "reported 1 router and 0 observed hosts"
+    ]
+  },
+  "check_determinism": true
+}

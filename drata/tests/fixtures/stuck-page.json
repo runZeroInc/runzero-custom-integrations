@@ -1,0 +1,238 @@
+{
+  "name": "stuck-page",
+  "description": "A Drata that ignores `page` and answers every request with the same full page of fifty. The walk's own two exits are an empty page and a short page, and this shape produces neither, so before the repeated-page check it spun until the task timed out with nothing in the log to say why.\n\nThis is the scenario the page ceiling used to be responsible for, and it is why the ceiling is no longer the primary guard: at the derived ceiling of 200,000 pages a stuck tenant would have been hammered two hundred thousand times before anything stopped it. The repeated-page check settles it in two requests instead, and can never truncate genuine data because it only fires on a page that adds nothing.\n\nrequest_count is exact at 2: page one, and the one re-fetch that reveals the repeat. A walk that does not notice issues more; one that stops too early issues fewer.\n\nThe route matching page=3 exists ONLY as a terminator. Serving the stuck page with when_exhausted=repeat_last alone would make a regressed walk run forever and fail this scenario by TIMING OUT rather than by failing an assertion; with the terminator it stops one request later and fails on request_count, requests_absent and the missing log line instead.\n\n`total` is deliberately far larger than what is served: the walk must terminate on the data alone, never on a count the API is free to omit or to get wrong. It is what the truncation line reports as the 'available' half, so log_contains pins the retrieved-versus-available shape as well as the reason.\n\nThe check runs BEFORE the page is reported, so the repeated rows never reach runZero -- which is what keeps asset_count at 1 and the ids unique. Every page carries a full fifty rows because a shorter page is exactly what ends the walk; the first row is a real asset so the scenario still proves rows are parsed and reported, and the other forty-nine have no id and are skipped.\n\nnamespaced_ids is skipped for the reason recorded in happy: the id is the bare Drata asset id with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "assets-terminator",
+      "match": {
+        "method": "GET",
+        "path": "/public/assets",
+        "query_contains": "page=3&"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 100000,
+            "data": []
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-stuck",
+      "match": {
+        "method": "GET",
+        "path": "/public/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 100000,
+            "data": [
+              {
+                "id": 5101,
+                "name": "drata-ceiling-laptop",
+                "assetType": "HARDWARE",
+                "device": {
+                  "osVersion": "macOS 14.2",
+                  "serialNumber": "SYN-CEIL-001",
+                  "model": "MacBook Pro",
+                  "macAddress": [
+                    "00:11:22:33:44:e1"
+                  ],
+                  "complianceChecks": []
+                }
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              },
+              {
+                "name": "drata-stuck-page-no-id"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "5101"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "path": "/public/assets",
+        "query_contains": "page=1&"
+      },
+      {
+        "path": "/public/assets",
+        "query_contains": "page=2&"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/public/assets",
+        "query_contains": "page=3&"
+      }
+    ],
+    "log_contains": [
+      "drata: paging stopped after 2 pages: the API returned the same page twice. Retrieved 1/100000 available assets"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

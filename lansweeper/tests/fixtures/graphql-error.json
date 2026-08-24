@@ -1,0 +1,138 @@
+{
+  "name": "graphql-error",
+  "integration": "lansweeper",
+  "description": "GraphQL reports failure inside a 200 response, so an integration that only checks the HTTP status imports an empty estate and calls it success. Proves the errors array is read: the first site's asset query returns an error and is logged by message and abandoned, while the second site is still walked and imported. One unreadable site must not cost the whole run. The first error entry is deliberately a bare string rather than the spec's object shape: reading .get off it used to abort the script, so the error summary must tolerate both shapes.",
+  "kwargs": {
+    "url": "$BASE",
+    "application_identity_code": "fixture-identity-code",
+    "import_software": "false",
+    "page_size": "200"
+  },
+  "routes": [
+    {
+      "name": "authorized-sites",
+      "match": {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "authorizedSites"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "authorizedSites": {
+                "sites": [
+                  {
+                    "id": "site-broken",
+                    "name": "Broken"
+                  },
+                  {
+                    "id": "site-good",
+                    "name": "Good"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "site-broken",
+      "match": {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "site(id: \\\"site-broken\\\")"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "site": null
+            },
+            "errors": [
+              "Not authorized to read assetResources for this site",
+              {
+                "message": "Not authorized to read assetResources for this site",
+                "path": [
+                  "site",
+                  "assetResources"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "site-good",
+      "match": {
+        "method": "POST",
+        "path": "/api/v2/graphql",
+        "body_contains": "site(id: \\\"site-good\\\")"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "site": {
+                "assetResources": {
+                  "total": 1,
+                  "pagination": {
+                    "limit": 200,
+                    "current": "c1",
+                    "next": null,
+                    "page": "FIRST"
+                  },
+                  "items": [
+                    {
+                      "key": "g-0001",
+                      "assetBasicInfo": {
+                        "name": "GOOD-0001",
+                        "fqdn": "good-0001.corp.example.com",
+                        "domain": "corp.example.com",
+                        "type": "Windows",
+                        "mac": "00:1A:2B:3C:7D:01",
+                        "ipAddress": "10.93.0.1",
+                        "lastSeen": "2026-02-07T10:00:00Z"
+                      },
+                      "assetCustom": {
+                        "stateName": "Active"
+                      },
+                      "operatingSystem": {
+                        "caption": "Microsoft Windows 11 Pro"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "lansweeper:site-good:g-0001"
+    ],
+    "ids_absent": [
+      "lansweeper:site-broken:g-0001"
+    ],
+    "request_count": 3,
+    "log_contains": [
+      "asset query returned an error for site site-broken: Not authorized to read assetResources for this site",
+      "reported 1 of 1 assets from site Good (site-good)"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

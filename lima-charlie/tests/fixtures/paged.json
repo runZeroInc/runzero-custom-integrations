@@ -1,0 +1,116 @@
+{
+  "name": "paged",
+  "integration": "lima-charlie",
+  "description": "The regression test for the sensor list being fetched once. LimaCharlie pages GET /v1/sensors/{oid} with an opaque continuation token: the response carries `continuation_token` and the next request sends it back under the same query-parameter name, ending when it comes back absent, null, or empty (refractionPOINT/python-limacharlie Organization.list_sensors, refractionPOINT/go-limacharlie sensor.go rawSensorListPage).\n\nThree pages, one sensor each, and each page route matches on the token that the PREVIOUS page returned -- so a walk that failed to send the token, or sent a stale one, starves on route 2 rather than quietly passing. Page 3 returns an empty-string token, the falsy spelling of 'no more'. request_count pins the walk at exactly four calls (one exchange, three pages): a script that treated \"\" as truthy would send it, fall through to the page-1 route again, and both re-import lc-page-1 (failing unique_ids) and make a fifth request. Every page route is when_exhausted:error, so no request may repeat. The sensors from pages 2 and 3 are asserted by id: a single-page walk imports only lc-page-1 and this scenario fails on the other two.\n\nrequests_absent pins is_compressed off. Sending it makes LimaCharlie return `sensors` as a base64-encoded gzip blob rather than a JSON array, which this script does not decode.\n\nPage 2's sensor carries an ext_ip, asserted as a custom attribute and absent from ipAddresses.",
+  "kwargs": {
+    "url": "$BASE",
+    "jwt_url": "$BASE",
+    "organization_id": "8bd1f0e2-0000-4000-8000-000000000001",
+    "api_token": "fixture-lc-secret"
+  },
+  "routes": [
+    {
+      "name": "jwt-exchange",
+      "match": {"method": "POST", "path": "/"},
+      "responses": [{"status": 200, "json": {"jwt": "fixture-lc-jwt"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-2",
+      "match": {"method": "GET", "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001", "query_contains": "continuation_token=lc-cont-page-2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "continuation_token": "lc-cont-page-3",
+            "sensors": [
+              {
+                "sid": "aaaa0002-0000-4000-8000-000000000002",
+                "hostname": "lc-page-2.example.com",
+                "arch": 2,
+                "plat": 268435456,
+                "int_ip": "192.0.2.22",
+                "ext_ip": "198.51.100.7",
+                "mac_addr": "00-11-22-33-44-22"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-3",
+      "match": {"method": "GET", "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001", "query_contains": "continuation_token=lc-cont-page-3"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "continuation_token": "",
+            "sensors": [
+              {
+                "sid": "aaaa0003-0000-4000-8000-000000000003",
+                "hostname": "lc-page-3.example.com",
+                "arch": 2,
+                "int_ip": "192.0.2.23",
+                "mac_addr": "00-11-22-33-44-23"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors-page-1",
+      "match": {"method": "GET", "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "continuation_token": "lc-cont-page-2",
+            "sensors": [
+              {
+                "sid": "aaaa0001-0000-4000-8000-000000000001",
+                "hostname": "lc-page-1.example.com",
+                "arch": 2,
+                "int_ip": "192.0.2.21",
+                "mac_addr": "00-11-22-33-44-21"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0001-0000-4000-8000-000000000001",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0002-0000-4000-8000-000000000002",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0003-0000-4000-8000-000000000003"
+    ],
+    "assets": [
+      {
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0002-0000-4000-8000-000000000002",
+        "fields": {
+          "hostnames": "lc-page-2.example.com",
+          "ipAddresses": "192.0.2.22",
+          "macAddresses": "00:11:22:33:44:22",
+          "ext_ip": "198.51.100.7"
+        }
+      }
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "query_contains": "continuation_token=lc-cont-page-2"},
+      {"method": "GET", "query_contains": "continuation_token=lc-cont-page-3"}
+    ],
+    "requests_absent": [
+      {"method": "GET", "query_contains": "is_compressed"}
+    ],
+    "log_contains": ["Reported 3 assets from 3 sensors"]
+  },
+  "invariants": {"skip": []}
+}

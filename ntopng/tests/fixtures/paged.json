@@ -1,0 +1,243 @@
+{
+  "name": "paged",
+  "integration": "ntopng",
+  "description": "Two pages of hosts on one interface. active.lua builds its response with totalRows = total where total is never assigned, so the field is nil in Lua and simply absent from the JSON - there is no total to page towards. Paging therefore has to advance on currentPage and stop on the first short page, and the second request must carry currentPage 2.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "2",
+    "include_macs": "false"
+  },
+  "routes": [
+    {
+      "name": "interfaces",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/ntopng/interfaces.lua"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": [
+              {
+                "ifid": 1,
+                "ifname": "eth0",
+                "name": "eth0",
+                "is_packet_interface": true,
+                "is_pcap_interface": false,
+                "is_zmq_interface": false
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-p1",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua",
+        "body_contains": "\"currentPage\":1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": {
+              "perPage": 2,
+              "currentPage": 1,
+              "data": [
+                {
+                  "key": "192_0_2_41",
+                  "first_seen": 1786700000,
+                  "last_seen": 1786841000,
+                  "vlan": 0,
+                  "ip": "192.0.2.41",
+                  "os": 1,
+                  "num_alerts": 0,
+                  "country": "",
+                  "is_blacklisted": false,
+                  "mac": "AA:BB:CC:DD:EE:41",
+                  "pool": {
+                    "id": 0,
+                    "name": "Not Assigned"
+                  },
+                  "name": "desk-4101.corp.example.com [Reception PC]",
+                  "score": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  },
+                  "thpt": {
+                    "pps": 12.0,
+                    "bps": 90400.0
+                  },
+                  "bytes": {
+                    "total": 9812345,
+                    "sent": 4012345,
+                    "recvd": 5800000
+                  },
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "num_flows": {
+                    "total": 7,
+                    "as_client": 6,
+                    "as_server": 1
+                  }
+                },
+                {
+                  "key": "192_0_2_42",
+                  "first_seen": 1786600000,
+                  "last_seen": 1786840500,
+                  "vlan": 30,
+                  "ip": "192.0.2.42",
+                  "os": 5,
+                  "num_alerts": 2,
+                  "country": "",
+                  "is_blacklisted": false,
+                  "mac": "00:1B:21:AA:BB:CC",
+                  "pool": {
+                    "id": 3,
+                    "name": "Servers"
+                  },
+                  "name": "192.0.2.42",
+                  "thpt": {
+                    "pps": 3,
+                    "bps": 4000
+                  },
+                  "bytes": {
+                    "total": 100,
+                    "sent": 60,
+                    "recvd": 40
+                  },
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "num_flows": {
+                    "total": 1,
+                    "as_client": 0,
+                    "as_server": 1
+                  }
+                }
+              ],
+              "sort": [
+                [
+                  "column_ip",
+                  "asc"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-p2",
+      "match": {
+        "method": "POST",
+        "path": "/lua/rest/v2/get/host/active.lua",
+        "body_contains": "\"currentPage\":2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "rc": 0,
+            "rc_str": "OK",
+            "rc_str_hr": "Success",
+            "rsp": {
+              "perPage": 2,
+              "currentPage": 2,
+              "data": [
+                {
+                  "key": "192_0_2_43",
+                  "first_seen": 4102444800,
+                  "last_seen": 4102444800,
+                  "vlan": 0,
+                  "ip": "192.0.2.43",
+                  "os": 4,
+                  "mac": "AA:BB:CC:DD:EE:43",
+                  "name": "skewed-clock",
+                  "is_localhost": true,
+                  "is_multicast": false,
+                  "is_broadcast": false,
+                  "is_broadcast_domain": true,
+                  "thpt": {
+                    "pps": 0,
+                    "bps": 0
+                  },
+                  "bytes": {
+                    "total": 0,
+                    "sent": 0,
+                    "recvd": 0
+                  },
+                  "num_flows": {
+                    "total": 0,
+                    "as_client": 0,
+                    "as_server": 0
+                  }
+                }
+              ],
+              "sort": [
+                [
+                  "column_ip",
+                  "asc"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 200,
+    "json": {
+      "rc": -1,
+      "rc_str": "NOT_FOUND",
+      "rc_str_hr": "Not found",
+      "rsp": {}
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "ntopng:$HOST:0:192.0.2.41",
+      "ntopng:$HOST:30:192.0.2.42",
+      "ntopng:$HOST:0:192.0.2.43"
+    ],
+    "requests_include": [
+      {
+        "body_contains": "\"currentPage\":2"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "macs_list"
+      },
+      {
+        "body_contains": "\"currentPage\":3"
+      }
+    ],
+    "log_contains": [
+      "ntopng: reported 3 assets from interface 1"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,173 @@
+{
+  "name": "happy",
+  "integration": "sumo-logic",
+  "script": "sumo-logic/sumo-logic.star",
+  "description": "The whole outbound path, asserted on the DESTINATION rather than on assets: this integration emits none, so the only evidence it worked is the request that reached the receiver. The export is read with the ET token and the `alive:t` search, and the result is posted to the Sumo HTTP source as newline-delimited JSON, one object per line. The POST-path assertions are the regression test for dst_url. A Sumo HTTP Source Address carries its unique collector code as the LAST PATH SEGMENT (https://<endpoint>.collection.sumologic.com/receiver/v1/http/<code>), so reading it with get_url_base() -- which returns scheme+host only -- discards the credential and posts to the bare host, where Sumo answers 404 and nothing is ever ingested. `requests_absent` on POST / is what catches that; src_url, by contrast, IS a bare console base and get_url_base is correct for it. Export rows carry the real /api/v1.0/export/org/assets.json shape (models.AssetWithJoin): addresses/names/macs are arrays of strings, timestamps are unix ints, and last_agent_id is a nullable UUID, so one row has it null and one has no addresses at all -- both real, and both must be forwarded verbatim rather than filtered or crashed on.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+  },
+
+  "routes": [
+    {
+      "name": "runzero asset export",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "6f1b0a5e-2c48-4d1a-9f30-8c2b7a1d4e55",
+              "organization_id": "11111111-2222-3333-4444-555555555555",
+              "site_id": "99999999-8888-7777-6666-555555555555",
+              "created_at": 1755000000,
+              "updated_at": 1755300000,
+              "first_seen": 1755000000,
+              "last_seen": 1755300000,
+              "alive": true,
+              "scanned": true,
+              "detected_by": "arp",
+              "type": "Server",
+              "name": "app-01.corp.example.com",
+              "os": "Ubuntu Linux 24.04",
+              "os_vendor": "Canonical",
+              "os_product": "Ubuntu Linux",
+              "os_version": "24.04",
+              "hw_vendor": "Dell Inc.",
+              "hw_product": "PowerEdge R650",
+              "addresses": ["10.42.0.11", "fe80::5054:ff:fe12:3456"],
+              "addresses_extra": [],
+              "macs": ["00:50:56:12:34:56"],
+              "mac_vendors": ["VMware, Inc."],
+              "names": ["app-01.corp.example.com", "app-01"],
+              "domains": ["corp.example.com"],
+              "service_ports_tcp": ["22", "443"],
+              "service_protocols": ["ssh", "tls"],
+              "sources": ["runZero"],
+              "tags": {"env": "prod", "owner": "infra"},
+              "service_count": 2,
+              "service_count_tcp": 2,
+              "software_count": 0,
+              "vulnerability_count": 0,
+              "last_agent_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "org_name": "Fixture Org",
+              "site_name": "Primary",
+              "risk": "low",
+              "criticality": "medium"
+            },
+            {
+              "id": "7a2c1b6f-3d59-4e2b-8041-9d3c8b2e5f66",
+              "organization_id": "11111111-2222-3333-4444-555555555555",
+              "site_id": "99999999-8888-7777-6666-555555555555",
+              "created_at": 1755100000,
+              "updated_at": 1755300500,
+              "first_seen": 1755100000,
+              "last_seen": 1755300500,
+              "alive": true,
+              "scanned": false,
+              "detected_by": "custom-integration",
+              "type": "Network Printer",
+              "name": "printer-lobby",
+              "os": "",
+              "addresses": ["192.168.7.31"],
+              "addresses_extra": [],
+              "macs": ["3c:2a:f4:aa:bb:cc"],
+              "mac_vendors": ["Brother Industries, LTD."],
+              "names": ["printer-lobby"],
+              "domains": [],
+              "service_ports_tcp": ["9100"],
+              "service_protocols": [],
+              "sources": ["runZero"],
+              "tags": {},
+              "service_count": 1,
+              "software_count": 0,
+              "vulnerability_count": 0,
+              "last_agent_id": null,
+              "org_name": "Fixture Org",
+              "site_name": "Primary",
+              "risk": "none",
+              "criticality": "low"
+            },
+            {
+              "id": "8b3d2c70-4e6a-4f3c-9152-ae4d9c3f6077",
+              "organization_id": "11111111-2222-3333-4444-555555555555",
+              "site_id": "99999999-8888-7777-6666-555555555555",
+              "created_at": 1755200000,
+              "updated_at": 1755301000,
+              "first_seen": 1755200000,
+              "last_seen": 1755301000,
+              "alive": true,
+              "scanned": false,
+              "detected_by": "custom-integration",
+              "type": "Cloud Resource",
+              "name": "queue-consumer",
+              "addresses": [],
+              "addresses_extra": [],
+              "macs": [],
+              "mac_vendors": [],
+              "names": ["queue-consumer"],
+              "domains": [],
+              "service_ports_tcp": [],
+              "service_protocols": [],
+              "sources": ["runZero"],
+              "tags": {"env": "staging"},
+              "service_count": 0,
+              "software_count": 0,
+              "vulnerability_count": 0,
+              "last_agent_id": null,
+              "org_name": "Fixture Org",
+              "site_name": "Primary",
+              "risk": "none",
+              "criticality": "low"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sumo http source",
+      "match": {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE"},
+      "responses": [{"status": 200, "text": ""}]
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.json",
+        "query_contains": "search=alive%3At",
+        "header_contains": "Bearer ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+      },
+      {
+        "method": "POST",
+        "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+        "body_contains": "6f1b0a5e-2c48-4d1a-9f30-8c2b7a1d4e55"
+      },
+      {
+        "method": "POST",
+        "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+        "body_contains": "8b3d2c70-4e6a-4f3c-9152-ae4d9c3f6077"
+      },
+      {
+        "method": "POST",
+        "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+        "body_contains": "}\n{"
+      }
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/"},
+      {"method": "POST", "path": "/receiver/v1/http"}
+    ],
+    "log_contains": [
+      "Got 3 assets",
+      "Sending 3 assets to Sumo Logic"
+    ]
+  }
+}

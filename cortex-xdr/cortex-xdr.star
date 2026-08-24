@@ -1,12 +1,20 @@
-# Copyright 2026 runZero, Inc. Available under the MIT License
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
 
 CONFIG = {
     "id": "runzero-cortex-xdr",
     "name": "Cortex XDR",
     "type": "inbound",
     "description": "Imports endpoints from Palo Alto Cortex XDR.",
-    "version": "26061000",
-    "minVersion": "5.0.260723.0",
+    "version": "1",
+    "maturity": "beta",
+    "minVersion": "5.1.260818.0",
+    # A BACKSTOP, not the primary guard: the repeated-page check in the walk
+    # catches a Cortex that ignores the search window after two requests. The
+    # number is derived from a record target rather than hand-picked --
+    # 100,000 pages x 100 records = 10,000,000 endpoints, past any real
+    # deployment -- and reaching it raises a clear error naming the loop, so a
+    # truncated import cannot look complete.
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -39,6 +47,71 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'post_json')
 load('kwargs', 'get_url_base', 'get_http_options')
+load('coerce', 'as_dict', 'as_int', 'as_list', text='as_text')
+
+# Cortex XDR classes every agent it manages, and reports that class as
+# endpoint_type on the endpoint record. The documented values carry an
+# AGENT_TYPE_ prefix ("AGENT_TYPE_SERVER"); the prefix is stripped before the
+# lookup so a tenant that returns the bare token maps the same way.
+#
+# WORKSTATION is the one coarse value: Cortex does not separate a desktop from
+# a laptop, so it is mapped to the runZero type that means "user endpoint" and
+# nothing finer is claimed. runZero's own hardware fingerprinting runs ahead of
+# a custom integration's type whenever it has a model, so this only fills the
+# gap where nothing else knows. AGENT_TYPE_UNKNOWN and anything unrecognised
+# leave the type unset rather than guessing.
+DEVICE_TYPES = {
+    "server": "Server",
+    "workstation": "Desktop",
+    "mobile": "Mobile",
+}
+
+AGENT_TYPE_PREFIX = "AGENT_TYPE_"
+
+PAGE_SIZE = 100
+
+
+def retrieved_of(retrieved, total):
+    """The "Retrieved X/Y available assets" half of a truncation message.
+
+    A truncated run has to say how much of the estate it actually got: a bare
+    count tells the reader nothing about whether the import is nearly complete
+    or stopped at the first percent. Where the API reports no total, say so
+    plainly rather than printing a bare slash or inventing a denominator.
+    """
+    if type(total) == "int" and total > 0:
+        return "Retrieved {}/{} available assets".format(retrieved, total)
+    return "Retrieved {} assets; the API does not report a total".format(retrieved)
+
+
+def page_signature(rows):
+    """A cheap fingerprint of one page: its length and the ids at either end.
+
+    Two consecutive pages sharing a fingerprint means the server re-served one
+    page rather than advancing through the inventory. Comparing ends rather than
+    every row keeps this O(1) per page, and it is enough for the failure it
+    guards against -- a Cortex that ignores the search window returns
+    byte-identical responses, not a rearrangement of one.
+    """
+    if not rows:
+        return "empty"
+    first = rows[0]
+    last = rows[-1]
+    first_id = ""
+    last_id = ""
+    if type(first) == "dict":
+        first_id = first.get("agent_id") or first.get("endpoint_id") or ""
+    if type(last) == "dict":
+        last_id = last.get("agent_id") or last.get("endpoint_id") or ""
+    return "{}|{}|{}".format(len(rows), first_id, last_id)
+
+def endpoint_device_type(endpoint):
+    """Map a Cortex endpoint class onto a runZero device type, or '' when the
+    record carries no class this integration is willing to translate."""
+    raw = str(endpoint.get("endpoint_type") or endpoint.get("agent_type") or "").strip()
+    if raw.upper().startswith(AGENT_TYPE_PREFIX):
+        raw = raw[len(AGENT_TYPE_PREFIX):]
+    return DEVICE_TYPES.get(raw.lower(), "")
 
 def do_cortex_api_call(base_url, api_key, api_key_id, api_call, post_data={}, config_kwargs={}):
     """Perform API request to Cortex XDR, handling authentication"""
@@ -61,11 +134,19 @@ def stream_endpoints(base_url, api_key, api_key_id, config_kwargs):
     """Retrieve Cortex XDR endpoints using pagination, building and streaming
     each page of assets via report_assets so the full endpoint set is never held
     in memory. Returns the number of assets reported."""
-    cortex_filter = {"request_data": {"search_from": 0, "search_to": 100}}
+    cortex_filter = {"request_data": {"search_from": 0, "search_to": PAGE_SIZE}}
     reported = 0
-    page_size = 100
+    page_size = PAGE_SIZE
+    last_signature = ""
+    # Cortex reports the size of the whole result set alongside every page. It
+    # is captured so a truncated run can say what fraction of the estate it got,
+    # rather than a bare count the reader cannot judge.
+    total_count = None
 
-    while True:
+    # The CONFIG maxPages bound backstops the repeated-page guard below; the
+    # pager raises at the ceiling rather than truncating in silence.
+    p = pager("endpoints")
+    while p.next():
         result = do_cortex_api_call(base_url, api_key, api_key_id, "endpoints/get_endpoint", cortex_filter, config_kwargs)
 
         if not result or "reply" not in result:
@@ -77,6 +158,25 @@ def stream_endpoints(base_url, api_key, api_key_id, config_kwargs):
             fetched_endpoints = reply
         else:
             fetched_endpoints = reply.get("endpoints", [])
+            reported_total = reply.get("total_count")
+            if type(reported_total) == "int" and reported_total >= 0:
+                total_count = reported_total
+
+        # THE PRIMARY RUNAWAY GUARD. A page identical to the one before it means
+        # Cortex is ignoring the search_from/search_to window and re-serving the
+        # same records, so the walk is not advancing and continuing can only
+        # re-report endpoints already reported. Checked BEFORE the page is
+        # reported, so the repeated records never reach runZero, and it can
+        # never truncate genuine data: it only fires on a page that adds
+        # nothing. It catches the stuck tenant in two requests where the page
+        # ceiling would take 100,000.
+        signature = page_signature(fetched_endpoints)
+        if fetched_endpoints and signature == last_signature:
+            print("cortex-xdr: paging stopped after {} pages: the API returned the same page twice. {}".format(
+                p.page, retrieved_of(reported, total_count)))
+            break
+        last_signature = signature
+
         reported += report_assets(build_assets(fetched_endpoints))
 
         if len(fetched_endpoints) < page_size:
@@ -93,32 +193,47 @@ def build_assets(all_endpoints):
     assets = []
 
     for endpoint in all_endpoints:
+        # A page can carry a row the API degraded into something other than an
+        # object; calling .get on it would abort the page.
+        if type(endpoint) != "dict":
+            print("cortex-xdr: skipping a non-object endpoint row")
+            continue
         endpoint_id = endpoint.get("agent_id") or endpoint.get("endpoint_id")
         if not endpoint_id:
             print("cortex-xdr: skipping endpoint with no agent_id/endpoint_id: name=" + str(endpoint.get("endpoint_name", "")))
             continue
-        endpoint_tags = endpoint.get("tags", {}).get("endpoint_tags", [])
-        server_tags = endpoint.get("tags", {}).get("server_tags", [])
-        group_names = endpoint.get("group_name", endpoint_tags + server_tags)
+        # .get's default only covers an ABSENT key. Cortex reports tags,
+        # group_name, and users as explicit nulls -- users is null on any
+        # server no one is logged into -- and None.get / join(None) aborts the
+        # page, so every layer is coerced instead.
+        tags_block = as_dict(endpoint.get("tags"))
+        endpoint_tags = as_list(tags_block.get("endpoint_tags"))
+        server_tags = as_list(tags_block.get("server_tags"))
+        group_names = endpoint.get("group_name")
+        if group_names == None:
+            group_names = endpoint_tags + server_tags
+        groups = ";".join([text(g) for g in as_list(group_names) if text(g)])
+        users = ";".join([text(u) for u in as_list(endpoint.get("users")) if text(u)])
 
         last_seen_raw = endpoint.get("last_seen")
         first_seen_raw = endpoint.get("first_seen")
 
+        # Epochs arrive in milliseconds or seconds depending on tenant, and a
+        # malformed value used to abort the run in int(); as_int folds it to
+        # the -1 sentinel, which leaves the attribute empty.
         last_seen = ""
-        if last_seen_raw != None and str(last_seen_raw) != "":
-            last_seen_int = int(last_seen_raw)
-            if last_seen_int > 9999999999:
-                last_seen = str(int(last_seen_int / 1000))
-            else:
-                last_seen = str(last_seen_int)
+        last_seen_int = as_int(last_seen_raw, default=-1)
+        if last_seen_int > 9999999999:
+            last_seen = str(last_seen_int // 1000)
+        elif last_seen_int > 0:
+            last_seen = str(last_seen_int)
 
         first_seen = ""
-        if first_seen_raw != None and str(first_seen_raw) != "":
-            first_seen_int = int(first_seen_raw)
-            if first_seen_int > 9999999999:
-                first_seen = str(int(first_seen_int / 1000))
-            else:
-                first_seen = str(first_seen_int)
+        first_seen_int = as_int(first_seen_raw, default=-1)
+        if first_seen_int > 9999999999:
+            first_seen = str(first_seen_int // 1000)
+        elif first_seen_int > 0:
+            first_seen = str(first_seen_int)
 
         custom_attrs = {
             "operational_status": endpoint.get("operational_status", ""),
@@ -126,25 +241,50 @@ def build_assets(all_endpoints):
             "agent_type": endpoint.get("agent_type", endpoint.get("endpoint_type", "")),
             "last_seen": last_seen,
             "first_seen": first_seen,
-            "groups": ";".join(group_names),
-            "users": ";".join(endpoint.get("users", [])),
+            "groups": groups,
+            "users": users,
             "assigned_prevention_policy": endpoint.get("assigned_prevention_policy", ""),
             "assigned_extensions_policy": endpoint.get("assigned_extensions_policy", ""),
             "endpoint_version": endpoint.get("endpoint_version", "")
         }
 
-        mac_address = endpoint.get("mac_address", [""])[0] if endpoint.get("mac_address") else ""
+        # Cortex does not say which address belongs to which adapter, so the
+        # addresses ride on the first MAC and the remaining MACs are carried on
+        # their own interfaces rather than dropped.
+        macs = [text(m) for m in as_list(endpoint.get("mac_address")) if text(m)]
 
-        assets.append(
-            ImportAsset(
-                id=str(endpoint_id),
-                networkInterfaces=[network_interface(ips=endpoint.get("ip", []) + endpoint.get("ipv6", []), mac=mac_address)],
-                hostnames=[endpoint.get("host_name", endpoint.get("endpoint_name", ""))],
-                os_version=endpoint.get("os_version", ""),
-                os=endpoint.get("operating_system", ""),
-                customAttributes=to_custom_attributes(custom_attrs),
-            )
-        )
+        # network_interface returns None when nothing usable survives -- an
+        # agent that has registered but not yet reported its adapters has no ip,
+        # no ipv6 and no mac_address. Passing [None] to ImportAsset aborts the
+        # entire run, losing every endpoint already parsed, so such an endpoint
+        # gets no interface and correlates on its hostname instead.
+        ips = as_list(endpoint.get("ip")) + as_list(endpoint.get("ipv6"))
+        interfaces = []
+        network = network_interface(ips=ips, mac=macs[0] if macs else "")
+        if network:
+            interfaces.append(network)
+        for mac in macs[1:]:
+            extra = network_interface(ips=[], mac=mac)
+            if extra:
+                interfaces.append(extra)
+
+        params = {
+            "id": str(endpoint_id),
+            "networkInterfaces": interfaces,
+            "hostnames": [endpoint.get("host_name", endpoint.get("endpoint_name", ""))],
+            "os_version": endpoint.get("os_version", ""),
+            "os": endpoint.get("operating_system", ""),
+            "customAttributes": to_custom_attributes(custom_attrs),
+        }
+
+        # Omitted rather than set to "" when Cortex reports no class it names:
+        # an empty deviceType is still a value, and it displaces the type
+        # runZero would otherwise derive for itself.
+        device_type = endpoint_device_type(endpoint)
+        if device_type:
+            params["deviceType"] = device_type
+
+        assets.append(ImportAsset(**params))
     return assets
 
 def main(**kwargs):

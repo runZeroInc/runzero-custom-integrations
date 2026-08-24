@@ -1,0 +1,76 @@
+{
+  "name": "stuck-pagination",
+  "integration": "absolute",
+  "description": "An Absolute that hands back the same nextPage cursor forever. The walk's only exits are an empty page and a blank cursor, so this shape produces neither: it would re-fetch page one until the 20,000-page ceiling, which at a ten-million-record target is not a guard at all. The no-progress check is the working guard -- a cursor equal to the one already in hand means the server stopped advancing -- and it stops on the first repeat and says so, which is what log_contains pins.\n\nAbsolute hides the query string inside the base64url JOSE header of the signed envelope, so the cursor is a run of 'A' characters, whose base64url encoding contains the block 'QUFB' repeated no matter where the run starts. The stuck route matches only a body carrying that block, so it sees exactly the requests that carry the cursor.\n\nThe stuck route's SECOND response is a terminator and exists only as a regression backstop: serving the repeated cursor forever would make an unguarded walk run to the ceiling and fail this scenario by timing out rather than by failing an assertion. With the terminator, an unguarded walk ends one request later on an empty page and fails on request_count and the missing log line instead.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1"
+  },
+  "routes": [
+    {
+      "name": "devices-stuck-cursor",
+      "match": {"method": "POST", "path": "/jws/validate", "body_contains": "QUFBQUFBQUFBQUFB"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+            "data": [
+              {
+                "deviceUid": "stuck-device-0002",
+                "deviceName": "FIXTURE-STUCK-B",
+                "serialNumber": "FIXTURESTUCK0002",
+                "localIp": "10.151.0.2",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+            "data": [
+              {
+                "deviceUid": "stuck-device-0001",
+                "deviceName": "FIXTURE-STUCK-A",
+                "serialNumber": "FIXTURESTUCK0001",
+                "localIp": "10.151.0.1",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "absolute:$HOST:stuck-device-0001",
+      "absolute:$HOST:stuck-device-0002"
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "absolute: paging stopped after 2 pages (API returned the same cursor twice walking devices, retrieved 2 assets, total not reported)"
+    ]
+  },
+  "invariants": {"skip": []}
+}

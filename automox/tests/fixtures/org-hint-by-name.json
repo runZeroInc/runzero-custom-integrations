@@ -1,0 +1,135 @@
+{
+  "name": "org-hint-by-name",
+  "integration": "automox",
+  "description": "organization_hint given as a NAME rather than an id. CONFIG documents the parameter as \"organization ID or name\", and the name form was silently ignored: looks_numeric() answered false, choose_org_id() fell through to orgs[0] for the package read, and the device listing dropped the hint entirely. An operator who typed their organization's name got a DIFFERENT organization's inventory, with nothing in the log to say the value had been disregarded -- the worst shape a configuration error can take, because the run reports success.\n\n\"Northwind Retail\" is the second organization in the /orgs response, deliberately, so resolving it cannot be confused with falling back to the first. Its id 7002 must reach both the package read and the `o=` parameter on the device listing, and the resolution must be logged. Matching is case-insensitive, which is why the hint is typed in a different case from the record.\n\nThe companion `org-hint` scenario covers the numeric form and asserts that /orgs is never called for it; this one is its mirror.\n\nThe id must be scoped by the organization the name resolved to -- automox:7002:6001 -- and check_determinism proves the resolution, and therefore the id, is stable across two runs.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "organization_hint": "northwind retail"
+  },
+  "routes": [
+    {
+      "name": "orgs",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 7001,
+              "name": "Contoso Manufacturing"
+            },
+            {
+              "id": 7002,
+              "name": "Northwind Retail"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "packages",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/7002/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "servers-scoped",
+      "match": {
+        "method": "GET",
+        "path": "/api/servers",
+        "query_contains": "o=7002"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 6001,
+              "name": "fixture-northwind-01",
+              "os_family": "Windows",
+              "os_name": "Windows 11",
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:dd:00:01",
+                    "IPS": [
+                      "192.0.2.81"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "automox:7002:6001"
+    ],
+    "assets": [
+      {
+        "id": "automox:7002:6001",
+        "fields": {
+          "ipAddresses": "192.0.2.81",
+          "macAddresses": "00:11:22:dd:00:01"
+        },
+        "fields_absent": [
+          "deviceType"
+        ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
+      {
+        "method": "GET",
+        "path": "/api/orgs/7002/packages"
+      },
+      {
+        "method": "GET",
+        "path": "/api/servers",
+        "query_contains": "o=7002"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/api/orgs/7001/packages"
+      }
+    ],
+    "log_contains": [
+      "automox: organization_hint 'northwind retail' resolved to org id 7002"
+    ]
+  },
+  "check_determinism": true
+}

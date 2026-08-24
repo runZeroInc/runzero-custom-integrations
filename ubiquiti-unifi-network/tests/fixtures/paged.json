@@ -1,0 +1,69 @@
+{
+  "name": "paged",
+  "integration": "ubiquiti-unifi-network",
+  "description": "The client list pages by offset against totalCount. With page_limit=2 and three clients, page 2 must carry offset=2 and the walk must stop once offset+len reaches totalCount rather than fetching a third page. Each page route matches on its own offset, so a walk that failed to advance would starve. The device extraction toggle is off, proving it is honoured and no device request is made.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "Default",
+    "page_limit": "2",
+    "extract_devices": "false",
+    "client_api_filter": "type.eq('WIRED')"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {"status": 200, "json": {"data": [{"id": "site-uuid-default", "name": "Default"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "clients-offset-0",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/clients", "query_contains": "offset=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 2, "count": 2, "totalCount": 3, "data": [
+            {"id": "c-1", "name": "wired-01", "macAddress": "00:11:22:ff:00:01", "ipAddress": "10.96.0.1", "type": "WIRED", "connectedAt": "2026-02-08T09:00:00Z"},
+            {"id": "c-2", "name": "wired-02", "macAddress": "00:11:22:ff:00:02", "ipAddress": "10.96.0.2", "type": "WIRED", "connectedAt": "2026-02-08T09:01:00Z"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "clients-offset-2",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/clients", "query_contains": "offset=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 2, "limit": 2, "count": 1, "totalCount": 3, "data": [
+            {"id": "c-3", "name": "wired-03", "macAddress": "00:11:22:ff:00:03", "ipAddress": "10.96.0.3", "type": "WIRED", "connectedAt": "2026-02-08T09:02:00Z"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": ["unifi:site-uuid-default:client:c-1", "unifi:site-uuid-default:client:c-2", "unifi:site-uuid-default:client:c-3"],
+    "request_count": 3,
+    "log_contains": [
+      "unifi: fetched 2/3 clients",
+      "unifi: fetched 3/3 clients",
+      "unifi: reported 3 client assets",
+      "unifi: device import is disabled (extract_devices is False)"
+    ],
+    "requests_include": [
+      {"method": "GET", "query_contains": "offset=2"},
+      {"method": "GET", "query_contains": "filter=type.eq%28%27WIRED%27%29"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/devices"},
+      {"method": "GET", "query_contains": "offset=4"}
+    ]
+  }
+}

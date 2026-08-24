@@ -1,0 +1,379 @@
+{
+ "name": "happy",
+ "integration": "cyberwatch",
+ "description": "One inventory page enriched from both per-asset detail endpoints. Proves the untyped addresses[] array is sniffed per element so only real IPs reach the interface and the rest become hostnames; that Cyberwatch's own documented sample ['WIN-GNVEC8UIKUD', '127.0.0.1'] yields an asset with NO interface; that remediated CVE announcements (fixed_at set, or active=false) are not imported as open findings; and that a record with a null id is skipped with a log line rather than aborting the page. Server 101 carries TWO installed versions of openssl (1.1.1n and 3.0.13); the Software id includes the version, so both must survive as distinct records rather than collapsing onto one id.",
+ "kwargs": {
+  "url": "$BASE",
+  "api_access_key": "fixture-access",
+  "api_secret_key": "fixture-secret",
+  "include_details": "true"
+ },
+ "routes": [
+  {
+   "name": "server-list",
+   "match": {
+    "method": "GET",
+    "path": "/api/v3/vulnerabilities/servers"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": [
+      {
+       "id": 101,
+       "hostname": "ot-plc-01",
+       "category": "industrial_device",
+       "description": "Line 3 programmable logic controller",
+       "status": "active",
+       "reboot_required": false,
+       "created_at": "2025-01-15T08:00:00.000Z",
+       "analyzed_at": "2026-08-14T09:30:00.000Z",
+       "last_communication": "2026-08-14T10:00:00.000+01:00",
+       "addresses": [
+        "10.70.4.21",
+        "ot-plc-01.plant.example.net",
+        "fe80::1",
+        "10.70.4.21"
+       ],
+       "os": {
+        "key": "vxworks_6",
+        "name": "VxWorks 6.9",
+        "short_name": "vxworks",
+        "arch": "ppc",
+        "type": "Os::Vxworks",
+        "eol": "2025-12-31"
+       },
+       "environment": {
+        "name": "production",
+        "confidentiality_requirement": "high",
+        "integrity_requirement": "high",
+        "availability_requirement": "high"
+       },
+       "groups": [
+        {
+         "id": 7,
+         "name": "Plant 3"
+        }
+       ],
+       "compliance_groups": [
+        {
+         "id": 2,
+         "name": "IEC 62443"
+        }
+       ],
+       "cve_announcements_count": 2,
+       "prioritized_cve_announcements_count": 1,
+       "updates_count": 1
+      },
+      {
+       "id": 102,
+       "hostname": "WIN-GNVEC8UIKUD",
+       "category": "server",
+       "status": "active",
+       "created_at": "2024-11-02T12:00:00.000Z",
+       "analyzed_at": "2026-08-13T22:05:00.000Z",
+       "last_communication": "2026-08-13T22:10:00.000Z",
+       "addresses": [
+        "WIN-GNVEC8UIKUD",
+        "127.0.0.1"
+       ],
+       "os": {
+        "key": "windows_server_2019",
+        "name": "Windows Server 2019",
+        "short_name": "win2019",
+        "arch": "x86_64",
+        "type": "Os::Windows"
+       },
+       "environment": {
+        "name": "production"
+       },
+       "groups": [],
+       "cve_announcements_count": 0,
+       "updates_count": 0
+      },
+      {
+       "id": null,
+       "hostname": "ghost-record",
+       "category": "server",
+       "addresses": [
+        "10.70.4.99"
+       ]
+      }
+     ]
+    }
+   ],
+   "when_exhausted": "empty"
+  },
+  {
+   "name": "vuln-detail-101",
+   "match": {
+    "method": "GET",
+    "path": "/api/v3/vulnerabilities/servers/101"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "id": 101,
+      "hostname": "ot-plc-01",
+      "addresses": [
+       "10.70.4.21",
+       "ot-plc-01.plant.example.net",
+       "fe80::1"
+      ],
+      "analyzed_at": "2026-08-14T09:30:00.000Z",
+      "cve_announcements": [
+       {
+        "cve_code": "CVE-2026-11111",
+        "score": 9.8,
+        "environmental_score": 9.1,
+        "epss": 0.42,
+        "published": "2026-02-01T00:00:00.000Z",
+        "detected_at": "2026-03-05T11:22:33.000Z",
+        "active": true,
+        "prioritized": true,
+        "ignored": false,
+        "comment": ""
+       },
+       {
+        "cve_code": "CVE-2025-22222",
+        "score": 5.3,
+        "environmental_score": null,
+        "published": "2025-06-01T00:00:00.000Z",
+        "detected_at": "2025-06-10T00:00:00.000Z",
+        "fixed_at": "2025-07-01T00:00:00.000Z",
+        "active": true
+       },
+       {
+        "cve_code": "CVE-2024-33333",
+        "score": 4.0,
+        "published": "2024-04-01T00:00:00.000Z",
+        "active": false
+       }
+      ],
+      "updates": [
+       {
+        "current": {
+         "product": "openssl",
+         "version": "1.1.1n"
+        },
+        "target": {
+         "product": "openssl",
+         "version": "1.1.1w"
+        },
+        "patchable": true,
+        "cve_announcements": [
+         "CVE-2026-11111"
+        ]
+       }
+      ],
+      "compliance_repositories": [
+       {
+        "id": 2,
+        "name": "IEC 62443"
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "asset-detail-101",
+   "match": {
+    "method": "GET",
+    "path": "/api/v3/assets/servers/101"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "id": 101,
+      "packages": [
+       {
+        "product": "openssl",
+        "version": "1.1.1n",
+        "type": "Packages::Deb",
+        "vendor": "Debian",
+        "active": true,
+        "paths": [
+         "ii"
+        ]
+       },
+       {
+        "product": "openssl",
+        "version": "3.0.13",
+        "type": "Packages::Deb",
+        "vendor": "Debian",
+        "active": true,
+        "paths": [
+         "ii"
+        ]
+       },
+       {
+        "product": "modbus-server",
+        "version": "1.2.0",
+        "type": "Packages::Deb",
+        "vendor": "Plantworks",
+        "active": true
+       },
+       {
+        "product": "",
+        "version": "9.9",
+        "type": "Packages::Deb"
+       }
+      ],
+      "ports": [
+       {
+        "port": 502,
+        "protocol": "tcp",
+        "package": {
+         "product": "modbus-server",
+         "version": "1.2.0"
+        }
+       },
+       {
+        "port": 44818,
+        "protocol": "udp"
+       },
+       {
+        "port": 0,
+        "protocol": "tcp"
+       },
+       {
+        "port": 22
+       }
+      ],
+      "services": [
+       {
+        "name": "sshd",
+        "status": "running",
+        "updated_at": "2026-08-14T09:00:00.000Z"
+       },
+       {
+        "name": "modbusd",
+        "status": "running"
+       }
+      ],
+      "metadata": [
+       {
+        "key": "plant-line",
+        "value": "3"
+       }
+      ],
+      "connector": {
+       "id": 4,
+       "type": "Connectors::Agent"
+      },
+      "security_issues": [
+       {
+        "sid": "cw-weak-tls"
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "vuln-detail-102",
+   "match": {
+    "method": "GET",
+    "path": "/api/v3/vulnerabilities/servers/102"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "id": 102,
+      "addresses": [
+       "WIN-GNVEC8UIKUD",
+       "127.0.0.1"
+      ],
+      "analyzed_at": "2026-08-13T22:05:00.000Z",
+      "cve_announcements": [],
+      "updates": []
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "asset-detail-102",
+   "match": {
+    "method": "GET",
+    "path": "/api/v3/assets/servers/102"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "id": 102,
+      "packages": [
+       {
+        "product": "Microsoft Edge",
+        "version": "127.0.1",
+        "type": "Packages::Windows",
+        "vendor": "Microsoft"
+       },
+       {
+        "product": "KB5041585",
+        "version": "1",
+        "type": "Packages::Kb"
+       }
+      ],
+      "ports": [
+       {
+        "port": 3389,
+        "protocol": "tcp"
+       }
+      ],
+      "services": [
+       {
+        "name": "TermService",
+        "status": "running"
+       }
+      ],
+      "metadata": []
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 2,
+  "ids": [
+   "cyberwatch:127.0.0.1:101",
+   "cyberwatch:127.0.0.1:102"
+  ],
+  "request_count": 6,
+  "requests_include": [
+   {
+    "method": "GET",
+    "path": "/api/v3/vulnerabilities/servers",
+    "query_contains": "per_page=500"
+   },
+   {
+    "method": "GET",
+    "path": "/api/v3/vulnerabilities/servers/101"
+   },
+   {
+    "method": "GET",
+    "path": "/api/v3/assets/servers/101"
+   },
+   {
+    "header_contains": "Basic "
+   }
+  ],
+  "min_software_total": 5,
+  "min_services_total": 3,
+  "log_contains": [
+   "skipping server with no id: hostname=ghost-record",
+   "reported 2 assets"
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

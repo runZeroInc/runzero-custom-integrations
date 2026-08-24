@@ -1,0 +1,88 @@
+{
+  "name": "import",
+  "integration": "greenbone",
+  "script": "greenbone/greenbone.star",
+  "description": "The full import path driven by a transcript recorded from a live Greenbone appliance (gvmd 25.2.1, GMP 22.6) over the gvmd UNIX socket. Addresses, MACs and UUIDs are redacted and TLS certificate material is stripped, but the XML is otherwise byte-for-byte what gvmd emitted: element order, the mix of single- and double-quoted attributes, entity-escaped NVT names, empty elements, and the tail-text encodings the parser depends on. Two real pages are replayed -- the report's first page and its real tail page, which is short and therefore ends the walk. Between them they cover the outer/inner <report> nesting; results grouped by host across a page boundary; the <ports> summary, where the port string is the TAIL text after <host> rather than the element's own text; host <detail> blocks carrying best_os_txt, best_os_cpe, MAC, ports/tcp_ports CSV and a Services triple; CPE-named details whose value is the port location, plus App details naming application CPEs; a 'general/CPE-T' pseudo-port and an app CPE whose location is a bare '/'; and an <errors> section whose <error> children are shaped almost exactly like results and carry negative severities. Errors are kept in the fixture precisely so they cannot be mistaken for results: a negative severity reaching Vulnerability(severityScore=) is floored at 0.0 by the platform and fails the ENTIRE record, so the importer must read only results/result. Host 1 deliberately yields no software -- its only CPE detail is an OS CPE (cpe:/o:), which the importer does not treat as an application. The namespaced_ids invariant is skipped because the importer adopts gvmd's bare asset UUID as the runZero id; that is a real deviation from the repo convention and is reported separately, not something this fixture should silently bless.",
+  "kwargs": {
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "fixture-user",
+    "gmp_password": "fixture-password",
+    "tls_disable_validation": "true",
+    "max_age_days": "0",
+    "page_size": "8"
+  },
+  "gmp": {
+    "routes": [
+      {
+        "name": "authenticate",
+        "match": {"command": "authenticate"},
+        "responses": [{"xml_file": "authenticate-ok.xml"}]
+      },
+      {
+        "name": "get-tasks",
+        "match": {"command": "get_tasks"},
+        "responses": [{"xml_file": "tasks.xml"}]
+      },
+      {
+        "name": "get-reports-paged",
+        "match": {"command": "get_reports"},
+        "responses": [
+          {"xml_file": "report-page1.xml"},
+          {"xml_file": "report-page2.xml"}
+        ],
+        "when_exhausted": "error"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  },
+  "expect": {
+    "asset_count": 2,
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GMP", "path": "authenticate"},
+      {"method": "GMP", "path": "get_tasks", "body_contains": "rows=-1"},
+      {"path": "get_reports", "body_contains": "levels=hmlg min_qod=70 first=1 rows=8 sort=host"},
+      {"path": "get_reports", "body_contains": "first=9 rows=8"},
+      {"path": "get_reports", "body_contains": "details=\"1\" lean=\"1\""},
+      {"path": "get_reports", "body_contains": "apply_overrides=0"}
+    ],
+    "requests_absent": [
+      {"path": "get_reports", "body_contains": "first=17"}
+    ],
+    "log_contains": [
+      "greenbone: 1 task(s) found",
+      "greenbone: importing task 'Lab All' report 00000000 (scan_end 2026-08-16T13:57:09Z)",
+      "greenbone: imported 2 assets from 1 report(s)"
+    ],
+    "assets": [
+      {
+        "id": "00000000-0000-4000-8000-000000000009",
+        "fields": {
+          "os": "Linux Kernel",
+          "ipAddresses": "10.0.0.1",
+          "greenbone.report_id": "00000000-0000-4000-8000-000000000007",
+          "greenbone.task": "Lab All",
+          "greenbone.scan_end": "2026-08-16T13:57:09Z",
+          "greenbone.os_cpe": "cpe:/o:linux:kernel",
+          "greenbone.asset_id": "00000000-0000-4000-8000-000000000009"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000062",
+        "fields": {
+          "os": "SonicWall SMA Firmware",
+          "ipAddresses": "10.0.2.17",
+          "greenbone.os_cpe": "cpe:/o:sonicwall:sma_firmware",
+          "greenbone.scan_end": "2026-08-16T13:57:09Z"
+        }
+      }
+    ],
+    "min_services_total": 5,
+    "min_software_total": 4,
+    "min_vulnerabilities_total": 12
+  }
+}

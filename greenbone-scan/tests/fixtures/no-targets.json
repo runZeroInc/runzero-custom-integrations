@@ -1,0 +1,50 @@
+{
+  "name": "no-targets",
+  "integration": "greenbone-scan",
+  "script": "greenbone-scan/greenbone-scan.star",
+  "description": "The export filter matches nothing scannable -- here one hostname-only asset whose `address` column is empty, which is what an asset discovered by a custom integration rather than a network observation looks like in this CSV. The behaviour under test is the early return: with zero addresses the script must stop BEFORE connecting to Greenbone and say which filter came up empty, because creating a Greenbone target with no hosts and then starting a task against it produces a scan that runs and finds nothing, and an operator reading the Greenbone side cannot tell that apart from a scan that legitimately found nothing. request_count==1 is the assertion that the GMP leg was never reached -- and it is also why this scenario needs no transport parameters at all, unlike its sibling.",
+  "kwargs": {
+    "runzero_url": "$BASE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "export_filter": "alive:t has_public:t",
+    "transport": "tls",
+    "gmp_host": "127.0.0.1",
+    "gmp_username": "admin",
+    "gmp_password": "fixture-gmp-password"
+  },
+  "routes": [
+    {
+      "name": "runzero asset CSV export, nothing addressable",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.csv"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "text/csv; charset=utf-8"
+          },
+          "text": "﻿id,organization,site,detected_by,type,os,os_version,hw,address,addresses_scope,addresses_extra,newest_mac,newest_mac_vendor,newest_mac_age,macs,mac_vendors,hostname,hostnames,risk,risk_rank,criticality,criticality_rank,owners,tags,domains,service_count,service_count_tcp,service_count_udp,service_count_arp,service_count_icmp,lowest_ttl,lowest_rtt,services,alive,first_seen_unix,first_seen_iso,last_updated_unix,last_updated_iso,last_seen_unix,last_seen_iso,comments,service_ports_tcp,service_ports_udp,service_protocols,service_products,last_agent_name,last_task_id,source_ids,sources,custom_integration_ids,eol_os,eol_os_ext,serialNumbers,fp.os.cpe23,category,functions,vlan,purdue_level\r\nad5f4e92-6a8c-4b5e-b374-c06fbeb08299,Fixture Org,HQ,,Cloud Resource,,,,,,,,,,,,queue-consumer,,,,,,,,,,,,,,,,,true,,,,,,,,,,,,,,,,,,,,,,,,\r\n"
+        }
+      ]
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1.0/export/org/assets.csv"
+      }
+    ],
+    "log_contains": [
+      "greenbone-scan: 0 assets matched export filter 'alive:t has_public:t'; nothing to scan, no Greenbone target created"
+    ]
+  }
+}

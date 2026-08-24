@@ -1,0 +1,145 @@
+{
+ "name": "reveal360-token-refresh",
+ "integration": "extrahop",
+ "description": "REGRESSION LOCK for the mid-run 401 on RevealX 360. Bearer tokens from /oauth2/token are valid for about ten minutes (the README's own words), and the token used to be fetched once and never refreshed, so an estate whose walk outlived it got 'status 401' mid-run and quietly imported a partial inventory. page_size=1 makes every page full so the walk keeps going: page 1 succeeds on the startup token, page 2 answers 401 once, and the script must mint a SECOND token (the token route serves fixture-access-token-2 on its second call), retry the rejected search with it, and finish the walk -- both devices must import. 401 is deliberately not in the transport retry list, so the recovery must come from the re-auth path, and the token route is when_exhausted:error so more than two mints fails loudly.",
+ "kwargs": {
+  "url": "$BASE",
+  "deployment": "reveal360",
+  "client_id": "fixture-client-id",
+  "client_secret": "fixture-client-secret",
+  "require_ip_address": "false",
+  "include_software": "false",
+  "page_size": "1"
+ },
+ "routes": [
+  {
+   "name": "token",
+   "match": {
+    "method": "POST",
+    "path": "/oauth2/token"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "access_token": "fixture-access-token-1",
+      "token_type": "Bearer",
+      "expires_in": 600
+     }
+    },
+    {
+     "status": 200,
+     "json": {
+      "access_token": "fixture-access-token-2",
+      "token_type": "Bearer",
+      "expires_in": 600
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "networks",
+   "match": {
+    "method": "GET",
+    "path": "/api/v1/networks"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": [
+      {
+       "node_id": null,
+       "appliance_uuid": "appl-uuid-360r"
+      }
+     ]
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "device-search",
+   "match": {
+    "method": "POST",
+    "path": "/api/v1/devices/search"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": [
+      {
+       "id": 601,
+       "discovery_id": "refresh01",
+       "node_id": null,
+       "is_l3": false,
+       "macaddr": "00:11:22:33:88:01",
+       "ipaddr4": "10.41.0.7",
+       "dns_name": "refresh01.corp.example.com",
+       "role": "http_server",
+       "last_seen_time": 1786000000000
+      }
+     ]
+    },
+    {
+     "status": 401,
+     "json": {
+      "error_message": "API key or bearer token expired"
+     }
+    },
+    {
+     "status": 200,
+     "json": [
+      {
+       "id": 602,
+       "discovery_id": "refresh02",
+       "node_id": null,
+       "is_l3": false,
+       "macaddr": "00:11:22:33:88:02",
+       "ipaddr4": "10.41.0.8",
+       "dns_name": "refresh02.corp.example.com",
+       "role": "db_server",
+       "last_seen_time": 1786000000000
+      }
+     ]
+    },
+    {
+     "status": 200,
+     "json": []
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 2,
+  "ids": [
+   "extrahop:appl-uuid-360r:refresh01",
+   "extrahop:appl-uuid-360r:refresh02"
+  ],
+  "request_count": 7,
+  "requests_include": [
+   {
+    "method": "POST",
+    "path": "/oauth2/token",
+    "body_contains": "grant_type=client_credentials"
+   },
+   {
+    "method": "POST",
+    "path": "/api/v1/devices/search",
+    "header_contains": "Bearer fixture-access-token-1"
+   },
+   {
+    "method": "POST",
+    "path": "/api/v1/devices/search",
+    "header_contains": "Bearer fixture-access-token-2"
+   }
+  ],
+  "log_contains": [
+   "extrahop: access token rejected mid-run; requesting a new one",
+   "extrahop: reported 2 devices"
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

@@ -1,0 +1,138 @@
+{
+  "name": "paged",
+  "description": "Three-page walk over /api/servers, proving page= increments until an empty batch ends the loop and that every page's devices are reported. Ids are emitted in the scoped automox:<org id>:<device id> form, enforced by the namespaced_ids invariant.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "packages",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "orgs",
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 4242,
+              "name": "Fixture Org"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "servers",
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 3001,
+              "name": "fixture-page1-a",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "ip_addrs_private": [
+                "192.0.2.101"
+              ]
+            },
+            {
+              "id": 3002,
+              "name": "fixture-page1-b",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "ip_addrs_private": [
+                "192.0.2.102"
+              ]
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": {
+            "data": [
+              {
+                "id": 3003,
+                "name": "fixture-page2-a",
+                "os_family": "Windows",
+                "os_name": "Windows 11",
+                "detail": {
+                  "NICS": [
+                    {
+                      "MAC": "00:11:22:bb:00:03",
+                      "IPS": [
+                        "198.51.100.103"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "automox:4242:3001",
+      "automox:4242:3002",
+      "automox:4242:3003"
+    ],
+    "assets": [
+      {
+        "id": "automox:4242:3003",
+        "fields": {
+          "ipAddresses": "198.51.100.103",
+          "macAddresses": "00:11:22:bb:00:03"
+        }
+      }
+    ],
+    "requests_include": [
+      {
+        "path": "/api/servers",
+        "query_contains": "page=0"
+      },
+      {
+        "path": "/api/servers",
+        "query_contains": "page=1"
+      },
+      {
+        "path": "/api/servers",
+        "query_contains": "page=2"
+      }
+    ]
+  }
+}

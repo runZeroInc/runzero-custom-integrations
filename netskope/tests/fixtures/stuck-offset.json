@@ -1,0 +1,55 @@
+{
+  "name": "stuck-offset",
+  "integration": "netskope",
+  "description": "A server that ignores `offset` and replays the same non-empty page forever. Without a repeated-page guard the walk would re-import the identical page until the CONFIG maxPages backstop raised, doing a run's worth of useless requests first. The guard compares each page's length and first record to the previous page and stops with a log line before importing the replay, so the two devices come out exactly once. Skips namespaced_ids: netskope uses the bare nsdeviceuid as the foreign id, with no tenant scope; a documented, deliberate gap.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-netskope-token"
+  },
+  "routes": [
+    {
+      "name": "clientstatus",
+      "match": {"method": "GET", "path": "/api/v2/events/datasearch/clientstatus"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "ok": 1,
+            "status": 200,
+            "result": [
+              {
+                "_id": {"nsdeviceuid": "NSDEV-STUCK-0001"},
+                "hostname": "stuck-01",
+                "mac_addresses": ["00:1B:44:11:3A:E1"],
+                "os": "Windows",
+                "ns_tenant_id": "fixture-tenant"
+              },
+              {
+                "_id": {"nsdeviceuid": "NSDEV-STUCK-0002"},
+                "hostname": "stuck-02",
+                "mac_addresses": ["00:1B:44:11:3A:E2"],
+                "os": "Windows",
+                "ns_tenant_id": "fixture-tenant"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "NSDEV-STUCK-0001",
+      "NSDEV-STUCK-0002"
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "netskope: server repeated the page at offset 2; stopping to avoid re-importing"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "name": "legacy-uncompressed-data",
+  "integration": "runzero-task-sync",
+  "script": "runzero-task-sync/runzero-task-sync.star",
+  "description": "An old task whose scan data was never migrated to gzip. This is not a hypothetical: Task.GetScanDataPresignedURL HEADs the `<type>_<task>_<site>.json.gz` object and, when it is absent, presigns the uncompressed `<type>_<task>_<site>.json` path instead (models/task.go, still carrying its 'remove once all data and agents are migrated to gzip' TODO). So /org/tasks/<id>/data can legitimately redirect to a body that is plain NDJSON, and this integration exists precisely to mirror historical tasks between consoles -- old tasks are its subject matter, not an edge case. Starlark has no exception handling, so gzip_decompress on a body with no gzip magic does not fail the task, it ABORTS main: the run dies mid-list and every task after the legacy one is silently never synced. The scenario puts the legacy task FIRST and a normal gzipped task second for exactly that reason -- asserting the second task's object was fetched and imported is what proves the first one did not take the run down with it. Both must arrive at the destination gzip-compressed, since the script always recompresses before the PUT.",
+
+  "kwargs": {
+    "src_url": "$BASE",
+    "src_org_id": "aaaaaaaa-1111-4222-8333-444444444444",
+    "src_task_search_filter": "type:scan",
+    "dst_url": "$BASE",
+    "dst_org_id": "bbbbbbbb-5555-4666-8777-888888888888",
+    "dst_site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+    "src_api_token": "OT-source-fixture-token",
+    "dst_api_token": "OT-destination-fixture-token"
+  },
+
+  "routes": [
+    {
+      "name": "source task list",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "d3d3d3d3-9999-4aaa-8bbb-cccccccccccc",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "name": "Archived 2019 sweep",
+              "created_at": 1560000000,
+              "updated_at": 1560003600,
+              "hidden": false,
+              "recur": false,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "params": {},
+              "stats": {}
+            },
+            {
+              "id": "d4d4d4d4-2222-4333-8444-555555555555",
+              "organization_id": "aaaaaaaa-1111-4222-8333-444444444444",
+              "site_id": "eeeeeeee-1111-4222-8333-444444444444",
+              "type": "scan",
+              "status": "processed",
+              "name": "Recent sweep",
+              "created_at": 1755200000,
+              "updated_at": 1755203600,
+              "hidden": false,
+              "recur": false,
+              "site_name": "HQ",
+              "agent_name": "explorer-hq-01",
+              "params": {},
+              "stats": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "legacy task data redirect",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d3d3d3d3-9999-4aaa-8bbb-cccccccccccc/data"},
+      "responses": [
+        {
+          "status": 303,
+          "headers": {"Location": "$BASE/scan-bucket/scan_d3d3d3d3_eeeeeeee.json"},
+          "json": {"url": "$BASE/scan-bucket/scan_d3d3d3d3_eeeeeeee.json"}
+        }
+      ]
+    },
+    {
+      "name": "legacy uncompressed scan data object",
+      "match": {"method": "GET", "path": "/scan-bucket/scan_d3d3d3d3_eeeeeeee.json"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/json"},
+          "text": "{\"type\": \"scan-info\", \"task_id\": \"d3d3d3d3-9999-4aaa-8bbb-cccccccccccc\", \"version\": \"3.10.0\"}\n{\"info\": {\"id\": \"asset-legacy1\", \"ipAddresses\": \"10.42.0.44\", \"hostnames\": \"legacy-01.corp.example.com\"}}\n"
+        }
+      ]
+    },
+    {
+      "name": "modern task data redirect",
+      "match": {"method": "GET", "path": "/api/v1.0/org/tasks/d4d4d4d4-2222-4333-8444-555555555555/data"},
+      "responses": [
+        {
+          "status": 303,
+          "headers": {"Location": "$BASE/scan-bucket/scan_d4d4d4d4_eeeeeeee.json.gz"},
+          "json": {"url": "$BASE/scan-bucket/scan_d4d4d4d4_eeeeeeee.json.gz"}
+        }
+      ]
+    },
+    {
+      "name": "modern gzipped scan data object",
+      "match": {"method": "GET", "path": "/scan-bucket/scan_d4d4d4d4_eeeeeeee.json.gz"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "application/gzip"},
+          "body_base64": "H4sIAAAAAAAC/02Myw7CIBBF935FM2uHUKBquvNLDCkYifIIQ4ym6b8LZePMZubenLNC+SYL8wC06IAu3CMcByianjdnWm5UXxR1UEkp8aKUwulvGvK2mVwMDZkYZ+LEz0IyDtthhV07D/XYlZrIFvTR2BzGxrp0NSbbGlPrR86UqI4ufkQqQftedQj5yJaYE7Mf7dPL1sfDth1+lYlvVc4AAAA="
+        }
+      ]
+    },
+    {
+      "name": "destination import",
+      "match": {"method": "PUT", "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "id": "f2f2f2f2-1111-4222-8333-444444444444",
+            "organization_id": "bbbbbbbb-5555-4666-8777-888888888888",
+            "site_id": "cccccccc-9999-4aaa-8bbb-cccccccccccc",
+            "type": "import",
+            "status": "new",
+            "name": "Scan Import",
+            "created_at": 1755400000,
+            "updated_at": 1755400000,
+            "hidden": false,
+            "recur": false,
+            "params": {},
+            "stats": {}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+
+  "default_response": {"status": 404, "text": "no fixture route"},
+
+  "expect": {
+    "asset_count": 0,
+    "request_count": 7,
+    "requests_include": [
+      {"method": "GET", "path": "/scan-bucket/scan_d3d3d3d3_eeeeeeee.json"},
+      {"method": "GET", "path": "/scan-bucket/scan_d4d4d4d4_eeeeeeee.json.gz"},
+      {
+        "method": "PUT",
+        "path": "/api/v1.0/org/sites/cccccccc-9999-4aaa-8bbb-cccccccccccc/import",
+        "header": {"Content-Encoding": "gzip"}
+      }
+    ],
+    "requests_absent": [
+      {"method": "POST", "path_contains": "/hide"}
+    ],
+    "log_contains": [
+      "Successfully synced task: d3d3d3d3-9999-4aaa-8bbb-cccccccccccc",
+      "Successfully synced task: d4d4d4d4-2222-4333-8444-555555555555"
+    ]
+  }
+}

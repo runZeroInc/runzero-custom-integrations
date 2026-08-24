@@ -1,0 +1,128 @@
+{
+  "name": "auth-seats",
+  "integration": "pihole",
+  "description": "Every API seat is taken, which is Pi-hole's most common failure for an automated caller: sessions last 30 minutes and the concurrent limit is small, so a task that never logs out locks out the administrator. The run must name the cause and the setting that fixes it, and must not go on to read anything.",
+  "kwargs": {
+    "url": "$BASE",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {
+        "method": "POST",
+        "path": "/api/auth"
+      },
+      "responses": [
+        {
+          "status": 429,
+          "json": {
+            "error": {
+              "key": "api_seats_exceeded",
+              "message": "API seats exceeded",
+              "hint": "increase webserver.api.max_sessions"
+            },
+            "took": 0.003
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "version",
+      "match": {
+        "method": "GET",
+        "path": "/api/info/version"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "version": {
+              "core": {
+                "local": {
+                  "branch": "master",
+                  "version": "v6.1.2",
+                  "hash": "955e36a9"
+                },
+                "remote": {
+                  "version": "v6.1.2",
+                  "hash": "955e36a9"
+                }
+              },
+              "web": {
+                "local": {
+                  "branch": "master",
+                  "version": "v6.1",
+                  "hash": "f69f7e88"
+                },
+                "remote": {
+                  "version": "v6.1",
+                  "hash": "f69f7e88"
+                }
+              },
+              "ftl": {
+                "local": {
+                  "branch": "master",
+                  "version": "v6.1.3",
+                  "hash": "64441ed6"
+                },
+                "remote": {
+                  "version": "v6.1.3",
+                  "hash": "64441ed6"
+                }
+              },
+              "docker": {
+                "local": null,
+                "remote": null
+              }
+            },
+            "took": 0.003
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "logout",
+      "match": {
+        "method": "DELETE",
+        "path": "/api/auth"
+      },
+      "responses": [
+        {
+          "status": 204,
+          "text": ""
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "error": {
+        "key": "not_found",
+        "message": "Not found",
+        "hint": null
+      },
+      "took": 0.001
+    }
+  },
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "the login was rate-limited or no API seat was free",
+      "raise webserver.api.max_sessions"
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/api/network/devices"
+      }
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,101 @@
+{
+  "name": "detail-cap",
+  "integration": "cyberark-epm",
+  "description": "Detail enrichment on, with a cap of one call and two endpoints. The first endpoint gets its detail (OS version and build, adapter MAC and IPs, vendor, serial, FQDN); the second is imported without detail and the skip is logged. Proves the enrichment mapping and that the rate-limit cap is honored rather than silently exceeded.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_details": "true",
+    "detail_limit": 1
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/EPM/API/Auth/EPM/Logon"},
+      "responses": [
+        {"status": 200, "json": {"IsPasswordExpired": false, "ManagerURL": "$BASE", "EPMAuthenticationResult": "session-tok-1"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sets",
+      "match": {"method": "GET", "path": "/EPM/API/Sets"},
+      "responses": [
+        {"status": 200, "json": {"SetsCount": 1, "Sets": [{"Id": "44e4a444-0004-4004-8004-000000000004", "Name": "Detailed"}]}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoint-detail",
+      "match": {"method": "POST", "path": "/EPM/API/Sets/44e4a444-0004-4004-8004-000000000004/Endpoints/eeee0001-0000-4000-8000-000000000001/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "name": "WS-DET-01",
+            "platform": "Windows",
+            "inventory": {
+              "osInfo": {"os": {"version": "Windows 10", "build": "19045.4412", "ubr": 4412, "osPlatform": "Windows"}},
+              "hardware": {"machineInfo": {"is64bit": true, "vendor": "Dell Inc.", "model": "Latitude 5440", "serialNumber": "7YXK123"}},
+              "network": {
+                "fullComputerName": "ws-det-01.corp.example.com",
+                "networkAdapters": [
+                  {"macAddress": "00:50:56:aa:bb:01", "ipSubnets": [{"ipAddress": "10.44.1.10", "subnetMask": "255.255.255.0"}]},
+                  {"macAddress": "00:00:00:00:00:00", "ipSubnets": [{"ipAddress": "169.254.10.10", "subnetMask": "255.255.0.0"}]}
+                ]
+              },
+              "domainInfo": {"isPartOfDomain": true, "domainDnsName": "corp.example.com", "computerNameDnsFullyQualified": "ws-det-01.corp.example.com"}
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "endpoints",
+      "match": {"method": "POST", "path_prefix": "/EPM/API/Sets/44e4a444-0004-4004-8004-000000000004/Endpoints/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "filteredCount": 2,
+            "returnedCount": 2,
+            "endpoints": [
+              {"id": "eeee0001-0000-4000-8000-000000000001", "legacyId": "ffff0001-0000-4000-8000-000000000001", "setId": "44e4a444-0004-4004-8004-000000000004", "name": "WS-DET-01", "platform": "Windows", "version": "24.1.0.100", "connectionStatus": "Connected", "platformType": "Desktop", "installTime": "2025-05-01T00:00:00Z", "lastConnected": "2026-08-20T00:00:00Z", "ip": "10.44.1.10"},
+              {"id": "eeee0002-0000-4000-8000-000000000002", "legacyId": "ffff0002-0000-4000-8000-000000000002", "setId": "44e4a444-0004-4004-8004-000000000004", "name": "WS-DET-02", "platform": "Windows", "version": "24.1.0.100", "connectionStatus": "Connected", "platformType": "Desktop", "installTime": "2025-05-02T00:00:00Z", "lastConnected": "2026-08-20T00:00:00Z", "ip": "10.44.1.11"}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "cyberark-epm:$HOST:ffff0001-0000-4000-8000-000000000001",
+        "fields": {
+          "os": "Windows 10",
+          "macAddresses": "00:50:56:aa:bb:01",
+          "serialNumber": "7YXK123",
+          "domain": "corp.example.com"
+        }
+      },
+      {
+        "id": "cyberark-epm:$HOST:ffff0002-0000-4000-8000-000000000002",
+        "fields": {
+          "os": "Windows"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "request_count": 4,
+    "log_contains": [
+      "cyberark-epm: detail cap reached; 1 endpoints in set Detailed imported without detail"
+    ]
+  },
+  "check_determinism": true
+}

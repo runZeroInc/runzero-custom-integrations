@@ -1,0 +1,64 @@
+{
+  "name": "empty",
+  "integration": "open-audit",
+  "description": "A server with no devices the credential can see, which is what a fresh install or an organisation filter matching nothing looks like. Open-AudIT answers 200 with an empty data array rather than an error, so the run must report zero assets and exit cleanly instead of treating the empty collection as a failure. An empty FIRST page with the default status filter applied is ambiguous -- it is also what a server version that fails to parse notin(deleted,lost,retired) as an operator answers, because the literal equality matches nothing -- so the walk retries exactly once without the server-side filter (excluding retired devices client-side instead) before concluding the estate is empty. Asserts both requests, the retry log line, and that no per-device detail request is attempted.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "org_id": "7"
+  },
+  "routes": [
+    {
+      "name": "logon",
+      "match": {"method": "POST", "path": "/open-audit/index.php/logon"},
+      "responses": [
+        {"status": 200, "headers": {"Set-Cookie": "ci_session=fixture-empty-session; Path=/"}, "json": {"id": "3", "name": "runzero"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/open-audit/index.php/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 500, "offset": 0, "total": 0, "filtered": 0},
+            "included": [],
+            "logs": [],
+            "data": []
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "meta": {"collection": "devices", "action": "collection", "format": "json", "header": 200, "version": 1, "limit": 500, "offset": 0, "total": 0, "filtered": 0},
+            "included": [],
+            "logs": [],
+            "data": []
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "devices.org_id=7"},
+      {"method": "GET", "path": "/open-audit/index.php/devices", "query_contains": "devices.status=notin"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/open-audit/index.php/devices/"}
+    ],
+    "log_contains": [
+      "open-audit: no devices matched the status filter; retrying without it and excluding retired devices client-side",
+      "open-audit: no assets retrieved"
+    ]
+  },
+  "invariants": {"skip": []},
+  "check_determinism": true
+}

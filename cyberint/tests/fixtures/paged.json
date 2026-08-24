@@ -1,0 +1,221 @@
+{
+  "name": "paged",
+  "integration": "cyberint",
+  "description": "The regression test for the alerts request having no paging at all. The endpoint used to be posted once with an empty {} body, so whatever a single unpaged response carried was the entire import and every alert past it was invisible.\n\nCyberint pages POST /alert/api/v1/alerts with a 1-based `page` and a `size`, both top-level fields of the request body, and answers with `total` -- the count across ALL pages -- alongside `alerts`. There is no cursor. The contract comes from four agreeing implementations, two of them Cyberint's own: github.com/CyberInt/servicenow-integration (fetchAlerts(page) posts {page, size, filters} and loops on the returned total), github.com/CyberInt/qradar-universal-cloud-rest-api (posts {\"page\": 1, \"size\": ...} literally), Check Point's Splunk SOAR app, and the Cortex XSOAR pack.\n\nThree pages, matched on the page number in the POST body, so a walk that failed to advance starves on page 2 rather than quietly passing. Every route is when_exhausted:error, so no request may repeat. Each page carries a slice of a declared total of 7, and reaching that count is what ends the walk -- which is the terminator Cyberint's own ServiceNow client uses, since `total` counts matching alerts across every page rather than the length of one.\n\nThe assertions that matter are the domains that exist only on pages 2 and 3: page2-only.example.com and page3-only.example.com. A single-request import produces one asset and this scenario fails on all three counts. requests_absent proves no fourth page is requested once the count is satisfied.\n\nnamespaced_ids is skipped: the foreign id is the dash-substituted domain, which carries no tenant scope -- a domain name is globally meaningful, so two tenants importing one domain landing on one asset is arguably correct.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-cyberint-cookie"
+  },
+  "routes": [
+    {
+      "name": "alerts-page-2",
+      "match": {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts",
+        "body_contains": "\"page\":2"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 7,
+            "alerts": [
+              {
+                "id": "alert-p2-a",
+                "severity": "high",
+                "title": "Typosquat domain registered",
+                "description": "A lookalike domain was registered this week.",
+                "recommendation": "File a takedown.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "page2-only.example.com"
+                  }
+                ]
+              },
+              {
+                "id": "alert-p2-b",
+                "severity": "medium",
+                "title": "Credential pair offered for sale",
+                "description": "A credential pair appeared on a paste site.",
+                "recommendation": "Force a password reset.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "page2-only.example.com"
+                  }
+                ]
+              },
+              {
+                "id": "alert-p2-c",
+                "severity": "low",
+                "title": "Expiring TLS certificate",
+                "description": "The certificate expires within 14 days.",
+                "recommendation": "Renew the certificate.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "spans-pages.example.com"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "alerts-page-3",
+      "match": {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts",
+        "body_contains": "\"page\":3"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 7,
+            "alerts": [
+              {
+                "id": "alert-p3-a",
+                "severity": "critical",
+                "title": "Exposed administrative interface",
+                "description": "An administrative interface is reachable from the public internet.",
+                "recommendation": "Restrict the interface to an allowlisted network.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "page3-only.example.com"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "alerts-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 7,
+            "alerts": [
+              {
+                "id": "alert-p1-a",
+                "severity": "critical",
+                "title": "Source code leaked to a public repository",
+                "description": "A private repository was published.",
+                "recommendation": "Request removal and rotate any embedded secrets.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "page1-only.example.com"
+                  }
+                ]
+              },
+              {
+                "id": "alert-p1-b",
+                "severity": "high",
+                "title": "Phishing page impersonating the brand",
+                "description": "A phishing page is live.",
+                "recommendation": "File a takedown.",
+                "related_assets": [
+                  {
+                    "type": "domain",
+                    "name": "spans-pages.example.com"
+                  }
+                ]
+              },
+              {
+                "id": "alert-p1-c",
+                "severity": "medium",
+                "title": "Mentioned in a threat actor channel",
+                "description": "The brand was named in a monitored channel.",
+                "recommendation": "Monitor.",
+                "related_assets": [
+                  {
+                    "type": "ip",
+                    "name": "203.0.113.9"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "page1-only-example-com",
+      "page2-only-example-com",
+      "page3-only-example-com",
+      "spans-pages-example-com"
+    ],
+    "assets": [
+      {
+        "id": "page2-only-example-com",
+        "fields": {
+          "hostnames": "page2-only.example.com"
+        }
+      },
+      {
+        "id": "page3-only-example-com",
+        "fields": {
+          "hostnames": "page3-only.example.com"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 6,
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts",
+        "body_contains": "\"page\":1"
+      },
+      {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts",
+        "body_contains": "\"page\":2"
+      },
+      {
+        "method": "POST",
+        "path": "/alert/api/v1/alerts",
+        "body_contains": "\"page\":3"
+      },
+      {
+        "body_contains": "\"size\":100"
+      },
+      {
+        "header": {
+          "Cookie": "access_token=fixture-cyberint-cookie"
+        }
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "\"page\":4"
+      }
+    ],
+    "log_contains": [
+      "cyberint: read 7 alerts of 7 reported"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

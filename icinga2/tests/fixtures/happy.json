@@ -1,0 +1,384 @@
+{
+  "name": "happy",
+  "integration": "icinga2",
+  "description": "One host query plus the service-check summary. Proves the read is sent as POST + X-HTTP-Method-Override: GET carrying attrs as a JSON array (a repeated query key the runtime cannot express); that address/address6 are classified by what they actually hold, so an FQDN in address becomes a hostname and an IP becomes an interface; that a MAC recovered from vars is used for the interface but never for the id; that a loopback-only host is imported with no interface rather than sharing 127.0.0.1 with the estate; that a future last_check is clamped to now instead of dropping the whole record; and that Icinga service checks raise no runZero Service objects, only counts and names.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "runzero",
+    "password": "fixture-secret",
+    "include_checks": "true",
+    "include_check_output": "true"
+  },
+  "routes": [
+    {
+      "name": "status",
+      "match": {
+        "method": "GET",
+        "path": "/v1/status/IcingaApplication"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "results": [
+              {
+                "perfdata": [],
+                "status": {
+                  "icingaapplication": {
+                    "app": {
+                      "enable_event_handlers": true,
+                      "enable_flapping": true,
+                      "enable_host_checks": true,
+                      "enable_notifications": true,
+                      "enable_perfdata": true,
+                      "enable_service_checks": true,
+                      "node_name": "icinga.example.com",
+                      "pid": 59819.0,
+                      "program_start": 1755000000.093372,
+                      "version": "r2.14.2-1"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "services",
+      "match": {
+        "method": "POST",
+        "path": "/v1/objects/services"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "results": [
+              {
+                "name": "web01.example.com!disk",
+                "type": "Service",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "host_name": "web01.example.com",
+                  "name": "disk",
+                  "display_name": "Disk usage",
+                  "state": 0.0,
+                  "check_command": "disk"
+                }
+              },
+              {
+                "name": "web01.example.com!http",
+                "type": "Service",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "host_name": "web01.example.com",
+                  "name": "http",
+                  "display_name": "HTTP",
+                  "state": 2,
+                  "check_command": "http"
+                }
+              },
+              {
+                "name": "sw-core-01!uptime",
+                "type": "Service",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "host_name": "sw-core-01",
+                  "name": "uptime",
+                  "display_name": "SNMP uptime",
+                  "state": 0,
+                  "check_command": "snmp-uptime"
+                }
+              },
+              {
+                "name": "orphan!check",
+                "type": "Service",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "name": "check",
+                  "display_name": "Check with no host",
+                  "state": 0
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts",
+      "match": {
+        "method": "POST",
+        "path": "/v1/objects/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "results": [
+              {
+                "name": "web01.example.com",
+                "type": "Host",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "name": "web01.example.com",
+                  "display_name": "Web frontend 01",
+                  "address": "192.0.2.24",
+                  "address6": "2001:db8:10::24",
+                  "groups": [
+                    "linux-servers",
+                    "production"
+                  ],
+                  "vars": {
+                    "os": "Linux",
+                    "mac": "AA:BB:CC:11:22:33",
+                    "location": "DC1 rack 14",
+                    "owner": "platform-team",
+                    "notification": {
+                      "mail": {
+                        "groups": [
+                          "icingaadmins"
+                        ]
+                      }
+                    }
+                  },
+                  "state": 0.0,
+                  "state_type": 1.0,
+                  "last_check": 1786840000.4831,
+                  "last_state_change": 1755100000.211,
+                  "last_check_result": {
+                    "output": "PING OK - Packet loss = 0%, RTA = 0.41 ms",
+                    "exit_status": 0.0,
+                    "performance_data": [
+                      "rta=0.414000ms;3000.000000;5000.000000;0.000000",
+                      "pl=0%;80;100;0"
+                    ],
+                    "command": [
+                      "/usr/lib/nagios/plugins/check_ping",
+                      "-H",
+                      "192.0.2.24"
+                    ],
+                    "active": true,
+                    "state": 0.0
+                  },
+                  "check_command": "hostalive",
+                  "zone": "master",
+                  "command_endpoint": "",
+                  "notes": "Front-end web server",
+                  "notes_url": "https://wiki.example.com/web01",
+                  "action_url": "",
+                  "templates": [
+                    "web01.example.com",
+                    "generic-host"
+                  ],
+                  "max_check_attempts": 3.0,
+                  "check_interval": 60.0,
+                  "enable_notifications": true,
+                  "acknowledgement": 0.0,
+                  "downtime_depth": 0.0,
+                  "flapping": false,
+                  "active": true,
+                  "paused": false
+                }
+              },
+              {
+                "name": "sw-core-01",
+                "type": "Host",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "name": "sw-core-01",
+                  "display_name": "Core switch 01",
+                  "address": "sw-core-01.mgmt.example.com",
+                  "address6": "",
+                  "groups": [
+                    "network"
+                  ],
+                  "vars": {
+                    "os": "IOS-XE",
+                    "snmp_community": "public"
+                  },
+                  "state": 1,
+                  "state_type": 1,
+                  "last_check": 1786839000,
+                  "last_state_change": 1786830000,
+                  "check_command": "hostalive",
+                  "zone": "master",
+                  "templates": [
+                    "generic-host"
+                  ],
+                  "max_check_attempts": 5,
+                  "check_interval": 300,
+                  "enable_notifications": true,
+                  "acknowledgement": 1,
+                  "downtime_depth": 0,
+                  "flapping": false,
+                  "active": true,
+                  "paused": false
+                }
+              },
+              {
+                "name": "localhost",
+                "type": "Host",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "name": "localhost",
+                  "display_name": "localhost",
+                  "address": "127.0.0.1",
+                  "address6": "::1",
+                  "groups": [],
+                  "vars": {
+                    "os": "Linux",
+                    "disks": {
+                      "disk /": {
+                        "disk_partitions": "/"
+                      }
+                    }
+                  },
+                  "state": 0,
+                  "state_type": 1,
+                  "last_check": 1786840100,
+                  "check_command": "hostalive",
+                  "templates": [
+                    "generic-host"
+                  ],
+                  "active": true,
+                  "paused": false
+                }
+              },
+              {
+                "name": "future-clock.example.com",
+                "type": "Host",
+                "joins": {},
+                "meta": {},
+                "attrs": {
+                  "name": "future-clock.example.com",
+                  "display_name": "Host on a skewed clock",
+                  "address": "198.51.100.9",
+                  "groups": [
+                    "linux-servers"
+                  ],
+                  "vars": {},
+                  "state": 0,
+                  "state_type": 1,
+                  "last_check": 4102444800,
+                  "check_command": "hostalive",
+                  "active": true,
+                  "paused": false
+                }
+              },
+              {
+                "type": "Host",
+                "attrs": {
+                  "display_name": "Nameless object",
+                  "address": "198.51.100.77",
+                  "check_command": "dummy"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {
+      "error": 404.0,
+      "status": "The requested path was not found."
+    }
+  },
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "icinga2:$HOST:web01.example.com",
+      "icinga2:$HOST:sw-core-01",
+      "icinga2:$HOST:future-clock.example.com"
+    ],
+    "assets": [
+      {
+        "id": "icinga2:$HOST:web01.example.com",
+        "fields": {
+          "os": "Linux",
+          "icinga_state": "UP",
+          "icinga_check_count": "2",
+          "icinga_check_problem_count": "1",
+          "icinga_var_location": "DC1 rack 14",
+          "icinga_var_notification_mail_groups": "icingaadmins",
+          "icinga_last_check_output": "PING OK - Packet loss = 0%, RTA = 0.41 ms",
+          "hostnames": "web01.example.com",
+          "icinga_mac": "AA:BB:CC:11:22:33",
+          "icinga_mac_source_var": "mac",
+          "macAddresses": "a8:bb:cc:11:22:33",
+          "icinga_last_check_epoch": "1786840000"
+        }
+      },
+      {
+        "id": "icinga2:$HOST:sw-core-01",
+        "fields": {
+          "hostnames": "sw-core-01\tsw-core-01.mgmt.example.com",
+          "icinga_state": "DOWN",
+          "icinga_acknowledgement": "NORMAL"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      }
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/v1/objects/hosts",
+        "header": {
+          "x-http-method-override": "GET"
+        },
+        "body_contains": "\"attrs\":[\"name\",\"display_name\",\"address\",\"address6\""
+      },
+      {
+        "method": "POST",
+        "path": "/v1/objects/hosts",
+        "body_contains": "last_check_result"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/objects/services",
+        "body_contains": "\"host_name\""
+      },
+      {
+        "method": "GET",
+        "path": "/v1/status/IcingaApplication"
+      },
+      {
+        "header_contains": "Basic "
+      }
+    ],
+    "log_contains": [
+      "icinga2: connected to Icinga r2.14.2-1",
+      "summarized 3 service checks across 2 hosts",
+      "skipping host object with no name: check_command=dummy",
+      "skipping host localhost: no MAC, routable address, or usable hostname",
+      "icinga2: reported 3 assets"
+    ],
+    "min_services_total": 0,
+    "ids_absent": [
+      "icinga2:$HOST:localhost"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": true
+}

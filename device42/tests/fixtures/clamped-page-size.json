@@ -1,0 +1,185 @@
+{
+ "name": "clamped-page-size",
+ "integration": "device42",
+ "description": "REGRESSION LOCK for silent truncation under a server-side row cap. The script requests limit=1000, but an appliance may clamp the served page below that; the old stop condition compared the page length against the REQUESTED limit, so the first (full, but clamped) page looked short, the walk ended after one request, and every device past page one was invisible while the run reported success. The served page size is now learned from the first response (the cyberwatch trick), the offset advances by rows actually served, and only a page shorter than the LEARNED size ends the walk. Here the appliance clamps to 3 rows per page: pages at offset 0 and 3 are full, offset 6 is short, and all seven devices must import across exactly three requests. Every route is when_exhausted:error so a walk that re-fetches or overshoots fails loudly. namespaced_ids is skipped for the reason recorded in happy: the id is the bare Device42 id with no appliance scope.",
+ "kwargs": {
+  "url": "$BASE",
+  "auth_scheme": "basic",
+  "credential": "Zml4dHVyZTpmaXh0dXJl"
+ },
+ "routes": [
+  {
+   "name": "devices-offset-0",
+   "match": {
+    "method": "GET",
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=0"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "Devices": [
+       {
+        "id": 9501,
+        "name": "d42-clamped-01",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.11",
+          "macaddress": "00:11:22:33:55:01"
+         }
+        ]
+       },
+       {
+        "id": 9502,
+        "name": "d42-clamped-02",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.12",
+          "macaddress": "00:11:22:33:55:02"
+         }
+        ]
+       },
+       {
+        "id": 9503,
+        "name": "d42-clamped-03",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.13",
+          "macaddress": "00:11:22:33:55:03"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "devices-offset-3",
+   "match": {
+    "method": "GET",
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=3"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "Devices": [
+       {
+        "id": 9504,
+        "name": "d42-clamped-04",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.14",
+          "macaddress": "00:11:22:33:55:04"
+         }
+        ]
+       },
+       {
+        "id": 9505,
+        "name": "d42-clamped-05",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.15",
+          "macaddress": "00:11:22:33:55:05"
+         }
+        ]
+       },
+       {
+        "id": 9506,
+        "name": "d42-clamped-06",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.16",
+          "macaddress": "00:11:22:33:55:06"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  },
+  {
+   "name": "devices-offset-6",
+   "match": {
+    "method": "GET",
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=6"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "Devices": [
+       {
+        "id": 9507,
+        "name": "d42-clamped-07",
+        "ip_addresses": [
+         {
+          "ip": "10.91.0.17",
+          "macaddress": "00:11:22:33:55:07"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 7,
+  "ids": [
+   "9501",
+   "9502",
+   "9503",
+   "9504",
+   "9505",
+   "9506",
+   "9507"
+  ],
+  "request_count": 3,
+  "requests_include": [
+   {
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=0"
+   },
+   {
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=3"
+   },
+   {
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=6"
+   },
+   {
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "limit=1000"
+   }
+  ],
+  "requests_absent": [
+   {
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=9"
+   },
+   {
+    "path": "/api/1.0/devices/all/",
+    "query_contains": "offset=1000"
+   }
+  ],
+  "log_contains": [
+   "device42: reported 7 assets"
+  ]
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
+}

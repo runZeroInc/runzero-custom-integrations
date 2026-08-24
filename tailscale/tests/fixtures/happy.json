@@ -1,0 +1,122 @@
+{
+  "name": "happy",
+  "integration": "tailscale",
+  "description": "API-key mode against one tailnet. Covers the tailnet-address interface, the latency map fanned out into per-region attributes, and the documented skip of a device with no id and of a device with no usable address at all. clientConnectivity.endpoints must stay OFF the interfaces: they include the public NAT egress address, which every device in an office shares, so importing them as interface data would cross-correlate unrelated devices - the asset assertions pin that the interfaces carry ONLY the tailnet addresses while the endpoints survive as the tailscale_client_endpoints attribute. namespaced_ids is legitimately skipped: the devices response carries no stable tailnet identifier to scope with, and the configured tailnet name cannot be the scope because tailnets can be renamed -- a rename would re-identify every record. Device ids are minted by Tailscale's central coordination service, unique across tailnets, so two tailnets imported into one runZero org cannot collide.",
+  "kwargs": {
+    "url": "$BASE",
+    "tailnet": "example.com",
+    "api_key_or_client_secret": "tskey-api-fixture-000000"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v2/tailnet/example.com/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "id": "90210000000001",
+                "nodeId": "nFIXTURE1CNTRL",
+                "name": "laptop-anna.example.ts.net",
+                "hostname": "laptop-anna",
+                "user": "anna@example.invalid",
+                "os": "macOS",
+                "clientVersion": "1.62.1",
+                "addresses": ["100.101.10.1", "fd7a:115c:a1e0::1"],
+                "authorized": true,
+                "updateAvailable": false,
+                "keyExpiryDisabled": false,
+                "isExternal": false,
+                "blocksIncomingConnections": false,
+                "created": "2025-06-01T12:00:00Z",
+                "tags": ["tag:laptop", "tag:corp"],
+                "advertisedRoutes": [],
+                "enabledRoutes": [],
+                "clientConnectivity": {
+                  "endpoints": ["198.51.100.9:41641", "10.200.0.9:41641"],
+                  "derp": "sfo",
+                  "mappingVariesByDestIP": false,
+                  "latency": {"New York City": {"latencyMs": 22.1}, "San Francisco": {"preferred": true, "latencyMs": 8.4}}
+                }
+              },
+              {
+                "id": "90210000000002",
+                "name": "gw-branch-2.example.ts.net",
+                "hostname": "gw-branch-2",
+                "user": "ops@example.invalid",
+                "os": "linux",
+                "clientVersion": "1.60.0",
+                "addresses": ["100.101.10.2"],
+                "authorized": true,
+                "isExternal": false,
+                "created": "2024-11-11T00:00:00Z",
+                "advertisedRoutes": ["192.0.2.0/24"],
+                "enabledRoutes": ["192.0.2.0/24"],
+                "clientConnectivity": {
+                  "endpoints": ["[2001:db8:44::9]:41641"],
+                  "derp": "fra"
+                }
+              },
+              {
+                "id": "",
+                "name": "no-id-device.example.ts.net",
+                "hostname": "no-id-device",
+                "addresses": ["100.101.10.3"]
+              },
+              {
+                "id": "90210000000004",
+                "name": "no-address-device.example.ts.net",
+                "hostname": "no-address-device",
+                "os": "windows",
+                "addresses": []
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["tailscale-90210000000001", "tailscale-90210000000002"],
+    "request_count": 1,
+    "assets": [
+      {
+        "id": "tailscale-90210000000001",
+        "fields": {
+          "hostnames": "laptop-anna.example.ts.net",
+          "ipAddresses": "100.101.10.1\tfd7a:115c:a1e0::1",
+          "os": "macOS",
+          "tailscale_client_endpoints": "198.51.100.9:41641, 10.200.0.9:41641",
+          "tailscale_latency_ms_New York City": "22.1",
+          "tailscale_derp_preferred_region": "San Francisco"
+        }
+      },
+      {
+        "id": "tailscale-90210000000002",
+        "fields": {
+          "ipAddresses": "100.101.10.2",
+          "tailscale_client_endpoints": "[2001:db8:44::9]:41641"
+        }
+      }
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/tailnet/example.com/devices", "query_contains": "fields=all"},
+      {"header_contains": "tskey-api-fixture-000000"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/oauth/token"}
+    ],
+    "log_contains": [
+      "tailscale: skipped 1 devices with no id (first: no-id-device.example.ts.net)",
+      "tailscale: skipped 1 devices with no network interfaces (first: no-address-device.example.ts.net)",
+      "tailscale: reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

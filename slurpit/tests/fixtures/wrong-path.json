@@ -1,0 +1,29 @@
+{
+  "name": "wrong-path",
+  "integration": "slurpit",
+  "description": "The URL points somewhere that is not the Slurp'it portal (or omits a reverse-proxy prefix), so /api/platform/ping answers 404. The preflight must end the run with the guidance message about the URL and prefix -- one request, no device walk, no abort.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/api/platform/ping"},
+      "responses": [
+        {"status": 404, "text": "not found"}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/api/devices"}
+    ],
+    "log_contains": [
+      "slurpit: /api/platform/ping returned 404"
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "unparseable-created",
+  "integration": "tailscale",
+  "description": "REGRESSION LOCK. transform_device_to_importasset called parse_time(created) with no shape check, and parse_time aborts the script on anything it cannot parse rather than returning an error -- Starlark has no exception handling, so the whole import died and every other device in the tailnet was lost. A space-separated, zone-less value like \"2025-06-01 12:00:00\" is what a proxy or an older node reports; it aborted with 'parsing time \"2025-06-01 12:00:00\" as \"2006-01-02T15:04:05Z07:00\": cannot parse \" 12:00:00\" as \"T\"'.\n\nThe value is now screened against an RFC 3339 pattern first, as the better integrations in this repo do. All three devices must import; only the well-formed one gets a tailscale_created_ts.\n\nSkips namespaced_ids for the reason recorded in happy: no API-provided tailnet scope exists, and the Tailscale-minted device id is already unique across tailnets.",
+  "kwargs": {
+    "url": "$BASE",
+    "tailnet": "example.net",
+    "api_key_or_client_secret": "tskey-api-fixture-000002"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v2/tailnet/example.net/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "id": "90211000000001",
+                "name": "syn-good-created.example.ts.net",
+                "hostname": "syn-good-created",
+                "user": "ops@example.invalid",
+                "os": "linux",
+                "addresses": ["100.101.20.1"],
+                "created": "2025-06-01T12:00:00Z"
+              },
+              {
+                "id": "90211000000002",
+                "name": "syn-space-separated.example.ts.net",
+                "hostname": "syn-space-separated",
+                "user": "ops@example.invalid",
+                "os": "linux",
+                "addresses": ["100.101.20.2"],
+                "created": "2025-06-01 12:00:00"
+              },
+              {
+                "id": "90211000000003",
+                "name": "syn-date-only.example.ts.net",
+                "hostname": "syn-date-only",
+                "user": "ops@example.invalid",
+                "os": "linux",
+                "addresses": ["100.101.20.3"],
+                "created": "2025-06-01"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tailscale-90211000000001",
+      "tailscale-90211000000002",
+      "tailscale-90211000000003"
+    ],
+    "assets": [
+      {"id": "tailscale-90211000000001", "fields": {"hostnames": "syn-good-created.example.ts.net", "tailscale_created_ts": "1748779200"}},
+      {"id": "tailscale-90211000000002", "fields": {"hostnames": "syn-space-separated.example.ts.net"}, "fields_absent": ["tailscale_created_ts"]},
+      {"id": "tailscale-90211000000003", "fields": {"hostnames": "syn-date-only.example.ts.net"}, "fields_absent": ["tailscale_created_ts"]}
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

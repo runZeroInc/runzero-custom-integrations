@@ -1,0 +1,85 @@
+{
+  "name": "profile-fallback",
+  "integration": "redhat-insights",
+  "description": "An Insights deployment that does not know every system profile field answers the sparse fieldset with a 400 naming the offending field. The run must step down from the full field set to the reduced one, then to no system profile at all, and import the systems from the plain inventory record rather than giving up. Also covers a 429 on a later page being absorbed by the default retry policy.",
+  "kwargs": {
+    "url": "$BASE",
+    "sso_url": "$BASE",
+    "client_id": "fixture-service-account",
+    "client_secret": "fixture-secret",
+    "page_size": "1"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/auth/realms/redhat-external/protocol/openid-connect/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-access-token", "expires_in": 900}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-1",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=1"},
+      "responses": [
+        {"status": 400, "json": {"detail": "'greenboot_status' is not a valid system profile field", "status": 400}},
+        {"status": 400, "json": {"detail": "'infrastructure_vendor' is not a valid system profile field", "status": 400}},
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "results": [
+              {
+                "id": "40000000-0000-4000-8000-000000000001",
+                "org_id": "10009999",
+                "fqdn": "fallback-a.fixture.example",
+                "ip_addresses": ["10.93.0.1", "127.0.0.1"],
+                "mac_addresses": ["00:11:22:44:00:01"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hosts-page-2",
+      "match": {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"},
+      "responses": [
+        {"status": 429, "json": {"detail": "Too Many Requests"}, "headers": {"Retry-After": "1"}},
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "results": [
+              {
+                "id": "40000000-0000-4000-8000-000000000002",
+                "org_id": "10009999",
+                "fqdn": "fallback-b.fixture.example",
+                "ip_addresses": ["10.93.0.2"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "redhat-insights:10009999:40000000-0000-4000-8000-000000000001",
+      "redhat-insights:10009999:40000000-0000-4000-8000-000000000002"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "greenboot_status"},
+      {"method": "GET", "path": "/api/inventory/v1/hosts", "query_contains": "&page=2"}
+    ],
+    "log_contains": [
+      "redhat-insights: the server rejected the requested system profile fields, retrying with the reduced set: status 400",
+      "redhat-insights: the server rejected the requested system profile fields, retrying with the none set: status 400",
+      "redhat-insights: reported 2 of 2 systems"
+    ]
+  },
+  "invariants": {"skip": []}
+}

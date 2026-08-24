@@ -1,0 +1,170 @@
+{
+  "name": "batching",
+  "integration": "audit-events-to-webhook",
+  "script": "audit-events-to-webhook/audit-events-to-webhook.star",
+  "description": "501 events, one past the 500-event batch boundary, so the delivery loop must issue TWO posts rather than one. This pins behaviour the README makes an explicit promise about -- 'events are sent 500 at a time, as several independent POSTs' -- which is the contract a receiver is written against. request_count==3 (one source read plus two deliveries) is the boundary assertion; a loop that sized its batch count with integer division would send one POST and silently drop 501 events, and one that sliced past the end would drop the tail. The three body_contains entries pin both ends of the walk: e001 opens the first batch, e500 closes it, and e501 exists only in the second. Rows are deliberately minimal -- the real models.Event shape is asserted in `happy`, and 501 full events would make this file unreadable for no extra coverage.",
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/hooks/runzero-audit",
+    "rz_account_token": "CT7f3a91c4e0b84d26a5c8f1e7d09b3a42"
+  },
+  "routes": [
+    {
+      "name": "account event log, a busy hour",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1.0/account/events.json"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"id": "e001", "action": "login", "success": true}, {"id": "e002", "action": "login", "success": true}, {"id": "e003", "action": "login", "success": true}, {"id": "e004", "action": "login", "success": true}, {"id": "e005", "action": "login", "success": true},
+            {"id": "e006", "action": "login", "success": true}, {"id": "e007", "action": "login", "success": true}, {"id": "e008", "action": "login", "success": true}, {"id": "e009", "action": "login", "success": true}, {"id": "e010", "action": "login", "success": true},
+            {"id": "e011", "action": "login", "success": true}, {"id": "e012", "action": "login", "success": true}, {"id": "e013", "action": "login", "success": true}, {"id": "e014", "action": "login", "success": true}, {"id": "e015", "action": "login", "success": true},
+            {"id": "e016", "action": "login", "success": true}, {"id": "e017", "action": "login", "success": true}, {"id": "e018", "action": "login", "success": true}, {"id": "e019", "action": "login", "success": true}, {"id": "e020", "action": "login", "success": true},
+            {"id": "e021", "action": "login", "success": true}, {"id": "e022", "action": "login", "success": true}, {"id": "e023", "action": "login", "success": true}, {"id": "e024", "action": "login", "success": true}, {"id": "e025", "action": "login", "success": true},
+            {"id": "e026", "action": "login", "success": true}, {"id": "e027", "action": "login", "success": true}, {"id": "e028", "action": "login", "success": true}, {"id": "e029", "action": "login", "success": true}, {"id": "e030", "action": "login", "success": true},
+            {"id": "e031", "action": "login", "success": true}, {"id": "e032", "action": "login", "success": true}, {"id": "e033", "action": "login", "success": true}, {"id": "e034", "action": "login", "success": true}, {"id": "e035", "action": "login", "success": true},
+            {"id": "e036", "action": "login", "success": true}, {"id": "e037", "action": "login", "success": true}, {"id": "e038", "action": "login", "success": true}, {"id": "e039", "action": "login", "success": true}, {"id": "e040", "action": "login", "success": true},
+            {"id": "e041", "action": "login", "success": true}, {"id": "e042", "action": "login", "success": true}, {"id": "e043", "action": "login", "success": true}, {"id": "e044", "action": "login", "success": true}, {"id": "e045", "action": "login", "success": true},
+            {"id": "e046", "action": "login", "success": true}, {"id": "e047", "action": "login", "success": true}, {"id": "e048", "action": "login", "success": true}, {"id": "e049", "action": "login", "success": true}, {"id": "e050", "action": "login", "success": true},
+            {"id": "e051", "action": "login", "success": true}, {"id": "e052", "action": "login", "success": true}, {"id": "e053", "action": "login", "success": true}, {"id": "e054", "action": "login", "success": true}, {"id": "e055", "action": "login", "success": true},
+            {"id": "e056", "action": "login", "success": true}, {"id": "e057", "action": "login", "success": true}, {"id": "e058", "action": "login", "success": true}, {"id": "e059", "action": "login", "success": true}, {"id": "e060", "action": "login", "success": true},
+            {"id": "e061", "action": "login", "success": true}, {"id": "e062", "action": "login", "success": true}, {"id": "e063", "action": "login", "success": true}, {"id": "e064", "action": "login", "success": true}, {"id": "e065", "action": "login", "success": true},
+            {"id": "e066", "action": "login", "success": true}, {"id": "e067", "action": "login", "success": true}, {"id": "e068", "action": "login", "success": true}, {"id": "e069", "action": "login", "success": true}, {"id": "e070", "action": "login", "success": true},
+            {"id": "e071", "action": "login", "success": true}, {"id": "e072", "action": "login", "success": true}, {"id": "e073", "action": "login", "success": true}, {"id": "e074", "action": "login", "success": true}, {"id": "e075", "action": "login", "success": true},
+            {"id": "e076", "action": "login", "success": true}, {"id": "e077", "action": "login", "success": true}, {"id": "e078", "action": "login", "success": true}, {"id": "e079", "action": "login", "success": true}, {"id": "e080", "action": "login", "success": true},
+            {"id": "e081", "action": "login", "success": true}, {"id": "e082", "action": "login", "success": true}, {"id": "e083", "action": "login", "success": true}, {"id": "e084", "action": "login", "success": true}, {"id": "e085", "action": "login", "success": true},
+            {"id": "e086", "action": "login", "success": true}, {"id": "e087", "action": "login", "success": true}, {"id": "e088", "action": "login", "success": true}, {"id": "e089", "action": "login", "success": true}, {"id": "e090", "action": "login", "success": true},
+            {"id": "e091", "action": "login", "success": true}, {"id": "e092", "action": "login", "success": true}, {"id": "e093", "action": "login", "success": true}, {"id": "e094", "action": "login", "success": true}, {"id": "e095", "action": "login", "success": true},
+            {"id": "e096", "action": "login", "success": true}, {"id": "e097", "action": "login", "success": true}, {"id": "e098", "action": "login", "success": true}, {"id": "e099", "action": "login", "success": true}, {"id": "e100", "action": "login", "success": true},
+            {"id": "e101", "action": "login", "success": true}, {"id": "e102", "action": "login", "success": true}, {"id": "e103", "action": "login", "success": true}, {"id": "e104", "action": "login", "success": true}, {"id": "e105", "action": "login", "success": true},
+            {"id": "e106", "action": "login", "success": true}, {"id": "e107", "action": "login", "success": true}, {"id": "e108", "action": "login", "success": true}, {"id": "e109", "action": "login", "success": true}, {"id": "e110", "action": "login", "success": true},
+            {"id": "e111", "action": "login", "success": true}, {"id": "e112", "action": "login", "success": true}, {"id": "e113", "action": "login", "success": true}, {"id": "e114", "action": "login", "success": true}, {"id": "e115", "action": "login", "success": true},
+            {"id": "e116", "action": "login", "success": true}, {"id": "e117", "action": "login", "success": true}, {"id": "e118", "action": "login", "success": true}, {"id": "e119", "action": "login", "success": true}, {"id": "e120", "action": "login", "success": true},
+            {"id": "e121", "action": "login", "success": true}, {"id": "e122", "action": "login", "success": true}, {"id": "e123", "action": "login", "success": true}, {"id": "e124", "action": "login", "success": true}, {"id": "e125", "action": "login", "success": true},
+            {"id": "e126", "action": "login", "success": true}, {"id": "e127", "action": "login", "success": true}, {"id": "e128", "action": "login", "success": true}, {"id": "e129", "action": "login", "success": true}, {"id": "e130", "action": "login", "success": true},
+            {"id": "e131", "action": "login", "success": true}, {"id": "e132", "action": "login", "success": true}, {"id": "e133", "action": "login", "success": true}, {"id": "e134", "action": "login", "success": true}, {"id": "e135", "action": "login", "success": true},
+            {"id": "e136", "action": "login", "success": true}, {"id": "e137", "action": "login", "success": true}, {"id": "e138", "action": "login", "success": true}, {"id": "e139", "action": "login", "success": true}, {"id": "e140", "action": "login", "success": true},
+            {"id": "e141", "action": "login", "success": true}, {"id": "e142", "action": "login", "success": true}, {"id": "e143", "action": "login", "success": true}, {"id": "e144", "action": "login", "success": true}, {"id": "e145", "action": "login", "success": true},
+            {"id": "e146", "action": "login", "success": true}, {"id": "e147", "action": "login", "success": true}, {"id": "e148", "action": "login", "success": true}, {"id": "e149", "action": "login", "success": true}, {"id": "e150", "action": "login", "success": true},
+            {"id": "e151", "action": "login", "success": true}, {"id": "e152", "action": "login", "success": true}, {"id": "e153", "action": "login", "success": true}, {"id": "e154", "action": "login", "success": true}, {"id": "e155", "action": "login", "success": true},
+            {"id": "e156", "action": "login", "success": true}, {"id": "e157", "action": "login", "success": true}, {"id": "e158", "action": "login", "success": true}, {"id": "e159", "action": "login", "success": true}, {"id": "e160", "action": "login", "success": true},
+            {"id": "e161", "action": "login", "success": true}, {"id": "e162", "action": "login", "success": true}, {"id": "e163", "action": "login", "success": true}, {"id": "e164", "action": "login", "success": true}, {"id": "e165", "action": "login", "success": true},
+            {"id": "e166", "action": "login", "success": true}, {"id": "e167", "action": "login", "success": true}, {"id": "e168", "action": "login", "success": true}, {"id": "e169", "action": "login", "success": true}, {"id": "e170", "action": "login", "success": true},
+            {"id": "e171", "action": "login", "success": true}, {"id": "e172", "action": "login", "success": true}, {"id": "e173", "action": "login", "success": true}, {"id": "e174", "action": "login", "success": true}, {"id": "e175", "action": "login", "success": true},
+            {"id": "e176", "action": "login", "success": true}, {"id": "e177", "action": "login", "success": true}, {"id": "e178", "action": "login", "success": true}, {"id": "e179", "action": "login", "success": true}, {"id": "e180", "action": "login", "success": true},
+            {"id": "e181", "action": "login", "success": true}, {"id": "e182", "action": "login", "success": true}, {"id": "e183", "action": "login", "success": true}, {"id": "e184", "action": "login", "success": true}, {"id": "e185", "action": "login", "success": true},
+            {"id": "e186", "action": "login", "success": true}, {"id": "e187", "action": "login", "success": true}, {"id": "e188", "action": "login", "success": true}, {"id": "e189", "action": "login", "success": true}, {"id": "e190", "action": "login", "success": true},
+            {"id": "e191", "action": "login", "success": true}, {"id": "e192", "action": "login", "success": true}, {"id": "e193", "action": "login", "success": true}, {"id": "e194", "action": "login", "success": true}, {"id": "e195", "action": "login", "success": true},
+            {"id": "e196", "action": "login", "success": true}, {"id": "e197", "action": "login", "success": true}, {"id": "e198", "action": "login", "success": true}, {"id": "e199", "action": "login", "success": true}, {"id": "e200", "action": "login", "success": true},
+            {"id": "e201", "action": "login", "success": true}, {"id": "e202", "action": "login", "success": true}, {"id": "e203", "action": "login", "success": true}, {"id": "e204", "action": "login", "success": true}, {"id": "e205", "action": "login", "success": true},
+            {"id": "e206", "action": "login", "success": true}, {"id": "e207", "action": "login", "success": true}, {"id": "e208", "action": "login", "success": true}, {"id": "e209", "action": "login", "success": true}, {"id": "e210", "action": "login", "success": true},
+            {"id": "e211", "action": "login", "success": true}, {"id": "e212", "action": "login", "success": true}, {"id": "e213", "action": "login", "success": true}, {"id": "e214", "action": "login", "success": true}, {"id": "e215", "action": "login", "success": true},
+            {"id": "e216", "action": "login", "success": true}, {"id": "e217", "action": "login", "success": true}, {"id": "e218", "action": "login", "success": true}, {"id": "e219", "action": "login", "success": true}, {"id": "e220", "action": "login", "success": true},
+            {"id": "e221", "action": "login", "success": true}, {"id": "e222", "action": "login", "success": true}, {"id": "e223", "action": "login", "success": true}, {"id": "e224", "action": "login", "success": true}, {"id": "e225", "action": "login", "success": true},
+            {"id": "e226", "action": "login", "success": true}, {"id": "e227", "action": "login", "success": true}, {"id": "e228", "action": "login", "success": true}, {"id": "e229", "action": "login", "success": true}, {"id": "e230", "action": "login", "success": true},
+            {"id": "e231", "action": "login", "success": true}, {"id": "e232", "action": "login", "success": true}, {"id": "e233", "action": "login", "success": true}, {"id": "e234", "action": "login", "success": true}, {"id": "e235", "action": "login", "success": true},
+            {"id": "e236", "action": "login", "success": true}, {"id": "e237", "action": "login", "success": true}, {"id": "e238", "action": "login", "success": true}, {"id": "e239", "action": "login", "success": true}, {"id": "e240", "action": "login", "success": true},
+            {"id": "e241", "action": "login", "success": true}, {"id": "e242", "action": "login", "success": true}, {"id": "e243", "action": "login", "success": true}, {"id": "e244", "action": "login", "success": true}, {"id": "e245", "action": "login", "success": true},
+            {"id": "e246", "action": "login", "success": true}, {"id": "e247", "action": "login", "success": true}, {"id": "e248", "action": "login", "success": true}, {"id": "e249", "action": "login", "success": true}, {"id": "e250", "action": "login", "success": true},
+            {"id": "e251", "action": "login", "success": true}, {"id": "e252", "action": "login", "success": true}, {"id": "e253", "action": "login", "success": true}, {"id": "e254", "action": "login", "success": true}, {"id": "e255", "action": "login", "success": true},
+            {"id": "e256", "action": "login", "success": true}, {"id": "e257", "action": "login", "success": true}, {"id": "e258", "action": "login", "success": true}, {"id": "e259", "action": "login", "success": true}, {"id": "e260", "action": "login", "success": true},
+            {"id": "e261", "action": "login", "success": true}, {"id": "e262", "action": "login", "success": true}, {"id": "e263", "action": "login", "success": true}, {"id": "e264", "action": "login", "success": true}, {"id": "e265", "action": "login", "success": true},
+            {"id": "e266", "action": "login", "success": true}, {"id": "e267", "action": "login", "success": true}, {"id": "e268", "action": "login", "success": true}, {"id": "e269", "action": "login", "success": true}, {"id": "e270", "action": "login", "success": true},
+            {"id": "e271", "action": "login", "success": true}, {"id": "e272", "action": "login", "success": true}, {"id": "e273", "action": "login", "success": true}, {"id": "e274", "action": "login", "success": true}, {"id": "e275", "action": "login", "success": true},
+            {"id": "e276", "action": "login", "success": true}, {"id": "e277", "action": "login", "success": true}, {"id": "e278", "action": "login", "success": true}, {"id": "e279", "action": "login", "success": true}, {"id": "e280", "action": "login", "success": true},
+            {"id": "e281", "action": "login", "success": true}, {"id": "e282", "action": "login", "success": true}, {"id": "e283", "action": "login", "success": true}, {"id": "e284", "action": "login", "success": true}, {"id": "e285", "action": "login", "success": true},
+            {"id": "e286", "action": "login", "success": true}, {"id": "e287", "action": "login", "success": true}, {"id": "e288", "action": "login", "success": true}, {"id": "e289", "action": "login", "success": true}, {"id": "e290", "action": "login", "success": true},
+            {"id": "e291", "action": "login", "success": true}, {"id": "e292", "action": "login", "success": true}, {"id": "e293", "action": "login", "success": true}, {"id": "e294", "action": "login", "success": true}, {"id": "e295", "action": "login", "success": true},
+            {"id": "e296", "action": "login", "success": true}, {"id": "e297", "action": "login", "success": true}, {"id": "e298", "action": "login", "success": true}, {"id": "e299", "action": "login", "success": true}, {"id": "e300", "action": "login", "success": true},
+            {"id": "e301", "action": "login", "success": true}, {"id": "e302", "action": "login", "success": true}, {"id": "e303", "action": "login", "success": true}, {"id": "e304", "action": "login", "success": true}, {"id": "e305", "action": "login", "success": true},
+            {"id": "e306", "action": "login", "success": true}, {"id": "e307", "action": "login", "success": true}, {"id": "e308", "action": "login", "success": true}, {"id": "e309", "action": "login", "success": true}, {"id": "e310", "action": "login", "success": true},
+            {"id": "e311", "action": "login", "success": true}, {"id": "e312", "action": "login", "success": true}, {"id": "e313", "action": "login", "success": true}, {"id": "e314", "action": "login", "success": true}, {"id": "e315", "action": "login", "success": true},
+            {"id": "e316", "action": "login", "success": true}, {"id": "e317", "action": "login", "success": true}, {"id": "e318", "action": "login", "success": true}, {"id": "e319", "action": "login", "success": true}, {"id": "e320", "action": "login", "success": true},
+            {"id": "e321", "action": "login", "success": true}, {"id": "e322", "action": "login", "success": true}, {"id": "e323", "action": "login", "success": true}, {"id": "e324", "action": "login", "success": true}, {"id": "e325", "action": "login", "success": true},
+            {"id": "e326", "action": "login", "success": true}, {"id": "e327", "action": "login", "success": true}, {"id": "e328", "action": "login", "success": true}, {"id": "e329", "action": "login", "success": true}, {"id": "e330", "action": "login", "success": true},
+            {"id": "e331", "action": "login", "success": true}, {"id": "e332", "action": "login", "success": true}, {"id": "e333", "action": "login", "success": true}, {"id": "e334", "action": "login", "success": true}, {"id": "e335", "action": "login", "success": true},
+            {"id": "e336", "action": "login", "success": true}, {"id": "e337", "action": "login", "success": true}, {"id": "e338", "action": "login", "success": true}, {"id": "e339", "action": "login", "success": true}, {"id": "e340", "action": "login", "success": true},
+            {"id": "e341", "action": "login", "success": true}, {"id": "e342", "action": "login", "success": true}, {"id": "e343", "action": "login", "success": true}, {"id": "e344", "action": "login", "success": true}, {"id": "e345", "action": "login", "success": true},
+            {"id": "e346", "action": "login", "success": true}, {"id": "e347", "action": "login", "success": true}, {"id": "e348", "action": "login", "success": true}, {"id": "e349", "action": "login", "success": true}, {"id": "e350", "action": "login", "success": true},
+            {"id": "e351", "action": "login", "success": true}, {"id": "e352", "action": "login", "success": true}, {"id": "e353", "action": "login", "success": true}, {"id": "e354", "action": "login", "success": true}, {"id": "e355", "action": "login", "success": true},
+            {"id": "e356", "action": "login", "success": true}, {"id": "e357", "action": "login", "success": true}, {"id": "e358", "action": "login", "success": true}, {"id": "e359", "action": "login", "success": true}, {"id": "e360", "action": "login", "success": true},
+            {"id": "e361", "action": "login", "success": true}, {"id": "e362", "action": "login", "success": true}, {"id": "e363", "action": "login", "success": true}, {"id": "e364", "action": "login", "success": true}, {"id": "e365", "action": "login", "success": true},
+            {"id": "e366", "action": "login", "success": true}, {"id": "e367", "action": "login", "success": true}, {"id": "e368", "action": "login", "success": true}, {"id": "e369", "action": "login", "success": true}, {"id": "e370", "action": "login", "success": true},
+            {"id": "e371", "action": "login", "success": true}, {"id": "e372", "action": "login", "success": true}, {"id": "e373", "action": "login", "success": true}, {"id": "e374", "action": "login", "success": true}, {"id": "e375", "action": "login", "success": true},
+            {"id": "e376", "action": "login", "success": true}, {"id": "e377", "action": "login", "success": true}, {"id": "e378", "action": "login", "success": true}, {"id": "e379", "action": "login", "success": true}, {"id": "e380", "action": "login", "success": true},
+            {"id": "e381", "action": "login", "success": true}, {"id": "e382", "action": "login", "success": true}, {"id": "e383", "action": "login", "success": true}, {"id": "e384", "action": "login", "success": true}, {"id": "e385", "action": "login", "success": true},
+            {"id": "e386", "action": "login", "success": true}, {"id": "e387", "action": "login", "success": true}, {"id": "e388", "action": "login", "success": true}, {"id": "e389", "action": "login", "success": true}, {"id": "e390", "action": "login", "success": true},
+            {"id": "e391", "action": "login", "success": true}, {"id": "e392", "action": "login", "success": true}, {"id": "e393", "action": "login", "success": true}, {"id": "e394", "action": "login", "success": true}, {"id": "e395", "action": "login", "success": true},
+            {"id": "e396", "action": "login", "success": true}, {"id": "e397", "action": "login", "success": true}, {"id": "e398", "action": "login", "success": true}, {"id": "e399", "action": "login", "success": true}, {"id": "e400", "action": "login", "success": true},
+            {"id": "e401", "action": "login", "success": true}, {"id": "e402", "action": "login", "success": true}, {"id": "e403", "action": "login", "success": true}, {"id": "e404", "action": "login", "success": true}, {"id": "e405", "action": "login", "success": true},
+            {"id": "e406", "action": "login", "success": true}, {"id": "e407", "action": "login", "success": true}, {"id": "e408", "action": "login", "success": true}, {"id": "e409", "action": "login", "success": true}, {"id": "e410", "action": "login", "success": true},
+            {"id": "e411", "action": "login", "success": true}, {"id": "e412", "action": "login", "success": true}, {"id": "e413", "action": "login", "success": true}, {"id": "e414", "action": "login", "success": true}, {"id": "e415", "action": "login", "success": true},
+            {"id": "e416", "action": "login", "success": true}, {"id": "e417", "action": "login", "success": true}, {"id": "e418", "action": "login", "success": true}, {"id": "e419", "action": "login", "success": true}, {"id": "e420", "action": "login", "success": true},
+            {"id": "e421", "action": "login", "success": true}, {"id": "e422", "action": "login", "success": true}, {"id": "e423", "action": "login", "success": true}, {"id": "e424", "action": "login", "success": true}, {"id": "e425", "action": "login", "success": true},
+            {"id": "e426", "action": "login", "success": true}, {"id": "e427", "action": "login", "success": true}, {"id": "e428", "action": "login", "success": true}, {"id": "e429", "action": "login", "success": true}, {"id": "e430", "action": "login", "success": true},
+            {"id": "e431", "action": "login", "success": true}, {"id": "e432", "action": "login", "success": true}, {"id": "e433", "action": "login", "success": true}, {"id": "e434", "action": "login", "success": true}, {"id": "e435", "action": "login", "success": true},
+            {"id": "e436", "action": "login", "success": true}, {"id": "e437", "action": "login", "success": true}, {"id": "e438", "action": "login", "success": true}, {"id": "e439", "action": "login", "success": true}, {"id": "e440", "action": "login", "success": true},
+            {"id": "e441", "action": "login", "success": true}, {"id": "e442", "action": "login", "success": true}, {"id": "e443", "action": "login", "success": true}, {"id": "e444", "action": "login", "success": true}, {"id": "e445", "action": "login", "success": true},
+            {"id": "e446", "action": "login", "success": true}, {"id": "e447", "action": "login", "success": true}, {"id": "e448", "action": "login", "success": true}, {"id": "e449", "action": "login", "success": true}, {"id": "e450", "action": "login", "success": true},
+            {"id": "e451", "action": "login", "success": true}, {"id": "e452", "action": "login", "success": true}, {"id": "e453", "action": "login", "success": true}, {"id": "e454", "action": "login", "success": true}, {"id": "e455", "action": "login", "success": true},
+            {"id": "e456", "action": "login", "success": true}, {"id": "e457", "action": "login", "success": true}, {"id": "e458", "action": "login", "success": true}, {"id": "e459", "action": "login", "success": true}, {"id": "e460", "action": "login", "success": true},
+            {"id": "e461", "action": "login", "success": true}, {"id": "e462", "action": "login", "success": true}, {"id": "e463", "action": "login", "success": true}, {"id": "e464", "action": "login", "success": true}, {"id": "e465", "action": "login", "success": true},
+            {"id": "e466", "action": "login", "success": true}, {"id": "e467", "action": "login", "success": true}, {"id": "e468", "action": "login", "success": true}, {"id": "e469", "action": "login", "success": true}, {"id": "e470", "action": "login", "success": true},
+            {"id": "e471", "action": "login", "success": true}, {"id": "e472", "action": "login", "success": true}, {"id": "e473", "action": "login", "success": true}, {"id": "e474", "action": "login", "success": true}, {"id": "e475", "action": "login", "success": true},
+            {"id": "e476", "action": "login", "success": true}, {"id": "e477", "action": "login", "success": true}, {"id": "e478", "action": "login", "success": true}, {"id": "e479", "action": "login", "success": true}, {"id": "e480", "action": "login", "success": true},
+            {"id": "e481", "action": "login", "success": true}, {"id": "e482", "action": "login", "success": true}, {"id": "e483", "action": "login", "success": true}, {"id": "e484", "action": "login", "success": true}, {"id": "e485", "action": "login", "success": true},
+            {"id": "e486", "action": "login", "success": true}, {"id": "e487", "action": "login", "success": true}, {"id": "e488", "action": "login", "success": true}, {"id": "e489", "action": "login", "success": true}, {"id": "e490", "action": "login", "success": true},
+            {"id": "e491", "action": "login", "success": true}, {"id": "e492", "action": "login", "success": true}, {"id": "e493", "action": "login", "success": true}, {"id": "e494", "action": "login", "success": true}, {"id": "e495", "action": "login", "success": true},
+            {"id": "e496", "action": "login", "success": true}, {"id": "e497", "action": "login", "success": true}, {"id": "e498", "action": "login", "success": true}, {"id": "e499", "action": "login", "success": true}, {"id": "e500", "action": "login", "success": true},
+            {"id": "e501", "action": "login", "success": true}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "destination webhook",
+      "match": {
+        "method": "POST",
+        "path": "/hooks/runzero-audit"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "text": "ok"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/hooks/runzero-audit",
+        "body_contains": "\"id\":\"e001\""
+      },
+      {
+        "method": "POST",
+        "path": "/hooks/runzero-audit",
+        "body_contains": "\"id\":\"e500\""
+      },
+      {
+        "method": "POST",
+        "path": "/hooks/runzero-audit",
+        "body_contains": "\"id\":\"e501\""
+      }
+    ],
+    "log_contains": [
+      "Sending 501 events to Webhook"
+    ]
+  }
+}

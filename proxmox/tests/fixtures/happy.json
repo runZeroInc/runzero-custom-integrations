@@ -1,0 +1,169 @@
+{
+  "name": "happy",
+  "integration": "proxmox",
+  "description": "A two-node cluster with a running VM, a stopped VM, a running container and a stopped container. Proves the four bootstrap calls (version, cluster status, cluster config, cluster resources), the guest-agent MAC-to-interface match that keeps a VM's k8s/loopback/link-local addresses off its interface, and the LXC interface filter that skips lo and calico. Skips namespaced_ids: proxmox scopes every id with the cluster name but joins it with '-' rather than ':', so the invariant's colon test cannot see the scope.",
+  "kwargs": {
+    "base_url": "$BASE",
+    "api_token_id": "svc@pve!runzero",
+    "api_token_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "version",
+      "match": {"method": "GET", "path": "/api2/json/version"},
+      "responses": [{"status": 200, "json": {"data": {"release": "8.2", "version": "8.2.4"}}}]
+    },
+    {
+      "name": "cluster-status",
+      "match": {"method": "GET", "path": "/api2/json/cluster/status"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"type": "cluster", "name": "lab-cluster", "quorate": 1},
+        {"type": "node", "name": "pve1", "online": 1},
+        {"type": "node", "name": "pve2", "online": 1}
+      ]}}]
+    },
+    {
+      "name": "cluster-config-nodes",
+      "match": {"method": "GET", "path": "/api2/json/cluster/config/nodes"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"node": "pve1", "nodeid": 1, "ring0_addr": "10.30.0.11"},
+        {"node": "pve2", "nodeid": 2, "ring0_addr": "10.30.0.12"}
+      ]}}]
+    },
+    {
+      "name": "cluster-resources-nodes",
+      "match": {"method": "GET", "path": "/api2/json/cluster/resources"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"type": "node", "node": "pve1", "status": "online", "uptime": 864000, "maxmem": 137438953472, "maxcpu": 32},
+        {"type": "node", "node": "pve2", "status": "online", "uptime": 432000, "maxmem": 68719476736, "maxcpu": 16}
+      ]}}]
+    },
+
+    {
+      "name": "pve1-qemu-list",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/qemu"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"vmid": 100, "name": "app01", "status": "running", "maxmem": 8589934592},
+        {"vmid": 101, "name": "build01", "status": "stopped", "maxmem": 4294967296}
+      ]}}]
+    },
+    {
+      "name": "pve1-qemu-100-config",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/qemu/100/config"},
+      "responses": [{"status": 200, "json": {"data": {
+        "name": "app01",
+        "net0": "virtio=AA:BB:CC:00:01:10,bridge=vmbr0,firewall=1",
+        "ostype": "l26"
+      }}}]
+    },
+    {
+      "name": "pve1-qemu-100-agent-ifaces",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/qemu/100/agent/network-get-interfaces"},
+      "responses": [{"status": 200, "json": {"data": {"result": [
+        {"name": "lo", "hardware-address": "00:00:00:00:00:00",
+         "ip-addresses": [{"ip-address": "127.0.0.1", "ip-address-type": "ipv4", "prefix": 8}]},
+        {"name": "eth0", "hardware-address": "aa:bb:cc:00:01:10",
+         "ip-addresses": [
+           {"ip-address": "10.30.10.20", "ip-address-type": "ipv4", "prefix": 24},
+           {"ip-address": "169.254.7.7", "ip-address-type": "ipv4", "prefix": 16},
+           {"ip-address": "10.244.3.9", "ip-address-type": "ipv4", "prefix": 24}
+         ]},
+        {"name": "cali9f0e1d2c3b4", "hardware-address": "ee:ee:ee:ee:ee:ee",
+         "ip-addresses": [{"ip-address": "10.255.4.1", "ip-address-type": "ipv4", "prefix": 32}]}
+      ]}}}]
+    },
+    {
+      "name": "pve1-qemu-100-agent-osinfo",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/qemu/100/agent/get-osinfo"},
+      "responses": [{"status": 200, "json": {"data": {"result": {
+        "id": "debian", "name": "Debian GNU/Linux",
+        "pretty-name": "Debian GNU/Linux 12 (bookworm)",
+        "version": "12 (bookworm)", "version-id": "12", "kernel-release": "6.1.0-21-amd64"
+      }}}}]
+    },
+    {
+      "name": "pve1-qemu-101-config",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/qemu/101/config"},
+      "responses": [{"status": 200, "json": {"data": {
+        "name": "build01",
+        "net0": "e1000=AA:BB:CC:00:01:11,bridge=vmbr0"
+      }}}]
+    },
+
+    {
+      "name": "pve1-lxc-list",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/lxc"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"vmid": 200, "name": "dns01", "status": "running", "maxmem": 1073741824}
+      ]}}]
+    },
+    {
+      "name": "pve1-lxc-200-config",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/lxc/200/config"},
+      "responses": [{"status": 200, "json": {"data": {
+        "hostname": "dns01.lab.example.com", "ostype": "debian", "arch": "amd64"
+      }}}]
+    },
+    {
+      "name": "pve1-lxc-200-interfaces",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve1/lxc/200/interfaces"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"name": "lo", "hwaddr": "00:00:00:00:00:00",
+         "ip-addresses": [{"ip-address": "127.0.0.1", "prefix": 8}]},
+        {"name": "cali3ab2c1d0e9f", "hwaddr": "9A:11:22:33:44:55",
+         "ip-addresses": [{"ip-address": "10.244.5.6", "prefix": 32}]},
+        {"name": "eth0", "hwaddr": "BC:24:11:AA:BB:01",
+         "ip-addresses": [
+           {"ip-address": "10.30.20.30", "prefix": 24},
+           {"ip-address": "fe80::be24:11ff:feaa:bb01", "prefix": 64}
+         ]}
+      ]}}]
+    },
+
+    {
+      "name": "pve2-qemu-list",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/qemu"},
+      "responses": [{"status": 200, "json": {"data": []}}]
+    },
+    {
+      "name": "pve2-lxc-list",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/lxc"},
+      "responses": [{"status": 200, "json": {"data": [
+        {"vmid": 201, "name": "web-ct", "status": "stopped", "maxmem": 536870912}
+      ]}}]
+    },
+    {
+      "name": "pve2-lxc-201-config",
+      "match": {"method": "GET", "path": "/api2/json/nodes/pve2/lxc/201/config"},
+      "responses": [{"status": 200, "json": {"data": {
+        "hostname": "web-ct.lab.example.com", "ostype": "alpine", "arch": "amd64"
+      }}}]
+    }
+  ],
+  "expect": {
+    "asset_count": 6,
+    "ids": [
+      "lab-cluster-node-pve1",
+      "lab-cluster-node-pve2",
+      "lab-cluster-vm-100",
+      "lab-cluster-vm-101",
+      "lab-cluster-ct-200",
+      "lab-cluster-ct-201"
+    ],
+    "requests_include": [
+      {"method": "GET", "path": "/api2/json/version"},
+      {"method": "GET", "path": "/api2/json/cluster/status"},
+      {"method": "GET", "path": "/api2/json/cluster/config/nodes"},
+      {"method": "GET", "path": "/api2/json/cluster/resources", "query_contains": "type=node"},
+      {"method": "GET", "path": "/api2/json/nodes/pve1/qemu/100/agent/network-get-interfaces"},
+      {"method": "GET", "path": "/api2/json/nodes/pve2/lxc"},
+      {"header_contains": "PVEAPIToken=svc@pve!runzero=fixture-secret"}
+    ],
+    "requests_absent": [
+      {"path_contains": "/qemu/101/agent/"}
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}
