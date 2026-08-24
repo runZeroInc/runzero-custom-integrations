@@ -1,0 +1,48 @@
+{
+  "name": "upload-retried",
+  "integration": "sumo-logic",
+  "script": "sumo-logic/sumo-logic.star",
+  "description": "Sumo throttles routinely, and a 429 means the batch was rejected UNPROCESSED -- the one upload failure a healthy configuration meets under load. The batch POST goes through post_json with retry_on=[429,503], so a transient throttle must be retried with backoff and DELIVERED rather than counted rejected and the task failed. The route answers 429 once and then accepts; request_count==3 (one export read plus two POST attempts of the same batch) pins that the retry happened, and the absence of any 'rejected a batch' line plus 'Uploaded 3 of 3' pins that it succeeded. Retry-After keeps the backoff short. The persistent-rejection case (401, outside the retry list, exactly one attempt) is the upload-rejected scenario.",
+  "kwargs": {
+    "src_url": "$BASE",
+    "dst_url": "$BASE/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809"
+  },
+  "routes": [
+    {
+      "name": "runzero asset export, 3 rows",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.json"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {"id": "r001"},
+            {"id": "r002"},
+            {"id": "r003"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sumo http source, throttles once then accepts",
+      "match": {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "text": "rate limit exceeded for this source"},
+        {"status": 200, "text": ""}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE", "body_contains": "\"id\":\"r001\""},
+      {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE", "body_contains": "\"id\":\"r003\""}
+    ],
+    "log_contains": [
+      "Uploaded 3 of 3 assets to Sumo Logic"
+    ]
+  }
+}

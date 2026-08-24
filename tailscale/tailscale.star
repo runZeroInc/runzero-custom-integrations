@@ -76,7 +76,7 @@ CONFIG = {
 
 load("runzero.types", "ImportAsset", "Software", "to_custom_attributes")
 load("net", "network_interface")
-load("http", "get_json", "bearer", "oauth2_token")
+load("http", "get_json", "post_json", "bearer", "url_encode")
 load("kwargs", "get_url_base", "get_http_options")
 load("time", "parse_time")
 load("re", re_match="match")
@@ -98,10 +98,54 @@ DEFAULT_SCOPE = "devices:core:read"
 # line per cause replaces one log line per device.
 SKIP_NO_ID = "no_id"
 SKIP_NO_INTERFACE = "no_interface"
+SKIP_NOT_OBJECT = "not_object"
 
 
 def _log(msg):
     print("tailscale: " + msg)
+
+
+def _strings(value):
+    """Return only the string members of a list, or [] for anything else.
+
+    A present-but-null field, a bare string where an array is documented, or a
+    junk element inside one would otherwise abort the run at a join() or an
+    iteration.
+    """
+    if type(value) != "list":
+        return []
+    return [v for v in value if type(v) == "string"]
+
+
+def oauth_access_token(token_url, client_id, secret, config_kwargs):
+    """Exchange OAuth client credentials for an access token, or return "".
+
+    oauth2_token() raises on any non-2xx, and a raise from a builtin aborts the
+    whole task with a raw error - so the exchange is done with post_json, which
+    hands failures back as an err string that can be logged cleanly.
+    """
+    form = url_encode({
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": secret,
+        "scope": DEFAULT_SCOPE,
+    })
+    data, err = post_json(
+        token_url,
+        body=bytes(form),
+        **get_http_options(config_kwargs, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    )
+    if err:
+        _log("OAuth token exchange failed: " + err)
+        return ""
+    if type(data) != "dict":
+        _log("OAuth token exchange returned an unexpected response shape")
+        return ""
+    token = data.get("access_token")
+    if type(token) != "string" or not token:
+        _log("OAuth token exchange returned no access_token")
+        return ""
+    return token
 
 
 # Map Tailscale-reported operating systems to runZero device types where the
@@ -161,7 +205,7 @@ def transform_device_to_importasset(device, tailnet):
     # network_interface() handles v4/v6 classification, port/CIDR stripping,
     # dedupe, and capping at 99 addresses per family.
     nics = []
-    tailscale_nic = network_interface(ips=device.get("addresses", []))
+    tailscale_nic = network_interface(ips=_strings(device.get("addresses")))
     if tailscale_nic:
         nics.append(tailscale_nic)
 
@@ -183,15 +227,16 @@ def transform_device_to_importasset(device, tailnet):
     }
 
     client_conn = device.get("clientConnectivity")
-    if client_conn:
-        endpoints = client_conn.get("endpoints") or []
+    if type(client_conn) == "dict":
+        endpoints = _strings(client_conn.get("endpoints"))
         if endpoints:
+            # Endpoints are the addresses the client is reachable at from the
+            # OUTSIDE, and they include the public NAT egress address - which
+            # every device in the same office shares. Placing that on a network
+            # interface would invite cross-device IP correlation under the
+            # default matchBehavior, so the endpoints are kept as a custom
+            # attribute only and never become interface data.
             attrs["tailscale_client_endpoints"] = ", ".join(endpoints)
-            # Physical IPs (public + private). network_interface() also
-            # strips "addr:port" and "[ipv6]:port" forms automatically.
-            phys_nic = network_interface(ips=endpoints)
-            if phys_nic:
-                nics.append(phys_nic)
 
         derp = client_conn.get("derp", "")
         if derp:
@@ -202,7 +247,9 @@ def transform_device_to_importasset(device, tailnet):
             attrs["tailscale_mapping_varies_by_dest_ip"] = str(mapping_varies)
 
         latency = client_conn.get("latency")
-        if latency:
+        # A present-but-null or non-object latency map used to abort the run at
+        # .items(); anything but an object is ignored.
+        if type(latency) == "dict":
             for region, info in latency.items():
                 # Each region maps to an object like
                 # {"latencyMs": 182.89, "preferred": true}. Flatten the numeric
@@ -227,12 +274,12 @@ def transform_device_to_importasset(device, tailnet):
         if parsed != None:
             attrs["tailscale_created_ts"] = parsed.unix
 
-    tags = device.get("tags") or []
+    tags = _strings(device.get("tags"))
     if tags:
         attrs["tailscale_tags"] = ", ".join(tags)
 
     for field in ("advertisedRoutes", "enabledRoutes"):
-        vals = device.get(field) or []
+        vals = _strings(device.get(field))
         if vals:
             attrs["tailscale_" + field] = ", ".join(vals)
 
@@ -278,16 +325,14 @@ def main(*args, **kwargs):
         return []
 
     # If a client_id was supplied, exchange it for an OAuth access token;
-    # otherwise treat `secret` as a long-lived API key.
+    # otherwise treat `secret` as a long-lived API key. The exchange reports
+    # failures as a printed diagnostic and a clean return rather than a raw
+    # abort - see oauth_access_token.
     if client_id:
         _log("using OAuth client credentials")
-        token = oauth2_token(
-            token_url=token_url,
-            client_id=client_id,
-            client_secret=secret,
-            scope=DEFAULT_SCOPE,
-            **get_http_options(kwargs)
-        )
+        token = oauth_access_token(token_url, client_id, secret, kwargs)
+        if not token:
+            return None
     else:
         _log("using an API key")
         token = secret
@@ -297,10 +342,17 @@ def main(*args, **kwargs):
         _log("no devices found, or the API call failed")
         return []
 
-    assets = []
-    skipped = {SKIP_NO_ID: 0, SKIP_NO_INTERFACE: 0}
-    first_skipped = {SKIP_NO_ID: "", SKIP_NO_INTERFACE: ""}
+    # Each asset is streamed as it is built, so a malformed record late in the
+    # walk costs only itself rather than the whole buffered tailnet.
+    reported = 0
+    skipped = {SKIP_NO_ID: 0, SKIP_NO_INTERFACE: 0, SKIP_NOT_OBJECT: 0}
+    first_skipped = {SKIP_NO_ID: "", SKIP_NO_INTERFACE: "", SKIP_NOT_OBJECT: ""}
     for d in devices:
+        if type(d) != "dict":
+            skipped[SKIP_NOT_OBJECT] += 1
+            if skipped[SKIP_NOT_OBJECT] == 1:
+                first_skipped[SKIP_NOT_OBJECT] = str(d)[:40]
+            continue
         ia, reason = transform_device_to_importasset(d, tailnet)
         if ia == None:
             # Tally by cause and keep one example of each for diagnosis; a
@@ -309,8 +361,11 @@ def main(*args, **kwargs):
             if skipped[reason] == 1:
                 first_skipped[reason] = str(d.get("name", ""))
             continue
-        assets.append(ia)
+        reported += report_asset(ia)
 
+    if skipped[SKIP_NOT_OBJECT] > 0:
+        _log("skipped {} device rows that were not objects (first: {})".format(
+            skipped[SKIP_NOT_OBJECT], first_skipped[SKIP_NOT_OBJECT]))
     if skipped[SKIP_NO_ID] > 0:
         _log("skipped {} devices with no id (first: {})".format(
             skipped[SKIP_NO_ID], first_skipped[SKIP_NO_ID]))
@@ -318,7 +373,5 @@ def main(*args, **kwargs):
         _log("skipped {} devices with no network interfaces (first: {})".format(
             skipped[SKIP_NO_INTERFACE], first_skipped[SKIP_NO_INTERFACE]))
 
-    # Stream assets to runZero via report_assets instead of returning a list.
-    reported = report_assets(assets)
     _log("reported " + str(reported) + " assets")
     return None

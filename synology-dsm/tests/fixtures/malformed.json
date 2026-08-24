@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "synology-dsm",
-  "description": "Junk in every collection, plus the two DSM-specific hazards. First, the DSM 6 spelling of the DHCP API - SYNO.Core.Network.DHCPServer.ClientList rather than the DSM 7 SYNO.Network.DHCPServer.ClientList - which proves both are probed rather than one being hardcoded, and lease records using an ALTERNATIVE key spelling (mac_address/ip_address/host_name), which is the defence against a response schema Synology has never published and that no public capture exists for. Second, a mid-run session loss: DSM answers error 119 on one collection while others still work, which must be reported as a session problem naming the concurrent-session limit rather than as an empty result. Also covers rows that are strings instead of objects, a guest whose vnics list holds junk, a camera whose host is a bare space, a backup device with no uuid, and a lease for the NAS's own MAC, which must not become a second asset for the NAS. The NAS reports the factory hostname 'DiskStation', which every unconfigured unit shares and which is therefore not imported as a hostname.",
+  "description": "Junk in every collection, plus the two DSM-specific hazards. First, the DSM 6 spelling of the DHCP API - SYNO.Core.Network.DHCPServer.ClientList rather than the DSM 7 SYNO.Network.DHCPServer.ClientList - which proves both are probed rather than one being hardcoded, and lease records using an ALTERNATIVE key spelling (mac_address/ip_address/host_name), which is the defence against a response schema Synology has never published and that no public capture exists for. Second, a mid-run session loss that PERSISTS: DSM answers error 119 on the VM collection, the script re-authenticates once (the second login response) and retries, and the retry answers 119 again - so the collection is reported as a session problem naming the concurrent-session limit rather than as an empty result, and no further re-login is attempted. The recovery case, where the retry succeeds, is the session-relogin scenario. Also covers rows that are strings instead of objects, a guest whose vnics list holds junk, a camera whose host is a bare space, a backup device with no uuid, and a lease for the NAS's own MAC, which must not become a second asset for the NAS. The NAS reports the factory hostname 'DiskStation', which every unconfigured unit shares and which is therefore not imported as a hostname.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-runzero",
@@ -36,7 +36,8 @@
       "name": "login",
       "match": {"method": "POST", "path": "/webapi/entry.cgi"},
       "responses": [
-        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-mixed"}}}
+        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-mixed"}}},
+        {"status": 200, "json": {"success": true, "data": {"sid": "fixture-sid-relogin"}}}
       ],
       "when_exhausted": "error"
     },

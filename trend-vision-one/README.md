@@ -148,7 +148,8 @@ for ad-hoc runs.
 - **Rate limiting:** Vision One enforces per-API request quotas that vary by endpoint and license tier, and answers `429` with `Retry-After`. The shared HTTP helper retries `408/425/429/5xx` with exponential backoff and honors `Retry-After`; the backoff multiplier is widened here so a long adapter pass does not exhaust its retry budget racing the quota window.
 - **Unverified assumptions**, stated plainly:
   - Whether an agent reinstall preserves `agentGuid` (see Asset identity above).
-  - The maximum accepted `top` value. Trend's published reference for this endpoint was not reachable without a tenant login; `pytmv1` defaults to 100, which is the default used here, and the parameter is capped at 1000.
+  - The maximum accepted `top` value. Trend's published reference for this endpoint was not reachable without a tenant login; `pytmv1` defaults to 100, which is the default used here, and the parameter is capped at 1000. Because the real cap is unverified, a `400` on the first page with an operator-raised `page_size` falls back once to `top=100` with a logged explanation rather than ending the run with zero assets.
+  - The detail response's `interfaces[]` shape (the only MAC source). When adapter lookups succeed but none of them yields an `interfaces[]` list, the run logs that the schema may differ rather than silently importing no MACs.
   - The exact regional domain list is taken from Trend's published regional domains guide and from the region mapping in `trendmicro/vision-one-mcp-server`; both agree, including the `.co.jp` Japan domain.
 - This integration was validated against local fixtures, not a live Trend Micro Vision One tenant.
 

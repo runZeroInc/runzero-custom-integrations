@@ -2,7 +2,7 @@
   "name": "upload-rejected",
   "integration": "sumo-logic",
   "script": "sumo-logic/sumo-logic.star",
-  "description": "The upload half of a run failing while the export half succeeded, which used to be invisible: `sync_to_sumo` assigned the result of `http_post` to a variable it never read, so a revoked collector code, a wrong source address, or a batch over the source's size limit produced no log line and a task that still finished green. An HTTP source is write-only -- the status code is the only acknowledgement Sumo gives -- so the status is the whole signal. 501 assets make two batches; the first is refused with 429 and the second accepted. Three things are asserted together, and each fails differently. The rejection is LOGGED with its status. The second batch is still POSTed, because batches are independent uploads and abandoning the rest would turn one refused batch into a lost estate -- request_count==3 and the a501 body assertion pin that. And the run does not end green: `Uploaded 1 of 501` is the last line the loop reaches, and `fail()` then carries the count into the task's own outcome, which is the only place an integration that emits no assets can report anything at all. 429 is deliberate rather than a 4xx that could only mean a bad credential: it is the failure a healthy configuration meets under load, and the one most likely to be mistaken for success.",
+  "description": "The upload half of a run failing while the export half succeeded, which used to be invisible: `sync_to_sumo` assigned the result of `http_post` to a variable it never read, so a revoked collector code, a wrong source address, or a batch over the source's size limit produced no log line and a task that still finished green. An HTTP source is write-only -- the status code is the only acknowledgement Sumo gives -- so the status is the whole signal. 501 assets make two batches; the first is refused with 401 and the second accepted. Three things are asserted together, and each fails differently. The rejection is LOGGED with its status. The second batch is still POSTed, because batches are independent uploads and abandoning the rest would turn one refused batch into a lost estate -- request_count==3 and the a501 body assertion pin that. And the run does not end green: `Uploaded 1 of 501` is the last line the loop reaches, and `fail()` then carries the count into the task's own outcome, which is the only place an integration that emits no assets can report anything at all. 401 is deliberate: it is OUTSIDE the retry_on=[429,503] list, so it must be rejected on the first attempt with no retry -- request_count==3 also pins that. The transient-throttle case (429 retried and delivered) is the upload-retried scenario.",
   "kwargs": {
     "src_url": "$BASE",
     "dst_url": "$BASE/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE",
@@ -72,10 +72,10 @@
       ]
     },
     {
-      "name": "sumo http source, throttles the first batch and accepts the second",
+      "name": "sumo http source, refuses the first batch and accepts the second",
       "match": {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE"},
       "responses": [
-        {"status": 429, "text": "rate limit exceeded for this source"},
+        {"status": 401, "text": "invalid or revoked collector code"},
         {"status": 200, "text": ""}
       ],
       "when_exhausted": "error"
@@ -90,8 +90,8 @@
       {"method": "POST", "path": "/receiver/v1/http/ZaVnC4dhaV1FIXTURECOLLECTORCODE", "body_contains": "\"id\":\"a501\""}
     ],
     "log_contains": [
-      "Sumo Logic rejected a batch of 500 assets with status 429",
-      "rate limit exceeded for this source",
+      "Sumo Logic rejected a batch of 500 assets: status 401",
+      "invalid or revoked collector code",
       "Uploaded 1 of 501 assets to Sumo Logic",
       "Sumo Logic did not accept 500 of 501 assets"
     ]

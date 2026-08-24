@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "tailscale",
-  "description": "API-key mode against one tailnet. Covers the tailnet-address interface, the second interface built from clientConnectivity.endpoints (which arrive as addr:port and [v6]:port and must be stripped), the latency map fanned out into per-region attributes, and the documented skip of a device with no id and of a device with no usable address at all. namespaced_ids is skipped because the script emits a bare \"tailscale-<device id>\" with no tenant scope; that is a real defect, reported separately, not something this scenario can assert around.",
+  "description": "API-key mode against one tailnet. Covers the tailnet-address interface, the latency map fanned out into per-region attributes, and the documented skip of a device with no id and of a device with no usable address at all. clientConnectivity.endpoints must stay OFF the interfaces: they include the public NAT egress address, which every device in an office shares, so importing them as interface data would cross-correlate unrelated devices - the asset assertions pin that the interfaces carry ONLY the tailnet addresses while the endpoints survive as the tailscale_client_endpoints attribute. namespaced_ids is skipped because the script emits a bare \"tailscale-<device id>\" with no tenant scope; that is a real defect, reported separately, not something this scenario can assert around.",
   "kwargs": {
     "url": "$BASE",
     "tailnet": "example.com",
@@ -83,6 +83,26 @@
     "asset_count": 2,
     "ids": ["tailscale-90210000000001", "tailscale-90210000000002"],
     "request_count": 1,
+    "assets": [
+      {
+        "id": "tailscale-90210000000001",
+        "fields": {
+          "hostnames": "laptop-anna.example.ts.net",
+          "ipAddresses": "100.101.10.1\tfd7a:115c:a1e0::1",
+          "os": "macOS",
+          "tailscale_client_endpoints": "198.51.100.9:41641, 10.200.0.9:41641",
+          "tailscale_latency_ms_New York City": "22.1",
+          "tailscale_derp_preferred_region": "San Francisco"
+        }
+      },
+      {
+        "id": "tailscale-90210000000002",
+        "fields": {
+          "ipAddresses": "100.101.10.2",
+          "tailscale_client_endpoints": "[2001:db8:44::9]:41641"
+        }
+      }
+    ],
     "requests_include": [
       {"method": "GET", "path": "/api/v2/tailnet/example.com/devices", "query_contains": "fields=all"},
       {"header_contains": "tskey-api-fixture-000000"}

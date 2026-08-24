@@ -1,0 +1,32 @@
+{
+  "name": "auth-failure",
+  "integration": "ubiquiti-unifi-network",
+  "description": "A revoked or wrong API key. The Integration API answers 401 on the very first call (the sites lookup), and the run must end with a printed diagnostic and zero assets - one request, no client or device fetches attempted against a credential the controller already refused. 401 is outside get_json's retry set, so exactly one request is made.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-revoked-key",
+    "site_name": "Default"
+  },
+  "routes": [
+    {
+      "name": "sites-unauthorized",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {"status": 401, "json": {"statusCode": 401, "message": "invalid API key"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/clients"},
+      {"path_contains": "/devices"}
+    ],
+    "log_contains": [
+      "unifi: failed to get the sites list: status 401"
+    ]
+  }
+}

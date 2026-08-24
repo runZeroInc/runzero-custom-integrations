@@ -1,7 +1,7 @@
 {
   "name": "stuck-cursor",
   "integration": "stairwell",
-  "description": "A Stairwell environment that stops advancing and hands back the same nextPageToken it was just given. The walk's ONLY exit is a response carrying no nextPageToken, so this shape produces no exit at all: the script used to re-import the same page until the task timed out, with nothing in the log to say why.\n\nThe no-progress check is the working guard -- the max_pages ceiling behind it defaults to ten million records deep and exists only so an adversarially rotating server still terminates. A token identical to the one just sent means Stairwell ignored the cursor or replayed a cached response, and the walk stops on the first repeat and says so, which is what log_contains pins. The stop happens BEFORE the page is reported, so the three assets are imported once; reporting first would re-import them and trip the unique_ids invariant, which is the duplicate work the guard exists to prevent.\n\ntotalSize is served so the message exercises its 'retrieved x/y available assets' form rather than the no-total fallback, and the denominator is far larger than what was retrieved so the line reads as the truncation it is.\n\nwhen_exhausted is `empty` ONLY as a terminator for a regression. The harness's empty response is a bare JSON array, which this script rejects as the wrong shape and stops on -- so if the no-progress check were removed the walk would end one request later on that instead of running to a two-million-page ceiling and failing this scenario by timing out. It then fails on request_count and the missing log line, which is a readable failure.\n\nnamespaced_ids is skipped for the reason recorded in happy: the id is the bare Stairwell asset number with no tenant scope.",
+  "description": "A Stairwell environment that stops advancing and hands back the same nextPageToken it was just given. The walk's ONLY exit is a response carrying no nextPageToken, so this shape produces no exit at all: the script used to re-import the same page until the task timed out, with nothing in the log to say why.\n\nThe no-progress check is the working guard -- the pager() ceiling behind it defaults to 100,000 pages deep and exists only so an adversarially rotating server still terminates. A token identical to the one just sent means Stairwell ignored the cursor or replayed a cached response, and the walk stops on the first repeat and says so, which is what log_contains pins. The stop happens BEFORE the page is reported, so the three assets are imported once; reporting first would re-import them and trip the unique_ids invariant, which is the duplicate work the guard exists to prevent.\n\ntotalSize is served so the message exercises its 'retrieved x/y available assets' form rather than the no-total fallback, and the denominator is far larger than what was retrieved so the line reads as the truncation it is.\n\nwhen_exhausted is `empty` ONLY as a terminator for a regression. The harness's empty response is a bare JSON array, which this script rejects as the wrong shape and stops on -- so if the no-progress check were removed the walk would end one request later on that instead of running to the 100,000-page ceiling and failing this scenario by timing out. It then fails on request_count and the missing log line, which is a readable failure.\n\nnamespaced_ids is skipped for the reason recorded in happy: the id is the bare Stairwell asset number with no tenant scope.",
   "kwargs": {
     "url": "$BASE",
     "environment_id": "env-1",
@@ -95,10 +95,13 @@
     "request_count": 2,
     "requests_include": [
       {
-        "query_contains": "limit=5"
+        "query_contains": "limit=100"
       },
       {
         "query_contains": "next_page_token=tok-1"
+      },
+      {
+        "query_contains": "&page_token=tok-1"
       }
     ],
     "log_contains": [

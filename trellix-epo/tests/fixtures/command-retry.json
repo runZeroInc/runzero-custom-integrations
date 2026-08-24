@@ -1,0 +1,43 @@
+{
+  "name": "command-retry",
+  "integration": "trellix-epo",
+  "description": "The remote-command transport is a raw http.get (the OK:-prefixed envelope cannot go through get_json), so it sits outside the built-in retry budget - and a transient 502 on system.find used to produce a green zero-asset run with one log line as the only signal. The hand-rolled bounded retry must repeat the command on a transient status and import normally when the console recovers: system.find answers 502 once and then the estate. request_count==3 (one findGroups, two system.find attempts) pins the retry; the asset pins the recovery. Every remote command is a read, so repeating it is safe.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "collection_mode": "search"
+  },
+  "routes": [
+    {
+      "name": "find-groups",
+      "match": {"method": "GET", "path": "/remote/system.findGroups"},
+      "responses": [
+        {"status": 200, "text": "OK:\r\n[\n  {\"groupId\": 2, \"groupPath\": \"My Organization\"}\n]"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "system-find",
+      "match": {"method": "GET", "path": "/remote/system.find"},
+      "responses": [
+        {"status": 502, "text": "<html>Bad Gateway</html>"},
+        {"status": 200, "text": "OK:\r\n[\n  {\n    \"EPOComputerProperties.ParentID\": 4242,\n    \"EPOComputerProperties.ComputerName\": \"RETRY-WS\",\n    \"EPOComputerProperties.ParentGroupId\": 2,\n    \"EPOComputerProperties.OSType\": \"Windows 11\",\n    \"EPOLeafNode.ManagedState\": 1\n  }\n]"}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["trellix-epo:$HOST:4242"],
+    "request_count": 3,
+    "assets": [
+      {
+        "id": "trellix-epo:$HOST:4242",
+        "fields": {"hostnames": "RETRY-WS"}
+      }
+    ]
+  },
+  "check_determinism": true
+}

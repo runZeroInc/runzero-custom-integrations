@@ -84,9 +84,10 @@ The two ends fail differently and it is worth knowing which you are looking at:
   nothing.
 - `runZero did not return any assets` means the token worked but the `SEARCH` constant
   (`alive:t`) matched nothing in that organization.
-- `Sumo Logic rejected a batch of ... with status ...` is the Sumo endpoint, not runZero:
-  the source address, the collector code, the batch size, or a rate limit. The status and
-  the response body are both in the line, and the task itself fails.
+- `Sumo Logic rejected a batch of ... : status ...` is the Sumo endpoint, not runZero:
+  the source address, the collector code, or the batch size. The status and a snippet of
+  the response body are both in the line, and the task itself fails. A transient `429`
+  or `503` is retried with backoff first and only counts as a rejection if it persists.
 
 To check the `CONFIG` block and the HTTP and TLS wiring without touching either end:
 
@@ -150,12 +151,14 @@ successful task:
   inventory is held in memory at once before the first batch is posted. On a very large
   organization, narrow `SEARCH` rather than raising the timeout.
 - **A rejected upload fails the task.** Every batch's status is checked — an HTTP source
-  answers `200` and the status code is the only acknowledgement it gives. A batch Sumo
-  refuses (a bad source address, a revoked collector, a payload over the source's size
-  limit, a 429 under load) is logged as
-  `Sumo Logic rejected a batch of <n> assets with status <code>` together with the response
-  body, and the remaining batches are still sent, because they are independent uploads and
-  abandoning them would turn one refused batch into a lost estate. The run then ends with
+  answers `200` and the status code is the only acknowledgement it gives. A transient
+  throttle (`429`) or unavailability (`503`) is retried with bounded backoff first,
+  honoring `Retry-After`; those statuses mean the batch was rejected unprocessed, so the
+  retry cannot double-ingest. A batch Sumo refuses outright (a bad source address, a
+  revoked collector, a payload over the source's size limit) is logged as
+  `Sumo Logic rejected a batch of <n> assets: status <code> ...` together with a snippet
+  of the response body, and the remaining batches are still sent, because they are
+  independent uploads and abandoning them would turn one refused batch into a lost estate. The run then ends with
   `Uploaded <sent> of <total> assets to Sumo Logic` and, if anything was refused, fails the
   task with `Sumo Logic did not accept <n> of <total> assets`. That last part matters
   because this integration emits no assets: the task's own outcome is the only place an

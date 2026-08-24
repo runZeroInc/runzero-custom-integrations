@@ -373,6 +373,7 @@ def build_assets(base_url, detail_options, scope, rows, import_software,
     """
     assets = []
     spent = 0
+    no_adapters = 0
     for row in rows:
         detail = {}
         agent_guid = _clean(row.get("agentGuid"))
@@ -384,10 +385,16 @@ def build_assets(base_url, detail_options, scope, rows, import_software,
                 print("trend-vision-one: failed to fetch details for {}: {}".format(
                     agent_guid, err))
                 detail = {}
+            elif not dicts(detail.get("interfaces")):
+                # The detail response's interfaces[] shape is unverified against
+                # a live tenant; count the successful lookups that yielded no
+                # adapters so a schema drift is reported instead of silently
+                # importing no MACs.
+                no_adapters += 1
         asset = build_asset(scope, row, detail, import_software)
         if asset:
             assets.append(asset)
-    return assets, spent
+    return assets, spent, no_adapters
 
 
 def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, page_size,
@@ -396,6 +403,7 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
     never held in memory at once."""
     reported = 0
     detailed = 0
+    adapterless = 0
     url = base_url + ENDPOINTS_PATH
     first = True
     _pager = pager("trend-vision-one")
@@ -403,6 +411,17 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
         if first:
             data, err = get_json(url, params={"top": page_size},
                                  retry_backoff=HTTP_RETRY_BACKOFF, **list_options)
+            # The maximum top the API accepts is not confirmed past the default.
+            # A 400 on the very first page with an operator-raised page_size is
+            # the shape of "too large", so fall back once to the known-good
+            # default instead of ending the run with zero assets.
+            if err and err.startswith("status 400") and page_size > 100:
+                print(("trend-vision-one: the API rejected top={} (status 400); " +
+                       "retrying with top=100 - the accepted maximum may be lower " +
+                       "than the configured page_size").format(page_size))
+                page_size = 100
+                data, err = get_json(url, params={"top": page_size},
+                                     retry_backoff=HTTP_RETRY_BACKOFF, **list_options)
         else:
             # nextLink is an absolute URL that already carries the paging cursor
             # in its query string. Passing params= here, even an empty dict,
@@ -411,12 +430,12 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
             data, err = get_json(url, retry_backoff=HTTP_RETRY_BACKOFF, **list_options)
         if err:
             print("trend-vision-one: failed to fetch endpoints:", err)
-            return reported, detailed
+            return reported, detailed, adapterless
         data = data or {}
         items = data.get("items", [])
         if type(items) != "list":
             print("trend-vision-one: stopping: unexpected items shape from", url)
-            return reported, detailed
+            return reported, detailed, adapterless
         rows = [row for row in items if type(row) == "dict"]
 
         if first and type(data.get("totalCount")) == "int":
@@ -429,9 +448,10 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
             if budget <= 0:
                 fetch_interfaces = False
                 budget = 0
-        assets, spent = build_assets(base_url, detail_options, scope, rows,
-                                     import_software, fetch_interfaces, budget)
+        assets, spent, no_adapters = build_assets(base_url, detail_options, scope, rows,
+                                                  import_software, fetch_interfaces, budget)
         detailed += spent
+        adapterless += no_adapters
         reported += report_assets(assets)
 
         next_link = _clean(data.get("nextLink"))
@@ -445,7 +465,7 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
             break
         first = False
         url = next_link
-    return reported, detailed
+    return reported, detailed, adapterless
 
 
 def main(**kwargs):
@@ -477,12 +497,16 @@ def main(**kwargs):
     list_options = get_http_options(kwargs, headers=list_headers)
 
     scope = _scope(base_url)
-    reported, detailed = fetch_and_report_endpoints(
+    reported, detailed, adapterless = fetch_and_report_endpoints(
         base_url, list_options, detail_options, scope, page_size,
         import_software, fetch_interfaces, interface_limit)
     print("trend-vision-one: reported {} endpoints".format(reported))
     if fetch_interfaces:
         print("trend-vision-one: fetched adapter details for {} endpoints".format(detailed))
+        if detailed and adapterless == detailed:
+            print("trend-vision-one: none of the fetched endpoint details carried an " +
+                  "interfaces[] list; the detail response shape may differ from the " +
+                  "expected schema, so no MAC addresses were imported")
     if not reported:
         print("trend-vision-one: no assets retrieved")
     return None

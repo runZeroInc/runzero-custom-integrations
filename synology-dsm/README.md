@@ -186,6 +186,7 @@ records *about* machines that other systems own, and are deliberately inert.
 - Final runZero ID: `synology:<nas-host>:camera:1`. Scoped, because camera `1` exists on every Surveillance Station on earth.
 - Match behavior: `no-id-match no-id-break`. The index is **reused** when a camera is deleted and another added, so letting it drive a merge would eventually merge a new camera onto a retired one's asset — and **nothing could veto it**, because the platform's foreign-id match path consults only a site check and a collision helper whose allowlist does not include custom integrations, so the MAC, IP, and name break flags are never consulted once an id matches.
 - Correlation runs on the address. **Surveillance Station reports no MAC for a camera anywhere in the response**, so the address in `host` is all there is — and `host` may hold an IP, a hostname, or a DDNS name, so both forms are handled. A camera with neither is skipped and counted.
+- The camera's display name is imported as a hostname **only when it is shaped like one**. A free-text label such as `Front Door` is an operator annotation, not a machine name — a value with a space or any other character that cannot appear in a DNS name is kept in the `synology_camera_name` attribute and stays off the hostname list, where it would be a weak merge key.
 - `vendor` and `model` are only imported when they are not the literal placeholders `User` and `Define`, which is what Surveillance Station stores for a manually added generic camera.
 - Verdict: **derived / non-authoritative.**
 
@@ -252,9 +253,14 @@ run, so this integration ends with an explicit `logout`. A scheduled task that
 never logged out would eventually lock itself out of its own account.
 
 Error codes `106` (session timeout), `107` (interrupted by duplicate login), and
-`119` (invalid session) are reported as session problems naming the
-concurrent-session limit, rather than as an empty result — the usual cause is a
-second tool signing in as the same account.
+`119` (invalid session) mid-run trigger **one re-login**: the script
+re-authenticates with the stored username and password (deliberately without
+the OTP, which is single-use and long expired by then) and retries the failed
+request with the new session id, so a duplicated login from another tool costs
+one round trip instead of every remaining collection. If the retry fails too,
+the collection is reported as a session problem naming the concurrent-session
+limit, rather than as an empty result — the usual cause is a second tool
+signing in as the same account — and no further re-login is attempted that run.
 
 Two more codes worth knowing: `105` means the account is not an administrator
 and is reported as such, and `150` means the request arrived from a different
@@ -307,7 +313,8 @@ a DSM 7.x API definition dump that exposes each API's `allowUser` list.
 **Two things are explicitly unverified and are handled defensively rather than
 assumed:**
 
-- **The DHCP lease record schema.** Synology documents none, and no public capture exists. DSM's own UI confirms the *columns* are MAC, IP, hostname, lease expiry, and reservation status, so the data is there — but the JSON keys are unknown. Every lease field is therefore read through a list of candidate spellings (`mac`/`mac_address`/`hwaddr`/…​), and the collection wrapper is likewise probed across `clients`/`leases`/`items`/`data`/`list`. The lease expiry is preserved verbatim as a string and **never** converted into a timestamp, because whether it is an epoch, a duration, or a formatted date is not established, and a value misread into the future would make the platform reject the whole record.
+- **The DHCP lease record schema.** Synology documents none, and no public capture exists. DSM's own UI confirms the *columns* are MAC, IP, hostname, lease expiry, and reservation status, so the data is there — but the JSON keys are unknown. Every lease field is therefore read through a list of candidate spellings (`mac`/`mac_address`/`hwaddr`/…​), and the collection wrapper is likewise probed across `clients`/`leases`/`items`/`data`/`list`. A response whose list lives under a key none of the candidates name is no longer a silent zero: the script logs the keys it actually received, so a schema drift is visible in the task log. The lease expiry is preserved verbatim as a string and **never** converted into a timestamp, because whether it is an epoch, a duration, or a formatted date is not established, and a value misread into the future would make the platform reject the whole record.
+- **The Active Backup device nesting.** `data.tasks[].devices[]` is reconstructed from community captures. The script also accepts a top-level `data.devices[]` list, and when a non-empty response yields no device row under either shape it logs the response keys rather than quietly reporting zero backup devices.
 - **POST with a form-encoded body is convention, not specification.** Synology's guides show only GET templates and never name a content type. Every community client posts form bodies against real hardware, so it is well proven in practice, but it is undocumented.
 
 A live NAS would settle both, and the lease schema is the single most valuable

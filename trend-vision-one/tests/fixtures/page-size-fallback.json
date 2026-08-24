@@ -1,0 +1,56 @@
+{
+  "name": "page-size-fallback",
+  "integration": "trend-vision-one",
+  "description": "The CONFIG allows page_size up to 1000, but the maximum top the live API accepts is unverified past the default - README's own admission. An operator raising it past the real cap used to get a 400 and a zero-asset green-looking run. The first page answering 400 to an operator-raised top must now fall back ONCE to the known-good top=100, log why, and import normally. 400 is outside get_json's retry set, so the fallback is exactly one extra request.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "api_token": "fixture-vision-one-key",
+    "import_software": "false",
+    "fetch_interfaces": "false",
+    "page_size": "1000"
+  },
+  "routes": [
+    {
+      "name": "top-too-large",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "top=1000"},
+      "responses": [
+        {"status": 400, "json": {"error": {"code": "BadRequest", "message": "top must be less than or equal to 200"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "top-default",
+      "match": {"method": "GET", "path": "/v3.0/endpointSecurity/endpoints", "query_contains": "top=100"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "totalCount": 1,
+            "items": [
+              {
+                "agentGuid": "dddddddd-4444-4000-8000-000000000004",
+                "endpointName": "FALLBACK-01",
+                "type": "desktop",
+                "osName": "Windows 11",
+                "osPlatform": "windows",
+                "ipAddresses": ["10.100.2.10"]
+              }
+            ],
+            "nextLink": ""
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["trend-vision-one:$HOST:dddddddd-4444-4000-8000-000000000004"],
+    "request_count": 2,
+    "log_contains": [
+      "trend-vision-one: the API rejected top=1000 (status 400); retrying with top=100",
+      "trend-vision-one: reported 1 endpoints"
+    ]
+  }
+}

@@ -70,9 +70,9 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', http_get='get', 'basic', 'url_encode', 'url_parse')
-load('json', json_decode='decode')
+load('jsonstream', 'iter_array')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_bool')
-load('time', 'parse_time', 'parse_ts')
+load('time', 'parse_time', 'parse_ts', 'sleep')
 load('re', re_match='match')
 
 # Every ePO remote command is an RPC name used as a path segment under /remote/.
@@ -183,20 +183,21 @@ def _parse_envelope(body):
 
 
 def _decode_rows(payload):
-    """Decode an ePO result array, rejecting any payload that is not one.
+    """Return an iterator over an ePO result array, rejecting other payloads.
 
-    json_decode aborts the script on malformed input, so the payload is checked
-    for the opening bracket of an array first. A command that succeeds without
-    matching anything answers with an empty payload rather than `[]`.
+    The payload is checked for the opening bracket of an array first, because
+    an HTML error page or a bare object handed to the iterator would abort the
+    script. The rows are streamed with jsonstream rather than decoded whole, so
+    a system.find over a large estate never holds the decoded result set in
+    memory - only the response text plus one row at a time. A command that
+    succeeds without matching anything answers with an empty payload rather
+    than `[]`.
     """
     if not payload:
         return [], None
     if not payload.startswith("["):
         return [], "expected a JSON array, got: " + payload[:120]
-    rows = json_decode(payload)
-    if type(rows) != "list":
-        return [], "expected a JSON array"
-    return rows, None
+    return iter_array(payload), None
 
 
 def _command_url(base_url, command, params):
@@ -219,15 +220,26 @@ def _command_url(base_url, command, params):
 
 
 def run_command(base_url, command, params, http_options):
-    """Run one ePO remote command and return its decoded rows as (rows, err).
+    """Run one ePO remote command and return its rows as (rows, err).
 
     get_json cannot be used here because the response body is prefixed with a
     status line and therefore does not decode as JSON. That also means the
-    retry budget get_json exposes is unavailable on this transport: the raw
-    http.get builtin rejects a `retries` argument outright. The query string is
-    built into the URL, so no `params` argument is passed alongside it.
+    retry budget get_json exposes is unavailable on this transport - the raw
+    http.get builtin rejects a `retries` argument outright - so a narrow retry
+    is hand-rolled: every command here is a read, safe to repeat, and only a
+    missing response or a transient status (408/425/429/5xx) is retried. A
+    transient 502 on system.find used to produce a green zero-asset run. The
+    query string is built into the URL, so no `params` argument is passed
+    alongside it.
     """
-    response = http_get(_command_url(base_url, command, params), **http_options)
+    url = _command_url(base_url, command, params)
+    response = None
+    for attempt in range(3):
+        if attempt:
+            sleep("{}s".format(attempt))
+        response = http_get(url, **http_options)
+        if response and response.status_code not in [408, 425, 429, 500, 502, 503, 504]:
+            break
     if not response:
         return [], "no response from " + command
     if response.status_code != 200:
@@ -370,9 +382,14 @@ def build_asset(row, scope, node_id, group_paths):
     return asset
 
 
-def build_assets(rows, scope, group_paths, include_unmanaged):
-    """Convert one batch of ePO result rows into ImportAsset objects."""
-    assets = []
+def report_systems(rows, scope, group_paths, include_unmanaged):
+    """Build and stream one asset per ePO result row, returning the count.
+
+    Each asset goes to report_asset as it is built, so even the search mode -
+    where ePO answers the whole estate in one response with no paging - holds
+    one built asset at a time rather than one estate.
+    """
+    reported = 0
     for row in rows:
         if type(row) != "dict":
             print("trellix-epo: skipping malformed system record")
@@ -390,8 +407,8 @@ def build_assets(rows, scope, group_paths, include_unmanaged):
         if not include_unmanaged and _int(row.get(LEAF + "ManagedState", 0)) != 1:
             continue
 
-        assets.append(build_asset(row, scope, node_id, group_paths))
-    return assets
+        reported += report_asset(build_asset(row, scope, node_id, group_paths))
+    return reported
 
 
 def fetch_group_paths(base_url, http_options):
@@ -422,8 +439,10 @@ def fetch_and_report_search(base_url, http_options, search_text, scope, group_pa
     """Fetch every matching system with a single system.find call.
 
     ePO returns the whole result set in one response and offers no paging
-    arguments, so this path holds one copy of the estate in memory. The
-    system-tree collection mode exists to break that up by group.
+    arguments, so this path necessarily holds one response body in memory - but
+    the rows are streamed off it and each asset is reported as it is built, so
+    the decoded estate never exists as one Starlark value. The system-tree
+    collection mode further breaks the response itself up by group.
     """
     rows, err = run_command(base_url, FIND_SYSTEMS_COMMAND, {"searchText": search_text},
                             http_options)
@@ -432,10 +451,7 @@ def fetch_and_report_search(base_url, http_options, search_text, scope, group_pa
         if err.startswith("status 401") or err.startswith("status 403"):
             print("trellix-epo: check the username and password")
         return 0
-    assets = build_assets(rows, scope, group_paths, include_unmanaged)
-    if not assets:
-        return 0
-    return report_assets(assets)
+    return report_systems(rows, scope, group_paths, include_unmanaged)
 
 
 def fetch_and_report_tree(base_url, http_options, scope, group_paths, include_unmanaged):
@@ -449,9 +465,7 @@ def fetch_and_report_tree(base_url, http_options, scope, group_paths, include_un
             # One unreadable group must not abandon the rest of the tree.
             print("trellix-epo: failed to fetch systems in group {}: {}".format(group_id, err))
             continue
-        assets = build_assets(rows, scope, group_paths, include_unmanaged)
-        if assets:
-            reported += report_assets(assets)
+        reported += report_systems(rows, scope, group_paths, include_unmanaged)
     return reported
 
 

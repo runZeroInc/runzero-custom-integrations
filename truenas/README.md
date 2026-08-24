@@ -295,7 +295,10 @@ parameters and return a **bare JSON array** — no total, no cursor, no wrapper.
 So a short page is the only end-of-collection signal available, and that is what
 the walk uses. `max_records` exists because a system with a few hundred disks
 would otherwise be read in full before anything is emitted; reaching it logs
-`truenas: record cap of <n> reached for <path>`.
+`truenas: record cap of <n> reached for <path>`. The walk itself is guarded by
+a `pager()` loop bound (CONFIG `maxPages`, 100,000 pages), so a server that
+ignored `offset` and kept answering full pages would fail the run loudly rather
+than spin silently.
 
 `system/info`, `network/configuration`, and `interface` are singletons or small
 enough not to need paging and are fetched whole.

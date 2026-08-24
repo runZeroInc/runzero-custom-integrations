@@ -89,9 +89,12 @@ CONFIG = {
             "default": 200,
             "min": 1,
             "max": 10000,
-            "description": "Hard stop on how many pages one collection may fetch, so a controller that ignores the page parameter cannot turn a run into an unbounded request loop.",
+            "description": "Hard stop on how many pages one collection may fetch. Hitting it fails the run rather than truncating silently.",
         },
     ],
+    # Backstop for the pager() loop guards; the max_pages parameter tightens the
+    # per-collection bound below this and cannot raise it past it.
+    "maxPages": 10000,
     "includes": {
         "tls_": OPTIONS_TLS,
         "http_": OPTIONS_HTTP,
@@ -332,10 +335,15 @@ def walk_pages(ctx, path, label, build):
     treated as the whole collection and the walk stops after it. Without that
     check a firmware that ignores the page parameter would answer page 2 with
     the same rows and the run would loop.
+
+    The loop guard is pager(): hitting the max_pages ceiling raises with the
+    loop label rather than ending silently, so a truncated import reads as an
+    error instead of a complete run.
     """
     reported = 0
-    page = 1
-    for _ in range(ctx["max_pages"]):
+    p = pager(label, limit=ctx["max_pages"])
+    while p.next():
+        page = p.page
         separator = "&" if "?" in path else "?"
         paged = "{}{}page={}&pageSize={}".format(path, separator, page, ctx["page_size"])
         result, code = api_get(ctx, paged, label)
@@ -362,7 +370,6 @@ def walk_pages(ctx, path, label, build):
             break
         if len(rows) < ctx["page_size"]:
             break
-        page += 1
     return reported
 
 
@@ -536,8 +543,9 @@ def list_sites(ctx):
         return [(site_id, "") for site_id in ctx["site_ids"]]
 
     sites = []
-    page = 1
-    for _ in range(ctx["max_pages"]):
+    p = pager("sites", limit=ctx["max_pages"])
+    while p.next():
+        page = p.page
         path = "{}?page={}&pageSize={}".format(
             SITES_PATH.format(ctx["omadac_id"]), page, ctx["page_size"])
         result, _code = api_get(ctx, path, "sites")
@@ -568,7 +576,6 @@ def list_sites(ctx):
             break
         if len(rows) < ctx["page_size"]:
             break
-        page += 1
     return sites
 
 

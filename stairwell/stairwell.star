@@ -31,15 +31,29 @@ CONFIG = {
             "required": True,
         },
         {
+            "key": "page_size",
+            "label": "Assets per page",
+            "type": "int",
+            "required": False,
+            "default": 100,
+            "min": 1,
+            "max": 1000,
+            "description": "How many assets to request per page. Sent as both `limit` and `page_size`.",
+        },
+        {
             "key": "max_pages",
             "label": "Maximum pages to retrieve",
             "type": "int",
             "required": False,
-            "default": 2000000,
-            "min": 1,
-            "description": "Safety ceiling on the paging walk. Raise it if a run reports hitting the limit.",
+            "default": 0,
+            "min": 0,
+            "description": "Optional ceiling on the paging walk below the CONFIG maxPages backstop. 0 uses the backstop.",
         },
     ],
+    # Backstop for the paging walk: 100,000 pages at the default 100-asset page
+    # is the repo-wide ten-million-record target. Hitting it raises rather than
+    # truncating silently; see pager() in docs/starlark-helpers.md.
+    "maxPages": 100000,
     "includes": {
         "tls_": OPTIONS_TLS,
         "http_": OPTIONS_HTTP,
@@ -49,31 +63,16 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface', 'ip_in_network')
 load('http', 'get_json')
 load('kwargs', 'get_http_options', 'get_int')
+load('coerce', 'as_list')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or non-production deployment can be reached
 # without editing the script.
 DEFAULT_STAIRWELL_API_URL = 'https://app.stairwell.com'
 
-# The `limit` this script asks for. It is not exposed as a parameter, and five
-# rows a page is small enough that the record-derived ceiling below lands on a
-# very large page count -- see the note there.
-PAGE_SIZE = 5
-
-# The repo-wide record target for a bounded walk: no integration should import
-# more than ten million records in one run, so the page ceiling is that target
-# divided by the page size. At 5 assets a page that is 2,000,000 pages, which is
-# a large number of requests precisely because the page is small; the ceiling is
-# stated in RECORDS so it never truncates a real environment, and raising
-# PAGE_SIZE would lower it proportionally.
-#
-# The ceiling is a backstop, not the working guard. The walk's only exit is a
-# response with no nextPageToken, so a server that echoes the same token forever
-# never reaches it -- the no-progress check on the token catches that on the
-# first repeat. Either stop is logged, because a truncated import that says
-# nothing looks exactly like a complete one.
-MAX_RECORDS = 10000000
-MAX_PAGES = (MAX_RECORDS + PAGE_SIZE - 1) // PAGE_SIZE
+# Default for the page_size parameter, repeated here because CONFIG defaults
+# are applied by the Console, not by the plain `script --kwargs` path.
+DEFAULT_PAGE_SIZE = 100
 
 def reported_total(body):
     """Stairwell's list APIs follow the Google resource style, where a total is
@@ -96,23 +95,45 @@ def retrieved_of(reported, total):
         return 'retrieved {} assets, total not reported'.format(reported)
     return 'retrieved {}/{} available assets'.format(reported, total)
 
-def stream_assets(base_url, env, token, config_kwargs, max_pages):
+def stream_assets(base_url, env, token, config_kwargs, max_pages, page_size):
     """Paginate Stairwell assets, building and streaming each page via
     report_assets so the full asset set is never held in memory. Returns the
     number of assets reported."""
     reported = 0
-    pages = 0
-    capped = True
     total = None
     token_seen = ''
 
     url = base_url + "/v1/environments/" + env + "/assets"
-    headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}
-    http_options = get_http_options(config_kwargs, headers=headers)
-    params = {'limit': PAGE_SIZE}
 
-    for _page in range(0, max_pages):
+    # Stairwell's quickstart shows `Authorization: Bearer <token>` while its own
+    # OpenAPI securityScheme declares the raw token with no prefix. Start with
+    # Bearer; a 401 on that form retries the same request once with the raw
+    # token, and whichever form the tenant accepted is kept for the rest of the
+    # run.
+    raw_auth = False
+
+    # The request parameter spellings could not be confirmed against a live
+    # tenant: the response follows the Google resource style (assets,
+    # nextPageToken, totalSize), where the REQUEST fields would be page_token
+    # and page_size, but Stairwell's quickstart shows limit. Send both spellings
+    # of both parameters -- the server reads the one it knows and ignores the
+    # other, so either convention pages correctly.
+    params = {'limit': page_size, 'page_size': page_size}
+
+    p = pager('assets', limit=max_pages)
+    while p.next():
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': token if raw_auth else 'Bearer ' + token,
+        }
+        http_options = get_http_options(config_kwargs, headers=headers)
         body, err = get_json(url, params=params, **http_options)
+        if err and err.startswith('status 401') and not raw_auth:
+            print('stairwell: Bearer authorization rejected (401), retrying with the raw token form')
+            raw_auth = True
+            headers['Authorization'] = token
+            http_options = get_http_options(config_kwargs, headers=headers)
+            body, err = get_json(url, params=params, **http_options)
         if err:
             print('failed to retrieve assets:', err)
             return reported
@@ -123,10 +144,8 @@ def stream_assets(base_url, env, token, config_kwargs, max_pages):
         # with no explanation rather than stopping cleanly here.
         if type(body) != "dict":
             print('stairwell: unexpected response shape, wanted an object')
-            capped = False
             break
 
-        pages += 1
         if total == None:
             total = reported_total(body)
 
@@ -137,24 +156,25 @@ def stream_assets(base_url, env, token, config_kwargs, max_pages):
         # a cursor it ignored, or a cached response replayed -- and every later
         # request would return these same rows. There is no other exit from
         # that state, so stop on the first repeat, and stop BEFORE reporting so
-        # the replayed page is not imported a second time.
+        # the replayed page is not imported a second time. This guard is
+        # complementary to the pager() ceiling: the pager catches a cursor that
+        # rotates forever, this catches one that stopped advancing.
         if next_token and next_token == token_seen:
             print('stairwell: paging stopped after {} pages (API returned the same cursor twice, {})'.format(
-                pages, retrieved_of(reported, total)))
-            capped = False
+                p.page, retrieved_of(reported, total)))
             break
 
-        reported += report_assets(build_assets(body.get('assets', [])))
+        reported += report_assets(build_assets(body.get('assets')))
 
         if not next_token:
-            capped = False
             break
         token_seen = next_token
-        params = {'next_page_token': next_token, 'limit': PAGE_SIZE}
-
-    if capped:
-        print('stairwell: page limit of {} hit (integration safety limit, {}) - raise the max_pages parameter to import the rest'.format(
-            max_pages, retrieved_of(reported, total)))
+        params = {
+            'limit': page_size,
+            'page_size': page_size,
+            'next_page_token': next_token,
+            'page_token': next_token,
+        }
 
     return reported
 
@@ -165,7 +185,13 @@ def is_loopback(ip):
 
 def build_assets(assets_json):
     imported_assets = []
-    for item in assets_json:
+    # `assets` can be present-but-null, and a row can be something other than an
+    # object; either used to abort the run mid-walk. as_list turns null into an
+    # empty list, and the type check skips the malformed row with a log line.
+    for item in as_list(assets_json, wrap=False):
+        if type(item) != 'dict':
+            print('stairwell: skipping non-object asset row')
+            continue
 
         # parse ip address
         ips = []
@@ -268,13 +294,17 @@ def main(**kwargs):
     # script still works if it is invoked without one.
     base_url = (kwargs.get('url') or DEFAULT_STAIRWELL_API_URL).rstrip('/')
     # CONFIG defaults are applied by the Console, not by the plain script
-    # --kwargs path, so the default is repeated here.
-    max_pages = get_int(kwargs, 'max_pages', default=MAX_PAGES)
-    if max_pages < 1:
-        max_pages = MAX_PAGES
+    # --kwargs path, so the defaults are repeated here. max_pages of 0 defers
+    # entirely to the CONFIG maxPages backstop, which pager() enforces.
+    max_pages = get_int(kwargs, 'max_pages', default=0)
+    if max_pages < 0:
+        max_pages = 0
+    page_size = get_int(kwargs, 'page_size', default=DEFAULT_PAGE_SIZE)
+    if page_size < 1:
+        page_size = DEFAULT_PAGE_SIZE
 
     # Assets are streamed page-by-page via report_assets in stream_assets.
-    reported = stream_assets(base_url, env, token, kwargs, max_pages)
+    reported = stream_assets(base_url, env, token, kwargs, max_pages, page_size)
     if not reported:
         print('failed to retrieve assets')
 

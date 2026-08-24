@@ -37,7 +37,7 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
 load('json', json_encode='encode')
 load('net', 'ip_address')
-load('http', http_post='post', 'get_json', 'bearer', 'url_encode')
+load('http', 'post_json', 'get_json', 'bearer', 'url_encode')
 load('kwargs', 'get_url_base', 'get_string', 'get_http_options')
 
 SEARCH = "alive:t"
@@ -69,20 +69,19 @@ def sync_to_sumo(dst_url, assets, http_options):
             tmp = ""
             for a in batch:
                 tmp = tmp + "{}\n".format(json_encode(a))
-            post_to_sumo = http_post(url=dst_url, body=bytes(tmp), **http_options)
-
             # An HTTP source is write-only: the status code is the ONLY
-            # acknowledgement Sumo gives, and it answers 200 on success. Leaving
-            # it unread -- as this did -- makes a revoked collector code, a wrong
-            # source address, or a batch over the source's size limit look
-            # exactly like an accepted upload. http_post aborts the run by itself
-            # on a transport failure, so a response here always has a status.
-            if not post_to_sumo or post_to_sumo.status_code != 200:
+            # acknowledgement Sumo gives, and it answers 200 on success -- so a
+            # non-2xx must be surfaced, not ignored. Sumo throttles routinely,
+            # and a 429 or 503 means the batch was rejected UNPROCESSED, so
+            # post_json's bounded retry (up to four attempts with backoff,
+            # honoring Retry-After) is safe for exactly those two statuses and
+            # turns a transient throttle into a delivered batch instead of a
+            # failed task. Anything else (401, 404, 413) is a real rejection
+            # and gets no retry.
+            _, err = post_json(url=dst_url, body=bytes(tmp), retry_on=[429, 503], **http_options)
+            if err:
                 rejected += len(batch)
-                print("Sumo Logic rejected a batch of {} assets with status {}: {}".format(
-                    len(batch),
-                    post_to_sumo.status_code if post_to_sumo else "no response",
-                    str(post_to_sumo.body)[:200] if post_to_sumo else ""))
+                print("Sumo Logic rejected a batch of {} assets: {}".format(len(batch), err))
                 # Keep going rather than returning: the remaining batches are
                 # independent uploads, and a size-limit rejection affects only
                 # the batch that hit it.

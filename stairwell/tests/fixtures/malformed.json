@@ -1,0 +1,61 @@
+{
+  "name": "malformed",
+  "integration": "stairwell",
+  "description": "Present-but-null and non-object rows. Page 1 carries `\"assets\": null` -- .get('assets', []) does NOT defend a present-but-null key, and iterating None used to abort the whole walk -- plus a nextPageToken proving the walk continues past it. Page 2 mixes a bare string row and a null row in with a real asset; each malformed row must be skipped with a log line while the real asset imports. namespaced_ids is skipped for the reason recorded in happy: the id is the bare Stairwell asset number with no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "environment_id": "env-1",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/v1/environments/env-1/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "assets": null,
+            "nextPageToken": "tok-1"
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "assets": [
+              "not-an-object",
+              null,
+              {
+                "name": "environments/env-1/assets/5001",
+                "label": "syn-survivor",
+                "ipAddress": "10.70.3.1",
+                "macAddress": "00:11:22:33:61:aa",
+                "os": "Linux",
+                "state": "ACTIVE"
+              }
+            ],
+            "nextPageToken": ""
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["5001"],
+    "request_count": 2,
+    "requests_include": [
+      {"query_contains": "next_page_token=tok-1"},
+      {"query_contains": "&page_token=tok-1"}
+    ],
+    "log_contains": [
+      "stairwell: skipping non-object asset row"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "synology-dsm",
-  "description": "A full collection from a DSM 7 NAS with Virtual Machine Manager, Surveillance Station, Active Backup for Business, and the DHCP Server package installed. Proves the whole design rests on API DISCOVERY rather than hardcoding: SYNO.API.Info is queried first, and the CGI path and version range it returns are what every later call uses - which matters because SYNO.API.Auth lives at auth.cgi on DSM 6 and entry.cgi on DSM 7, and because SYNO.DSM.Info and SYNO.DSM.Network are version 2 ONLY. Discovery is also what makes the optional packages safe: a NAS without Surveillance Station is never asked about cameras. Also proves: login is a POST with a form-encoded body so the password never enters a URL, and enable_syno_token is requested so a CSRF-hardened DSM works; the returned synotoken is sent back as X-SYNO-TOKEN on every later call; the chassis serial becomes a real foreign id that IS allowed to drive merges; DSM's dash-separated upper-case MACs are canonicalised; a PPPoE interface with no mac key and an interface holding only APIPA are both handled; VMM guest MACs come from the OFFICIAL SYNO.Virtualization.API.Guest, whose vnics array the internal SYNO.Virtualization.Guest does not have; a camera's address arrives in `host` and may be an IP or a name; and the session is ended with an explicit logout, because DSM allows few concurrent sessions. no_mac_in_id is skipped: a DHCP lease has no identifier but its MAC, deliberately paired with no-id-match no-id-break.",
+  "description": "A full collection from a DSM 7 NAS with Virtual Machine Manager, Surveillance Station, Active Backup for Business, and the DHCP Server package installed. Proves the whole design rests on API DISCOVERY rather than hardcoding: SYNO.API.Info is queried first, and the CGI path and version range it returns are what every later call uses - which matters because SYNO.API.Auth lives at auth.cgi on DSM 6 and entry.cgi on DSM 7, and because SYNO.DSM.Info and SYNO.DSM.Network are version 2 ONLY. Discovery is also what makes the optional packages safe: a NAS without Surveillance Station is never asked about cameras. Also proves: login is a POST with a form-encoded body so the password never enters a URL, and enable_syno_token is requested so a CSRF-hardened DSM works; the returned synotoken is sent back as X-SYNO-TOKEN on every later call; the chassis serial becomes a real foreign id that IS allowed to drive merges; DSM's dash-separated upper-case MACs are canonicalised; a PPPoE interface with no mac key and an interface holding only APIPA are both handled; VMM guest MACs come from the OFFICIAL SYNO.Virtualization.API.Guest, whose vnics array the internal SYNO.Virtualization.Guest does not have; a camera's address arrives in `host` and may be an IP or a name; and the session is ended with an explicit logout, because DSM allows few concurrent sessions. Camera 1's display name 'Front Door' is an operator label, not a machine name: it carries a space, so it must land in synology_camera_name and NOT in hostnames, where it would be a merge hazard. no_mac_in_id is skipped: a DHCP lease has no identifier but its MAC, deliberately paired with no-id-match no-id-break.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-runzero",
@@ -396,9 +396,10 @@
           "model": "DS-2CD2143G2-I",
           "osVersion": "V5.7.3",
           "ipAddresses": "192.168.20.101",
-          "hostnames": "Front Door",
+          "synology_camera_name": "Front Door",
           "synology_port": "554"
-        }
+        },
+        "fields_absent": ["hostnames"]
       },
       {
         "id": "synology:$HOST:camera:2",

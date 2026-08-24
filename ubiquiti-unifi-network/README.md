@@ -40,7 +40,7 @@ Custom Integration for retrieving clients and Unifi devices from the Unifi Netwo
     - **Extract clients** (`extract_clients`): optional; import connected clients (default: enabled).
     - **Extract devices** (`extract_devices`): optional; import UniFi devices — access points, switches, gateways (default: enabled).
     - **Client API filter** (`client_api_filter`): optional; a UniFi filter expression passed straight through as the `filter` query parameter on the clients call.
-    - **Page size** (`page_limit`): optional; records requested per page, 1–1000 (default: 100).
+    - **Page size** (`page_limit`): optional; records requested per page, 1–200 (default: 100). The Integration API documents a 200-row maximum, and the script clamps a larger value down to 200 with a log line.
     - **TLS options** (`tls_*`): set `tls_disable_validation` or supply `tls_ca_cert` if the console uses its stock self-signed certificate.
 2. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "unifi").
@@ -188,7 +188,9 @@ The old code did neither: it used the MAC *as* the foreign id with `id-match` on
 
 ### Notes
 
-- **Client hostnames are cleaned before use.** UniFi names an unnamed client after the last two octets of its MAC (`Some Device a1:b2`), so when `name` ends with that suffix the suffix is stripped. Devices use `name` as-is.
+- **Client and device names are screened before use.** UniFi names an unnamed client after the last two octets of its MAC (`Some Device a1:b2`), so when `name` ends with that suffix the suffix is stripped. After that, a name is imported as a hostname **only when it is shaped like one**: free-text display labels such as `Kitchen TV` — a space or any other character that cannot appear in a DNS name — stay in the `unifi_name` attribute instead of becoming a weak merge key. The same screening applies to device names.
+- **Pagination stops are visible.** `totalCount` is the only forward signal the clients and devices walks have; a response that omits it, or reports zero alongside a non-empty page, stops the walk after that page **and says so** (`carried no usable totalCount; stopping after this page`). Each walk is also guarded by a `pager()` bound so a controller that ignored `offset` cannot spin a run forever.
+- **The site lookup is paginated too.** The lookup walks `/sites` with `offset`/`limit` until the named site is found, so an MSP console with more sites than one page can still resolve a site beyond page one.
 - **A client contributes at most one address**, from `ipAddress`, and a device likewise. Neither endpoint returns an address list.
 - **`deviceType` for UniFi hardware is inferred from the model string** — `USW` becomes `Switch`, `UAP` or `U6` becomes `WAP`, `UDM` or `USG` becomes `Gateway`, and **an unrecognized model leaves the field unset**. Clients get no device type at all, which is correct: the controller does not classify them and runZero's own fingerprinting is better placed to.
 

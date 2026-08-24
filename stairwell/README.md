@@ -82,17 +82,24 @@ to fetch, a `nextPageToken`. If you get back a JSON *array* rather than an
 object, or an error document, the script stops cleanly and logs
 `stairwell: unexpected response shape, wanted an object` rather than aborting.
 
-**One inconsistency to be aware of if that call fails on authentication.**
-Stairwell's sources disagree about the header format. The API quickstart shows
-`Authorization: Bearer <token>`, which is what `stairwell.star` sends. Stairwell's
-own OpenAPI `securitySchemes` block declares the token as a plain `apiKey` in the
+**One inconsistency the script handles for you.** Stairwell's sources disagree
+about the header format. The API quickstart shows `Authorization: Bearer <token>`,
+which is what `stairwell.star` sends first. Stairwell's own OpenAPI
+`securitySchemes` block declares the token as a plain `apiKey` in the
 `Authorization` header — that is, the raw token with **no** `Bearer` prefix — and
 Stairwell's official Python client leaves the prefix commented out by default.
-The server most likely accepts both. If a token you are confident in is rejected,
-retry the curl above with `-H 'Authorization: ExampleFakeStairwellToken...'` to
-find out which form your tenant wants; the script's format is not configurable.
-Whatever the answer, put the bare token in `api_token` — the script adds its own
-prefix.
+The server most likely accepts both. The script covers the disagreement itself:
+a 401 on the Bearer form retries the same request once with the raw token and
+keeps whichever form the tenant accepted, logging
+`stairwell: Bearer authorization rejected (401), retrying with the raw token form`
+when the fallback fires. Put the bare token in `api_token` — the script adds the
+prefix when the tenant wants one.
+
+The same uncertainty applies to the pagination request parameters: the response
+follows the Google resource style (`assets`, `nextPageToken`, `totalSize`), where
+the request fields would be `page_token`/`page_size`, while the quickstart shows
+`limit`. The script sends both spellings of both parameters on every request, so
+either convention pages correctly.
 
 ## Steps
 
@@ -109,14 +116,14 @@ prefix.
 ### runZero configuration
 
 1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
-    - The script pages the asset list 5 records at a time following `nextPageToken`. Raise `PAGE_SIZE` in the script if you have a large environment and want fewer round trips; the `max_pages` default is derived from it, so a larger page lowers the page count needed to reach the same record ceiling.
     - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
     - **Stairwell API URL** (`url`): optional; defaults to `https://app.stairwell.com`.
     - **Environment ID** (`environment_id`): the environment whose assets to import.
     - **API token** (`api_token`): the Stairwell API token.
-    - **Maximum pages to retrieve** (`max_pages`, optional, default `2000000`): safety ceiling on the paging walk. The default is the repo-wide ten-million-record target divided by the 5-asset page this script requests, so it does not truncate any real environment. Raise it only if a run logs `page limit of 2000000 hit (integration safety limit, ...)`; that line is the only signal that an import was cut short. A run that instead logs `paging stopped after N pages (API returned the same cursor twice, ...)` is a server that stopped advancing its `nextPageToken`, which no ceiling change will fix.
+    - **Assets per page** (`page_size`, optional, default `100`): how many assets to request per page, sent as both `limit` and `page_size`. Raise it for fewer round trips on a large environment.
+    - **Maximum pages to retrieve** (`max_pages`, optional, default `0`): optional ceiling below the script's `maxPages` backstop of 100,000 pages; `0` uses the backstop. Hitting either ceiling now fails the run with `pagination limit reached: "assets" ran N pages ...` rather than truncating silently — the pages already retrieved are still imported, because assets stream per page. A run that instead logs `paging stopped after N pages (API returned the same cursor twice, ...)` is a server that stopped advancing its `nextPageToken`, which no ceiling change will fix.
 3. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
     - Add a Name and Icon for the integration (e.g., "Stairwell").
     - Upload an image file for the Stairwell icon.
@@ -150,9 +157,9 @@ runzero script --filename stairwell/stairwell.star \
 `--output` writes the assets the run produced. The scanner refuses to write into a
 directory that already exists, so add `--overwrite` when re-running into the same path.
 Add `--verbose` for the request-by-request log, or omit `--output` to see only the log
-lines. There is no cap parameter, and the script pages 5 assets at a time, so a first
-run against a large environment is both a full collection and a lot of round trips —
-worth watching with `--verbose` before you schedule it.
+lines. The script pages 100 assets at a time by default (`page_size`), so a first
+run against a large environment is a full collection — worth watching with
+`--verbose` before you schedule it.
 
 `--kwargs` takes the value verbatim as long as the whole argument holds a single `=`, so
 a comma inside a value is passed through intact. Only a value that *also* contains an `=`
@@ -268,7 +275,7 @@ conflicting MAC, address, or name.
 - **Asset-to-object association as the join.** The interesting query is "which objects has this asset uploaded", and the asset id this integration already imports is the key it would be asked with. That association is the bridge between the two halves of the product, and it is what would turn this from an inventory import into a detection feed.
 - **Forwarder health as coverage data.** The asset record already carries `forwarderVersion`, `lastCheckinTime`, `backscanState`, and `state`, all of which this integration imports as custom attributes and none of which it acts on. Together they answer "which forwarders are stale, out of date, or never completed their initial backscan" — a deployment-quality report that needs no new endpoint at all, only a runZero-side query over attributes already present.
 - **Multiple environments in one task.** `environment_id` is a single required value, so a tenant with several managed environments needs one credential and one task per environment. `GET /v1/environments` would let one task enumerate and sweep them all — and it is also the natural moment to fix the scoping weakness above, since an id that spans environments has to encode which one it came from.
-- **Page size as a parameter.** `page_size` is hardcoded to **5**. That is an unusually small page, and on any real environment it means a great many round trips following `nextPageToken`. Raising it currently means editing the script. Promoting it to a `CONFIG` parameter with a sensible default would be a one-line change with a large effect on run time.
+- ~~**Page size as a parameter.**~~ Done: `page_size` is a `CONFIG` parameter with a default of 100, sent as both `limit` and `page_size`.
 - **Outbound: runZero context into Stairwell.** Stairwell's API is primarily a read and upload surface — the write path that exists is for submitting files and creating rules, not for annotating assets. There is no documented endpoint for writing a tag, a note, or a custom field onto an asset, so runZero could not currently push its own verdict back. The one genuine outbound possibility is **rule creation**: Stairwell supports YARA and IOC rules, so a runZero-derived indicator list could in principle seed detection content. That is a very different integration from an asset sync and it writes live detection logic, so it would need a much tighter confirmation model.
 - **Coverage-gap reporting needs no new endpoint.** Stairwell knows only hosts with a forwarder. runZero discovers hosts regardless. In-scope runZero assets carrying no `custom_integration:stairwell` source are forwarder deployment gaps — and because the forwarder is what feeds the file corpus, a gap there is a blind spot in the detection product, not just in an inventory.
 - **There is no event or alert feed on this endpoint.** The assets collection is a paged list with a page token and no change cursor, so anything near-real-time would be re-listing. If a live feed is wanted, the object and detection side of the API is where to look for it, not here.

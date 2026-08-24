@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "ubiquiti-unifi-network",
-  "description": "The site-name to site-id lookup that every other call depends on, then one page of clients and one page of network devices. Proves the site bootstrap is required and honoured, that the X-API-KEY header carries the credential, that a client name ending in the last two MAC octets has that suffix trimmed back off, that a client with no MAC is skipped, and that the model string is mapped to a device type.\n\nIdentity is the controller's own per-site `id`, namespaced as unifi:<siteId>:<kind>:<id>. Client aa:bb:cc:dd:ee:01 is the case that shows why: network_interface clears the locally administered bit, so it is imported with interface MAC a8:bb:cc:dd:ee:01 -- a MAC-derived id would have folded it onto whatever else normalizes to that value. No invariant is skipped.",
+  "description": "The site-name to site-id lookup that every other call depends on, then one page of clients and one page of network devices. Proves the site bootstrap is required and honoured, that the X-API-KEY header carries the credential, that a client name ending in the last two MAC octets has that suffix trimmed back off, that a client with no MAC is skipped, and that the model string is mapped to a device type.\n\nClient 0001's display label 'Kitchen TV' is an operator annotation, not a machine name: it carries a space, so it must land in unifi_name and NOT in hostnames, where it would be a weak merge key. DNS-shaped names (reception-printer, sw-core-01) still import as hostnames.\n\nIdentity is the controller's own per-site `id`, namespaced as unifi:<siteId>:<kind>:<id>. Client aa:bb:cc:dd:ee:01 is the case that shows why: network_interface clears the locally administered bit, so it is imported with interface MAC a8:bb:cc:dd:ee:01 -- a MAC-derived id would have folded it onto whatever else normalizes to that value. No invariant is skipped.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "fixture-unifi-key",
@@ -110,11 +110,18 @@
       {
         "id": "unifi:site-uuid-default:client:client-0001",
         "fields": {
-          "hostnames": "Kitchen TV",
+          "unifi_name": "Kitchen TV",
           "ipAddresses": "10.95.0.11",
           "macAddresses": "a8:bb:cc:dd:ee:01",
           "unifi_id": "client-0001",
           "unifi_site_id": "site-uuid-default"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "unifi:site-uuid-default:client:client-0002",
+        "fields": {
+          "hostnames": "reception-printer"
         }
       },
       {

@@ -1,0 +1,56 @@
+{
+  "name": "totalcount-missing",
+  "integration": "ubiquiti-unifi-network",
+  "description": "totalCount is the only forward signal the clients and devices walks have. A response that omits it (or reports zero alongside a non-empty page) used to end the walk after one page in silence, so a truncated import looked complete. The page's records must still import, and the early stop must be NAMED in the log. The route errors if called twice, pinning that no second page was requested.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-unifi-key",
+    "site_name": "Default",
+    "page_limit": "1",
+    "extract_devices": "false"
+  },
+  "routes": [
+    {
+      "name": "sites",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 25, "count": 1, "totalCount": 1, "data": [
+            {"id": "site-uuid-default", "name": "Default"}
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "clients-no-totalcount",
+      "match": {"method": "GET", "path": "/proxy/network/integration/v1/sites/site-uuid-default/clients"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"offset": 0, "limit": 1, "count": 1, "data": [
+            {
+              "id": "client-nc-01",
+              "name": "lab-sensor-01",
+              "macAddress": "f0:9f:c2:11:22:33",
+              "ipAddress": "10.96.0.20",
+              "type": "WIRED"
+            }
+          ]}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["unifi:site-uuid-default:client:client-nc-01"],
+    "request_count": 2,
+    "log_contains": [
+      "unifi: the clients response carried no usable totalCount; stopping after this page - the import may be incomplete",
+      "unifi: reported 1 client assets"
+    ]
+  }
+}

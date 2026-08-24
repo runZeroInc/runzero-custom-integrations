@@ -89,7 +89,7 @@ clean, stable, and enough to inventory a network.
    - **Import Omada devices** (`extract_devices`): the access points, switches, and gateways (default: true).
    - **Import clients** (`extract_clients`): the wired and wireless clients attached to them (default: true).
    - **Page size** (`page_size`): rows per page (default: 100).
-   - **Maximum pages per collection** (`max_pages`): hard stop per collection (default: 200).
+   - **Maximum pages per collection** (`max_pages`): hard stop per collection (default: 200). Hitting it fails the run with a `pagination limit reached` error rather than truncating silently.
    - **TLS options** (`tls_*`): set the CA certificate here if the controller uses its own. Turning validation off is a last resort.
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
    - Select the Credential and Custom Integration created in steps 1 and 2.
@@ -302,8 +302,11 @@ of state to carry across a retry.
 Each collection is walked with `page` and `pageSize`, and a page is turned into
 assets and handed to `report_asset` before the next page is requested, so peak
 memory is one page rather than one estate. The walk stops on whichever comes
-first: `page * pageSize >= totalRows`, a page shorter than requested, an empty
-page, or `max_pages`.
+first: `page * pageSize >= totalRows`, a page shorter than requested, or an
+empty page. The `max_pages` ceiling is enforced by a `pager()` loop guard, so
+hitting it **fails the run with an error naming the collection** — the pages
+already streamed are still imported, but a truncated import no longer looks
+like a complete one.
 
 There is one defensive case worth naming. A response whose `result` is a **bare
 list** rather than a paginated envelope is treated as the whole collection and

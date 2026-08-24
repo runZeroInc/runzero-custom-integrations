@@ -68,7 +68,7 @@ load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
 load("http", "get_json", http_get="get", "url_parse")
 load("kwargs", "require", "get_url_base", "get_http_options", "get_string", "get_bool", "get_int")
 load("jsonstream", "iter_array")
-load("time", "now", "parse_time", "from_timestamp")
+load("time", "now", "parse_time", "from_timestamp", "sleep")
 load("re", re_match="match", re_search="search", re_find_all="find_all")
 
 load('coerce', 'as_dict')
@@ -446,7 +446,10 @@ def stream_agents(ctx):
 
     The raw http builtin is used because iter_array needs the body itself. Raw
     http.get takes no retries kwarg -- that is a get_json/post_json parameter --
-    so this request gets exactly one attempt.
+    so the bounded retry below is hand-rolled: this is the only load-bearing
+    request in the run, and one transient 502 used to turn the whole run into a
+    green zero-asset import. A GET is safe to repeat; only transient statuses
+    and missing responses are retried, and a 4xx is returned immediately.
     """
     url = ctx["base_url"] + AGENTS_PATH
     query = []
@@ -455,18 +458,27 @@ def stream_agents(ctx):
     if query:
         url = url + "?" + "&".join(query)
 
-    resp = http_get(url, **ctx["http_options"])
+    resp = None
+    for attempt in range(3):
+        if attempt:
+            sleep("{}s".format(attempt))
+        resp = http_get(url, **ctx["http_options"])
+        if resp != None and resp.status_code not in [408, 425, 429, 500, 502, 503, 504]:
+            break
     if resp == None:
         return None, "no response"
     if resp.status_code != 200:
-        return None, "status {}: {}".format(resp.status_code, _text(resp.body)[:200])
+        return None, "status {}: {}".format(resp.status_code, _text(resp.body[:200]))
 
     body = resp.body
-    if not re_search(JSON_ARRAY_RE, _text(body)[:64]):
+    # Only the first bytes are needed to check for a leading '[': stringifying
+    # the whole body here would momentarily double the memory of a
+    # tens-of-megabytes response just to look at one character.
+    if not re_search(JSON_ARRAY_RE, _text(body[:64])):
         # iter_array aborts the entire script when the body does not hold an
         # array, so an HTML error page or a DRF error object has to be caught
         # here rather than by the iterator.
-        return None, "response was not a JSON array: {}".format(_text(body)[:200])
+        return None, "response was not a JSON array: {}".format(_text(body[:200]))
     return iter_array(body), None
 
 

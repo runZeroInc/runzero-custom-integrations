@@ -1,0 +1,46 @@
+{
+  "name": "list-retry",
+  "integration": "tactical-rmm",
+  "description": "GET /agents/ is the only load-bearing request in the run, and it is a raw http.get because jsonstream needs the body -- so it sits outside get_json's built-in retry, and a transient 502 used to turn the whole run into a green zero-asset import. The hand-rolled bounded retry must repeat the request on a transient status and import normally when the reverse proxy recovers. The route answers 502 once and then serves one agent; request_count==2 pins the retry, and the asset pins the recovery. A persistent failure still ends the run with the printed error after three attempts.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-tactical-key",
+    "extract_software": "false"
+  },
+  "routes": [
+    {
+      "match": {"method": "GET", "path": "/agents/"},
+      "responses": [
+        {"status": 502, "text": "<html>Bad Gateway</html>"},
+        {
+          "status": 200,
+          "json": [
+            {
+              "agent_id": "RetryAgentXYZ123",
+              "hostname": "retry-host",
+              "operating_system": "Ubuntu 24.04, 64 bit v6.8 (kernel)",
+              "monitoring_type": "server",
+              "plat": "linux",
+              "local_ips": "10.60.0.14",
+              "status": "online"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["tacticalrmm:$HOST:RetryAgentXYZ123"],
+    "request_count": 2,
+    "assets": [
+      {
+        "id": "tacticalrmm:$HOST:RetryAgentXYZ123",
+        "fields": {"hostnames": "retry-host", "ipAddresses": "10.60.0.14", "deviceType": "Server"}
+      }
+    ]
+  },
+  "check_determinism": true
+}

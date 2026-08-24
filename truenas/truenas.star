@@ -4,7 +4,7 @@ CONFIG = {
     "id": "runzero-truenas",
     "name": "TrueNAS",
     "type": "inbound",
-    "description": "Imports the TrueNAS system, its virtual machines, and its applications over the v2.0 REST API.",
+    "description": "Imports the TrueNAS system, its virtual machines, and its applications over the v2.0 REST API. The REST API is deprecated in 25.04 and removed in TrueNAS 26, where this integration cannot collect anything; see the README.",
     "version": "1",
     "maturity": "alpha",
     "minVersion": "5.1.260818.0",
@@ -18,6 +18,10 @@ CONFIG = {
     "assetTypeBehavior": {
         'vm': "no-id-match no-id-break",
     },
+    # Backstop for the pager() guard on collection paging; the max_records cap
+    # is the working bound, this exists so a server that ignores limit/offset
+    # cannot spin a run forever.
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -252,11 +256,16 @@ def fetch_collection(ctx, path):
     TrueNAS returns a bare JSON array and no total, so a short page is the only
     end-of-collection signal. The cap exists because a system with thousands of
     disks would otherwise be read in full before anything is emitted.
+
+    The loop is guarded by pager(): a server that ignores limit/offset and
+    keeps answering full pages raises with the collection's label rather than
+    ending silently at an arbitrary bound.
     """
     page_size = ctx["page_size"]
     limit = ctx["max_records"]
     rows = []
-    for _page in range(1, 100001):
+    p = pager("collection " + path)
+    while p.next():
         offset = len(rows)
         if limit and offset >= limit:
             print("truenas: record cap of {} reached for {}".format(limit, path))

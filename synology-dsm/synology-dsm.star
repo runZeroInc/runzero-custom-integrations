@@ -197,12 +197,30 @@ def _mac_key(value):
     if text == "000000000000":
         return ""
     return ":".join([text[index * 2:index * 2 + 2] for index in range(6)])
+# Characters that can appear in a hostname. Underscore is tolerated because
+# real DHCP and NetBIOS names carry it, even though strict DNS does not.
+HOSTNAME_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-._"
+
+
 def _hostname(value):
+    """Return a value fit to import as a hostname, or "".
+
+    Rejects placeholders, IP literals, over-long values, and anything carrying
+    a character that cannot appear in a DNS name - which is what screens out
+    free-text display labels such as a camera named "Front Door": such a label
+    is an operator annotation, not a machine name, and a label with a space is
+    a merge hazard rather than a key.
+    """
     text = as_text(value, join=",").strip().rstrip(".")
     if not text or text.lower() in PLACEHOLDER_NAMES:
         return ""
     if ip_address(text) != None:
         return ""
+    if len(text) > 253:
+        return ""
+    for ch in text.lower().elems():
+        if ch not in HOSTNAME_CHARS:
+            return ""
     return text
 
 
@@ -436,29 +454,45 @@ def logout(ctx):
 
 
 def call(ctx, name, method, preferred_version, extra, label):
-    """Call one webapi method and return its data object, or None."""
+    """Call one webapi method and return its data object, or None.
+
+    A session lost mid-run (codes 106/107/119) is re-authenticated ONCE per
+    run and the failed request retried with the new sid, so a duplicated login
+    from another tool costs one round trip instead of every remaining
+    collection. The re-login deliberately omits the OTP - a one-time code has
+    expired by mid-run - so a 2FA-enforced account falls through to the
+    diagnostic below, exactly as before.
+    """
     entry = as_dict(ctx["apis"].get(name))
     if not entry:
         print("synology: skipping {}: this DSM does not publish {}".format(label, name))
         return None
     version = api_version(ctx, name, preferred_version)
-    params = {
-        "api": name,
-        "version": str(version),
-        "method": method,
-        "_sid": ctx["sid"],
-    }
-    for key in extra:
-        params[key] = extra[key]
+    for _attempt in range(2):
+        params = {
+            "api": name,
+            "version": str(version),
+            "method": method,
+            "_sid": ctx["sid"],
+        }
+        for key in extra:
+            params[key] = extra[key]
 
-    payload, err = get_json(ctx["base"] + "/" + as_text(entry.get("path"), join=",").strip(),
-                            params=params, **options(ctx, {}))
-    if err:
-        print("synology: {} failed: {}".format(label, as_text(err, join=",")))
-        return None
-    problem = _describe_error(payload, False)
-    if problem:
+        payload, err = get_json(ctx["base"] + "/" + as_text(entry.get("path"), join=",").strip(),
+                                params=params, **options(ctx, {}))
+        if err:
+            print("synology: {} failed: {}".format(label, as_text(err, join=",")))
+            return None
+        problem = _describe_error(payload, False)
+        if not problem:
+            return as_dict(as_dict(payload).get("data"))
         code = _to_int(as_dict(as_dict(payload).get("error")).get("code"))
+        if code in SESSION_ERRORS and not ctx["relogin_done"]:
+            ctx["relogin_done"] = True
+            print("synology: {} lost the session ({}); re-authenticating once".format(label, problem))
+            if login(ctx, ctx["username"], ctx["password"], ""):
+                continue
+            return None
         if code in SESSION_ERRORS:
             print("synology: {} lost the session ({}). ".format(label, problem) +
                   "DSM allows few concurrent sessions; check that no other tool is signing in as this account.")
@@ -468,7 +502,7 @@ def call(ctx, name, method, preferred_version, extra, label):
         else:
             print("synology: {} refused: {}".format(label, problem))
         return None
-    return as_dict(as_dict(payload).get("data"))
+    return None
 
 
 def room(ctx):
@@ -771,8 +805,16 @@ def collect_backup_devices(ctx):
     batch = []
     seen = []
     skipped = 0
-    for task in dicts(data.get("tasks")):
+    # The tasks[].devices[] nesting is reconstructed from community captures,
+    # not a vendor schema. Walk that shape first, and additionally accept a
+    # top-level devices[] list, so a DSM release that flattens the nesting
+    # still imports. If neither shape yields a single device row from a
+    # non-empty response, say so rather than reporting 0 quietly - a nesting
+    # drift would otherwise be invisible while the run stays green.
+    device_rows = 0
+    for task in dicts(data.get("tasks")) + [{"task_name": "", "devices": data.get("devices")}]:
         for device in dicts(task.get("devices")):
+            device_rows += 1
             address = routable_ip(device.get("host_ip"))
             hostname = _hostname(device.get("host_name"))
             # device_uuid is preferred. device_id is a positive integer, so a
@@ -823,6 +865,9 @@ def collect_backup_devices(ctx):
             if os_name:
                 params["os"] = os_name
             batch.append(ImportAsset(**params))
+    if not device_rows and data:
+        print("synology: SYNO.ActiveBackup.Task answered but no device rows were found under " +
+              "tasks[].devices[] or devices[]; the response keys were: " + ", ".join(sorted(data.keys())))
     count = emit(ctx, batch)
     if skipped:
         print("synology: {} backup devices had no usable identifier, address, or hostname and were skipped".format(skipped))
@@ -858,6 +903,12 @@ def collect_dhcp_leases(ctx, interfaces):
                 if type(data.get(key)) == "list":
                     rows = data.get(key)
                     break
+        # The record schema is undocumented and probed by candidate spellings.
+        # A response whose list lives under a key none of the candidates name
+        # would yield zero leases in silence; say what arrived instead.
+        if type(rows) != "list" and data:
+            print("synology: DHCP lease response on {} had no recognizable client list; ".format(ifname) +
+                  "the response keys were: " + ", ".join(sorted(data.keys())))
         for lease in dicts(rows):
             mac = _mac_key(_pick(lease, LEASE_MAC_KEYS))
             if not mac or mac in ctx["nas_macs"]:
@@ -933,6 +984,11 @@ def main(**kwargs):
         "emitted": 0,
         "nas_name": "",
         "nas_macs": [],
+        # Kept so a session lost mid-run can be re-established once; the OTP is
+        # deliberately not kept - a one-time code has expired by then.
+        "username": get_string(kwargs, "username"),
+        "password": get_string(kwargs, "password"),
+        "relogin_done": False,
     }
 
     ctx["apis"] = discover(ctx)
