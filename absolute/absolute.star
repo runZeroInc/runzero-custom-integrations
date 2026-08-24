@@ -12,6 +12,12 @@ CONFIG = {
     # survives rename, reimage and hardware refresh, while the laptops this
     # source tracks roam constantly and often report no adapter at all.
     "matchBehavior": "no-mac-break no-ip-break no-name-break",
+    # The pager() ceiling. The effective per-run bound is tighter: the
+    # max_pages parameter, or the record-target arithmetic in page_ceiling(),
+    # is passed to pager() as its limit. This value only has to be high enough
+    # that the computed bound can never be clipped (10,000,000 records at a
+    # page size of 1).
+    "maxPages": 10000000,
     "params": [
         {
             "key": "api_host",
@@ -128,8 +134,8 @@ MAX_PAGE_SIZE = 500
 # no-progress check in each walk: a cursor the server never advances means the
 # ceiling itself becomes the request count, and no page cap set from a record
 # target can be small enough to catch that quickly without truncating a real
-# estate. Either stop is logged, because a truncated import that says nothing
-# looks exactly like a complete one.
+# estate. The no-progress stop is logged; the ceiling is enforced by pager(),
+# which errors rather than handing back a truncated import that looks complete.
 MAX_RECORDS = 10000000
 MAX_PAGES = 20000
 MAX_SOFTWARE_PER_ASSET = 99
@@ -327,6 +333,8 @@ def build_network_interfaces(device):
     netifs = []
     covered = {}
     for adapter in device.get("networkAdapters", []) or []:
+        if type(adapter) != "dict":
+            continue
         mac = _clean(adapter.get("macAddress"))
         ips = []
         for key in ["ipV4Address", "ipV6Address"]:
@@ -460,13 +468,25 @@ def build_asset(scope, device):
     return asset
 
 
-def build_assets(scope, devices):
-    """Convert one page of device report records into ImportAsset objects."""
+def build_assets(scope, devices, seen_uids=None):
+    """Convert one page of device report records into ImportAsset objects.
+
+    A `data` member that is not an object -- a string or null the report should
+    never contain but occasionally does -- is skipped with a log line rather
+    than aborting the entire task on a `.get` call. When seen_uids is a dict,
+    the deviceUid of every built asset is recorded in it, so the software walk
+    can honor the active_only filter the device report was queried with.
+    """
     assets = []
     for device in devices:
+        if type(device) != "dict":
+            print("absolute: skipping non-dict device record: " + type(device))
+            continue
         asset = build_asset(scope, device)
         if asset:
             assets.append(asset)
+            if seen_uids != None:
+                seen_uids[_clean(device.get("deviceUid"))] = True
     return assets
 
 
@@ -514,98 +534,105 @@ def page_ceiling(config_kwargs, page_size):
 
 
 def fetch_and_report_devices(base_url, http_options, token_id, secret_key, scope,
-                             page_size, agent_status, max_pages):
+                             page_size, agent_status, max_pages, seen_uids=None):
     """Fetch and stream devices one page at a time so the full set is never
-    held in memory at once."""
+    held in memory at once. Reaching the page ceiling raises through pager()
+    rather than truncating silently."""
     reported = 0
     next_page = ""
-    pages = 0
-    capped = True
-    for _page in range(0, max_pages):
+    p = pager("devices", limit=max_pages)
+    while p.next():
         query = build_query_string(DEVICE_SELECT, page_size, "", agent_status, next_page)
         rows, cursor, err = fetch_page(base_url, http_options, token_id, secret_key,
                                        DEVICES_URI, query)
         if err:
             print("absolute: failed to fetch devices:", err)
             return reported
-        pages += 1
         if not rows:
-            capped = False
             break
-        reported += report_assets(build_assets(scope, rows))
+        reported += report_assets(build_assets(scope, rows, seen_uids))
         if not cursor:
-            capped = False
             break
         if cursor == next_page:
             # A cursor that never advances would otherwise re-fetch page one
             # until the page ceiling is hit, which at a ten-million-record
             # target is not a guard at all.
             print("absolute: paging stopped after {} pages (API returned the same cursor twice walking devices, {})".format(
-                pages, retrieved_of(reported, None)))
-            capped = False
+                p.page, retrieved_of(reported, None)))
             break
         next_page = cursor
-    if capped:
-        print("absolute: page limit of {} hit (integration safety limit, walking devices, {}) - raise the max_pages parameter to import the rest".format(
-            max_pages, retrieved_of(reported, None)))
     return reported
 
 
+def report_software_group(scope, device_uid, rows, only_uids):
+    """Emit one device's software group, honoring the active-only device set.
+
+    Returns (reported, skipped). When only_uids is a dict, a group whose device
+    never came through the device walk is dropped: the software report has no
+    agent-status filter of its own, so without this an active_only run would
+    emit orphan enrichment assets for the inactive agents it just excluded.
+    """
+    if only_uids != None and device_uid not in only_uids:
+        return 0, 1
+    asset = build_software_asset(scope, device_uid, rows)
+    if asset:
+        return report_assets(asset), 0
+    return 0, 0
+
+
 def fetch_and_report_software(base_url, http_options, token_id, secret_key, scope,
-                              page_size, max_pages):
+                              page_size, max_pages, only_uids=None):
     """Stream the software report, emitting one enrichment asset per device.
 
     The report is sorted by deviceUid so rows for a device arrive together; a
     partial group is carried across the page boundary and flushed once the next
-    device id appears, which keeps memory bounded to a single device.
+    device id appears, which keeps memory bounded to a single device. Reaching
+    the page ceiling raises through pager() rather than truncating silently.
     """
     reported = 0
+    skipped = 0
     next_page = ""
     current_uid = ""
     current_rows = []
-    pages = 0
-    capped = True
-    for _page in range(0, max_pages):
+    p = pager("software", limit=max_pages)
+    while p.next():
         query = build_query_string(SOFTWARE_SELECT, page_size, SOFTWARE_SORT, "", next_page)
         rows, cursor, err = fetch_page(base_url, http_options, token_id, secret_key,
                                        SOFTWARE_URI, query)
         if err:
             print("absolute: failed to fetch software:", err)
             return reported
-        pages += 1
         if not rows:
-            capped = False
             break
         for row in rows:
+            if type(row) != "dict":
+                print("absolute: skipping non-dict software record: " + type(row))
+                continue
             device_uid = _clean(row.get("deviceUid"))
             if not device_uid:
                 continue
             if device_uid != current_uid:
                 if current_uid and current_rows:
-                    asset = build_software_asset(scope, current_uid, current_rows)
-                    if asset:
-                        reported += report_assets(asset)
+                    count, dropped = report_software_group(scope, current_uid, current_rows, only_uids)
+                    reported += count
+                    skipped += dropped
                 current_uid = device_uid
                 current_rows = []
             current_rows.append(row)
         if not cursor:
-            capped = False
             break
         if cursor == next_page:
             print("absolute: paging stopped after {} pages (API returned the same cursor twice walking software, {})".format(
-                pages, retrieved_of(reported, None)))
-            capped = False
+                p.page, retrieved_of(reported, None)))
             break
         next_page = cursor
 
-    if capped:
-        print("absolute: page limit of {} hit (integration safety limit, walking software, {}) - raise the max_pages parameter to import the rest".format(
-            max_pages, retrieved_of(reported, None)))
-
     if current_uid and current_rows:
-        asset = build_software_asset(scope, current_uid, current_rows)
-        if asset:
-            reported += report_assets(asset)
+        count, dropped = report_software_group(scope, current_uid, current_rows, only_uids)
+        reported += count
+        skipped += dropped
+    if skipped:
+        print("absolute: skipped software for {} devices excluded by active_only".format(skipped))
     return reported
 
 
@@ -628,15 +655,21 @@ def main(**kwargs):
 
     max_pages = page_ceiling(kwargs, page_size)
 
+    # With active_only the device report is filtered by agent status but the
+    # software report cannot be, so the device walk records which devices were
+    # actually imported and the software walk drops the rest.
+    seen_uids = {} if (active_only and import_software) else None
+
     reported = fetch_and_report_devices(base_url, http_options, token_id, secret_key,
-                                        scope, page_size, agent_status, max_pages)
+                                        scope, page_size, agent_status, max_pages,
+                                        seen_uids)
     print("absolute: reported {} devices".format(reported))
     if not reported:
         print("absolute: no assets retrieved")
 
     if import_software:
         enriched = fetch_and_report_software(base_url, http_options, token_id, secret_key,
-                                             scope, page_size, max_pages)
+                                             scope, page_size, max_pages, seen_uids)
         print("absolute: reported software for {} devices".format(enriched))
 
     return None

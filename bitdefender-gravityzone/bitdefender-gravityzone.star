@@ -101,7 +101,7 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
 load('http', 'post_json', 'basic', 'url_parse')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_dict')
@@ -129,8 +129,6 @@ RPC_ID = "runzero"
 # 1.0 of the same method caps it at 100, which is why the version matters here.
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 1000
-# Length of the leading "YYYY-MM-DD" date, past which an offset may appear.
-DATE_LEN = 10
 
 # Endpoint ids are interpolated into a JSON body rather than a URL, but they are
 # still screened before being used to address a resource. Every observed value is
@@ -188,12 +186,6 @@ def _strings(value):
     return [_clean(item) for item in value if _clean(item)]
 
 
-def _has_offset(text):
-    """Report whether an ISO-like timestamp already carries a zone designator."""
-    tail = text[DATE_LEN:]
-    if tail.endswith("Z") or tail.endswith("z"):
-        return True
-    return tail.find("+") >= 0 or tail.find("-") >= 0
 def _console(base_url):
     """Return the Control Center hostname used to namespace asset ids."""
     parsed = url_parse(base_url)

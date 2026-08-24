@@ -43,6 +43,7 @@ load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
+load('coerce', 'as_dict', 'as_list', 'as_text')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or non-production deployment can be reached
@@ -58,6 +59,25 @@ DEFAULT_AUTOMOX_URL = "https://console.automox.com"
 # package rows those devices produce. Hitting it is logged, because a silently
 # truncated import is indistinguishable from a complete one.
 MAX_PAGES = 2000
+
+# The platform rejects an asset carrying more than 99 software children, and a
+# real Automox endpoint routinely reports hundreds of package rows, so the list
+# is capped with a printed note rather than failing the record.
+MAX_SOFTWARE_PER_ASSET = 99
+
+def page_signature(rows):
+    """A cheap fingerprint of one page: its length and the ids at either end.
+
+    Two consecutive pages sharing a fingerprint means the console re-served one
+    page rather than advancing, so the walk is not making progress and every
+    further request can only duplicate rows already collected."""
+    if not rows:
+        return "empty"
+    first = rows[0]
+    last = rows[-1]
+    first_id = first.get("id", "") if type(first) == "dict" else ""
+    last_id = last.get("id", "") if type(last) == "dict" else ""
+    return "{}|{}|{}".format(len(rows), first_id, last_id)
 
 def looks_numeric(v):
     if v == None:
@@ -82,25 +102,43 @@ def normalize_list(decoded):
             return decoded["items"]
         if "records" in decoded and type(decoded["records"]) == "list":
             return decoded["records"]
-        fail("Unexpected dict response (no data/results/items/records list field).")
-    fail("Unexpected response type: " + t)
+        # An unexpected envelope ends the walk with what was already collected
+        # rather than aborting the task and losing every asset already streamed.
+        print("automox: unexpected dict response (no data/results/items/records list field); treating the page as empty")
+        return []
+    print("automox: unexpected response type: " + t + "; treating the page as empty")
+    return []
 
 def get_orgs(base_url, http_options):
     orgs = []
     limit = 500
     capped = True
+    last_signature = ""
 
     for page in range(0, MAX_PAGES):
         params = {"limit": str(limit), "page": str(page)}
         data, err = get_json(base_url + "/api/orgs", params=params, **http_options)
 
         if err:
-            fail("Failed to fetch orgs from Automox: " + err)
+            print("automox: failed to fetch orgs: " + err + "; continuing with the {} collected".format(len(orgs)))
+            capped = False
+            break
 
         batch = normalize_list(data)
         if not batch:
             capped = False
             break
+
+        # A console that ignores page= re-serves the same organizations forever;
+        # without this check that shape costs MAX_PAGES requests and duplicates
+        # every org row MAX_PAGES times.
+        signature = page_signature(batch)
+        if signature == last_signature:
+            print("automox: stopped reading organizations after {} pages (API returned the same page twice) with {} collected".format(
+                page + 1, len(orgs)))
+            capped = False
+            break
+        last_signature = signature
 
         for o in batch:
             orgs.append(o)
@@ -132,12 +170,16 @@ def resolve_org(base_url, http_options, org_hint):
 
     orgs = get_orgs(base_url, http_options)
     if not orgs:
-        fail("No organizations returned from Automox; cannot determine org_id.")
+        print("automox: no organizations returned; software will be skipped and the device listing left unscoped")
+        return None, None
 
+    first = orgs[0] if type(orgs[0]) == "dict" else {}
     hint = str(org_hint or "").strip()
     if hint:
         wanted = hint.lower()
         for org in orgs:
+            if type(org) != "dict":
+                continue
             name = str(org.get("name", "") or "").strip()
             if name and name.lower() == wanted:
                 oid = org.get("id", None)
@@ -145,11 +187,12 @@ def resolve_org(base_url, http_options, org_hint):
                     print("automox: organization_hint '{}' resolved to org id {}".format(hint, oid))
                     return str(oid), str(oid)
         print("automox: organization_hint '{}' matched no organization by id or name; using '{}' and leaving the device listing unscoped".format(
-            hint, str(orgs[0].get("name", "") or orgs[0].get("id", ""))))
+            hint, str(first.get("name", "") or first.get("id", ""))))
 
-    oid = orgs[0].get("id", None)
+    oid = first.get("id", None)
     if oid == None:
-        fail("Automox /orgs response missing 'id'.")
+        print("automox: /orgs response missing 'id'; software will be skipped and the device listing left unscoped")
+        return None, None
     return str(oid), None
 
 def fetch_org_packages(base_url, http_options, org_id):
@@ -163,7 +206,9 @@ def fetch_org_packages(base_url, http_options, org_id):
         data, err = get_json(url, params=params, **http_options)
 
         if err:
-            fail("Failed to fetch org packages from Automox: " + err)
+            print("automox: failed to fetch org packages: " + err + "; software will be incomplete for this run")
+            capped = False
+            break
 
         batch = normalize_list(data)
         if not batch:
@@ -183,6 +228,8 @@ def index_software_by_server(packages):
     by_server = {}
 
     for soft in packages:
+        if type(soft) != "dict":
+            continue
         sid = soft.get("server_id", None)
         if sid == None:
             continue
@@ -236,8 +283,10 @@ def build_network_interfaces_from_device(device):
         if type(nics) == "list" and nics:
             out = []
             for nic in nics[:99]:
-                mac = nic.get("MAC", "")
-                ips = nic.get("IPS", [])
+                if type(nic) != "dict":
+                    continue
+                mac = as_text(nic.get("MAC"))
+                ips = [as_text(ip) for ip in as_list(nic.get("IPS")) if as_text(ip)]
                 # network_interface returns None when neither the addresses nor
                 # the MAC survive parsing -- a NICS entry with an empty IPS list
                 # and a null or unparseable MAC does that. Appending None makes
@@ -253,37 +302,54 @@ def build_network_interfaces_from_device(device):
     # Reached when the device has no NICS, and also when every NIC above was
     # dropped as unusable. A device with no addresses either yields None here for
     # the same reason, so this needs the same guard; returning no interfaces
-    # leaves the asset to correlate on its hostname.
-    ips = device.get("ip_addrs", []) + device.get("ip_addrs_private", [])
+    # leaves the asset to correlate on its hostname. as_list defends the
+    # present-but-null shape: `"ip_addrs": null` is not a device with no
+    # addresses, it is None + None, which aborts the whole run.
+    ips = []
+    for ip in as_list(device.get("ip_addrs")) + as_list(device.get("ip_addrs_private")):
+        candidate = as_text(ip)
+        if candidate:
+            ips.append(candidate)
     iface = network_interface(ips=ips, mac="")
     if iface:
         return [iface]
     return []
 
 def build_device_asset(device, sw_by_server):
+    if type(device) != "dict":
+        print("automox: skipping non-dict device record: " + type(device))
+        return None
     device_id = device.get("id")
     if not device_id:
         print("automox: skipping device with no id: name=" + str(device.get("name", "")))
         return None
 
     custom_attrs = {
-        "os_version": device.get("os_version", ""),
-        "os_name": device.get("os_name", ""),
-        "os_family": device.get("os_family", ""),
-        "agent_version": device.get("agent_version", ""),
+        "os_version": as_text(device.get("os_version")),
+        "os_name": as_text(device.get("os_name")),
+        "os_family": as_text(device.get("os_family")),
+        "agent_version": as_text(device.get("agent_version")),
         "compliant": str(device.get("compliant", "")),
-        "last_logged_in_user": device.get("last_logged_in_user", ""),
-        "serial_number": device.get("serial_number", ""),
-        "agent_status": device.get("status", {}).get("agent_status", ""),
+        "last_logged_in_user": as_text(device.get("last_logged_in_user")),
+        "serial_number": as_text(device.get("serial_number")),
+        # as_dict defends the present-but-null shape: `"status": null` is a
+        # device row the API really emits, and None.get aborts the whole run.
+        "agent_status": as_text(as_dict(device.get("status")).get("agent_status")),
     }
+
+    software = sw_by_server.get(str(device_id), [])
+    if len(software) > MAX_SOFTWARE_PER_ASSET:
+        print("automox: device {} reports {} software entries; importing the first {}".format(
+            device_id, len(software), MAX_SOFTWARE_PER_ASSET))
+        software = software[:MAX_SOFTWARE_PER_ASSET]
 
     return ImportAsset(
         id=str(device_id),
         networkInterfaces=build_network_interfaces_from_device(device),
-        hostnames=[device.get("name", "")],
-        os_version=device.get("os_version", ""),
-        os=device.get("os_family", "") + " " +  device.get("os_name", ""),
-        software=sw_by_server.get(str(device_id), []),
+        hostnames=[as_text(device.get("name"))],
+        os_version=as_text(device.get("os_version")),
+        os=as_text(device.get("os_family")) + " " + as_text(device.get("os_name")),
+        software=software,
         customAttributes=to_custom_attributes(custom_attrs),
         # trust_os / trust_os_version are meaningful: Automox reports the OS
         # from an agent running on the host, which is better evidence than a
@@ -338,7 +404,9 @@ def stream_device_assets(base_url, http_options, scope_org_id, sw_by_server):
             continue
 
         if err:
-            fail("Failed to fetch devices from Automox: " + err)
+            print("automox: failed to fetch devices: " + err + "; ending the walk with {} assets reported".format(reported))
+            capped = False
+            break
 
         batch = normalize_list(data)
         if not batch:
@@ -366,8 +434,12 @@ def build_assets(base_url, api_token, org_hint, config_kwargs):
 
     org_id, scope_org_id = resolve_org(base_url, http_options, org_hint)
 
-    packages = fetch_org_packages(base_url, http_options, org_id)
-    sw_by_server = index_software_by_server(packages)
+    # A run that could not resolve any organization still imports devices; it
+    # just cannot read the package table, so those assets carry no software.
+    sw_by_server = {}
+    if org_id != None:
+        packages = fetch_org_packages(base_url, http_options, org_id)
+        sw_by_server = index_software_by_server(packages)
 
     return stream_device_assets(base_url, http_options, scope_org_id, sw_by_server)
 
@@ -379,7 +451,8 @@ def main(**kwargs):
     base_url = (kwargs.get("url") or DEFAULT_AUTOMOX_URL).rstrip("/")
 
     if not api_token:
-        fail("Missing api_token (Automox API token).")
+        print("automox: missing api_token (Automox API token); nothing imported")
+        return None
 
     # Assets are streamed page-by-page via report_assets in build_assets.
     build_assets(base_url, api_token, org_hint, kwargs)

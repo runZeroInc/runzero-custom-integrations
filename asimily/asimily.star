@@ -247,6 +247,8 @@ def _string_list(value):
 def build_vulnerabilities(device_row):
     """Convert the cves array on one device-cves row into Vulnerability objects."""
     vulns = []
+    seen = {}
+    duplicates = 0
     for cve in device_row.get("cves", []) or []:
         if type(cve) != "dict":
             continue
@@ -259,6 +261,14 @@ def build_vulnerabilities(device_row):
         vuln_id = cve_name
         if product_name:
             vuln_id = "{}:{}".format(cve_name, product_name)
+        vuln_id = vuln_id[:255]
+
+        # A repeated cveName:productName pair on one device would emit two
+        # Vulnerability children with the same id; the first entry wins.
+        if vuln_id in seen:
+            duplicates += 1
+            continue
+        seen[vuln_id] = True
 
         asimily_score = _score(cve.get("score"))
         cvss_base = _score(cve.get("cvssBaseScore"))
@@ -284,7 +294,7 @@ def build_vulnerabilities(device_row):
         # No port, transport, or address is available from this endpoint, so
         # the Vulnerability service fields are deliberately left unset.
         vuln_args = {
-            "id": vuln_id[:255],
+            "id": vuln_id,
             "name": cve_name,
             "description": str(cve.get("description", "") or "")[:1024],
             "solution": str(cve.get("fixedBy", "") or "")[:1024],
@@ -314,6 +324,9 @@ def build_vulnerabilities(device_row):
         vulns.append(Vulnerability(**vuln_args))
         if len(vulns) >= CHILD_LIMIT:
             break
+    if duplicates:
+        print("asimily: skipped {} duplicate CVE entries for device {}".format(
+            duplicates, _device_key(device_row)))
     return vulns
 
 

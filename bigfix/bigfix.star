@@ -99,8 +99,6 @@ MAX_VALUES = 500
 VALUE_SEPARATOR = "~|~"
 
 DIGITS = "0123456789"
-MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-          "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
 # BigFix reports the OS as a short platform code followed by a build number,
 # for example "Win2016 10.0.14393.6796". The code is expanded so the imported
 # os field reads the same way it does everywhere else in runZero; the untouched
@@ -179,11 +177,6 @@ def _is_version(text):
         if text[index] != "." and text[index] not in DIGITS:
             return False
     return True
-
-
-def _pad2(value):
-    """Render a small non-negative int as two digits."""
-    return "0" + str(value) if value < 10 else str(value)
 
 
 def _attr_key(name):

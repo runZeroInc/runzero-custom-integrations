@@ -1,0 +1,97 @@
+{
+  "name": "v3-fallback",
+  "integration": "akamai-guardicore-centra",
+  "script": "akamai-guardicore-centra/centra-v3-api.star",
+  "description": "A Centra deployment without the v4 API. The status=on walk targets /api/v4.0/assets first -- the endpoint the script inherited from a field deployment -- and on such an appliance every request to it answers 404, which used to cost the entire primary collection: only status=off assets imported. The walk must fall back to /api/v3.0/assets when its FIRST page 404s, log the retry, and import both statuses. requests_include pins that the v3 endpoint was asked with status=on; request_count pins that the 404 was not retried (404 is not a retryable status).",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {"method": "POST", "path": "/api/v3.0/authenticate"},
+      "responses": [{"status": 200, "json": {"access_token": "fixture-centra-token", "2fa_required": false}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-v4-missing",
+      "match": {"method": "GET", "path": "/api/v4.0/assets"},
+      "responses": [{"status": 404, "json": {"error": "not found"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-v3-on",
+      "match": {"method": "GET", "path": "/api/v3.0/assets", "query_contains": "status=on"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "objects": [
+              {
+                "id": "asset-guid-0501",
+                "name": "syn-centra-501",
+                "status": "on",
+                "guest_agent_details": {
+                  "hostname": "syn-centra-501",
+                  "os_details": {"os_version_name": "Ubuntu 22.04"},
+                  "hardware": {"vendor": "VMware, Inc."},
+                  "network": [
+                    {"hardware_address": "00:50:56:00:c5:01", "ip_addresses": [{"address": "198.51.100.51"}]}
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-v3-off",
+      "match": {"method": "GET", "path": "/api/v3.0/assets", "query_contains": "status=off"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "objects": [
+              {
+                "id": "asset-guid-0502",
+                "name": "syn-centra-502",
+                "status": "off",
+                "guest_agent_details": {
+                  "hostname": "syn-centra-502",
+                  "os_details": {"os_version_name": "Ubuntu 20.04"},
+                  "hardware": {"vendor": "VMware, Inc."},
+                  "network": [
+                    {"hardware_address": "00:50:56:00:c5:02", "ip_addresses": [{"address": "198.51.100.52"}]}
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["asset-guid-0501", "asset-guid-0502"],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v4.0/assets", "query_contains": "status=on"},
+      {"method": "GET", "path": "/api/v3.0/assets", "query_contains": "status=on"},
+      {"method": "GET", "path": "/api/v3.0/assets", "query_contains": "status=off"}
+    ],
+    "log_contains": [
+      "answered 404 for status=on; retrying against"
+    ]
+  },
+  "invariants": {
+    "skip": ["namespaced_ids"]
+  }
+}

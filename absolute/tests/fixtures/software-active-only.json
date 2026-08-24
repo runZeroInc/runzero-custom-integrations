@@ -1,0 +1,72 @@
+{
+  "name": "software-active-only",
+  "integration": "absolute",
+  "description": "active_only=true with import_software=true. The device report is filtered by agentStatus=A but the software report has no such filter, so the software walk used to emit orphan enrichment assets -- an id and a software list, nothing else -- for the inactive devices the device walk had just excluded. The device walk now records which deviceUids it imported and the software walk drops every other group, logging the count. The software rows for inactive-device-0002 must produce no asset. unique_ids and has_correlator are skipped for the same reason as the software scenario: the enrichment pass re-emits the device's own id with no correlator of its own, by design.",
+  "kwargs": {
+    "api_host": "$BASE",
+    "token_id": "fixture-token-id",
+    "secret_key": "fixture-secret-key",
+    "import_software": "true",
+    "active_only": "true"
+  },
+  "routes": [
+    {
+      "name": "jws-validate",
+      "match": {"method": "POST", "path": "/jws/validate"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": [
+              {
+                "deviceUid": "active-device-0001",
+                "deviceName": "FIXTURE-ACT-0001",
+                "agentStatus": "A",
+                "localIp": "10.180.0.1",
+                "operatingSystem": {"name": "Windows 11 Pro"}
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"pagination": {"nextPage": ""}},
+            "data": [
+              {
+                "deviceUid": "active-device-0001",
+                "deviceAppId": "fixture-app-1001",
+                "appName": "Fixture Agent Console",
+                "appVersion": "4.2.0"
+              },
+              {
+                "deviceUid": "inactive-device-0002",
+                "deviceAppId": "fixture-app-1002",
+                "appName": "Fixture Legacy Tool",
+                "appVersion": "1.0.0"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["absolute:$HOST:active-device-0001"],
+    "ids_absent": ["absolute:$HOST:inactive-device-0002"],
+    "request_count": 2,
+    "min_software_total": 1,
+    "requests_include": [
+      {"method": "POST", "path": "/jws/validate"}
+    ],
+    "log_contains": [
+      "absolute: reported 1 devices",
+      "absolute: skipped software for 1 devices excluded by active_only",
+      "absolute: reported software for 1 devices"
+    ]
+  },
+  "invariants": {"skip": ["unique_ids", "has_correlator"]}
+}

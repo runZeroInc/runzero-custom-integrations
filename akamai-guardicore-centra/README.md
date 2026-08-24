@@ -7,7 +7,7 @@ scripts — pick one:
 | Script | Reads assets from | Also does |
 | --- | --- | --- |
 | `centra-v4-api.star` | `/api/v4.0/assets` for both `on` and `off` status | Resolves label GUIDs to `key: value` strings via `/api/v4.0/labels/{guid}`, with a cache shared across pages |
-| `centra-v3-api.star` | `/api/v4.0/assets` for `on`, `/api/v3.0/assets` for `off` | Nothing extra |
+| `centra-v3-api.star` | `/api/v4.0/assets` for `on` (falling back to `/api/v3.0/assets` when the deployment answers 404 to the v4 path), `/api/v3.0/assets` for `off` | Nothing extra |
 
 A large portion of the data overlaps. **Use `centra-v4-api.star` unless you have
 a specific reason not to** — it is the one that resolves labels into readable
@@ -86,8 +86,9 @@ failures that look like something else:
   response. Guardicore's own published Python client has no two-factor handling
   of any kind, which suggests an MFA-enrolled account cannot complete this flow
   — though Akamai does not document that outright, so treat it as a likely cause
-  rather than a certainty. The symptom is `invalid authentication data`:
-  authentication was answered, but the response carried no `access_token`.
+  rather than a certainty. The symptom is `authentication response carried no
+  access_token (is 2FA enabled for this account?)`: authentication was
+  answered, but no token came back, and the run stops cleanly with zero assets.
 - **Password rotation policy applies to this account too.** A Centra password
   policy that expires the password will stop the scheduled task at the next
   expiry, with an authentication failure rather than a warning.
@@ -188,9 +189,10 @@ backstop that logs `page limit of N hit (integration safety limit, ...) - raise 
 max_pages parameter to import the rest`. Both lines report what fraction of Centra's own
 `total_count` the run actually retrieved.
 
-`authentication failed` in the log is a rejected credential; `invalid authentication
-data` means Centra answered but the response carried no `access_token`, which is what
-an MFA challenge looks like from here.
+`authentication failed` in the log is a rejected credential; `authentication response
+carried no access_token (is 2FA enabled for this account?)` means Centra answered but
+returned no token, which is what an MFA challenge looks like from here. Either way the
+run ends cleanly with zero assets rather than aborting.
 
 `--kwargs` takes the value verbatim as long as the whole argument holds a single `=`, so
 a comma inside a password is passed through intact. Only a value that *also* contains an

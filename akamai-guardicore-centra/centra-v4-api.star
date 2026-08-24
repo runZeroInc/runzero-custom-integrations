@@ -52,6 +52,7 @@ load('kwargs', 'get_int', 'get_url_base', 'get_http_options')
 load('net', 'network_interface')
 load('time', 'parse_time')
 load('re', re_match='match')
+load('coerce', 'as_dict', 'as_list', 'as_text')
 
 # Centra documents its timestamps as 'YYYY-MM-DD HH:MM:SS', but agent and
 # orchestration paths report RFC 3339 instead. Splitting on the space and taking
@@ -134,8 +135,15 @@ def parse_centra_ts(value):
 def build_assets(base_url, assets, token, config_kwargs, label_mapping):
     assets_import = []
     for asset in assets:
-        agent_info = asset.get('agent', {})
-        os_info = asset.get('os_info', {})
+        if type(asset) != 'dict':
+            print('centra-v4: skipping non-dict asset record: ' + type(asset))
+            continue
+        # Agentless assets report agent/os_info/nics/scoping_details as null
+        # rather than omitting them, and None.get aborts the whole run --
+        # one such asset used to end the import. as_dict/as_list turn every
+        # present-but-null block into an empty one.
+        agent_info = as_dict(asset.get('agent'))
+        os_info = as_dict(asset.get('os_info'))
         raw_id = asset.get('id') or asset.get('bios_uuid') or asset.get('instance_id')
         if not raw_id:
             print("centra-v4: skipping asset with no stable id: name=" + str(asset.get('name', '')))
@@ -148,9 +156,11 @@ def build_assets(base_url, assets, token, config_kwargs, label_mapping):
 
         # create the network interfaces
         interfaces = []
-        nics = asset.get('nics', [])
+        nics = as_list(asset.get('nics'))
         for nic in nics:
-            addresses = nic.get('ip_addresses', [])
+            if type(nic) != 'dict':
+                continue
+            addresses = as_list(nic.get('ip_addresses'))
             interface = network_interface(ips=addresses, mac=nic.get('mac_address', None))
             # network_interface returns None when neither the addresses nor the
             # MAC survive parsing -- a NIC entry carrying only a link-local or
@@ -162,8 +172,8 @@ def build_assets(base_url, assets, token, config_kwargs, label_mapping):
 
         # Retrieve and map custom attributes
         
-        orchestration_metadata = asset.get('orchestration_metadata', {})
-        scoping_details = asset.get('scoping_details', {}).get('worksite', {})
+        orchestration_metadata = as_dict(asset.get('orchestration_metadata'))
+        scoping_details = as_dict(as_dict(asset.get('scoping_details')).get('worksite'))
         agent_id = agent_info.get('id', '')
         #reformat agent_last_seen timestamp for runZero parsing
         agent_last_seen = parse_centra_ts(agent_info.get('agent_last_seen', ''))
@@ -187,8 +197,8 @@ def build_assets(base_url, assets, token, config_kwargs, label_mapping):
         worksite_mod = scoping_details.get('modified', '')
         worksite_name = scoping_details.get('name', '')
 
-        labels = asset.get('labels', [])
-        label_guids = [v for item in labels for k,v in item.items() if k == 'id']
+        labels = as_list(asset.get('labels'))
+        label_guids = [v for item in labels if type(item) == 'dict' for k,v in item.items() if k == 'id']
         label_names = []
         for guid in label_guids:
             # Membership, not truthiness. A label the API user cannot read, one
@@ -248,12 +258,19 @@ def build_assets(base_url, assets, token, config_kwargs, label_mapping):
             'orchestrationMetadata.vsName': orc_vs_name
         }
 
-        label_groups = asset.get('label_groups', [])
+        label_groups = as_list(asset.get('label_groups'))
         for group in label_groups:
+            # A member that is not an object has no .items() and would abort
+            # the run; it is preserved whole under its index instead.
+            if type(group) != 'dict':
+                custom_attributes['labelGroup.' + str(label_groups.index(group))] = as_text(group)
+                continue
             for k, v in group.items():
                 custom_attributes['labelGroup.' + str(label_groups.index(group)) + '.' + k] = v
-        orchestration_details = asset.get('orchestration_details', [])
+        orchestration_details = as_list(asset.get('orchestration_details'))
         for detail in orchestration_details:
+            if type(detail) != 'dict':
+                continue
             for k, v in detail.items():
                 custom_attributes['orchestrationDetails.' + str(orchestration_details.index(detail)) + '.' + k] = v
 
@@ -294,11 +311,11 @@ def get_labels(base_url, guid, token, config_kwargs):
     if err:
         print('failed to retrieve label info for ' + guid + ': ' + err)
         return {}
-    label_info = (data or {}).get('objects', [])
-    if not label_info:
+    label_info = as_list(as_dict(data).get('objects'))
+    if not label_info or type(label_info[0]) != 'dict':
         return {}
-    label_key = label_info[0].get('key', '')
-    label_value = label_info[0].get('value', '')
+    label_key = as_text(label_info[0].get('key'))
+    label_value = as_text(label_info[0].get('value'))
     return { guid: label_key + ': ' + label_value }
 
 def stream_assets(base_url, token, config_kwargs):
@@ -384,16 +401,26 @@ def get_token(base_url, username, password, config_kwargs):
     if err:
         print('authentication failed:', err)
         return None
-    if not data:
+    if not data or type(data) != 'dict':
         print('invalid authentication data')
         return None
-    return data.get('access_token')
+    token = data.get('access_token')
+    if not token:
+        # A 2FA-enabled account answers 200 without an access_token.
+        print('authentication response carried no access_token (is 2FA enabled for this account?)')
+        return None
+    return token
 
 def main(*args, **kwargs):
     base_url = get_url_base(kwargs)
     username = kwargs['username']
     password = kwargs['password']
     token = get_token(base_url, username, password, kwargs)
+    if not token:
+        # get_token already printed why. Passing None to bearer() would abort
+        # with a type error instead of this clean stop.
+        print('centra-v4: authentication failed; no assets retrieved')
+        return None
 
     # Assets are streamed page-by-page via report_assets in stream_assets.
     reported = stream_assets(base_url, token, kwargs)

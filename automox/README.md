@@ -159,9 +159,10 @@ script pages 500 devices at a time, so a large account can approach that on its 
 you re-running it in a loop. Responses carry `x-ratelimit-limit`, `x-ratelimit-remaining`,
 `x-ratelimit-reset`, and `retry-after`.
 
-`Failed to fetch devices from Automox:` in the log ends the run and names the underlying
-error. A run that reports nothing at all, on an account with devices, is usually the
-organization mismatch described above rather than a credential problem.
+`automox: failed to fetch devices:` in the log names the underlying error and ends the
+device walk with whatever was already imported, rather than failing the task. A run that
+reports nothing at all, on an account with devices, is usually the organization mismatch
+described above rather than a credential problem.
 
 `--kwargs` takes the value verbatim as long as the whole argument holds a single `=`, so a
 comma inside a value is passed through intact. Only a value that *also* contains an `=`
@@ -177,20 +178,15 @@ To check the `CONFIG` block and the HTTP and TLS wiring without a live console:
 runzero script --filename automox/automox.star --validate
 ```
 
-**Expect this one to report failure, and expect that to be fine.** Validation answers from a
-local dummy server whose canned response contains no organizations, so `choose_org_id` hits
-its own guard and the run ends with:
-
-```
-automox/automox.star: script returned an error after 1 validation HTTP request(s):
-fail: No organizations returned from Automox; cannot determine org_id.
-```
-
-That message means the script compiled, declared its parameters, issued a request, parsed
-the reply, and correctly refused to continue without an organization — which is the whole
-of what validation can establish here. It does not prove Automox accepts the token, that the
-user's role can read devices, or that any device is parsed. The fixture scenarios are what
-exercise the parsing — including the organization-hint path and the rate-limit response:
+Validation answers from a local dummy server whose canned response contains no
+organizations, so the run logs
+`automox: no organizations returned; software will be skipped and the device listing left
+unscoped`, walks an empty device listing, and finishes cleanly with zero assets. That means
+the script compiled, declared its parameters, issued a request, and parsed the reply — which
+is the whole of what validation can establish here. It does not prove Automox accepts the
+token, that the user's role can read devices, or that any device is parsed. The fixture
+scenarios are what exercise the parsing — including the organization-hint path and the
+rate-limit response:
 
 ```bash
 python3 tests/run.py automox

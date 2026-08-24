@@ -1,7 +1,7 @@
 {
   "name": "malformed-cve",
   "integration": "asimily",
-  "description": "One device carries a cveName the platform's Vulnerability.cve pattern rejects (lower-case 'cve-2025-60001') and one carries a vendor advisory id that is not a CVE at all. Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and a miss fails the whole ImportAsset, which aborts the run and loses every device already parsed. The finding must still be imported -- named by the raw value, with the raw value kept as an attribute -- and only the cve field dropped. check_determinism is off for the same harness reason as happy: the asset id is scoped by the ephemeral fixture port.",
+  "description": "One device carries a cveName the platform's Vulnerability.cve pattern rejects (lower-case 'cve-2025-60001') and one carries a vendor advisory id that is not a CVE at all. Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and a miss fails the whole ImportAsset, which aborts the run and loses every device already parsed. The finding must still be imported -- named by the raw value, with the raw value kept as an attribute -- and only the cve field dropped. The cves array also repeats one cveName:productName pair, which used to emit two Vulnerability children with the same id on one asset; the duplicate must be skipped and the skip logged. check_determinism is off for the same harness reason as happy: the asset id is scoped by the ephemeral fixture port.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -42,6 +42,14 @@
                   },
                   {
                     "cveName": "CVE-2026-60002",
+                    "productName": "PumpOS",
+                    "score": 7.6,
+                    "cvssBaseScore": 7.8,
+                    "isFixed": 56
+                  },
+                  {
+                    "cveName": "CVE-2026-60002",
+                    "cveTitle": "Same CVE and product repeated on one device",
                     "productName": "PumpOS",
                     "score": 7.6,
                     "cvssBaseScore": 7.8,
@@ -96,7 +104,10 @@
   "expect": {
     "asset_count": 2,
     "min_vulnerabilities_total": 3,
-    "min_requests": 2
+    "min_requests": 2,
+    "log_contains": [
+      "asimily: skipped 1 duplicate CVE entries for device 91001"
+    ]
   },
   "invariants": {
     "skip": []

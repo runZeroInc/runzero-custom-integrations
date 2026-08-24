@@ -51,7 +51,7 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('http', 'get_json', 'post_json', 'bearer')
 load('kwargs', 'get_int', 'get_url_base', 'get_http_options')
 load('net', 'network_interface')
-load('time', 'parse_time')
+load('coerce', 'as_dict', 'as_list', 'as_text')
 
 RESULTS_PER_PAGE = 1000
 
@@ -104,14 +104,21 @@ def page_signature(rows):
 def build_assets(assets):
     assets_import = []
     for asset in assets:
-        agent_info = asset.get('guest_agent_details', {})
-        hardware = agent_info.get('hardware', {})
+        if type(asset) != 'dict':
+            print('centra-v3: skipping non-dict asset record: ' + type(asset))
+            continue
+        # Agentless assets -- common in a Centra inventory -- report
+        # guest_agent_details as null rather than omitting it, and None.get
+        # aborts the whole run. as_dict turns every present-but-null block
+        # into an empty one.
+        agent_info = as_dict(asset.get('guest_agent_details'))
+        hardware = as_dict(agent_info.get('hardware'))
         raw_id = asset.get('id') or asset.get('bios_uuid') or hardware.get('hw_uuid')
         if not raw_id:
             print("centra-v3: skipping asset with no stable id: name=" + str(asset.get('name', '')))
             continue
         asset_id = str(raw_id)
-        os_info = agent_info.get('os_details', {})
+        os_info = as_dict(agent_info.get('os_details'))
         hostname = agent_info.get('hostname', '')
         os = os_info.get('os_version_name', '')
         vendor = hardware.get('vendor', '')
@@ -119,9 +126,11 @@ def build_assets(assets):
 
         # create the network interfaces
         interfaces = []
-        networks = agent_info.get('network', [])
+        networks = as_list(agent_info.get('network'))
         for network in networks:
-            ips = [address.get('address', '') for address in network.get('ip_addresses', [])]
+            if type(network) != 'dict':
+                continue
+            ips = [address.get('address', '') for address in as_list(network.get('ip_addresses')) if type(address) == 'dict']
             interface = network_interface(ips=ips, mac=network.get('hardware_address', None))
             # See the v4 script: a None interface here aborts the whole run.
             if interface:
@@ -139,14 +148,14 @@ def build_assets(assets):
         doc_version = asset.get('doc_version', '')
         hw_uuid = hardware.get('hw_uuid', '')
         is_on = asset.get('is_on', '')
-        labels = agent_info.get('labels', [])
+        labels = as_list(agent_info.get('labels'))
         last_seen = asset.get('last_seen', '')
         kernel_major = os_info.get('os_kernel_major', '')
         kernel_minor = os_info.get('os_kernel_minor', '')
         os_kernel = str(kernel_major) + '.' + str(kernel_minor)
         os_type = os_info.get('os_type', '')
         proc_count = os_info.get('num_of_processors', '')
-        recent_domains = asset.get('recent_domains', [])
+        recent_domains = as_list(asset.get('recent_domains'))
         serial = hardware.get('serial', '')
         status = asset.get('status', '')
         vm_id = asset.get('vm_id', '')
@@ -177,21 +186,31 @@ def build_assets(assets):
             'vmName': vm_name
         }
 
-        agent_labels = agent_info.get('labels', [])
+        agent_labels = as_list(agent_info.get('labels'))
         for label in agent_labels:
             custom_attributes['agent.labels.' + str(agent_labels.index(label))] = label
-        labels = asset.get('labels', [])
+        labels = as_list(asset.get('labels'))
         for label in labels:
+            # A label that is not an object has no .items() and would abort the
+            # run; it is preserved whole under its index instead.
+            if type(label) != 'dict':
+                custom_attributes['labels.' + str(labels.index(label))] = as_text(label)
+                continue
             for k, v in label.items():
                 custom_attributes['labels.' + str(labels.index(label)) + '.' + k ] = v
-        metadata = asset.get('metadata', [])
+        metadata = as_list(asset.get('metadata'))
         for data in metadata:
-            custom_attributes['metadata.' + str(metadata.index(data))] = ':'.join(data)
-        orc_details = asset.get('orchestration_details', [])
+            # A metadata member holding anything but strings would abort
+            # ':'.join; each element is coerced to text first, and a bare
+            # scalar member is treated as a one-element list.
+            custom_attributes['metadata.' + str(metadata.index(data))] = ':'.join([as_text(item) for item in as_list(data)])
+        orc_details = as_list(asset.get('orchestration_details'))
         for detail in orc_details:
+            if type(detail) != 'dict':
+                continue
             for k, v in detail.items():
                 custom_attributes['orchestrationDetails.' + str(orc_details.index(detail)) + '.' + k ] = v
-        agent_supported_features = agent_info.get('supported_features', {}).get('RevealAgent', [])
+        agent_supported_features = as_list(as_dict(agent_info.get('supported_features')).get('RevealAgent'))
         for feature in agent_supported_features:
             custom_attributes['agent.supportedFeatures.' + str(agent_supported_features.index(feature))] = feature
 
@@ -208,79 +227,111 @@ def build_assets(assets):
         )
     return assets_import
 
+def walk_status_assets(url, status, token, config_kwargs, max_pages, already_reported):
+    """Walk one status's asset listing, streaming each page via report_assets.
+
+    Returns (reported, first_page_404). first_page_404 is True only when the
+    FIRST request answers 404 -- the signal that this endpoint does not exist
+    on the deployment, and the only point at which a caller can safely retry
+    another endpoint: nothing has been reported yet, so a fallback walk cannot
+    re-report assets.
+    """
+    reported = 0
+    results_per_page = RESULTS_PER_PAGE
+    start = 0
+    capped = True
+    last_signature = ''
+    # Centra reports the size of the whole result set alongside every page.
+    # It is captured so a truncated run can say what fraction of the estate
+    # it got, rather than a bare count the reader cannot judge.
+    total_count = None
+    for _page in range(0, max_pages):
+        headers = {'Accept': 'application/json',
+                    'Authorization': bearer(token)}
+        http_options = get_http_options(config_kwargs, headers=headers)
+        params = {'max_results': results_per_page,
+                  'start_at': start,
+                  'status': status}
+        data, err = get_json(url, params=params, **http_options)
+        if err:
+            if start == 0 and err.startswith('status 404'):
+                return reported, True
+            print('failed to retrieve "' + status + '" assets ' + str(start) + ' to ' + str(start + results_per_page) + ': ' + err)
+            capped = False
+            break
+        envelope = data or {}
+        reported_total = envelope.get('total_count')
+        if type(reported_total) == 'int' and reported_total >= 0:
+            total_count = reported_total
+
+        assets = envelope.get('objects', [])
+
+        # THE PRIMARY RUNAWAY GUARD. A page identical to the one before it
+        # means Centra is ignoring start_at and re-serving the same rows, so
+        # the walk is not advancing and continuing can only re-report assets
+        # already reported. Checked BEFORE the page is reported, so the
+        # repeated rows never reach runZero, and it can never truncate
+        # genuine data: it only fires on a page that adds nothing. It
+        # catches the stuck appliance in two requests where the page ceiling
+        # would take 10,000.
+        signature = page_signature(assets)
+        if assets and signature == last_signature:
+            capped = False
+            # No quotes around the status: the runtime escapes them in the
+            # log line, which makes the message awkward to assert and grep.
+            print('centra-v3: paging stopped after {} pages (API returned the same page twice walking status={}, {})'.format(
+                _page + 1, status, retrieved_of(already_reported + reported, total_count)))
+            break
+        last_signature = signature
+
+        reported += report_assets(build_assets(assets))
+        last_return = len(assets)
+        start += last_return
+        if last_return < results_per_page:
+            capped = False
+            break
+
+    if capped:
+        # No quotes around the status: the runtime escapes them in the log
+        # line, which makes the message awkward to assert on and to grep.
+        print('centra-v3: page limit of {} hit (integration safety limit, walking status={}, {}) - raise the max_pages parameter to import the rest'.format(
+            max_pages, status, retrieved_of(already_reported + reported, total_count)))
+
+    return reported, False
+
 def stream_assets(base_url, token, config_kwargs):
     """Paginate Centra assets ('on' then 'off'), building and streaming each page
     via report_assets so the full asset set is never held in memory. Returns the
     number of assets reported."""
     reported = 0
-    results_per_page = RESULTS_PER_PAGE
     # The ceiling is a parameter so an operator whose estate outgrows the
     # record target can move it without editing the script.
     max_pages = get_int(config_kwargs, 'max_pages', default=MAX_PAGES)
 
     # The 'on' and 'off' status queries historically target different API
-    # versions; preserve those endpoints exactly.
-    status_urls = [('on', base_url + '/api/v4.0/assets?'), ('off', base_url + '/api/v3.0/assets?')]
+    # versions; preserve those endpoints exactly. Deployments without the v4
+    # API answer 404 to the v4 path, which used to cost the whole status=on
+    # collection, so that walk falls back to the v3 endpoint when its first
+    # page 404s.
+    status_urls = [
+        ('on', [base_url + '/api/v4.0/assets?', base_url + '/api/v3.0/assets?']),
+        ('off', [base_url + '/api/v3.0/assets?']),
+    ]
 
-    for status, url in status_urls:
+    for status, urls in status_urls:
         # Remove the 'off' entry above to restrict import to only status 'on'
         # assets.
-        start = 0
-        capped = True
-        last_signature = ''
-        # Centra reports the size of the whole result set alongside every page.
-        # It is captured so a truncated run can say what fraction of the estate
-        # it got, rather than a bare count the reader cannot judge.
-        total_count = None
-        for _page in range(0, max_pages):
-            headers = {'Accept': 'application/json',
-                        'Authorization': bearer(token)}
-            http_options = get_http_options(config_kwargs, headers=headers)
-            params = {'max_results': results_per_page,
-                      'start_at': start,
-                      'status': status}
-            data, err = get_json(url, params=params, **http_options)
-            if err:
-                print('failed to retrieve "' + status + '" assets ' + str(start) + ' to ' + str(start + results_per_page) + ': ' + err)
-                capped = False
+        for index in range(len(urls)):
+            count, first_page_404 = walk_status_assets(urls[index], status, token,
+                                                       config_kwargs, max_pages, reported)
+            reported += count
+            if not first_page_404:
                 break
-            envelope = data or {}
-            reported_total = envelope.get('total_count')
-            if type(reported_total) == 'int' and reported_total >= 0:
-                total_count = reported_total
-
-            assets = envelope.get('objects', [])
-
-            # THE PRIMARY RUNAWAY GUARD. A page identical to the one before it
-            # means Centra is ignoring start_at and re-serving the same rows, so
-            # the walk is not advancing and continuing can only re-report assets
-            # already reported. Checked BEFORE the page is reported, so the
-            # repeated rows never reach runZero, and it can never truncate
-            # genuine data: it only fires on a page that adds nothing. It
-            # catches the stuck appliance in two requests where the page ceiling
-            # would take 10,000.
-            signature = page_signature(assets)
-            if assets and signature == last_signature:
-                capped = False
-                # No quotes around the status: the runtime escapes them in the
-                # log line, which makes the message awkward to assert and grep.
-                print('centra-v3: paging stopped after {} pages (API returned the same page twice walking status={}, {})'.format(
-                    _page + 1, status, retrieved_of(reported, total_count)))
-                break
-            last_signature = signature
-
-            reported += report_assets(build_assets(assets))
-            last_return = len(assets)
-            start += last_return
-            if last_return < results_per_page:
-                capped = False
-                break
-
-        if capped:
-            # No quotes around the status: the runtime escapes them in the log
-            # line, which makes the message awkward to assert on and to grep.
-            print('centra-v3: page limit of {} hit (integration safety limit, walking status={}, {}) - raise the max_pages parameter to import the rest'.format(
-                max_pages, status, retrieved_of(reported, total_count)))
+            if index + 1 < len(urls):
+                print('centra-v3: {} answered 404 for status={}; retrying against {}'.format(
+                    urls[index], status, urls[index + 1]))
+            else:
+                print('failed to retrieve "' + status + '" assets: every endpoint answered 404')
 
     return reported
 
@@ -290,16 +341,26 @@ def get_token(base_url, username, password, config_kwargs):
     if err:
         print('authentication failed:', err)
         return None
-    if not data:
+    if not data or type(data) != 'dict':
         print('invalid authentication data')
         return None
-    return data.get('access_token')
+    token = data.get('access_token')
+    if not token:
+        # A 2FA-enabled account answers 200 without an access_token.
+        print('authentication response carried no access_token (is 2FA enabled for this account?)')
+        return None
+    return token
 
 def main(*args, **kwargs):
     base_url = get_url_base(kwargs)
     username = kwargs['username']
     password = kwargs['password']
     token = get_token(base_url, username, password, kwargs)
+    if not token:
+        # get_token already printed why. Passing None to bearer() would abort
+        # with a type error instead of this clean stop.
+        print('centra-v3: authentication failed; no assets retrieved')
+        return None
 
     # Assets are streamed page-by-page via report_assets in stream_assets.
     reported = stream_assets(base_url, token, kwargs)
