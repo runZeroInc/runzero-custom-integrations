@@ -223,6 +223,8 @@ password can be expressed through it.
 - The task will appear on the [Tasks](https://console.runzero.com/tasks) page and run like any other integration.
 - It will update existing assets or create new ones based on device merge criteria (hostname, MAC, etc.).
 - You can filter assets imported via this integration using `custom_integration:mosyle`. The search term comes from the `CONFIG` id (`runzero-mosyle`) with the `runzero-` prefix removed, which is how every integration in this repository derives it. If that returns nothing, check the name you gave the integration in the console.
+## Asset identity
+
 - Target entity: an Apple device enrolled in Mosyle Manager MDM — iPhone, iPad, iPod, Mac, Apple TV, or Vision Pro. The script asks for each family separately (`ios`, `mac`, `tvos`, `visionos`), so the entity is always a physical Apple device rather than a user or a configuration record.
 - Source ID field: `deviceudid`, falling back to `serial_number`. A record carrying neither is skipped with `continue`.
 - Documentation evidence: **none from the vendor.** Mosyle publishes no public API reference at all, as recorded at the top of this document, so the field names come from the live API and the fixtures rather than from a contract. What *can* be leaned on is what the values are: `deviceudid` is Apple's device UDID, minted by Apple per device, and `serial_number` is the hardware serial engraved by Apple. Both are properties of Apple hardware that Mosyle reports rather than identifiers Mosyle invents, which is why they are strong despite the missing documentation.

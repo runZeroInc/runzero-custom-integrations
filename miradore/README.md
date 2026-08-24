@@ -164,7 +164,7 @@ Some deliberate choices worth knowing:
   nothing. The unmodified strings are kept as `miradore_last_reported`,
   `miradore_created`, and `miradore_modified`.
 
-## Merge behavior
+## Asset identity
 
 `matchBehavior` is `no-mac-break no-ip-break no-name-break`.
 
@@ -292,7 +292,7 @@ The script has also been run end to end against a live Miradore Online site: 102
 assets from 186 records, with software, tags, storage, ownership, and timestamps
 populated — 102 assets and 35,754 software rows from 186 records.
 
-## Known gaps
+## Future
 
 - **No custom attributes.** Miradore's per-device custom attributes are readable
   only through v2's `GET /api/v2/Device/{id}/CustomAttribute`, which is one
