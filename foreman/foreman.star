@@ -747,6 +747,20 @@ def fetch_packages(ctx, host_id):
     return packages
 
 
+def _clean_fact_names(names):
+    """Drop user-supplied fact names that cannot be interpolated into the
+    scoped-search string. A double quote would end the quoted term early,
+    Foreman would answer 400 for the whole search, and every host would then
+    import without facts, so the one bad name is skipped instead."""
+    cleaned = []
+    for name in names:
+        if '"' in name:
+            print("foreman: ignoring extra fact name containing a double quote: {}".format(name))
+            continue
+        cleaned.append(name)
+    return cleaned
+
+
 def fact_search(ctx):
     """Build the Foreman search that limits the fact walk to the facts that are
     actually mapped. Exact names cover the flat facts; the per-interface facts
@@ -899,7 +913,7 @@ def main(**kwargs):
         "facts": get_bool(kwargs, "include_facts", default=True),
         "interfaces": get_bool(kwargs, "include_interfaces", default=False),
         "packages": get_bool(kwargs, "include_packages", default=False),
-        "extra_facts": dedupe(get_list(kwargs, "extra_facts", default=[])),
+        "extra_facts": _clean_fact_names(dedupe(get_list(kwargs, "extra_facts", default=[]))),
         "katello": True,
         "detail_limit": detail_limit,
         "detail_used": 0,

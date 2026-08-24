@@ -1,0 +1,73 @@
+{
+  "name": "hangup-rollback",
+  "integration": "greenbone-scan",
+  "script": "greenbone-scan/greenbone-scan.star",
+  "description": "gvmd hangs up instead of replying when it rejects a command (recorded behaviour of gvmd 25.2.1). Here it hangs up on create_task, AFTER create_target succeeded. The framer must turn the EOF into a returned error rather than a raise -- recv_until raises at EOF, which used to abort the run past the rollback and leave the target orphaned with an opaque 'recv_until: EOF'. Because the original connection is dead, the rollback must reconnect, re-authenticate, and still delete the orphaned target; the second authenticate in the request log is that fresh connection.",
+  "kwargs": {
+    "runzero_url": "$BASE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "admin",
+    "gmp_password": "fixture-gmp-password",
+    "tls_disable_validation": "true"
+  },
+  "routes": [
+    {
+      "name": "runzero asset CSV export",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.csv"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/csv; charset=utf-8"},
+          "text": "id,address\r\n1,10.42.0.31\r\n"
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "gmp": {
+    "routes": [
+      {
+        "name": "authenticate",
+        "match": {"command": "authenticate"},
+        "responses": [{"xml": "<authenticate_response status=\"200\" status_text=\"OK\"/>"}],
+        "when_exhausted": "repeat_last"
+      },
+      {
+        "name": "create-target",
+        "match": {"command": "create_target"},
+        "responses": [{"xml": "<create_target_response status=\"201\" status_text=\"OK, resource created\" id=\"11111111-0000-4000-8000-000000000001\"/>"}],
+        "when_exhausted": "error"
+      },
+      {
+        "name": "create-task-hangs-up",
+        "match": {"command": "create_task"},
+        "responses": [{"xml": "", "close": true}],
+        "when_exhausted": "error"
+      },
+      {
+        "name": "delete-target",
+        "match": {"command": "delete_target"},
+        "responses": [{"xml": "<delete_target_response status=\"200\" status_text=\"OK\"/>"}],
+        "when_exhausted": "error"
+      }
+    ]
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 6,
+    "requests_include": [
+      {"method": "GMP", "path": "create_task"},
+      {"method": "GMP", "path": "delete_target", "body_contains": "11111111-0000-4000-8000-000000000001"}
+    ],
+    "requests_absent": [
+      {"method": "GMP", "path": "start_task"}
+    ],
+    "log_contains": [
+      "connection closed before a complete response was read",
+      "greenbone-scan: rolled back target 11111111-0000-4000-8000-000000000001 (status 200)"
+    ]
+  }
+}

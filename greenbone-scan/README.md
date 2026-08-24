@@ -20,7 +20,10 @@ imported back into runZero — a closed loop between the two systems.
    — unless disabled — **starts** the scan. The new report ID is logged.
 
 If task creation fails, the just-created target is rolled back so a failed run
-does not leave orphaned objects on the appliance.
+does not leave orphaned objects on the appliance. That holds even when gvmd
+rejects the command by hanging up instead of replying (recorded gvmd behavior):
+the hangup is reported as an error rather than aborting the run, and the
+rollback reconnects, re-authenticates, and deletes the orphaned target.
 
 ## runZero export
 

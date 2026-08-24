@@ -1,0 +1,72 @@
+{
+  "name": "task-rejected",
+  "integration": "greenbone-scan",
+  "script": "greenbone-scan/greenbone-scan.star",
+  "description": "gvmd answers create_task with a 400 (a bad scan config id, for example) while the connection stays up. The orphaned target created one step earlier must be rolled back over the same connection with delete_target ultimate=1, and the failure must surface with gvmd's own status_text.",
+  "kwargs": {
+    "runzero_url": "$BASE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "admin",
+    "gmp_password": "fixture-gmp-password",
+    "tls_disable_validation": "true"
+  },
+  "routes": [
+    {
+      "name": "runzero asset CSV export",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.csv"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/csv; charset=utf-8"},
+          "text": "id,address\r\n1,10.42.0.21\r\n"
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "gmp": {
+    "routes": [
+      {
+        "name": "authenticate",
+        "match": {"command": "authenticate"},
+        "responses": [{"xml": "<authenticate_response status=\"200\" status_text=\"OK\"/>"}]
+      },
+      {
+        "name": "create-target",
+        "match": {"command": "create_target"},
+        "responses": [{"xml": "<create_target_response status=\"201\" status_text=\"OK, resource created\" id=\"11111111-0000-4000-8000-000000000001\"/>"}],
+        "when_exhausted": "error"
+      },
+      {
+        "name": "create-task",
+        "match": {"command": "create_task"},
+        "responses": [{"xml": "<create_task_response status=\"400\" status_text=\"Failed to find config\"/>"}],
+        "when_exhausted": "error"
+      },
+      {
+        "name": "delete-target",
+        "match": {"command": "delete_target"},
+        "responses": [{"xml": "<delete_target_response status=\"200\" status_text=\"OK\"/>"}],
+        "when_exhausted": "error"
+      }
+    ]
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GMP", "path": "create_task"},
+      {"method": "GMP", "path": "delete_target", "body_contains": "11111111-0000-4000-8000-000000000001"}
+    ],
+    "requests_absent": [
+      {"method": "GMP", "path": "start_task"}
+    ],
+    "log_contains": [
+      "greenbone-scan: rolled back target 11111111-0000-4000-8000-000000000001 (status 200)",
+      "greenbone-scan: create_task failed (status 400: Failed to find config)"
+    ]
+  }
+}

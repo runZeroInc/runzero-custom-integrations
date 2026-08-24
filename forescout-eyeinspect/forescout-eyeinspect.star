@@ -19,6 +19,7 @@ CONFIG = {
     # relaxing them would let the collisions this source is known to
     # produce merge unrelated OT assets.
     "matchBehavior": "no-name-break",
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -74,7 +75,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'Software', 'Vulnerability', 'to_custom_attributes')
-load('net', 'network_interface')
+load('net', 'network_interface', 'clean_hostname')
 load('http', 'get_json', 'basic', 'url_parse')
 load('json', json_encode='encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
@@ -495,9 +496,12 @@ def build_asset(ctx, host):
         "alerts_fetched": len(alerts),
     }
 
+    # main_name is inferred from traffic, so placeholders ("unknown", bare
+    # IPs) are screened out; every unresolved host would share one name.
+    main_name = clean_hostname(as_text(host.get("main_name"), join=",").strip())
     params = {
         "id": "{}:{}:{}".format(VENDOR, ctx["scope"], host_id),
-        "hostnames": [as_text(host.get("main_name"), join=",").strip()],
+        "hostnames": [main_name] if main_name else [],
         "networkInterfaces": netifs,
         "tags": tags,
         "services": build_services(host_ip, _list(host.get("open_ports")))[:MAX_CHILDREN],
@@ -547,7 +551,8 @@ def fetch_and_report_hosts(ctx):
     url = ctx["base_url"] + API_PATH + "hosts"
     reported = 0
     offset = 0
-    for _page in range(1, 100001):
+    p = pager("hosts")
+    while p.next():
         params = {"offset": str(offset), "limit": str(PAGE_SIZE), "sort_field": "id", "sort_ascending": "true"}
         if ctx["last_seen"]:
             params["last_seen"] = ctx["last_seen"]

@@ -16,6 +16,7 @@ CONFIG = {
     # only one address and one MAC per host and both are re-derived on every
     # detail refresh, so network churn must not disqualify a merge.
     "matchBehavior": "no-mac-break no-ip-break no-name-break",
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -135,7 +136,6 @@ API_BASE = "/api/v1/fleet"
 LOGIN_PATH = "/api/v1/fleet/login"
 HOSTS_PATH = "/api/v1/fleet/hosts"
 
-MAX_PAGES = 100000
 MAX_CHILDREN = 99
 MAX_POLICY_NAMES = 25
 
@@ -181,9 +181,19 @@ EMPTY_MAC = "00:00:00:00:00:00"
 # own fingerprinting decides.
 MOBILE_PLATFORMS = ["ios", "ipados", "android"]
 
-# Query parameters that older Fleet releases do not understand. They are
-# dropped together after a rejected page so the import still runs.
+# Query parameters that older Fleet releases do not understand. After a
+# rejected page the request first falls back to the boolean populate_software
+# form those releases do support, and only then drops the optional set.
 OPTIONAL_PARAMS = ["populate_software", "populate_policies", "populate_labels", "additional_info_filters"]
+
+# Fallback levels for servers that reject the newer query parameters.
+# FALLBACK_FULL sends everything; FALLBACK_BOOLEAN keeps software import alive
+# through the original boolean populate_software=true form that predates the
+# string values and the other populate_* parameters; FALLBACK_BARE sends only
+# the paging parameters.
+FALLBACK_FULL = 0
+FALLBACK_BOOLEAN = 1
+FALLBACK_BARE = 2
 
 # Statuses that mean Fleet rejected the request itself rather than the caller.
 # Only these justify dropping the optional parameters and trying again: a 401
@@ -668,7 +678,15 @@ def list_params(ctx, page):
         "order_key": "id",
         "order_direction": "asc",
     }
-    if ctx["reduced"]:
+    if ctx["fallback"] >= FALLBACK_BARE:
+        return params
+    if ctx["fallback"] == FALLBACK_BOOLEAN:
+        # A pre-4.43 server rejects the string-valued populate_software and may
+        # not know populate_policies/populate_labels/additional_info_filters,
+        # but it does accept the original boolean form, so software import
+        # survives on the reduced set.
+        if ctx["software"]:
+            params["populate_software"] = "true"
         return params
     if ctx["software"]:
         # "true" adds the CVSS score, publication date, and description that
@@ -696,13 +714,18 @@ def fetch_hosts_page(ctx, page):
     """Fetch one page of hosts, returning (records, err).
 
     Fleet is self-hosted, so a server can predate the populate_* parameters.
-    A request rejected as invalid is retried once without the optional
-    parameters, and the rest of the run then stays on the reduced set. A
+    A request rejected as invalid is retried once with the older boolean
+    populate_software form, then once more with no optional parameters at all,
+    and the rest of the run stays at whichever level the server accepted. A
     transient or credential failure is passed straight back instead."""
     url = ctx["base_url"] + HOSTS_PATH
     data, err = get_json(url, params=list_params(ctx, page), **ctx["http_options"])
-    if err and not ctx["reduced"] and _param_rejected(err):
-        ctx["reduced"] = True
+    if err and ctx["fallback"] == FALLBACK_FULL and _param_rejected(err):
+        ctx["fallback"] = FALLBACK_BOOLEAN
+        print("fleet-osquery: the server rejected the newer query parameters, retrying with boolean populate_software: {}".format(err))
+        data, err = get_json(url, params=list_params(ctx, page), **ctx["http_options"])
+    if err and ctx["fallback"] == FALLBACK_BOOLEAN and _param_rejected(err):
+        ctx["fallback"] = FALLBACK_BARE
         print("fleet-osquery: the server rejected {}, retrying without them: {}".format(
             ",".join(OPTIONAL_PARAMS), err))
         data, err = get_json(url, params=list_params(ctx, page), **ctx["http_options"])
@@ -714,10 +737,13 @@ def fetch_hosts_page(ctx, page):
 def fetch_and_report_hosts(ctx):
     """Fetch and stream hosts one page at a time so the full inventory is never
     held in memory at once. Fleet numbers pages from zero and returns no total,
-    so paging stops on the first short or empty page."""
+    so paging stops on the first short or empty page. The loop is bounded by
+    CONFIG maxPages through pager(), which raises rather than truncating
+    silently when the bound is hit."""
     reported = 0
-    for page in range(FIRST_PAGE, FIRST_PAGE + MAX_PAGES):
-        records, err = fetch_hosts_page(ctx, page)
+    p = pager("hosts")
+    while p.next():
+        records, err = fetch_hosts_page(ctx, FIRST_PAGE + p.page - 1)
         if err:
             if err.startswith("status 401") or err.startswith("status 403"):
                 print("fleet-osquery: authentication to the Fleet server failed:", err)
@@ -796,7 +822,7 @@ def main(**kwargs):
         "detail_limit": detail_limit,
         "detail_used": 0,
         "detail_skipped": 0,
-        "reduced": False,
+        "fallback": FALLBACK_FULL,
     }
 
     reported = fetch_and_report_hosts(ctx)

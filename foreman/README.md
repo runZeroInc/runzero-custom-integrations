@@ -58,7 +58,7 @@
    - **Per-host request limit** (`detail_limit`): optional; cap on how many hosts get the per-host requests (default: 1000, 0 removes the cap).
    - **Hosts per page** (`page_size`): optional; hosts requested per page (default: 100).
    - **Fact values per page** (`fact_page_size`): optional; fact values requested per page (default: 1000).
-   - **Additional fact names** (`extra_facts`): optional; comma-separated Foreman fact names to import alongside the built-in set.
+   - **Additional fact names** (`extra_facts`): optional; comma-separated Foreman fact names to import alongside the built-in set. A name containing a double quote cannot be placed in the scoped-search string and is ignored with a log line, so one typo cannot 400 the whole fact walk.
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
    - Select the Credential and Custom Integration created in steps 1 and 2.
    - Update the task schedule to recur at the desired timeframes.

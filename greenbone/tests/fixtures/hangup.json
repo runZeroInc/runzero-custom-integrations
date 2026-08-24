@@ -2,7 +2,7 @@
   "name": "hangup",
   "integration": "greenbone",
   "script": "greenbone/greenbone.star",
-  "description": "gvmd hangs up rather than replying when it rejects a command: a live gvmd 25.2.1 closes the socket immediately after answering a pre-authenticate command, and the next send fails with a broken pipe. This scenario points that behaviour at the importer's response framer -- the connection dies with no bytes delivered.\n\nTHIS SCENARIO ASSERTS A DEFECT, DELIBERATELY. gmp_read_element is written as if recv_until returns an empty value at EOF:\n\n    tok = conn.recv_until(b\">\", ...)\n    if len(str(tok)) == 0:\n        return None, \"connection closed before a complete response was read\"\n\nThe runtime does not do that. recv_until RAISES at EOF, so the run dies with 'failed to call main function: recv_until: EOF' and that error branch is unreachable dead code. A mid-run hangup therefore aborts the whole import with an opaque runtime error instead of the intended message -- and because gvmd really does hang up, this is reachable in production.\n\nThe assertion below pins today's wrong behaviour so the gap stays visible. When gmp_read_element is fixed to survive EOF, this scenario will fail: replace the log_contains entry with 'connection closed before a complete response was read' at that point.",
+  "description": "gvmd hangs up rather than replying when it rejects a command: a live gvmd 25.2.1 closes the socket immediately after answering a pre-authenticate command, and the next send fails with a broken pipe. This scenario points that behaviour at the importer's response framer -- the connection dies with no bytes delivered.\n\nThe framer reads through recv, which returns EMPTY bytes at EOF, rather than recv_until, which RAISES at EOF and used to abort the whole run with an opaque 'failed to call main function: recv_until: EOF'. A hangup must now surface as the framer's own printed error, mark the connection dead so nothing sends on it again, and end the run cleanly with zero assets -- which is exactly what this scenario asserts.",
   "kwargs": {
     "transport": "tls",
     "gmp_host": "$GMP_HOST",
@@ -28,6 +28,6 @@
     "requests_include": [
       {"method": "GMP", "path": "authenticate"}
     ],
-    "log_contains": ["recv_until: EOF"]
+    "log_contains": ["connection closed before a complete response was read"]
   }
 }

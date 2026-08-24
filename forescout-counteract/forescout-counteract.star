@@ -76,12 +76,12 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'Software', 'Vulnerability', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip', 'clean_hostnames')
 load('http', 'get_json', http_post='post', 'url_encode', 'url_parse')
 load('json', json_encode='encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('re', re_find_all='find_all')
-load('time', 'now')
+load('time', 'now', 'sleep')
 
 load('coerce', 'as_text', 'dedupe')
 VENDOR = "forescout-counteract"
@@ -104,6 +104,13 @@ CVE_PATTERN = r"CVE-[0-9]{4}-[0-9]{4,19}"
 # The Web API mints a JWT whose default validity is five minutes, so the token is
 # refreshed well inside that window rather than waiting for the first 401.
 TOKEN_TTL_SECONDS = 240
+
+# The login POST stays a raw http_post (the token comes back as a bare body, not
+# JSON), and the raw builtin has no retries kwarg, so transient failures are
+# retried by hand. Only statuses that mean the request was rejected unprocessed
+# are retried, matching what get_json retries elsewhere in the run.
+LOGIN_ATTEMPTS = 4
+LOGIN_RETRY_STATUSES = [408, 425, 429, 500, 502, 503, 504]
 
 EXCLUDED_MACS = ["00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"]
 
@@ -358,7 +365,15 @@ def login(ctx):
     options["headers"] = headers
 
     body = url_encode({"username": ctx["username"], "password": ctx["password"]})
-    resp = http_post(ctx["base_url"] + LOGIN_PATH, body=bytes(body), **options)
+    resp = None
+    for attempt in range(LOGIN_ATTEMPTS):
+        if attempt:
+            sleep("{}s".format(attempt))
+        resp = http_post(ctx["base_url"] + LOGIN_PATH, body=bytes(body), **options)
+        if resp != None and resp.status_code not in LOGIN_RETRY_STATUSES:
+            break
+        print("forescout-counteract: transient Web API login failure (attempt {} of {}): {}".format(
+            attempt + 1, LOGIN_ATTEMPTS, resp.status_code if resp != None else "no response"))
     if resp == None:
         print("forescout-counteract: no response from the Web API login endpoint")
         return False
@@ -631,7 +646,10 @@ def build_asset(ctx, record):
         if nic:
             netifs.append(nic)
 
-    hostnames = dedupe([_value(fields, name) for name in HOSTNAME_FIELDS])
+    # NBT/DHCP-derived names carry placeholders ("UNKNOWN", bare IPs) that every
+    # unresolved host shares, so they are screened before import: one shared
+    # name across an estate is a merge hazard, not an identity.
+    hostnames = clean_hostnames([_value(fields, name) for name in HOSTNAME_FIELDS])
 
     if not netifs and not hostnames:
         print("forescout-counteract: skipping host {} with no address, MAC, or name to correlate on".format(host_id))

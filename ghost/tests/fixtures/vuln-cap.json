@@ -1,0 +1,1041 @@
+{
+  "name": "vuln-cap",
+  "integration": "ghost",
+  "description": "One repository with 120 findings. runZero rejects an asset carrying more than 99 children, so the bucket must stop at 99 and count the overflow -- the child_caps invariant would fail on an over-cap asset, and the log line proves the truncation is announced rather than silent.\n\nnamespaced_ids is skipped because the foreign id is the bare repository name with no tenant scope -- a known defect outside the scope of this change.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-ghost-token"
+  },
+  "routes": [
+    {
+      "name": "repos",
+      "match": {
+        "method": "GET",
+        "path": "/v1/repos"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              {
+                "id": "repo-cap",
+                "name": "capped-service",
+                "projects": [
+                  {
+                    "deployments": {
+                      "production": [
+                        "https://capped.example.com"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "findings",
+      "match": {
+        "method": "GET",
+        "path": "/v1/findings"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "has_more": false,
+            "items": [
+              {
+                "id": "finding-0000",
+                "name": "Injection risk 0",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 0."
+              },
+              {
+                "id": "finding-0001",
+                "name": "Injection risk 1",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 1."
+              },
+              {
+                "id": "finding-0002",
+                "name": "Injection risk 2",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 2."
+              },
+              {
+                "id": "finding-0003",
+                "name": "Injection risk 3",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 3."
+              },
+              {
+                "id": "finding-0004",
+                "name": "Injection risk 4",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 4."
+              },
+              {
+                "id": "finding-0005",
+                "name": "Injection risk 5",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 5."
+              },
+              {
+                "id": "finding-0006",
+                "name": "Injection risk 6",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 6."
+              },
+              {
+                "id": "finding-0007",
+                "name": "Injection risk 7",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 7."
+              },
+              {
+                "id": "finding-0008",
+                "name": "Injection risk 8",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 8."
+              },
+              {
+                "id": "finding-0009",
+                "name": "Injection risk 9",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 9."
+              },
+              {
+                "id": "finding-0010",
+                "name": "Injection risk 10",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 10."
+              },
+              {
+                "id": "finding-0011",
+                "name": "Injection risk 11",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 11."
+              },
+              {
+                "id": "finding-0012",
+                "name": "Injection risk 12",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 12."
+              },
+              {
+                "id": "finding-0013",
+                "name": "Injection risk 13",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 13."
+              },
+              {
+                "id": "finding-0014",
+                "name": "Injection risk 14",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 14."
+              },
+              {
+                "id": "finding-0015",
+                "name": "Injection risk 15",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 15."
+              },
+              {
+                "id": "finding-0016",
+                "name": "Injection risk 16",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 16."
+              },
+              {
+                "id": "finding-0017",
+                "name": "Injection risk 17",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 17."
+              },
+              {
+                "id": "finding-0018",
+                "name": "Injection risk 18",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 18."
+              },
+              {
+                "id": "finding-0019",
+                "name": "Injection risk 19",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 19."
+              },
+              {
+                "id": "finding-0020",
+                "name": "Injection risk 20",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 20."
+              },
+              {
+                "id": "finding-0021",
+                "name": "Injection risk 21",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 21."
+              },
+              {
+                "id": "finding-0022",
+                "name": "Injection risk 22",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 22."
+              },
+              {
+                "id": "finding-0023",
+                "name": "Injection risk 23",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 23."
+              },
+              {
+                "id": "finding-0024",
+                "name": "Injection risk 24",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 24."
+              },
+              {
+                "id": "finding-0025",
+                "name": "Injection risk 25",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 25."
+              },
+              {
+                "id": "finding-0026",
+                "name": "Injection risk 26",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 26."
+              },
+              {
+                "id": "finding-0027",
+                "name": "Injection risk 27",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 27."
+              },
+              {
+                "id": "finding-0028",
+                "name": "Injection risk 28",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 28."
+              },
+              {
+                "id": "finding-0029",
+                "name": "Injection risk 29",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 29."
+              },
+              {
+                "id": "finding-0030",
+                "name": "Injection risk 30",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 30."
+              },
+              {
+                "id": "finding-0031",
+                "name": "Injection risk 31",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 31."
+              },
+              {
+                "id": "finding-0032",
+                "name": "Injection risk 32",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 32."
+              },
+              {
+                "id": "finding-0033",
+                "name": "Injection risk 33",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 33."
+              },
+              {
+                "id": "finding-0034",
+                "name": "Injection risk 34",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 34."
+              },
+              {
+                "id": "finding-0035",
+                "name": "Injection risk 35",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 35."
+              },
+              {
+                "id": "finding-0036",
+                "name": "Injection risk 36",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 36."
+              },
+              {
+                "id": "finding-0037",
+                "name": "Injection risk 37",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 37."
+              },
+              {
+                "id": "finding-0038",
+                "name": "Injection risk 38",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 38."
+              },
+              {
+                "id": "finding-0039",
+                "name": "Injection risk 39",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 39."
+              },
+              {
+                "id": "finding-0040",
+                "name": "Injection risk 40",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 40."
+              },
+              {
+                "id": "finding-0041",
+                "name": "Injection risk 41",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 41."
+              },
+              {
+                "id": "finding-0042",
+                "name": "Injection risk 42",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 42."
+              },
+              {
+                "id": "finding-0043",
+                "name": "Injection risk 43",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 43."
+              },
+              {
+                "id": "finding-0044",
+                "name": "Injection risk 44",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 44."
+              },
+              {
+                "id": "finding-0045",
+                "name": "Injection risk 45",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 45."
+              },
+              {
+                "id": "finding-0046",
+                "name": "Injection risk 46",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 46."
+              },
+              {
+                "id": "finding-0047",
+                "name": "Injection risk 47",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 47."
+              },
+              {
+                "id": "finding-0048",
+                "name": "Injection risk 48",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 48."
+              },
+              {
+                "id": "finding-0049",
+                "name": "Injection risk 49",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 49."
+              },
+              {
+                "id": "finding-0050",
+                "name": "Injection risk 50",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 50."
+              },
+              {
+                "id": "finding-0051",
+                "name": "Injection risk 51",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 51."
+              },
+              {
+                "id": "finding-0052",
+                "name": "Injection risk 52",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 52."
+              },
+              {
+                "id": "finding-0053",
+                "name": "Injection risk 53",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 53."
+              },
+              {
+                "id": "finding-0054",
+                "name": "Injection risk 54",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 54."
+              },
+              {
+                "id": "finding-0055",
+                "name": "Injection risk 55",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 55."
+              },
+              {
+                "id": "finding-0056",
+                "name": "Injection risk 56",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 56."
+              },
+              {
+                "id": "finding-0057",
+                "name": "Injection risk 57",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 57."
+              },
+              {
+                "id": "finding-0058",
+                "name": "Injection risk 58",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 58."
+              },
+              {
+                "id": "finding-0059",
+                "name": "Injection risk 59",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 59."
+              },
+              {
+                "id": "finding-0060",
+                "name": "Injection risk 60",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 60."
+              },
+              {
+                "id": "finding-0061",
+                "name": "Injection risk 61",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 61."
+              },
+              {
+                "id": "finding-0062",
+                "name": "Injection risk 62",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 62."
+              },
+              {
+                "id": "finding-0063",
+                "name": "Injection risk 63",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 63."
+              },
+              {
+                "id": "finding-0064",
+                "name": "Injection risk 64",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 64."
+              },
+              {
+                "id": "finding-0065",
+                "name": "Injection risk 65",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 65."
+              },
+              {
+                "id": "finding-0066",
+                "name": "Injection risk 66",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 66."
+              },
+              {
+                "id": "finding-0067",
+                "name": "Injection risk 67",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 67."
+              },
+              {
+                "id": "finding-0068",
+                "name": "Injection risk 68",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 68."
+              },
+              {
+                "id": "finding-0069",
+                "name": "Injection risk 69",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 69."
+              },
+              {
+                "id": "finding-0070",
+                "name": "Injection risk 70",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 70."
+              },
+              {
+                "id": "finding-0071",
+                "name": "Injection risk 71",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 71."
+              },
+              {
+                "id": "finding-0072",
+                "name": "Injection risk 72",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 72."
+              },
+              {
+                "id": "finding-0073",
+                "name": "Injection risk 73",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 73."
+              },
+              {
+                "id": "finding-0074",
+                "name": "Injection risk 74",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 74."
+              },
+              {
+                "id": "finding-0075",
+                "name": "Injection risk 75",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 75."
+              },
+              {
+                "id": "finding-0076",
+                "name": "Injection risk 76",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 76."
+              },
+              {
+                "id": "finding-0077",
+                "name": "Injection risk 77",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 77."
+              },
+              {
+                "id": "finding-0078",
+                "name": "Injection risk 78",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 78."
+              },
+              {
+                "id": "finding-0079",
+                "name": "Injection risk 79",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 79."
+              },
+              {
+                "id": "finding-0080",
+                "name": "Injection risk 80",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 80."
+              },
+              {
+                "id": "finding-0081",
+                "name": "Injection risk 81",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 81."
+              },
+              {
+                "id": "finding-0082",
+                "name": "Injection risk 82",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 82."
+              },
+              {
+                "id": "finding-0083",
+                "name": "Injection risk 83",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 83."
+              },
+              {
+                "id": "finding-0084",
+                "name": "Injection risk 84",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 84."
+              },
+              {
+                "id": "finding-0085",
+                "name": "Injection risk 85",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 85."
+              },
+              {
+                "id": "finding-0086",
+                "name": "Injection risk 86",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 86."
+              },
+              {
+                "id": "finding-0087",
+                "name": "Injection risk 87",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 87."
+              },
+              {
+                "id": "finding-0088",
+                "name": "Injection risk 88",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 88."
+              },
+              {
+                "id": "finding-0089",
+                "name": "Injection risk 89",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 89."
+              },
+              {
+                "id": "finding-0090",
+                "name": "Injection risk 90",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 90."
+              },
+              {
+                "id": "finding-0091",
+                "name": "Injection risk 91",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 91."
+              },
+              {
+                "id": "finding-0092",
+                "name": "Injection risk 92",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 92."
+              },
+              {
+                "id": "finding-0093",
+                "name": "Injection risk 93",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 93."
+              },
+              {
+                "id": "finding-0094",
+                "name": "Injection risk 94",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 94."
+              },
+              {
+                "id": "finding-0095",
+                "name": "Injection risk 95",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 95."
+              },
+              {
+                "id": "finding-0096",
+                "name": "Injection risk 96",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 96."
+              },
+              {
+                "id": "finding-0097",
+                "name": "Injection risk 97",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 97."
+              },
+              {
+                "id": "finding-0098",
+                "name": "Injection risk 98",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 98."
+              },
+              {
+                "id": "finding-0099",
+                "name": "Injection risk 99",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 99."
+              },
+              {
+                "id": "finding-0100",
+                "name": "Injection risk 100",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 100."
+              },
+              {
+                "id": "finding-0101",
+                "name": "Injection risk 101",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 101."
+              },
+              {
+                "id": "finding-0102",
+                "name": "Injection risk 102",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 102."
+              },
+              {
+                "id": "finding-0103",
+                "name": "Injection risk 103",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 103."
+              },
+              {
+                "id": "finding-0104",
+                "name": "Injection risk 104",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 104."
+              },
+              {
+                "id": "finding-0105",
+                "name": "Injection risk 105",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 105."
+              },
+              {
+                "id": "finding-0106",
+                "name": "Injection risk 106",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 106."
+              },
+              {
+                "id": "finding-0107",
+                "name": "Injection risk 107",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 107."
+              },
+              {
+                "id": "finding-0108",
+                "name": "Injection risk 108",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 108."
+              },
+              {
+                "id": "finding-0109",
+                "name": "Injection risk 109",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 109."
+              },
+              {
+                "id": "finding-0110",
+                "name": "Injection risk 110",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 110."
+              },
+              {
+                "id": "finding-0111",
+                "name": "Injection risk 111",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 111."
+              },
+              {
+                "id": "finding-0112",
+                "name": "Injection risk 112",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 112."
+              },
+              {
+                "id": "finding-0113",
+                "name": "Injection risk 113",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 113."
+              },
+              {
+                "id": "finding-0114",
+                "name": "Injection risk 114",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 114."
+              },
+              {
+                "id": "finding-0115",
+                "name": "Injection risk 115",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 115."
+              },
+              {
+                "id": "finding-0116",
+                "name": "Injection risk 116",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 116."
+              },
+              {
+                "id": "finding-0117",
+                "name": "Injection risk 117",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 117."
+              },
+              {
+                "id": "finding-0118",
+                "name": "Injection risk 118",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 118."
+              },
+              {
+                "id": "finding-0119",
+                "name": "Injection risk 119",
+                "repo_id": "repo-cap",
+                "repo_url": "https://git.example.com/example/capped",
+                "severity": "high",
+                "description": "Synthetic finding 119."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "capped-service"
+    ],
+    "min_vulnerabilities_total": 99,
+    "request_count": 2,
+    "log_contains": [
+      "Total findings returned: 120",
+      "ghost: capped vulnerabilities for 'capped-service' at 99; 21 more findings were truncated"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

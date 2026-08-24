@@ -411,6 +411,28 @@ def build_asset(ctx, item_type, record, software):
     return asset
 
 
+def reopen_session(ctx):
+    """Re-open the API session once per run after GLPI invalidates the token
+    mid-run. Large estates with a short PHP session lifetime otherwise import
+    the front of the inventory every run and never the tail. Returns True when
+    a fresh token was installed and the failed request should be retried."""
+    if ctx["reauthed"]:
+        return False
+    ctx["reauthed"] = True
+    print("glpi: the API session expired mid-run, re-opening it once")
+    token = open_session(ctx["api_url"], ctx["auth_options"])
+    if not token:
+        print("glpi: re-opening the API session failed")
+        return False
+    ctx["http_options"]["headers"]["Session-Token"] = token
+    return True
+
+
+def _session_rejected(err):
+    """Report whether the error means GLPI no longer accepts the session token."""
+    return err != None and "ERROR_SESSION_TOKEN" in err
+
+
 def fetch_software(ctx, item_id):
     """Fetch the software installed on one computer. Only the single-item
     endpoint honors with_softwares, so this is one request per computer; the
@@ -419,6 +441,8 @@ def fetch_software(ctx, item_id):
     url = "{}/Computer/{}".format(ctx["api_url"], item_id)
     params = {"expand_dropdowns": "true", "get_hateoas": "false", "with_softwares": "true"}
     data, err = get_json(url, params=params, **ctx["http_options"])
+    if _session_rejected(err) and reopen_session(ctx):
+        data, err = get_json(url, params=params, **ctx["http_options"])
     if err:
         print("glpi: failed to fetch software for Computer {}: {}".format(item_id, err))
         return []
@@ -464,6 +488,8 @@ def fetch_page(ctx, path, params, offset, page_size):
     query = dict(params)
     query["range"] = "{}-{}".format(offset, offset + page_size - 1)
     data, err = get_json(ctx["api_url"] + path, params=query, **ctx["http_options"])
+    if _session_rejected(err) and reopen_session(ctx):
+        data, err = get_json(ctx["api_url"] + path, params=query, **ctx["http_options"])
     if err:
         if "ERROR_RANGE_EXCEED_TOTAL" in err:
             return [], None
@@ -641,7 +667,8 @@ def main(**kwargs):
     if app_token:
         auth_header["App-Token"] = app_token
 
-    session_token = open_session(api_url, get_http_options(kwargs, headers=auth_header))
+    auth_options = get_http_options(kwargs, headers=auth_header)
+    session_token = open_session(api_url, auth_options)
     if not session_token:
         return None
 
@@ -657,6 +684,10 @@ def main(**kwargs):
     ctx = {
         "api_url": api_url,
         "http_options": http_options,
+        # Kept so an expired session can be re-opened mid-run with the same
+        # credential; reauthed limits that to once per run.
+        "auth_options": auth_options,
+        "reauthed": False,
         "now": now(),
         "scope": scope,
         "include_software": get_bool(kwargs, "include_software", default=True),

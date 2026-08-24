@@ -300,11 +300,11 @@ weak id and merely redundant for a strong one.
   `http.post` builtin: `post_json` would try to decode a bare JWT as a document. The response is
   checked for the three-segment JWT shape before it is installed, so an HTML error page or a
   captive-portal redirect is never stored and used as a credential. The token is never printed.
-- **The login request has no retry budget**, because `retries` is a parameter of
-  `get_json`/`post_json` only and the raw builtins reject it. A transient failure or a TLS
-  problem on the login call aborts the run with the transport error rather than being retried,
-  which is visible in the task log. Every other request in this integration goes through
-  `get_json` and gets the built-in retry and backoff behavior.
+- **The login request retries transient failures by hand**, because `retries` is a parameter
+  of `get_json`/`post_json` only and the raw builtins reject it. A 408/425/429/5xx answer or a
+  missing response is retried up to three more times with a short backoff, each attempt logged,
+  so one transient 503 at the first login no longer ends the whole run. Every other request in
+  this integration goes through `get_json` and gets the built-in retry and backoff behavior.
 - **Token lifetime is short and is handled in both directions.** The Web API's default JWT
   validity is five minutes, which a run that enriches a thousand hosts will certainly outlive.
   The token is refreshed proactively once it is four minutes old, and if the Enterprise Manager

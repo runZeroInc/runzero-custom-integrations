@@ -220,8 +220,10 @@ this way. Prefer `script --kwargs` for ad-hoc runs.
   `GET /apirest.php/initSession`, which returns a `session_token`. That token is sent as
   the `Session-Token` header on every subsequent request and released with
   `GET /apirest.php/killSession` when the run ends, including when the run ended in an
-  error. Verified end to end against GLPI 10.0.26: after `killSession` the next request
-  returns 401.
+  error. If GLPI invalidates the token mid-run (`ERROR_SESSION_TOKEN`, e.g. a short PHP
+  session lifetime on a large estate), the session is re-opened once and the failed
+  request retried, so the tail of the inventory is not lost. Verified end to end against
+  GLPI 10.0.26: after `killSession` the next request returns 401.
 - **The App-Token is conditionally required.** `apirest.md` lists it as optional, and it
   genuinely is when the API client matching the Explorer's IP address has an empty token.
   As soon as that client defines a token, omitting it fails with

@@ -1,0 +1,136 @@
+{
+  "name": "paged",
+  "integration": "frontline-vm",
+  "description": "Both walks follow the DRF-style `next` cursor, and the cursor is an absolute URL that already carries its own query -- so the filter parameters sent on page one must NOT be re-sent alongside it. _get_page passes `params` only when there is something to send, because the http helper REPLACES the URL's query with `params` rather than merging: a regression that re-sent the filters (or an empty dict) with the cursor would erase the `page=2` marker, land back on the page-one route, and starve. The page-one routes here answer exactly once and are when_exhausted:error, so that regression fails loudly. The page-two vulnerability joins onto the page-two host, proving both second pages were fetched and joined; request_count pins the walk at exactly two requests per collection. check_determinism is off for the same reason as the happy scenario: the foreign id embeds $BASE_HOST, and the fixture server binds a fresh ephemeral port on the second run, so the ids legitimately differ; they are still asserted exactly via the token.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "include_vulnerabilities": "true",
+    "min_vuln_severity": "high",
+    "max_days_since_scan": "3650"
+  },
+  "routes": [
+    {
+      "name": "vulnerabilities page 2 (cursor)",
+      "match": {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/", "query_contains": "page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "next": null,
+            "results": [
+              {
+                "id": 9102,
+                "title": "Outdated PHP release CVE-2026-22222",
+                "severities": {"ddi": "Critical"},
+                "ip_address": "10.9.0.2",
+                "hostname": "app02",
+                "active_view_date_created": "2026-08-02T10:00:00Z",
+                "data": "PHP 7.4 is past end of life."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vulnerabilities page 1 (filtered)",
+      "match": {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/", "query_contains": "_0_lte_vuln_severity_ddi=high"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "next": "$BASE/api/scanresults/active/vulnerabilities/?page=2",
+            "results": [
+              {
+                "id": 9101,
+                "title": "OpenSSH permits weak MAC algorithms CVE-2026-11111",
+                "severities": {"ddi": "High"},
+                "ip_address": "10.9.0.1",
+                "hostname": "app01",
+                "active_view_date_created": "2026-08-01T10:00:00Z",
+                "data": "The remote SSH service offers hmac-md5."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts page 2 (cursor)",
+      "match": {"method": "GET", "path": "/api/scanresults/active/hosts/", "query_contains": "page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "next": null,
+            "results": [
+              {
+                "id": 102,
+                "ip_address": "10.9.0.2",
+                "hostname": "app02",
+                "dns_name": "app02.corp.example.com",
+                "mac_address": "00:11:22:44:88:02",
+                "os": "Ubuntu 22.04.3 LTS",
+                "os_type": "Linux",
+                "date_created": "2026-07-02T12:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "hosts page 1 (filtered)",
+      "match": {"method": "GET", "path": "/api/scanresults/active/hosts/", "query_contains": "_0_gte_host_date_created"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count": 2,
+            "next": "$BASE/api/scanresults/active/hosts/?page=2",
+            "results": [
+              {
+                "id": 101,
+                "ip_address": "10.9.0.1",
+                "hostname": "app01",
+                "dns_name": "app01.corp.example.com",
+                "mac_address": "00:11:22:44:88:01",
+                "os": "Red Hat Enterprise Linux 9",
+                "os_type": "Linux",
+                "date_created": "2026-07-01T12:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "frontline-vm:$BASE_HOST:101",
+      "frontline-vm:$BASE_HOST:102"
+    ],
+    "request_count": 4,
+    "requests_include": [
+      {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/", "query_contains": "_0_lte_vuln_severity_ddi=high"},
+      {"method": "GET", "path": "/api/scanresults/active/vulnerabilities/", "query_contains": "page=2"},
+      {"method": "GET", "path": "/api/scanresults/active/hosts/", "query_contains": "_0_gte_host_date_created"},
+      {"method": "GET", "path": "/api/scanresults/active/hosts/", "query_contains": "page=2"}
+    ],
+    "min_vulnerabilities_total": 2,
+    "log_contains": [
+      "frontline-vm: indexed 2 vulnerabilities across 2 hosts"
+    ]
+  },
+  "check_determinism": false
+}

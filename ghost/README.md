@@ -82,14 +82,22 @@ No manual mapping of repositories to IPs or hostnames is required.
 1. The integration calls `GET /v1/repos` to fetch all repositories.
 
    * Each repo’s project `deployments` are parsed to extract hostnames (production, staging, etc.).
+   * If `/v1/repos` answers `404` — the vendor retiring the superseded `/v1` surface — the run
+     switches to the documented `/v2` prefix for both collections and continues.
 2. It then calls `GET /v1/findings` to collect findings.
 
    * Each finding includes a `repo_id` and optional `project.deployments`.
    * The script maps findings back to repositories using `repo_id`.
-3. Assets are created for each repo in runZero with:
+   * Findings are capped at **99 per asset** (the platform's child limit); overflow is counted
+     and logged rather than producing an over-cap asset.
+3. Assets are streamed to runZero one repository at a time with:
 
    * Hostnames from Ghost deployments.
    * Associated vulnerabilities for each finding.
+
+   Only the finding buckets and the name/hostname mappings are buffered, so a failure late in
+   the run cannot lose the assets already reported. Malformed records — a string where an
+   object is documented, a null id or name — are skipped with a log line instead of aborting.
 
 ---
 
@@ -177,8 +185,9 @@ a comma cannot be passed this way; prefer `script --kwargs` for ad-hoc runs.
 ### Troubleshooting
 
 * If no assets appear:
-  * Ensure your Ghost account has repositories **with findings**. Repositories with no
-    findings never become assets — see Asset identity below.
+  * Ensure your Ghost account has repositories with at least one project **deployment
+    hostname**. A repository deployed nowhere has nothing to correlate on and is skipped
+    (and counted in the log) — see Asset identity below. Findings are not required.
   * Confirm the API key has access to `/v1/repos` and `/v1/findings`.
 
 ---

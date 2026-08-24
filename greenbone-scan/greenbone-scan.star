@@ -269,7 +269,7 @@ def gmp_connect(kwargs):
         conn = socket_tls(host, port, timeout=timeout, tls=tls_opts)
         if not conn:
             return None, "failed to open TLS connection to {}:{}".format(host, port)
-        return {"conn": conn, "sess": None}, None
+        return {"conn": conn, "sess": None, "dead": False, "rbuf": ""}, None
 
     require(kwargs, "ssh_host", "ssh_username")
     host = get_string(kwargs, "ssh_host")
@@ -299,7 +299,7 @@ def gmp_connect(kwargs):
         timeout=timeout,
     )
     conn = sess.open_unix(socket_path)
-    return {"conn": conn, "sess": sess}, None
+    return {"conn": conn, "sess": sess, "dead": False, "rbuf": ""}, None
 
 def gmp_close(state):
     if state == None:
@@ -309,24 +309,41 @@ def gmp_close(state):
     if state.get("sess"):
         state["sess"].close()
 
-def gmp_read_element(conn):
+def gmp_read_element(state):
+    """Read one top-level XML element. Reads go through recv, which returns
+    EMPTY bytes at EOF instead of raising (recv_until raises), so a gvmd
+    hangup -- which is how gvmd rejects a command -- becomes a returned error
+    and marks the connection dead rather than aborting the run past the
+    rollback. Leftover bytes are kept in state["rbuf"] for the next read."""
+    conn = state["conn"]
+    buf = state["rbuf"]
+    state["rbuf"] = ""
     parts = []
     total = 0
     depth = 0
     started = False
     for _ in range(MAX_TAGS_PER_RESPONSE):
-        tok = conn.recv_until(b">", max=MAX_TAG_BYTES, timeout=60)
-        s = str(tok)
-        if len(s) == 0:
-            return None, "connection closed before a complete response was read"
-        total += len(s)
-        if total > MAX_RESPONSE_BYTES:
-            return None, "GMP response exceeded {} bytes".format(MAX_RESPONSE_BYTES)
-        parts.append(s)
-        lt = s.rfind("<")
+        gt = buf.find(">")
+        if gt < 0:
+            if len(buf) > MAX_TAG_BYTES:
+                return None, "GMP tag exceeded {} bytes".format(MAX_TAG_BYTES)
+            chunk = conn.recv(max=65536, timeout=60)
+            s = str(chunk)
+            if len(s) == 0:
+                state["dead"] = True
+                return None, "connection closed before a complete response was read"
+            total += len(s)
+            if total > MAX_RESPONSE_BYTES:
+                return None, "GMP response exceeded {} bytes".format(MAX_RESPONSE_BYTES)
+            buf += s
+            continue
+        tok = buf[:gt + 1]
+        buf = buf[gt + 1:]
+        parts.append(tok)
+        lt = tok.rfind("<")
         if lt < 0:
             continue
-        tag = s[lt:]
+        tag = tok[lt:]
         if tag.startswith("</"):
             depth -= 1
         elif tag.startswith("<?") or tag.startswith("<!"):
@@ -337,12 +354,15 @@ def gmp_read_element(conn):
             depth += 1
             started = True
         if started and depth <= 0:
+            state["rbuf"] = buf
             return "".join(parts), None
     return None, "GMP response exceeded tag limit"
 
-def gmp_command(conn, request_xml):
-    conn.send(request_xml)
-    text, err = gmp_read_element(conn)
+def gmp_command(state, request_xml):
+    if state.get("dead"):
+        return None, "", "", "connection closed by the GMP endpoint"
+    state["conn"].send(request_xml)
+    text, err = gmp_read_element(state)
     if err:
         return None, "", "", err
     root = xml_parse(text)
@@ -350,10 +370,10 @@ def gmp_command(conn, request_xml):
         return None, "", "", "failed to parse GMP response XML"
     return root, root.get("status"), root.get("status_text"), None
 
-def gmp_authenticate(conn, username, password):
+def gmp_authenticate(state, username, password):
     req = "<authenticate><credentials><username>{}</username><password>{}</password></credentials></authenticate>".format(
         xml_escape(username), xml_escape(password))
-    root, status, status_text, err = gmp_command(conn, req)
+    root, status, status_text, err = gmp_command(state, req)
     if err:
         return err
     if status != "200":
@@ -409,7 +429,35 @@ def fetch_target_addresses(kwargs):
 # -------------------------
 # Scan creation
 # -------------------------
-def create_scan(conn, addresses, kwargs):
+def rollback_target(state, kwargs, target_id):
+    """Delete the target created for a run that could not finish, so a failed
+    run does not litter gvmd with orphans. gvmd hangs up instead of replying
+    when it rejects a command, so the original connection may already be dead;
+    the rollback then opens a fresh connection so the orphan is still removed."""
+    req = "<delete_target target_id=\"{}\" ultimate=\"1\"/>".format(xml_escape(target_id))
+    if not state.get("dead"):
+        root, status, status_text, err = gmp_command(state, req)
+        if not err:
+            print("greenbone-scan: rolled back target {} (status {})".format(target_id, status))
+            return
+    # The original connection is gone; try once more over a new one.
+    fresh, err = gmp_connect(kwargs)
+    if err or fresh == None:
+        print("greenbone-scan: could not reconnect to roll back target {}: {}".format(target_id, err))
+        return
+    auth_err = gmp_authenticate(fresh, get_string(kwargs, "gmp_username"), get_string(kwargs, "gmp_password"))
+    if auth_err:
+        print("greenbone-scan: could not re-authenticate to roll back target {}: {}".format(target_id, auth_err))
+        gmp_close(fresh)
+        return
+    root, status, status_text, err = gmp_command(fresh, req)
+    if err:
+        print("greenbone-scan: rollback of target {} failed: {}".format(target_id, err))
+    else:
+        print("greenbone-scan: rolled back target {} (status {})".format(target_id, status))
+    gmp_close(fresh)
+
+def create_scan(state, addresses, kwargs):
     target_prefix = get_string(kwargs, "target_name", default="runZero")
     config_id = get_string(kwargs, "scan_config_id", default="daba56c8-73ec-11df-a475-002264764cea")
     scanner_id = get_string(kwargs, "scanner_id", default="08b69003-5fc2-4037-a479-93b440211c73")
@@ -423,7 +471,7 @@ def create_scan(conn, addresses, kwargs):
     # 1) Create the target.
     target_req = "<create_target><name>{}</name><hosts>{}</hosts><port_list id=\"{}\"/><comment>Created by runZero ({} hosts)</comment></create_target>".format(
         xml_escape(name), xml_escape(hosts), xml_escape(port_list_id), len(addresses))
-    root, status, status_text, err = gmp_command(conn, target_req)
+    root, status, status_text, err = gmp_command(state, target_req)
     if err:
         return "create_target failed: {}".format(err)
     if status != "201":
@@ -436,11 +484,12 @@ def create_scan(conn, addresses, kwargs):
     # 2) Create the task.
     task_req = "<create_task><name>{}</name><comment>Created by runZero</comment><config id=\"{}\"/><target id=\"{}\"/><scanner id=\"{}\"/></create_task>".format(
         xml_escape(name), xml_escape(config_id), xml_escape(target_id), xml_escape(scanner_id))
-    root, status, status_text, err = gmp_command(conn, task_req)
+    root, status, status_text, err = gmp_command(state, task_req)
     if err or status != "201":
-        # Roll back the orphaned target so a failed run does not litter gvmd.
-        gmp_command(conn, "<delete_target target_id=\"{}\" ultimate=\"1\"/>".format(xml_escape(target_id)))
-        return "create_task failed (status {}: {}); rolled back target".format(status, status_text if status_text else err)
+        # Roll back the orphaned target so a failed run does not litter gvmd,
+        # even when the failure was gvmd hanging up mid-exchange.
+        rollback_target(state, kwargs, target_id)
+        return "create_task failed (status {}: {})".format(status, status_text if status_text else err)
     task_id = root.get("id")
     if not task_id:
         return "create_task did not return a task id"
@@ -451,7 +500,7 @@ def create_scan(conn, addresses, kwargs):
         print("greenbone-scan: created target {} and task {} (not started)".format(target_id, task_id))
         return None
 
-    root, status, status_text, err = gmp_command(conn, "<start_task task_id=\"{}\"/>".format(xml_escape(task_id)))
+    root, status, status_text, err = gmp_command(state, "<start_task task_id=\"{}\"/>".format(xml_escape(task_id)))
     if err or status != "202":
         return "start_task failed (status {}: {})".format(status, status_text if status_text else err)
     report_id = ""
@@ -488,15 +537,14 @@ def main(*args, **kwargs):
     if state == None:
         print("connection failed")
         return None
-    conn = state["conn"]
 
-    err = gmp_authenticate(conn, get_string(kwargs, "gmp_username"), get_string(kwargs, "gmp_password"))
+    err = gmp_authenticate(state, get_string(kwargs, "gmp_username"), get_string(kwargs, "gmp_password"))
     if err:
         print(err)
         gmp_close(state)
         return None
 
-    err = create_scan(conn, addresses, kwargs)
+    err = create_scan(state, addresses, kwargs)
     if err:
         print("greenbone-scan:", err)
 

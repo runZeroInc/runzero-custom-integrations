@@ -1,0 +1,72 @@
+{
+  "name": "scan-started",
+  "integration": "greenbone-scan",
+  "script": "greenbone-scan/greenbone-scan.star",
+  "description": "The full GMP leg, end to end against the harness's GMP TLS responder: authenticate, create_target answering 201 with the new target id, create_task answering 201, and start_task answering 202 with the report id. The create_target body assertion pins that the deduplicated export addresses reach Greenbone as the hosts CSV, and the final log line proves the script read the target, task, and report ids out of the right attributes and elements.",
+  "kwargs": {
+    "runzero_url": "$BASE",
+    "runzero_export_token": "ET1a2b3c4d5e6f708192a3b4c5d6e7f809",
+    "transport": "tls",
+    "gmp_host": "$GMP_HOST",
+    "gmp_port": "$GMP_PORT",
+    "gmp_username": "admin",
+    "gmp_password": "fixture-gmp-password",
+    "tls_disable_validation": "true"
+  },
+  "routes": [
+    {
+      "name": "runzero asset CSV export",
+      "match": {"method": "GET", "path": "/api/v1.0/export/org/assets.csv"},
+      "responses": [
+        {
+          "status": 200,
+          "headers": {"Content-Type": "text/csv; charset=utf-8"},
+          "text": "id,address\r\n1,10.42.0.11\r\n2,10.42.0.12\r\n3,10.42.0.11\r\n"
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "gmp": {
+    "routes": [
+      {
+        "name": "authenticate",
+        "match": {"command": "authenticate"},
+        "responses": [{"xml": "<authenticate_response status=\"200\" status_text=\"OK\"/>"}]
+      },
+      {
+        "name": "create-target",
+        "match": {"command": "create_target"},
+        "responses": [{"xml": "<create_target_response status=\"201\" status_text=\"OK, resource created\" id=\"11111111-0000-4000-8000-000000000001\"/>"}],
+        "when_exhausted": "error"
+      },
+      {
+        "name": "create-task",
+        "match": {"command": "create_task"},
+        "responses": [{"xml": "<create_task_response status=\"201\" status_text=\"OK, resource created\" id=\"22222222-0000-4000-8000-000000000002\"/>"}],
+        "when_exhausted": "error"
+      },
+      {
+        "name": "start-task",
+        "match": {"command": "start_task"},
+        "responses": [{"xml": "<start_task_response status=\"202\" status_text=\"OK, request submitted\"><report_id>33333333-0000-4000-8000-000000000003</report_id></start_task_response>"}],
+        "when_exhausted": "error"
+      }
+    ]
+  },
+  "expect": {
+    "asset_count": 0,
+    "request_count": 5,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1.0/export/org/assets.csv"},
+      {"method": "GMP", "path": "authenticate"},
+      {"method": "GMP", "path": "create_target", "body_contains": "10.42.0.11,10.42.0.12"},
+      {"method": "GMP", "path": "create_task", "body_contains": "11111111-0000-4000-8000-000000000001"},
+      {"method": "GMP", "path": "start_task", "body_contains": "22222222-0000-4000-8000-000000000002"}
+    ],
+    "log_contains": [
+      "greenbone-scan: 2 target address(es) selected",
+      "greenbone-scan: started task 22222222-0000-4000-8000-000000000002 (target 11111111-0000-4000-8000-000000000001, report 33333333-0000-4000-8000-000000000003)"
+    ]
+  }
+}

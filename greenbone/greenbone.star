@@ -215,7 +215,8 @@ CONFIG = {
 load("runzero.types", "ImportAsset", "Service", "ServiceProtocolData", "Software", "Vulnerability")
 load("net", "network_interface", "ip_address")
 load("xml", xml_parse="parse")
-load("time", "parse_time", "now", "parse_duration")
+load("time", "parse_ts", "now", "parse_duration")
+load("coerce", "as_float")
 load("kwargs", "require", "get_string", "get_int", "get_bool", "get_http_tls")
 load("runzero.ssh", ssh_dial="dial")
 load("socket", socket_tls="tls")
@@ -292,7 +293,9 @@ def clean_attrs(d):
 # -------------------------
 def gmp_connect(kwargs):
     """Open a socket-like connection to the GMP endpoint. Returns (state, err)
-    where state = {"conn": socket, "sess": ssh_session_or_None}."""
+    where state = {"conn": socket, "sess": ssh_session_or_None, "dead": bool,
+    "rbuf": leftover read bytes}. "dead" is set when the peer hangs up, which
+    gvmd really does instead of replying when it rejects a command."""
     transport = get_string(kwargs, "transport", default="ssh")
     timeout = 60
 
@@ -304,7 +307,7 @@ def gmp_connect(kwargs):
         conn = socket_tls(host, port, timeout=timeout, tls=tls_opts)
         if not conn:
             return None, "failed to open TLS connection to {}:{}".format(host, port)
-        return {"conn": conn, "sess": None}, None
+        return {"conn": conn, "sess": None, "dead": False, "rbuf": ""}, None
 
     # SSH transport: dial, then forward to the gvmd UNIX socket.
     require(kwargs, "ssh_host", "ssh_username")
@@ -335,7 +338,7 @@ def gmp_connect(kwargs):
         timeout=timeout,
     )
     conn = sess.open_unix(socket_path)
-    return {"conn": conn, "sess": sess}, None
+    return {"conn": conn, "sess": sess, "dead": False, "rbuf": ""}, None
 
 def gmp_close(state):
     if state == None:
@@ -345,30 +348,46 @@ def gmp_close(state):
     if state.get("sess"):
         state["sess"].close()
 
-def gmp_read_element(conn):
-    """Read exactly one top-level XML element from conn by tokenizing on '>'
-    and tracking tag depth. gvmd escapes '<'/'>' in text, so every '>' ends a
-    tag. Returns (element_text, err)."""
+def gmp_read_element(state):
+    """Read exactly one top-level XML element by tokenizing on '>' and tracking
+    tag depth. gvmd escapes '<'/'>' in text, so every '>' ends a tag. Returns
+    (element_text, err).
+
+    Reads go through recv, which returns EMPTY bytes at EOF instead of raising
+    (recv_until raises), so a gvmd hangup -- which is how gvmd rejects a
+    command -- becomes a printed error and marks the connection dead rather
+    than aborting the whole run. Leftover bytes past the element are kept in
+    state["rbuf"] for the next read."""
+    conn = state["conn"]
+    buf = state["rbuf"]
+    state["rbuf"] = ""
     parts = []
     total = 0
     depth = 0
     started = False
-    count = 0
     for _ in range(MAX_TAGS_PER_RESPONSE):
-        count += 1
-        tok = conn.recv_until(b">", max=MAX_TAG_BYTES, timeout=60)
-        s = str(tok)
-        if len(s) == 0:
-            return None, "connection closed before a complete response was read"
-        total += len(s)
-        if total > MAX_RESPONSE_BYTES:
-            return None, "GMP response exceeded {} bytes".format(MAX_RESPONSE_BYTES)
-        parts.append(s)
-        lt = s.rfind("<")
+        gt = buf.find(">")
+        if gt < 0:
+            if len(buf) > MAX_TAG_BYTES:
+                return None, "GMP tag exceeded {} bytes".format(MAX_TAG_BYTES)
+            chunk = conn.recv(max=65536, timeout=60)
+            s = str(chunk)
+            if len(s) == 0:
+                state["dead"] = True
+                return None, "connection closed before a complete response was read"
+            total += len(s)
+            if total > MAX_RESPONSE_BYTES:
+                return None, "GMP response exceeded {} bytes".format(MAX_RESPONSE_BYTES)
+            buf += s
+            continue
+        tok = buf[:gt + 1]
+        buf = buf[gt + 1:]
+        parts.append(tok)
+        lt = tok.rfind("<")
         if lt < 0:
             # A token with no tag start would be malformed; keep reading.
             continue
-        tag = s[lt:]
+        tag = tok[lt:]
         if tag.startswith("</"):
             depth -= 1
         elif tag.startswith("<?") or tag.startswith("<!"):
@@ -379,13 +398,16 @@ def gmp_read_element(conn):
             depth += 1
             started = True
         if started and depth <= 0:
+            state["rbuf"] = buf
             return "".join(parts), None
     return None, "GMP response exceeded tag limit"
 
-def gmp_command(conn, request_xml):
+def gmp_command(state, request_xml):
     """Send one GMP request and return (parsed_root, status, err)."""
-    conn.send(request_xml)
-    text, err = gmp_read_element(conn)
+    if state.get("dead"):
+        return None, "", "connection closed by the GMP endpoint"
+    state["conn"].send(request_xml)
+    text, err = gmp_read_element(state)
     if err:
         return None, "", err
     root = xml_parse(text)
@@ -393,10 +415,10 @@ def gmp_command(conn, request_xml):
         return None, "", "failed to parse GMP response XML"
     return root, root.get("status"), None
 
-def gmp_authenticate(conn, username, password):
+def gmp_authenticate(state, username, password):
     req = "<authenticate><credentials><username>{}</username><password>{}</password></credentials></authenticate>".format(
         xml_escape(username), xml_escape(password))
-    root, status, err = gmp_command(conn, req)
+    root, status, err = gmp_command(state, req)
     if err:
         return err
     if status != "200":
@@ -427,10 +449,12 @@ def parse_port(port_str):
     return None, proto
 
 def threat_to_rank(threat, severity):
-    """Map GMP threat/severity to runZero severity rank 0-4."""
+    """Map GMP threat/severity to runZero severity rank 0-4. as_float keeps a
+    non-numeric severity string from aborting the run: it reads as 0.0, the
+    same as no score."""
     sev = 0.0
     if severity:
-        sev = float(severity)
+        sev = as_float(severity, 0.0)
     # GMP overloads negative severities as markers rather than scores: -1.0 is
     # False Positive, -2.0 Debug, -3.0 Error (older OpenVAS used -99.0). runZero
     # validates severityScore against a 0.0 minimum and a failure there fails the
@@ -629,7 +653,9 @@ def merge_result(hs, result_el):
     cvss2 = None
     cvss3 = None
     if cvss_base:
-        score = float(cvss_base)
+        # gvmd emits non-numeric cvss_base values (e.g. "None"); as_float turns
+        # those into -1.0, which the range check below discards.
+        score = as_float(cvss_base, -1.0)
         if score >= 0.0 and score <= 10.0:
             if "v3" in sev_types or "v4" in sev_types:
                 cvss3 = score
@@ -741,10 +767,25 @@ def build_asset(hs, report_id, task_name, scan_end):
         vulnerabilities=vulns,
         customAttributes=clean_attrs(attrs),    )
 
+def flush_host(hs, report_id, task_name, scan_end, seen):
+    """Report one host unless its asset id was already emitted this run.
+    Returns True when the asset was reported. The id here must mirror
+    build_asset's choice exactly."""
+    aid = trunc(hs["asset_id"] if hs["asset_id"] else "greenbone:{}".format(hs["ip"]), 256)
+    if aid in seen:
+        return False
+    seen[aid] = True
+    report_assets(build_asset(hs, report_id, task_name, scan_end))
+    return True
+
 # -------------------------
 # Report import (paged, streaming)
 # -------------------------
-def import_report(conn, report_id, task_name, scan_end, kwargs):
+def import_report(state, report_id, task_name, scan_end, kwargs, seen):
+    """Import one report, streaming per host. `seen` is the run-level set of
+    asset ids already reported: a host that appears in the latest reports of
+    two overlapping tasks is imported once per run, not once per report, so
+    the same foreign id is never emitted twice in one task run."""
     levels = get_string(kwargs, "severity_levels", default="hmlg")
     min_qod = get_int(kwargs, "min_qod", default=70)
     page_size = get_int(kwargs, "page_size", default=100)
@@ -754,6 +795,7 @@ def import_report(conn, report_id, task_name, scan_end, kwargs):
     order = []        # ip order across pages (for stable flushing)
     first = 1
     total_assets = 0
+    duplicates = 0
     prev_sig = None   # guards against a server that ignores pagination
 
     for _page in range(1000000):
@@ -763,7 +805,7 @@ def import_report(conn, report_id, task_name, scan_end, kwargs):
             filt = extra_filter + " " + filt
         req = "<get_reports report_id=\"{}\" details=\"1\" lean=\"1\" filter=\"{}\"/>".format(
             xml_escape(report_id), xml_escape(filt))
-        root, status, err = gmp_command(conn, req)
+        root, status, err = gmp_command(state, req)
         if err:
             print("get_reports failed for {}: {}".format(report_id, err))
             break
@@ -830,8 +872,10 @@ def import_report(conn, report_id, task_name, scan_end, kwargs):
             if ip == keep:
                 continue
             if ip in pending:
-                report_assets(build_asset(pending[ip], report_id, task_name, scan_end))
-                total_assets += 1
+                if flush_host(pending[ip], report_id, task_name, scan_end, seen):
+                    total_assets += 1
+                else:
+                    duplicates += 1
                 flushed.append(ip)
                 pending.pop(ip)
         new_order = []
@@ -849,8 +893,13 @@ def import_report(conn, report_id, task_name, scan_end, kwargs):
     # Flush any remainder.
     for ip in order:
         if ip in pending:
-            report_assets(build_asset(pending[ip], report_id, task_name, scan_end))
-            total_assets += 1
+            if flush_host(pending[ip], report_id, task_name, scan_end, seen):
+                total_assets += 1
+            else:
+                duplicates += 1
+    if duplicates:
+        print("greenbone: report {} skipped {} host(s) already imported by an earlier report this run".format(
+            report_id[:8], duplicates))
     return total_assets
 
 # -------------------------
@@ -870,9 +919,8 @@ def main(*args, **kwargs):
     if state == None:
         print("connection failed")
         return None
-    conn = state["conn"]
 
-    err = gmp_authenticate(conn, gmp_username, gmp_password)
+    err = gmp_authenticate(state, gmp_username, gmp_password)
     if err:
         print(err)
         gmp_close(state)
@@ -882,7 +930,7 @@ def main(*args, **kwargs):
     task_filt = "rows=-1"
     if task_filter:
         task_filt = task_filter + " rows=-1"
-    root, status, err = gmp_command(conn, "<get_tasks filter=\"{}\"/>".format(xml_escape(task_filt)))
+    root, status, err = gmp_command(state, "<get_tasks filter=\"{}\"/>".format(xml_escape(task_filt)))
     if err or status != "200":
         print("greenbone: get_tasks failed: {}".format(err if err else "status {}".format(status)))
         gmp_close(state)
@@ -897,6 +945,9 @@ def main(*args, **kwargs):
 
     total = 0
     imported_reports = 0
+    # Run-level set of reported asset ids: a host in two overlapping tasks'
+    # latest reports is imported once, not once per report.
+    seen = {}
     # Age-filtered tasks are counted rather than announced one by one; on a
     # long-lived install most tasks are older than the window and the list of
     # them says nothing the count does not.
@@ -917,7 +968,11 @@ def main(*args, **kwargs):
             continue
 
         if cutoff != None and scan_end:
-            ended = parse_time(scan_end)
+            # parse_ts, not parse_time: a scan_end in a shape parse_time does
+            # not recognize would raise and abort the run; parse_ts returns
+            # None instead, and an unparseable scan_end simply skips the age
+            # filter for that task.
+            ended = parse_ts(scan_end)
             if ended != None and ended.unix < cutoff.unix:
                 stale += 1
                 if stale == 1:
@@ -925,9 +980,12 @@ def main(*args, **kwargs):
                 continue
 
         print("greenbone: importing task '{}' report {} (scan_end {})".format(task_name, report_id[:8], scan_end))
-        n = import_report(conn, report_id, task_name, scan_end, kwargs)
+        n = import_report(state, report_id, task_name, scan_end, kwargs, seen)
         total += n
         imported_reports += 1
+        if state.get("dead"):
+            print("greenbone: the GMP endpoint hung up; stopping after {} report(s)".format(imported_reports))
+            break
 
     gmp_close(state)
     if stale > 0:

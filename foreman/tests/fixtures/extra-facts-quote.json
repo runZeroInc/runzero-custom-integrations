@@ -1,0 +1,83 @@
+{
+  "name": "extra-facts-quote",
+  "integration": "foreman",
+  "description": "A user-supplied extra_facts value containing a double quote used to be interpolated raw into the scoped-search string, producing a malformed search that Foreman answers with 400 -- and every host then imported without facts. The bad name must be dropped with a log line while the well-formed names still reach the fact_values search. requests_include proves the clean extra fact went out in the search; requests_absent proves the quoted name never reached the wire; the asset still carries the fact enrichment that a malformed search would have destroyed.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-token",
+    "include_facts": "true",
+    "include_interfaces": "false",
+    "include_packages": "false",
+    "extra_facts": "ansible_processor_count,bad\"name"
+  },
+  "routes": [
+    {
+      "name": "fact values",
+      "match": {"method": "GET", "path": "/api/v2/fact_values"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 2,
+            "subtotal": 2,
+            "page": 1,
+            "per_page": 1000,
+            "results": {
+              "quoted01.corp.example.net": {
+                "os::name": "RedHat",
+                "os::release::full": "9.4",
+                "networking::fqdn": "quoted01.corp.example.net",
+                "ansible_processor_count": "8"
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "hosts",
+      "match": {"method": "GET", "path": "/api/v2/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 1,
+            "subtotal": 1,
+            "page": 1,
+            "per_page": 100,
+            "results": [
+              {
+                "id": 31,
+                "name": "quoted01.corp.example.net",
+                "certname": "quoted01.corp.example.net",
+                "ip": "10.210.0.31",
+                "mac": "aa:bb:cc:00:00:31",
+                "operatingsystem_name": "RedHat 9.4",
+                "created_at": "2025-02-01T10:00:00.000Z",
+                "last_report": "2026-08-14T06:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["foreman:$HOST:31"],
+    "requests_include": [
+      {"method": "GET", "path": "/api/v2/fact_values", "query_contains": "ansible_processor_count"}
+    ],
+    "requests_absent": [
+      {"query_contains": "bad%22name"},
+      {"query_contains": "bad\"name"}
+    ],
+    "log_contains": [
+      "foreman: ignoring extra fact name containing a double quote"
+    ]
+  }
+}
