@@ -64,12 +64,12 @@ CONFIG = {
 }
 
 load("runzero.types", "ImportAsset", "Software", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", http_get="get", "url_parse")
 load("kwargs", "require", "get_url_base", "get_http_options", "get_string", "get_bool", "get_int")
 load("jsonstream", "iter_array")
 load("time", "now", "parse_time", "from_timestamp", "sleep")
-load("re", re_match="match", re_search="search", re_find_all="find_all")
+load("re", re_match="match", re_search="search")
 
 load('coerce', 'as_dict')
 VENDOR = "tacticalrmm"
@@ -121,7 +121,6 @@ PLATFORM_NAMES = {
     "darwin": "macOS",
 }
 
-
 def _text(value):
     """Return a value as a string, with bytes decoded, or "" for anything else."""
     if type(value) == "string":
@@ -129,7 +128,6 @@ def _text(value):
     if type(value) == "bytes":
         return str(value)
     return ""
-
 
 def _clean(value):
     """Return a trimmed string for a scalar, or "" when the value carries nothing.
@@ -143,7 +141,6 @@ def _clean(value):
         return str(value)
     return ""
 
-
 def _real(value):
     """Return a cleaned string, or "" when the agent sent one of its sentinels."""
     text = _clean(value)
@@ -152,7 +149,6 @@ def _real(value):
     if text.lower() in SENTINELS:
         return ""
     return text
-
 
 def _real_list(value):
     """Return a list of real strings from a field the API types as a list.
@@ -193,7 +189,6 @@ def _local_ips(value):
             addresses.append(canonical)
     return addresses
 
-
 def _hostname(record):
     """Return the agent hostname, or "" when it is a placeholder.
 
@@ -209,7 +204,6 @@ def _hostname(record):
     if ip_address(text) != None:
         return ""
     return text
-
 
 def _os(record):
     """Split operating_system into an OS name and a version.
@@ -257,7 +251,6 @@ def _os(record):
             return " ".join(parts[:index]), parts[index]
     return raw, ""
 
-
 def _timestamp(value, ceiling):
     """Return a parsed timestamp clamped to now, or None.
 
@@ -273,7 +266,6 @@ def _timestamp(value, ceiling):
         return ceiling
     return parsed
 
-
 def _boot_time(value, ceiling):
     """Return boot_time -- a float of epoch SECONDS -- as a clamped time, or None."""
     if type(value) != "int" and type(value) != "float":
@@ -285,7 +277,6 @@ def _boot_time(value, ceiling):
     if parsed.unix > ceiling.unix:
         return ceiling
     return parsed
-
 
 def _software(payload, agent_id):
     """Return the Software records for one agent.
@@ -326,7 +317,6 @@ def _software(payload, agent_id):
         ))
     return records
 
-
 def _attrs(record, os_raw, addresses):
     """Return the custom attributes for one agent."""
     checks = as_dict(record.get("checks"))
@@ -359,7 +349,6 @@ def _attrs(record, os_raw, addresses):
         "last_seen": _clean(record.get("last_seen")),
     }
     return to_custom_attributes(raw, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
-
 
 def build_asset(record, namespace, ceiling, software):
     """Convert one agent row into an ImportAsset, or None when it has no identity."""
@@ -420,7 +409,6 @@ def build_asset(record, namespace, ceiling, software):
 
     return asset
 
-
 def fetch_software(ctx, agent_id):
     """Return the Software records for one agent, or [] on any failure.
 
@@ -433,7 +421,6 @@ def fetch_software(ctx, agent_id):
         print("{}: software request for agent {} failed: {}".format(VENDOR, agent_id, err))
         return []
     return _software(payload, agent_id)
-
 
 def stream_agents(ctx):
     """Return an iterator over the agent rows, and an error string.
@@ -480,7 +467,6 @@ def stream_agents(ctx):
         # here rather than by the iterator.
         return None, "response was not a JSON array: {}".format(_text(body[:200]))
     return iter_array(body), None
-
 
 def main(*args, **kwargs):
     require(kwargs, "url", "api_key")
@@ -544,7 +530,6 @@ def main(*args, **kwargs):
             continue
         seen[asset.id] = True
         reported += report_asset(asset)
-
 
     if software_skipped:
         print("{}: software limit of {} reached, {} agents imported without software".format(

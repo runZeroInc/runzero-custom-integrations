@@ -72,10 +72,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', http_get='get', 'url_parse', 'url_encode')
-load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'from_timestamp', 'now', 'parse_ts', 'sleep')
+load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_bool')
+load('time', 'parse_ts', 'sleep')
 load('re', re_match='match', re_search='search')
 load('jsonstream', 'iter_array')
 
@@ -177,7 +177,6 @@ def _clean_mac(value):
         return ""
     return mac
 
-
 def _hostname_like(value):
     """Report whether a string is usable as a hostname.
 
@@ -191,13 +190,11 @@ def _hostname_like(value):
         return False
     return re_match(HOSTNAME_RE, text) != None
 
-
 def api_url(ctx, path):
     """Build an absolute API URL. The site name is a mandatory path segment on
     every Checkmk endpoint, which is the single most common first-attempt
     failure against this API."""
     return "{}/{}{}{}".format(ctx["base_url"], ctx["site"], API_PATH, path)
-
 
 def stream_values(ctx, url, label):
     """Stream the entries of a Checkmk collection response without decoding the
@@ -234,7 +231,6 @@ def stream_values(ctx, url, label):
         # caught here rather than by the iterator.
         return None, "{} response carried no value array: {}".format(label, text[:200])
     return iter_array(body, path="value"), None
-
 
 def fetch_config(ctx):
     """Index every configured host's WATO attributes in one request.
@@ -280,7 +276,6 @@ def fetch_config(ctx):
     print("checkmk: read configuration for {} hosts".format(len(index)))
     return index
 
-
 def status_url(ctx):
     """Build the monitoring query URL.
 
@@ -298,7 +293,6 @@ def status_url(ctx):
         parts.append(url_encode({"query": ctx["query"]}))
     return api_url(ctx, HOST_STATUS_PATH) + "?" + "&".join(parts)
 
-
 def _branch(node, capital, lower):
     """Read one of an inventory node's three reserved keys under either casing.
 
@@ -314,7 +308,6 @@ def _branch(node, capital, lower):
     if type(value) == "dict":
         return value
     return {}
-
 
 def inv_node(tree, path):
     """Resolve a dotted inventory path to its node.
@@ -333,12 +326,10 @@ def inv_node(tree, path):
         node = as_dict(children[part])
     return node
 
-
 def inv_pairs(tree, path):
     """Return the scalar attributes at an inventory path."""
     node = inv_node(tree, path)
     return _branch(_branch(node, "Attributes", "attributes"), "Pairs", "pairs")
-
 
 def inv_rows(tree, path):
     """Return the table rows at an inventory path."""
@@ -347,7 +338,6 @@ def inv_rows(tree, path):
     if type(rows) != "list":
         rows = table.get("rows")
     return dicts(rows)
-
 
 def inventory_interfaces(tree):
     """Build interface entries from the inventory tree.
@@ -396,7 +386,6 @@ def inventory_interfaces(tree):
         if routable not in entry["ips"]:
             entry["ips"].append(routable)
     return entries
-
 
 def build_interfaces(entries, host_ips):
     """Reduce the inventory's per-device entries to runZero network interfaces.
@@ -447,7 +436,6 @@ def build_interfaces(entries, host_ips):
             netifs.append(nic)
     return netifs
 
-
 def build_software(ctx, hostname, address, tree):
     """Convert the inventory's package table into Software records.
 
@@ -491,7 +479,6 @@ def build_software(ctx, hostname, address, tree):
         if len(software) >= MAX_CHILDREN:
             break
     return software
-
 
 def build_asset(ctx, hostname, attributes, status, tree):
     """Convert one Checkmk host into a runZero asset."""
@@ -660,7 +647,6 @@ def build_asset(ctx, hostname, attributes, status, tree):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def collect(ctx, config_index):
     """Stream the monitoring query, building and reporting hosts one at a time.
 
@@ -729,7 +715,6 @@ def collect(ctx, config_index):
         print("checkmk: {} hosts have no HW/SW inventory yet".format(ctx["inventory_missing"]))
     print("checkmk: reported {} hosts".format(reported))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

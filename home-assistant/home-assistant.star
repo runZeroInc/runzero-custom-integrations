@@ -78,11 +78,11 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', http_get='get', http_post='post', 'get_json', 'bearer', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('json', json_encode='encode', json_decode='decode')
-load('time', 'parse_time', 'now', 'parse_ts')
+load('time', 'now', 'parse_ts')
 load('re', re_match='match', re_search='search')
 load('jsonstream', 'iter_array')
 
@@ -170,7 +170,6 @@ def _clean_mac(value):
         return ""
     return mac
 
-
 def _hostname_like(value):
     """Report whether a string is usable as a hostname.
 
@@ -185,13 +184,11 @@ def _hostname_like(value):
         return False
     return re_match(HOSTNAME_RE, text) != None
 
-
 def _domain_of(entity_id):
     """Return the domain half of an entity id."""
     text = as_text(entity_id, join=",")
     dot = text.find(".")
     return text[:dot] if dot > 0 else ""
-
 
 def stream_states(ctx):
     """Stream /api/states, returning (iterator, err).
@@ -212,7 +209,6 @@ def stream_states(ctx):
     if not re_search(ARRAY_RE, as_text(resp.body, join=",")[:64]):
         return None, "the states response was not a JSON array"
     return iter_array(resp.body), None
-
 
 def index_entities(ctx):
     """Index the entities that carry an address, keyed by entity id.
@@ -286,7 +282,6 @@ def index_entities(ctx):
         total, len(index), trackers))
     return index, None
 
-
 def fetch_config_entries(ctx):
     """Index config entries by id, for integration provenance.
 
@@ -308,7 +303,6 @@ def fetch_config_entries(ctx):
         if entry_id:
             index[entry_id] = record
     return index
-
 
 def device_template(start, end):
     """Build the Jinja template that dumps one page of the device registry.
@@ -363,7 +357,6 @@ def device_template(start, end):
         "{{ ns.rows | to_json }}",
     ])
 
-
 def fetch_device_page(ctx, start, end):
     """Render one page of the device registry, returning (rows, err).
 
@@ -389,7 +382,6 @@ def fetch_device_page(ctx, start, end):
     if not re_search(ARRAY_RE, text[:64]):
         return None, "the rendered template was not a JSON array: " + text[:200]
     return as_list(json_decode(text)), None
-
 
 def device_addresses(ctx, record, entity_index):
     """Collect every MAC and IP that belongs to one device registry entry.
@@ -445,7 +437,6 @@ def device_addresses(ctx, record, entity_index):
         if found.get("hostname"):
             hostnames.append(found["hostname"])
     return macs, ips, hostnames, entities, other_connections
-
 
 def build_device_asset(ctx, record, entity_index, config_entries):
     """Convert one device registry entry into a runZero asset."""
@@ -535,7 +526,6 @@ def build_device_asset(ctx, record, entity_index, config_entries):
     params["customAttributes"] = to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     return ImportAsset(**params)
 
-
 def build_tracker_asset(ctx, found):
     """Convert one device_tracker entity into a runZero asset.
 
@@ -603,7 +593,6 @@ def build_tracker_asset(ctx, found):
     if last_seen != None:
         asset.lastSeenTS = last_seen
     return asset
-
 
 def collect_devices(ctx, entity_index, config_entries):
     """Page through the device registry, streaming each page as it is built.
@@ -683,7 +672,6 @@ def collect_devices(ctx, entity_index, config_entries):
         print("home-assistant: skipped {} device rows repeated across registry pages (registry changed mid-run)".format(skipped_repeated))
     return reported, claimed, True
 
-
 def collect_trackers(ctx, entity_index, claimed):
     """Emit an asset for each addressed device_tracker not already claimed."""
     reported = 0
@@ -713,7 +701,6 @@ def collect_trackers(ctx, entity_index, claimed):
     print("home-assistant: imported {} device trackers; {} already covered by a registry device, {} not on the network".format(
         reported, skipped_claimed, skipped_away))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

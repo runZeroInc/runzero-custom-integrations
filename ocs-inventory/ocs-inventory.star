@@ -65,10 +65,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'now', 'parse_ts')
 
 load('coerce', 'dicts')
 VENDOR = "ocs-inventory"
@@ -186,7 +186,6 @@ VIRTUAL_HINTS = [
     "bhyve", "apple virtualization", "utm",
 ]
 
-
 def _text(value):
     """Flatten a scalar or list into a plain string. Every OCS section is a SQL
     row rendered by DBI, which returns integer columns as JSON strings on some
@@ -197,7 +196,6 @@ def _text(value):
     if type(value) == "list":
         return ",".join([_text(item) for item in value if item != None])
     return str(value)
-
 
 def _to_int(value):
     """Convert an int or an all-digit string to an int, or -1 when it is not
@@ -211,7 +209,6 @@ def _to_int(value):
         if text[index] not in DIGITS:
             return -1
     return int(text)
-
 
 def _truthy(value):
     """Read an OCS boolean column. The schema declares these as tinyint but the
@@ -262,7 +259,6 @@ def _first(value):
         return {}
     return rows[0]
 
-
 def _values(rows, field):
     """Collect the distinct non-empty values of one column across a section."""
     found = []
@@ -271,7 +267,6 @@ def _values(rows, field):
         if text and text not in found and len(found) < MAX_LIST_VALUES:
             found.append(text)
     return found
-
 
 def _sum_int(rows, field):
     """Total one numeric column across a section, ignoring rows whose value is
@@ -302,7 +297,6 @@ def _split_addresses(value):
             addresses.append(routable)
     return addresses
 
-
 def _is_virtual_adapter(description, adapter_type):
     """Decide whether an adapter is a software device rather than real hardware.
     The Unix agent puts the interface name in DESCRIPTION and the Windows agent
@@ -318,7 +312,6 @@ def _is_virtual_adapter(description, adapter_type):
             if hint in lowered:
                 return True
     return False
-
 
 def build_software(ctx, computer_id, entries):
     """Convert the software installations OCS records against one computer into
@@ -359,7 +352,6 @@ def build_software(ctx, computer_id, entries):
         }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
         software.append(Software(**params))
     return software
-
 
 def collect_adapters(rows):
     """Sort the networks section into the adapters worth importing and the
@@ -405,7 +397,6 @@ def collect_adapters(rows):
         })
     return adapters, skipped
 
-
 def build_interfaces(adapters, fallback_ips):
     """Build one runZero network interface per physical OCS adapter, so a
     multi-homed host keeps its per-NIC addressing. When no adapter survived the
@@ -423,7 +414,6 @@ def build_interfaces(adapters, fallback_ips):
         interfaces.append(nic)
     return interfaces
 
-
 def build_device_type(chassis, manufacturer, model):
     """Map the SMBIOS chassis type OCS records in bios.TYPE onto a runZero device
     type, falling back to the system manufacturer and model when the chassis is
@@ -440,7 +430,6 @@ def build_device_type(chassis, manufacturer, model):
         if hint in identity:
             return "Virtual Machine"
     return ""
-
 
 def build_asset(ctx, computer_id, record):
     """Convert one OCS computer, with every inventory section the API returned
@@ -615,7 +604,6 @@ def build_asset(ctx, computer_id, record):
         asset.lastSeenTS = last_ts
     return asset
 
-
 def fetch_software(ctx, computer_id):
     """Fetch the software installed on one computer. The bulk listing carries the
     software rows with their name, publisher, and version left as foreign keys
@@ -640,7 +628,6 @@ def fetch_software(ctx, computer_id):
         # key when no section was named in the path.
         rows = record.get("", [])
     return rows
-
 
 def build_assets(ctx, page):
     """Convert one page of OCS computers into runZero assets, enriching them with
@@ -687,7 +674,6 @@ def build_assets(ctx, page):
         assets.append(build_asset(ctx, computer_id, record))
     return assets
 
-
 def fetch_and_report_computers(ctx):
     """Fetch and stream OCS computers one page at a time so the full inventory is
     never held in memory at once. Every inventory section for a page arrives with
@@ -730,7 +716,6 @@ def fetch_and_report_computers(ctx):
 
     print("ocs-inventory: reported {} computers".format(reported))
     return reported
-
 
 def main(**kwargs):
     # get_url_base would drop the path, and OCS is very often installed behind a

@@ -91,12 +91,11 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'get_json', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool', 'get_list')
 load('json', json_encode='encode')
-load('time', 'now', 'parse_time', 'parse_ts')
-load('re', re_match='match')
+load('time', 'now', 'parse_ts')
 
 load('coerce', 'as_dict', 'dedupe', 'dicts')
 VENDOR = "puppetdb"
@@ -220,7 +219,6 @@ CHASSIS_TYPES = {
 # Values of the Facter virtual fact that mean the node is running on bare metal.
 PHYSICAL_VIRTUAL = ["physical", "", "none"]
 
-
 def _text(value):
     """Flatten a fact value into a plain string. Fact values are real JSON, so a
     structured fact arrives as a nested hash and is kept as compact JSON rather
@@ -269,7 +267,6 @@ def _path(root, path):
         node = node.get(key)
     return node
 
-
 def _fact_text(facts, paths):
     """Return the first non-empty value among the named fact paths, as text.
 
@@ -298,7 +295,6 @@ def _seen_ts(ctx, value):
         return ctx["now"]
     return parsed
 
-
 def _latest_ts(ctx, values):
     """Return the most recent of a set of timestamps, already clamped."""
     latest = None
@@ -318,7 +314,6 @@ def _clean_mac(value):
         return ""
     return mac
 
-
 def _and(left, right):
     """Combine two optional AST query clauses."""
     if left == None:
@@ -326,7 +321,6 @@ def _and(left, right):
     if right == None:
         return left
     return ["and", left, right]
-
 
 def build_software(ctx, certname, address, packages):
     """Convert the packages Puppet Enterprise records against one node into
@@ -364,7 +358,6 @@ def build_software(ctx, certname, address, packages):
         software.append(Software(**params))
     return software
 
-
 def collect_interfaces(networking):
     """Group everything Facter knows about each of a node's interfaces into one
     entry per device name.
@@ -395,7 +388,6 @@ def collect_interfaces(networking):
             continue
         ifaces[name] = {"identifier": name, "mac": mac, "ips": ips}
     return ifaces
-
 
 def merge_interfaces(ifaces, node_mac, node_ips):
     """Reduce the per-device entries to the set that becomes network interfaces.
@@ -445,7 +437,6 @@ def merge_interfaces(ifaces, node_mac, node_ips):
         merged.append({"identifiers": ["primary"], "mac": mac, "ips": remaining})
     return merged
 
-
 def build_interfaces(merged):
     """Build one runZero network interface per Facter interface, so a multi-homed
     node keeps its per-NIC addressing instead of being collapsed onto a single
@@ -456,7 +447,6 @@ def build_interfaces(merged):
         if nic:
             netifs.append(nic)
     return netifs
-
 
 def build_asset(ctx, record, facts, packages):
     """Convert one PuppetDB node record and its facts into a runZero asset."""
@@ -637,7 +627,6 @@ def build_asset(ctx, record, facts, packages):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def query_pdb(ctx, path, query, order_by, limit, offset):
     """Fetch one page of a PuppetDB query endpoint, returning (rows, err).
 
@@ -660,7 +649,6 @@ def query_pdb(ctx, path, query, order_by, limit, offset):
         return None, "expected a JSON array from {}".format(path)
     return data, None
 
-
 def state_query(state):
     """Build the node-state predicate for a pass.
 
@@ -670,7 +658,6 @@ def state_query(state):
     if state == STATE_INACTIVE:
         return ["=", "node_state", STATE_INACTIVE]
     return None
-
 
 def fetch_facts(ctx, state, facts):
     """Index the mapped facts for every node in one paged walk over the facts
@@ -732,7 +719,6 @@ def fetch_facts(ctx, state, facts):
     print("puppetdb: indexed {} {} fact rows for {} nodes".format(rows, state, len(facts)))
     return facts
 
-
 def fetch_packages(ctx, certnames):
     """Fetch the installed packages for one page of nodes.
 
@@ -790,7 +776,6 @@ def fetch_packages(ctx, certnames):
                 break
     return packages
 
-
 def build_assets(ctx, records, facts):
     """Convert a page of PuppetDB node records into runZero assets, enriching
     each with its facts and, when enabled, its package inventory."""
@@ -815,7 +800,6 @@ def build_assets(ctx, records, facts):
             continue
         assets.append(build_asset(ctx, record, facts.get(certname, {}), packages.get(certname, [])))
     return assets
-
 
 def fetch_and_report_nodes(ctx, state, facts):
     """Fetch and stream nodes one page at a time so the full inventory is never
@@ -845,7 +829,6 @@ def fetch_and_report_nodes(ctx, state, facts):
 
     print("puppetdb: reported {} {} nodes".format(reported, state))
     return reported
-
 
 def main(**kwargs):
     base_url = _base_url(kwargs)

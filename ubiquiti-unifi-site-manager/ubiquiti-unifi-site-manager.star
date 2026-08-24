@@ -97,7 +97,7 @@ CONFIG = {
 }
 
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "url_encode", "url_parse")
 load("kwargs", "require", "get_http_options", "get_string", "get_bool", "get_int")
 load("time", "parse_ts")
@@ -142,7 +142,6 @@ PRODUCT_LINE_TYPES = {
     "protect": "IP Camera",
 }
 
-
 def _clean(value):
     """Return a trimmed string for a scalar, or "" for anything else."""
     if type(value) == "string":
@@ -157,7 +156,6 @@ def _add_ips(found, values):
         if canonical and canonical not in found:
             found.append(canonical)
     return found
-
 
 def _hostname(value):
     """Return a usable hostname, or "".
@@ -176,7 +174,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _timestamp(value):
     """Return a parsed timestamp clamped to now, or None.
 
@@ -192,7 +189,6 @@ def _timestamp(value):
         return None
     return parse_ts(text)
 
-
 def _device_type(shortname, product_line):
     """Return a runZero device type for the families that name one unambiguously."""
     upper = shortname.upper()
@@ -200,7 +196,6 @@ def _device_type(shortname, product_line):
         if upper.startswith(prefix):
             return device_type
     return PRODUCT_LINE_TYPES.get(product_line.lower(), "")
-
 
 def fetch_page(ctx, path, cursor, label):
     """Fetch one page of a Site Manager collection.
@@ -235,7 +230,6 @@ def fetch_page(ctx, path, cursor, label):
         return None, ""
 
     return data, _clean(payload.get("nextToken"))
-
 
 def index_hosts(ctx):
     """Return every console keyed by its host id.
@@ -304,7 +298,6 @@ def index_hosts(ctx):
             break
     return hosts
 
-
 def index_sites(ctx):
     """Return the site records for each console, keyed by host id."""
     sites = {}
@@ -343,7 +336,6 @@ def index_sites(ctx):
             break
     return sites
 
-
 def _device_attrs(device, host, site, host_id, host_name, updated_at):
     """Return the custom attributes for one device."""
     raw = {
@@ -376,7 +368,6 @@ def _device_attrs(device, host, site, host_id, host_name, updated_at):
         raw["console_cloud_address"] = host.get("cloud_address", "")
         raw["console_registration_time"] = host.get("registration_time", "")
     return to_custom_attributes(raw, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
-
 
 def build_device(ctx, device, host_id, host_name, updated_at):
     """Convert one device row into an ImportAsset, or None when it has no id."""
@@ -443,7 +434,6 @@ def build_device(ctx, device, host_id, host_name, updated_at):
 
     return asset
 
-
 def build_devices(ctx, groups):
     """Convert one page of host-grouped device rows into ImportAssets."""
     assets = []
@@ -464,7 +454,6 @@ def build_devices(ctx, groups):
             if asset != None:
                 assets.append(asset)
     return assets
-
 
 def build_orphan_hosts(ctx):
     """Return assets for consoles the device list never mentioned.
@@ -556,7 +545,6 @@ def build_orphan_hosts(ctx):
 
         assets.append(asset)
     return assets
-
 
 def main(*args, **kwargs):
     require(kwargs, "api_key")

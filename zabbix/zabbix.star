@@ -86,7 +86,7 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "Service", "Software", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", http_post="post", "post_json", "bearer", "url_parse")
 load("json", json_decode="decode")
 load("jsonstream", "iter_array")
@@ -184,7 +184,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _to_port(value):
     """Zabbix returns every scalar as a string, including the interface port,
     and a port may also be a {$MACRO} reference that cannot be resolved here."""
@@ -199,7 +198,6 @@ def _to_port(value):
         return -1
     return port
 
-
 def _inventory(record):
     """Return a host's inventory as a dict.
 
@@ -213,7 +211,6 @@ def _inventory(record):
     if type(inventory) == "dict":
         return inventory
     return {}
-
 
 def _endpoint(url):
     """Return the JSON-RPC endpoint for a configured frontend URL.
@@ -232,13 +229,11 @@ def _endpoint(url):
         return text
     return text + API_PATH
 
-
 def _scope(url):
     parsed = url_parse(url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return as_text(url, join=",").split("://")[-1].split("/")[0].split(":")[0]
-
 
 def _rpc_error(payload):
     """Render a JSON-RPC error object as one readable line."""
@@ -249,7 +244,6 @@ def _rpc_error(payload):
         return ""
     return "{} {} {}".format(
         as_text(error.get("code"), join=","), as_text(error.get("message"), join=","), as_text(error.get("data"), join=",")).strip()
-
 
 def call(ctx, method, params, authenticated):
     """Make one JSON-RPC call and return its result, or None on failure.
@@ -277,7 +271,6 @@ def call(ctx, method, params, authenticated):
         return None
     return data.get("result")
 
-
 def check_version(ctx):
     """Read apiinfo.version, which must be called WITHOUT credentials.
 
@@ -299,7 +292,6 @@ def check_version(ctx):
                   "so every call is about to fail. Upgrade Zabbix, or add the legacy user.login handshake.")
     print("zabbix: server API version {}".format(text))
     return text
-
 
 def fetch_group_ids(ctx, wanted):
     """Enumerate host group ids, optionally filtered to named groups.
@@ -329,7 +321,6 @@ def fetch_group_ids(ctx, wanted):
             print("zabbix: these host groups were not found and are being skipped: {}".format(",".join(missing)))
     return groups
 
-
 def host_get_params(ctx, groupids):
     """Build the one host.get call this integration makes per group chunk."""
     params = {
@@ -349,7 +340,6 @@ def host_get_params(ctx, groupids):
     if not ctx["include_disabled"]:
         params["filter"] = {"status": "0"}
     return params
-
 
 def stream_hosts(ctx, groupids):
     """POST one host.get and yield its hosts without decoding the whole result.
@@ -398,7 +388,6 @@ def stream_hosts(ctx, groupids):
         return []
     return iter_array(text, path="result")
 
-
 def build_interfaces(record, inventory):
     """Return (netifs, services_source, addresses, dns_names) for one host.
 
@@ -436,7 +425,6 @@ def build_interfaces(record, inventory):
         if secondary:
             netifs.append(secondary)
     return netifs, endpoints, addresses, dns_names
-
 
 def build_services(ctx, hostid, endpoints):
     """Turn each Zabbix interface into the service it polls.
@@ -480,7 +468,6 @@ def build_services(ctx, hostid, endpoints):
         services.append(Service(**params))
     return services
 
-
 def build_software(ctx, hostid, address, inventory):
     """Emit the inventory software fields as Software records.
 
@@ -503,7 +490,6 @@ def build_software(ctx, hostid, address, inventory):
             }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
         }))
     return software
-
 
 def build_asset(ctx, record):
     """Convert one Zabbix host into a runZero asset."""
@@ -615,7 +601,6 @@ def build_asset(ctx, record):
     # the entire asset record, not just the field. They are kept as attributes.
     return ImportAsset(**params)
 
-
 def collect(ctx, groupids):
     """Stream one host.get chunk and report the assets it produces."""
     seen = 0
@@ -646,7 +631,6 @@ def collect(ctx, groupids):
         ctx["reported"] += 1
         seen += 1
     return seen
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url")

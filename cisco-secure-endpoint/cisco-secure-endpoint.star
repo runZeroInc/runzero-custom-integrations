@@ -92,10 +92,10 @@ CONFIG = {
 }
 
 load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match', re_sub='sub')
 
 load('coerce', 'dicts')
@@ -142,7 +142,6 @@ SERVER_OS_NAMES = [
     "amazon linux", "oracle linux", "suse linux enterprise server", "sles",
 ]
 
-
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     return str(value or "").strip()
@@ -176,14 +175,12 @@ def _score_rank(score):
         return 3
     return 4
 
-
 def _scope(base_url):
     """Return the regional API hostname used to namespace asset ids."""
     parsed = url_parse(base_url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url
-
 
 def split_os(operating_system, os_version):
     """Split the reported OS strings into a product name and a version.
@@ -202,7 +199,6 @@ def split_os(operating_system, os_version):
     if version and name.endswith(" " + version):
         name = name[:len(name) - len(version)].strip()
     return name, version
-
 
 def _device_type(os_name):
     """Return a runZero device type for one computer record, or "".
@@ -229,7 +225,6 @@ def _device_type(os_name):
         if name in text:
             return "Server"
     return ""
-
 
 def build_vulnerabilities(scope, connector_guid, records):
     """Convert the vulnerable applications observed on one computer into runZero
@@ -296,7 +291,6 @@ def build_vulnerabilities(scope, connector_guid, records):
             vulns.append(Vulnerability(**params))
     return vulns
 
-
 def build_network_interfaces(computer):
     """Build one interface per reported MAC/IP pair, falling back to the bare
     internal address list when the connector reported no adapters."""
@@ -333,7 +327,6 @@ def build_network_interfaces(computer):
     # by every connector behind one gateway, and attaching it to an interface
     # would invite unrelated endpoints to merge together.
     return netifs
-
 
 def build_asset(scope, computer):
     """Convert one computer record into an ImportAsset."""
@@ -445,7 +438,6 @@ def build_asset(scope, computer):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(scope, computers):
     """Convert one page of computer records into ImportAsset objects."""
     assets = []
@@ -454,7 +446,6 @@ def build_assets(scope, computers):
         if asset:
             assets.append(asset)
     return assets
-
 
 def build_vulnerability_asset(scope, connector_guid, records):
     """Build an enrichment asset carrying one computer's vulnerable applications."""
@@ -466,7 +457,6 @@ def build_vulnerability_asset(scope, connector_guid, records):
         vulnerabilities=vulns[:MAX_VULNS_PER_ASSET],
     )
 
-
 def keep_computer(computer, active_only, include_demo):
     """Report whether a computer record survives the configured filters."""
     if active_only and computer.get("active") != True:
@@ -474,7 +464,6 @@ def keep_computer(computer, active_only, include_demo):
     if not include_demo and computer.get("demo") == True:
         return False
     return True
-
 
 def fetch_vulnerabilities(base_url, http_options, connector_guid):
     """Fetch the vulnerable applications observed on one computer."""
@@ -488,7 +477,6 @@ def fetch_vulnerabilities(base_url, http_options, connector_guid):
     if type(payload) != "dict":
         return [], "unexpected data shape"
     return dicts(payload.get("vulnerabilities")), None
-
 
 def report_page_vulnerabilities(base_url, http_options, scope, computers, budget):
     """Enrich up to `budget` computers from one page with their findings.
@@ -515,7 +503,6 @@ def report_page_vulnerabilities(base_url, http_options, scope, computers, budget
         if asset:
             report_assets(asset)
     return enriched
-
 
 def fetch_and_report_computers(base_url, http_options, scope, page_size, active_only,
                                include_demo, import_vulnerabilities, vulnerability_limit):
@@ -565,7 +552,6 @@ def fetch_and_report_computers(base_url, http_options, scope, page_size, active_
             break
         offset += page_size
     return reported, enriched
-
 
 def main(**kwargs):
     require(kwargs, "api_host", "client_id", "api_key")

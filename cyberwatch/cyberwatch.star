@@ -66,10 +66,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'Software', 'Vulnerability', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'now', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_text', 'dedupe', 'dicts')
@@ -120,7 +120,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _to_float(value):
     """Return a positive numeric value as a float, or -1.0 when it is absent or
     not a number. Cyberwatch serializes an unset score as null."""
@@ -157,7 +156,6 @@ def split_addresses(addresses):
         hostnames.append(text)
     return dedupe(ips), dedupe(hostnames)
 
-
 def _score_rank(score):
     """Convert a CVSS score to a runZero 0-4 rank using the standard bands."""
     if score < 0.1:
@@ -169,7 +167,6 @@ def _score_rank(score):
     if score < 9.0:
         return 3
     return 4
-
 
 def build_update_index(updates):
     """Index the asset's pending updates by CVE code so each finding can carry
@@ -205,7 +202,6 @@ def build_update_index(updates):
             if fix not in index[key]:
                 index[key].append(fix)
     return index
-
 
 def build_vulnerabilities(ctx, server_id, detail):
     """Convert the CVE announcements Cyberwatch records against one asset into
@@ -289,7 +285,6 @@ def build_vulnerabilities(ctx, server_id, detail):
 
     return vulns, fixed
 
-
 def build_software(ctx, server_id, address, detail):
     """Convert the installed packages Cyberwatch inventories on one asset into
     Software records. Applications are emitted first so that Windows KB
@@ -336,7 +331,6 @@ def build_software(ctx, server_id, address, detail):
             applications.append(Software(**params))
 
     return applications + patches
-
 
 def _port_entry(entry):
     """Extract (port, transport, product, version) from one ports[] element.
@@ -400,7 +394,6 @@ def _port_entry(entry):
 
     return port, transport, product, version
 
-
 def build_service_states(detail):
     """Summarize the asset's system services. Cyberwatch's services[] holds
     operating system service units — {name, status, updated_at} — with no port
@@ -417,7 +410,6 @@ def build_service_states(detail):
         status = as_text(entry.get("status"), join=",").strip()
         states.append("{}:{}".format(name, status) if status else name)
     return dedupe(states)
-
 
 def build_services(address, detail):
     """Build Service objects from the asset's open ports. Entries that name no
@@ -462,7 +454,6 @@ def build_services(address, detail):
 
     return services
 
-
 def fetch_detail(ctx, path, server_id):
     """Fetch one per-asset detail document. A failure is reported and treated as
     an empty document so a single unreadable asset cannot end the run."""
@@ -474,7 +465,6 @@ def fetch_detail(ctx, path, server_id):
     if type(data) != "dict":
         return {}
     return data
-
 
 def build_asset(ctx, record):
     """Convert one Cyberwatch server record into a runZero asset, optionally
@@ -615,7 +605,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_ts
     return asset
 
-
 def build_assets(ctx, records):
     """Convert a page of Cyberwatch server records into runZero assets."""
     assets = []
@@ -628,7 +617,6 @@ def build_assets(ctx, records):
             continue
         assets.append(build_asset(ctx, record))
     return assets
-
 
 def fetch_and_report_servers(ctx):
     """Fetch and stream servers one page at a time so the full inventory is
@@ -670,7 +658,6 @@ def fetch_and_report_servers(ctx):
         print("cyberwatch: detail limit of {} reached; software, services, and CVEs were not imported for {} of {} assets".format(
             ctx["detail_limit"], ctx["detail_skipped"], reported))
     return reported
-
 
 def main(**kwargs):
     base_url = _base_url(kwargs)

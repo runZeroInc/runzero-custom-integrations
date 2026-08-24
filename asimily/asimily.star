@@ -107,7 +107,7 @@ load('runzero.types', 'ImportAsset', 'Software', 'Vulnerability', 'to_custom_att
 load('net', 'network_interface')
 load('http', 'get_json', 'post_json', 'basic')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'from_timestamp', 'now', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 ASSETS_PATH = "/api/extapi/assets"
@@ -185,7 +185,6 @@ SOURCE_RE = r"^[A-Za-z]+$"
 # needs overriding if an Asimily representative assigns a specific value.
 DEFAULT_SOURCE = "runzero"
 
-
 def _device_key(record):
     """Return the Asimily device id as a string, accepting either spelling.
 
@@ -200,13 +199,11 @@ def _device_key(record):
         return ""
     return str(value)
 
-
 def _score(value):
     """Coerce a vendor score to float, returning 0.0 for missing or non-numeric input."""
     if type(value) == "int" or type(value) == "float":
         return float(value)
     return 0.0
-
 
 def _rank(score, critical, high, medium):
     """Map a 0-10 score onto the runZero 0-4 severity/risk rank."""
@@ -227,7 +224,6 @@ def _portal_host(base_url):
     """
     return base_url.split("://")[-1]
 
-
 def _string_list(value):
     """Return a list of non-empty strings from a value that may be a list or scalar."""
     if value == None:
@@ -242,7 +238,6 @@ def _string_list(value):
             continue
         out.append(str(item))
     return out
-
 
 def build_vulnerabilities(device_row):
     """Convert the cves array on one device-cves row into Vulnerability objects."""
@@ -329,7 +324,6 @@ def build_vulnerabilities(device_row):
             duplicates, _device_key(device_row)))
     return vulns
 
-
 def build_software(applications):
     """Convert the applications array for one device into Software objects."""
     software = []
@@ -358,7 +352,6 @@ def build_software(applications):
             break
     return software
 
-
 def fetch_software(base_url, http_options, mac):
     """Fetch installed applications for one device, keyed on its MAC address."""
     data, err = get_json(base_url + APPLICATIONS_PATH, params={"macAddr": mac},
@@ -373,7 +366,6 @@ def fetch_software(base_url, http_options, mac):
     if type(first) != "dict":
         return []
     return build_software(first.get("applications", []) or [])
-
 
 def build_asset(record, device_id, base_url, portal_host, vulns, software):
     """Build a single ImportAsset from one Asimily asset record."""
@@ -449,7 +441,6 @@ def build_asset(record, device_id, base_url, portal_host, vulns, software):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(records, base_url, portal_host, http_options, vuln_map,
                  include_software, software_state):
     """Build one page of ImportAssets, attaching CVEs and optional software."""
@@ -477,7 +468,6 @@ def build_assets(records, base_url, portal_host, http_options, vuln_map,
         assets.append(build_asset(record, device_id, base_url, portal_host, vulns, software))
     return assets
 
-
 def retrieved_of(reported, total):
     """The retrieved/available half of a truncation message.
 
@@ -489,7 +479,6 @@ def retrieved_of(reported, total):
     if type(total) == "int" and total > 0:
         return "retrieved {}/{} available assets".format(reported, total)
     return "retrieved {} assets, total not reported".format(reported)
-
 
 def page_ceiling(config_kwargs, page_size):
     """The paging ceiling for one walk.
@@ -505,7 +494,6 @@ def page_ceiling(config_kwargs, page_size):
     if page_size > 0:
         return (MAX_RECORDS + page_size - 1) // page_size
     return MAX_PAGES
-
 
 def _page_signature(rows):
     """A cheap fingerprint of one page: its length and the ids at either end.
@@ -529,14 +517,12 @@ def _page_signature(rows):
     last_id = _device_key(last) if type(last) == "dict" else ""
     return "{}|{}|{}".format(len(rows), first_id, last_id)
 
-
 def _total_elements(data):
     """Asimily's count of everything the query matched, or None when absent."""
     value = data.get("totalElements")
     if type(value) == "int" and value >= 0:
         return value
     return None
-
 
 def fetch_vulnerability_map(base_url, http_options, max_pages):
     """Fetch open device CVEs and index the Vulnerability objects by device id.
@@ -615,7 +601,6 @@ def fetch_vulnerability_map(base_url, http_options, max_pages):
     print("asimily: indexed {} open CVEs across {} devices".format(total, len(vuln_map)))
     return vuln_map
 
-
 def fetch_and_report_assets(base_url, http_options, page_size, vuln_map,
                             include_software, software_state, max_pages):
     """Fetch and stream devices one page at a time so the full inventory is never
@@ -673,7 +658,6 @@ def fetch_and_report_assets(base_url, http_options, page_size, vuln_map,
             max_pages, retrieved_of(reported, total_count)))
 
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

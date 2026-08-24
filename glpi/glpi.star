@@ -78,10 +78,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'now', 'parse_ts')
 
 load('coerce', 'dicts')
 VENDOR = "glpi"
@@ -158,7 +158,6 @@ ENTITIES = [
     ("&#38;", "&"), ("&amp;", "&"),
 ]
 
-
 def _text(value):
     """Flatten a scalar or list into a plain string, decoding the HTML entities
     GLPI leaves in every text field."""
@@ -171,7 +170,6 @@ def _text(value):
         if entity in text:
             text = text.replace(entity, char)
     return text
-
 
 def _to_int(value):
     """Convert an int or an all-digit string to an int, or -1 when it is not numeric."""
@@ -228,7 +226,6 @@ def build_software(ctx, item_type, item_id, entries):
         software.append(Software(**params))
     return software
 
-
 def _is_virtual_port(name):
     """Decide whether a network port is a software device rather than real
     hardware. An agent on a container or hypervisor host reports these under the
@@ -245,7 +242,6 @@ def _is_virtual_port(name):
         if hint in lowered:
             return True
     return False
-
 
 def collect_ports(networkports):
     """Flatten the _networkports expansion into one entry per port. GLPI keys the
@@ -283,7 +279,6 @@ def collect_ports(networkports):
             })
     return ports
 
-
 def build_interfaces(ports):
     """Build one runZero network interface per GLPI network port. GLPI models a
     MAC and its addresses on each port individually, so a multi-homed host keeps
@@ -294,7 +289,6 @@ def build_interfaces(ports):
         if nic:
             interfaces.append(nic)
     return interfaces
-
 
 def build_asset(ctx, item_type, record, software):
     """Convert one GLPI inventory record into a runZero asset."""
@@ -410,7 +404,6 @@ def build_asset(ctx, item_type, record, software):
         asset.lastSeenTS = last_ts
     return asset
 
-
 def reopen_session(ctx):
     """Re-open the API session once per run after GLPI invalidates the token
     mid-run. Large estates with a short PHP session lifetime otherwise import
@@ -427,11 +420,9 @@ def reopen_session(ctx):
     ctx["http_options"]["headers"]["Session-Token"] = token
     return True
 
-
 def _session_rejected(err):
     """Report whether the error means GLPI no longer accepts the session token."""
     return err != None and "ERROR_SESSION_TOKEN" in err
-
 
 def fetch_software(ctx, item_id):
     """Fetch the software installed on one computer. Only the single-item
@@ -450,7 +441,6 @@ def fetch_software(ctx, item_id):
     if type(data) != "dict":
         return []
     return data.get("_softwares", [])
-
 
 def build_assets(ctx, item_type, records):
     """Convert a page of GLPI records into runZero assets, enriching computers
@@ -480,7 +470,6 @@ def build_assets(ctx, item_type, records):
         assets.append(build_asset(ctx, item_type, record, software))
     return assets
 
-
 def fetch_page(ctx, path, params, offset, page_size):
     """Fetch one range of a GLPI collection. GLPI answers a range whose first
     index is past the total with 400 ERROR_RANGE_EXCEED_TOTAL rather than an
@@ -498,7 +487,6 @@ def fetch_page(ctx, path, params, offset, page_size):
     if type(data) != "list":
         return [], "unexpected response type {}".format(type(data))
     return data, None
-
 
 def fetch_publishers(ctx):
     """Index the software catalog by product name so each installation can carry
@@ -527,7 +515,6 @@ def fetch_publishers(ctx):
         if len(records) < SIDE_PAGE_SIZE:
             break
     return publishers
-
 
 def fetch_operating_systems(ctx):
     """Index the operating system assigned to every inventory item. GLPI 10 does
@@ -575,7 +562,6 @@ def fetch_operating_systems(ctx):
             break
     return os_map
 
-
 def fetch_and_report_items(ctx, item_type):
     """Fetch and stream one GLPI item type a page at a time so the full inventory
     is never held in memory at once. with_networkports is honored on the
@@ -608,7 +594,6 @@ def fetch_and_report_items(ctx, item_type):
     print("glpi: reported {} assets from {}".format(reported, item_type))
     return reported
 
-
 def open_session(api_url, http_options):
     """Exchange the application token and the user credential for a session
     token. Every other endpoint requires the session token, so a failure here
@@ -622,14 +607,12 @@ def open_session(api_url, http_options):
         return ""
     return _text(data.get("session_token")).strip()
 
-
 def close_session(ctx):
     """Release the GLPI session. A session left open holds server-side state
     until it expires, so it is closed even when the import failed."""
     data, err = get_json(ctx["api_url"] + "/killSession", **ctx["http_options"])
     if err:
         print("glpi: failed to close the API session:", err)
-
 
 def main(**kwargs):
     # get_url_base would drop the path, and GLPI is very often installed in a

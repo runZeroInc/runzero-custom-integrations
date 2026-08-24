@@ -74,7 +74,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'basic')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'now', 'from_timestamp')
@@ -140,7 +140,6 @@ VM_ATTRS = [
     "tools_running_status", "uuid", "vm_logical_timestamp",
 ]
 
-
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     if value == None:
@@ -150,7 +149,6 @@ def _clean(value):
     if type(value) == "dict":
         return ""
     return str(value).strip()
-
 
 def _to_int(value):
     """Convert an int or an all-digit string to an int, or -1 when it is neither."""
@@ -177,7 +175,6 @@ def _routable_ips(values):
         kept.append(canonical)
     return kept
 
-
 def _boot_time(record, ceiling):
     """Return the node's boot time as a normalized string, or "".
 
@@ -195,7 +192,6 @@ def _boot_time(record, ceiling):
         parsed = ceiling
     return parsed.format("2006-01-02T15:04:05Z07:00")
 
-
 def _pick(record, names):
     """Return the first non-empty value among several candidate field names."""
     for name in names:
@@ -203,7 +199,6 @@ def _pick(record, names):
         if value:
             return value
     return ""
-
 
 def _attrs(record, names, extra):
     """Collect the documented fields plus computed extras into one flat dict."""
@@ -214,7 +209,6 @@ def _attrs(record, names, extra):
     for key in extra:
         attrs[key] = extra[key]
     return attrs
-
 
 def split_hypervisor(record):
     """Split hypervisor_full_name into an OS name and a version.
@@ -235,7 +229,6 @@ def split_hypervisor(record):
         head = " ".join(parts[:-1])
         return named or head, tail
     return named or full, ""
-
 
 def build_host_asset(ctx, record):
     """Build one ImportAsset for a physical Nutanix node, or None to skip it."""
@@ -318,7 +311,6 @@ def build_host_asset(ctx, record):
     asset.lastSeenTS = ctx["now"]
     return asset
 
-
 def build_host_assets(ctx, records):
     """Build node assets for one page of hosts, skipping unusable rows."""
     assets = []
@@ -327,7 +319,6 @@ def build_host_assets(ctx, records):
         if asset:
             assets.append(asset)
     return assets
-
 
 def build_vm_interfaces(record):
     """Build one network interface per virtual NIC.
@@ -367,7 +358,6 @@ def build_vm_interfaces(record):
         if nic:
             netifs.append(nic)
     return netifs[:MAX_INTERFACES]
-
 
 def build_vm_asset(ctx, record):
     """Build one ImportAsset for a guest VM, or None to skip it."""
@@ -414,7 +404,6 @@ def build_vm_asset(ctx, record):
     asset.lastSeenTS = ctx["now"]
     return asset
 
-
 def build_vm_assets(ctx, records):
     """Build guest assets for one page of VMs, skipping unusable rows."""
     assets = []
@@ -424,7 +413,6 @@ def build_vm_assets(ctx, records):
             assets.append(asset)
     return assets
 
-
 def _entities(data):
     """Return the entity list out of a Prism paged envelope, or None."""
     if type(data) != "dict":
@@ -433,7 +421,6 @@ def _entities(data):
     if type(entities) != "list":
         return None
     return entities
-
 
 def _total(data):
     """Return the entity total a Prism envelope advertises, or -1."""
@@ -448,11 +435,9 @@ def _total(data):
             return total
     return -1
 
-
 def _auth_failure(err):
     """Report whether an error string is Prism rejecting the credential."""
     return err.startswith("status 401") or err.startswith("status 403")
-
 
 def fetch_cluster(ctx):
     """Fetch the cluster record and record its uuid as the identity namespace.
@@ -488,7 +473,6 @@ def fetch_cluster(ctx):
     print("nutanix-prism: cluster {} ({}) running {}".format(
         ctx["cluster_name"], cluster_uuid, _clean(data.get("version"))))
     return True
-
 
 def fetch_and_report_hosts(ctx):
     """Fetch and stream nodes one page at a time.
@@ -553,7 +537,6 @@ def fetch_and_report_hosts(ctx):
     print("nutanix-prism: reported {} hypervisor nodes".format(reported))
     return reported
 
-
 def fetch_and_report_vms(ctx):
     """Fetch and stream guests one page at a time.
 
@@ -597,7 +580,6 @@ def fetch_and_report_vms(ctx):
 
     print("nutanix-prism: reported {} guest VMs".format(reported))
     return reported
-
 
 def main(**kwargs):
     require(kwargs, "url", "username", "password")

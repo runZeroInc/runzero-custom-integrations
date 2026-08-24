@@ -90,7 +90,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'from_timestamp', 'now')
@@ -185,7 +185,6 @@ def _key(value):
         return str(int(value))
     return as_text(value, join=",").strip()
 
-
 def _parse_millis(value):
     """Convert an OpenNMS timestamp to a time, clamping a future value to now.
 
@@ -225,7 +224,6 @@ def _clean_mac(value):
         return ""
     return mac
 
-
 def _hostname_like(value):
     """Report whether a string is usable as a hostname.
 
@@ -241,16 +239,13 @@ def _hostname_like(value):
         return False
     return re_match(HOSTNAME_RE, text) != None
 
-
 def v1_url(ctx, path):
     """Build a URL in the stable v1 ReST tree."""
     return ctx["base_url"] + ctx["context"] + V1_PATH + path
 
-
 def v2_url(ctx, path):
     """Build a URL in the experimental v2 tree."""
     return ctx["base_url"] + ctx["context"] + V2_PATH + path
-
 
 def fetch_page(ctx, url, collection, offset, label):
     """Fetch one page of an OpenNMS collection, returning (records, err).
@@ -271,7 +266,6 @@ def fetch_page(ctx, url, collection, offset, label):
     if collection not in data:
         return [], None
     return dicts(data[collection]), None
-
 
 def walk(ctx, url, collection, label, handler):
     """Page through a collection, handing each page to a handler.
@@ -294,7 +288,6 @@ def walk(ctx, url, collection, label, handler):
         if len(records) < ctx["page_size"]:
             break
     return seen
-
 
 def index_ip_interfaces(ctx):
     """Index every IP interface in the estate by node id.
@@ -320,7 +313,6 @@ def index_ip_interfaces(ctx):
     print("opennms: indexed IP interfaces for {} nodes".format(len(index)))
     return index
 
-
 def index_snmp_interfaces(ctx):
     """Index the SNMP interfaces that carry a physical address by node id.
 
@@ -341,7 +333,6 @@ def index_snmp_interfaces(ctx):
     if walk(ctx, v2_url(ctx, SNMPINTERFACES_PATH), "snmpInterface", "SNMP interfaces", absorb) < 0:
         return None
     return index
-
 
 def index_services(ctx):
     """Index monitored service names by node label and address.
@@ -378,7 +369,6 @@ def index_services(ctx):
     if walk(ctx, v1_url(ctx, IFSERVICES_PATH), "monitored-service", "monitored services", absorb) < 0:
         return {}
     return index
-
 
 def lookup_services(service_index, record, ip_records):
     """Resolve one node's monitored services from the index.
@@ -417,7 +407,6 @@ def lookup_services(service_index, record, ip_records):
         return {}
     return as_dict(as_dict(service_index.get("by_label")).get(label))
 
-
 def fetch_node_interfaces(ctx, node_id):
     """Fetch one node's IP interfaces directly.
 
@@ -432,7 +421,6 @@ def fetch_node_interfaces(ctx, node_id):
             print("opennms: failed to read interfaces for node {}: {}".format(node_id, err))
         return []
     return records
-
 
 def build_interfaces(ip_records, snmp_records):
     """Build runZero network interfaces from a node's interface records.
@@ -509,7 +497,6 @@ def build_interfaces(ip_records, snmp_records):
             netifs.append(nic)
     return netifs
 
-
 def device_type_from(sysdescr, asset):
     """Map a node to a runZero device type, conservatively.
 
@@ -527,7 +514,6 @@ def device_type_from(sysdescr, asset):
         if needle in text:
             return mapped
     return ""
-
 
 def build_asset(ctx, record, ip_records, snmp_records, services):
     """Convert one OpenNMS node into a runZero asset."""
@@ -678,7 +664,6 @@ def build_asset(ctx, record, ip_records, snmp_records, services):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def collect(ctx, ip_index, snmp_index, service_index):
     """Walk the node list, streaming each page as it is built."""
     reported = 0
@@ -730,7 +715,6 @@ def collect(ctx, ip_index, snmp_index, service_index):
         print("opennms: per-node request limit of {} reached; {} nodes were imported without interfaces".format(
             ctx["detail_limit"], ctx["detail_skipped"]))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

@@ -90,7 +90,7 @@ load("runzero.types", "ImportAsset", "to_custom_attributes")
 load("http", "get_json")
 load("base64", base64_encode="encode")
 load("kwargs", "require", "get_string", "get_int", "get_bool", "get_url_base", "get_http_options")
-load("net", "ip_address", "network_interface", "routable_ip", "clean_hostnames")
+load("net", "ip_address", "network_interface", "clean_hostnames")
 load("time", "from_timestamp")
 load("coerce", "as_int")
 load("runzero.progress", progress_info="info")
@@ -106,10 +106,8 @@ DNS_SERVICE = "dns_rr_list"
 
 MAX_HOSTNAMES = 99
 
-
 def rest_url(base_url, service):
     return base_url + "/rest/" + service
-
 
 def auth_headers(username, password):
     """SOLIDserver native authentication: both values base64-encoded, one per
@@ -120,11 +118,9 @@ def auth_headers(username, password):
         "Content-Type": "application/json",
     }
 
-
 def quote_where(value):
     """Escape a value for a single-quoted WHERE literal by doubling quotes."""
     return str(value or "").replace("'", "''")
-
 
 def fetch_rows(base_url, http_options, service, where, orderby, page_size, label):
     """Walk one list service and return every row.
@@ -162,7 +158,6 @@ def fetch_rows(base_url, http_options, service, where, orderby, page_size, label
         offset += page_size
     return rows
 
-
 def stream_rows(base_url, http_options, service, where, orderby, page_size, label, handler):
     """Walk one list service, calling handler(row) per row instead of
     accumulating, so a large address estate is never held in memory."""
@@ -194,7 +189,6 @@ def stream_rows(base_url, http_options, service, where, orderby, page_size, labe
         offset += page_size
     return count
 
-
 def clean_mac(value):
     """Return a usable MAC, dropping SOLIDserver's EIP:-prefixed pseudo-MACs
     minted for reservations that have no real hardware address."""
@@ -202,7 +196,6 @@ def clean_mac(value):
     if not mac or mac.upper().startswith("EIP:"):
         return ""
     return mac
-
 
 def parse_epoch(value):
     """SOLIDserver serializes every value as a string, including the decimal
@@ -212,9 +205,7 @@ def parse_epoch(value):
         return None
     return from_timestamp(seconds)
 
-
 HEX_DIGITS = "0123456789abcdefABCDEF"
-
 
 def v6_from_hex(text):
     """Convert SOLIDserver's bare 32-hex-digit IPv6 column form (ip6_addr,
@@ -229,7 +220,6 @@ def v6_from_hex(text):
     for index in range(0, 32, 4):
         groups.append(text[index:index + 4])
     return ":".join(groups)
-
 
 def canonical_ip(value):
     """Return the canonical text of an address, so join keys agree between the
@@ -246,7 +236,6 @@ def canonical_ip(value):
     if addr == None:
         return ""
     return str(addr)
-
 
 def build_lease_maps(base_url, http_options, page_size, include_v6):
     """Index DHCP leases and reservations by address.
@@ -290,7 +279,6 @@ def build_lease_maps(base_url, http_options, page_size, include_v6):
                 }
     return leases, statics
 
-
 def build_dns_map(base_url, http_options, page_size):
     """Index A and AAAA record names by canonical address."""
     names = {}
@@ -306,7 +294,6 @@ def build_dns_map(base_url, http_options, page_size):
         names[ip] = existing
     return names
 
-
 def hostnames_for(row, name_field, lease, static, dns_names):
     """Collect the IPAM, DHCP, and DNS names for one address."""
     candidates = [row.get(name_field, "")]
@@ -318,7 +305,6 @@ def hostnames_for(row, name_field, lease, static, dns_names):
     for name in dns_names:
         candidates.append(name)
     return clean_hostnames(candidates)[:MAX_HOSTNAMES]
-
 
 def build_asset(row, ip, is_v6, site_name, appliance_host, lease, static, dns_names):
     """Build one ImportAsset from an IPAM address row and its joins."""
@@ -403,7 +389,6 @@ def build_asset(row, ip, is_v6, site_name, appliance_host, lease, static, dns_na
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_sites(base_url, http_options, page_size, only_space):
     """Return the IPAM spaces to walk as a list of (site_id, site_name)."""
     where = ""
@@ -416,7 +401,6 @@ def fetch_sites(base_url, http_options, page_size, only_space):
         if site_id and site_name:
             sites.append((site_id, site_name))
     return sites
-
 
 def main(**kwargs):
     require(kwargs, "url", "username", "password")

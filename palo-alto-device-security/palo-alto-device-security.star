@@ -74,7 +74,7 @@ load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
 load('net', 'network_interface', 'routable_ips', 'ip_address')
 load('http', 'get_json', 'post_json', 'bearer', 'basic', 'url_encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int')
-load('time', 'now', 'parse_time', 'parse_duration', 'parse_ts')
+load('time', 'now', 'parse_duration', 'parse_ts')
 load('re', re_match='match')
 
 TOKEN_PATH = "/oauth2/access_token"
@@ -174,7 +174,6 @@ VULN_DEVICE_FIELDS = {
     "date": "last_activity",
 }
 
-
 def _first(record, keys):
     """Return the first populated value among alternate vendor field names."""
     for key in keys:
@@ -182,7 +181,6 @@ def _first(record, keys):
         if value != None and value != "":
             return value
     return ""
-
 
 def _hostname(value):
     """Return a value fit to import as a hostname, or "".
@@ -204,7 +202,6 @@ def _start_time(lookback_days):
     cutoff = now() + parse_duration("-{}h".format(lookback_days * 24))
     return cutoff.format("2006-01-02T15:04:05Z")
 
-
 def _device_from_vulnerability(item):
     """Project a vulnerability instance onto the inventory device field names."""
     device = {}
@@ -213,7 +210,6 @@ def _device_from_vulnerability(item):
         if value != None and value != "":
             device[target] = value
     return device
-
 
 def build_vulnerability(item):
     """Convert one vulnerability instance into a runZero Vulnerability."""
@@ -255,7 +251,6 @@ def build_vulnerability(item):
         params["firstDetectedTS"] = detected
 
     return Vulnerability(**params)
-
 
 def build_asset(device, vulns, tsg_id):
     """Convert one Device Security device into a runZero ImportAsset."""
@@ -342,7 +337,6 @@ def build_asset(device, vulns, tsg_id):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(devices, vuln_index, tsg_id):
     """Build a page of assets, consuming any indexed findings for each device."""
     assets = []
@@ -353,7 +347,6 @@ def build_assets(devices, vuln_index, tsg_id):
         if asset:
             assets.append(asset)
     return assets
-
 
 def fetch_access_token(auth_url, tsg_id, client_id, client_secret, config_kwargs):
     """Exchange Strata Cloud Manager client credentials for a bearer token."""
@@ -376,7 +369,6 @@ def fetch_access_token(auth_url, tsg_id, client_id, client_secret, config_kwargs
         print("palo-alto-device-security: token response contained no access_token")
     return token
 
-
 def _api_options(config_kwargs, token):
     """Collect the HTTP options used for every API call under a given token."""
     options = get_http_options(config_kwargs, headers={
@@ -385,7 +377,6 @@ def _api_options(config_kwargs, token):
     })
     options["retries"] = RETRIES
     return options
-
 
 def fetch_json(ctx, url, params):
     """GET one API page, re-minting the access token once on a 401.
@@ -408,7 +399,6 @@ def fetch_json(ctx, url, params):
                 continue
         return None, err
     return None, "unreachable"
-
 
 def fetch_vulnerability_index(ctx, stime):
     """Index confirmed vulnerability instances by device id, keeping only the
@@ -464,7 +454,6 @@ def fetch_vulnerability_index(ctx, stime):
     print("palo-alto-device-security: indexed {} vulnerabilities across {} devices".format(kept, len(index)))
     return index
 
-
 def fetch_and_report_devices(ctx, stime, vuln_index):
     """Fetch and stream devices one page at a time so the full inventory is
     never held in memory at once."""
@@ -494,7 +483,6 @@ def fetch_and_report_devices(ctx, stime, vuln_index):
 
     return reported
 
-
 def report_unmatched_vulnerabilities(vuln_index, tsg_id):
     """Report assets for devices that carry findings but never appeared in the
     inventory page set, so their vulnerabilities are not silently dropped."""
@@ -508,7 +496,6 @@ def report_unmatched_vulnerabilities(vuln_index, tsg_id):
     if reported:
         print("palo-alto-device-security: reported {} devices seen only in vulnerability data".format(reported))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

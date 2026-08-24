@@ -40,7 +40,6 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'bearer')
 load('kwargs', 'get_http_options')
-load('flatten_json', 'flatten')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or non-production deployment can be reached
@@ -48,7 +47,6 @@ load('flatten_json', 'flatten')
 DEFAULT_DRATA_URL = 'https://public-api.drata.com'
 
 PAGE_SIZE = 50
-
 
 def retrieved_of(retrieved, total):
     """The "Retrieved X/Y available assets" half of a truncation message.
@@ -61,7 +59,6 @@ def retrieved_of(retrieved, total):
     if type(total) == 'int' and total > 0:
         return 'Retrieved {}/{} available assets'.format(retrieved, total)
     return 'Retrieved {} assets; the API does not report a total'.format(retrieved)
-
 
 def page_signature(rows):
     """A cheap fingerprint of one page: its length and the ids at either end.
@@ -79,7 +76,6 @@ def page_signature(rows):
     first_id = first.get('id', '') if type(first) == 'dict' else ''
     last_id = last.get('id', '') if type(last) == 'dict' else ''
     return '{}|{}|{}'.format(len(rows), first_id, last_id)
-
 
 def build_assets(assets_json):
     assets_import = []
@@ -386,7 +382,6 @@ def main(**kwargs):
     # script still works if it is invoked without one.
     base_url = (kwargs.get('url') or DEFAULT_DRATA_URL).rstrip('/')
     http_options = get_http_options(kwargs, headers={"Authorization": bearer(token)})
-
 
     # Get assets
     filter = 'assetClassType=HARDWARE&employmentStatus=CURRENT_EMPLOYEE'

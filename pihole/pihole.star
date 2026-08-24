@@ -66,7 +66,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'get_json', 'post_json', 'delete', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'now', 'from_timestamp')
@@ -114,7 +114,6 @@ def _epoch(value, ceiling):
         return ceiling
     return from_timestamp(seconds)
 
-
 def _real_mac(value):
     """Return a genuine MAC address, or an empty string.
 
@@ -151,7 +150,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def open_session(api_url, password, http_options):
     """Exchange the password for a session id.
 
@@ -185,7 +183,6 @@ def open_session(api_url, password, http_options):
         print("pihole: no session id was issued:", as_text(session.get("message")) or "no password is set")
     return sid, True
 
-
 def close_session(ctx):
     """Release the API seat. Left open, it counts against the concurrent-session
     limit for the full 30-minute session lifetime."""
@@ -205,7 +202,6 @@ def close_session(ctx):
         status = resp.status_code if resp != None else "no response"
         print("pihole: failed to delete the API session:", status)
 
-
 def fetch_version(ctx):
     """Read the component versions, so the run log names what it talked to."""
     data, err = get_json(ctx["api_url"] + "/info/version", **ctx["http_options"])
@@ -221,7 +217,6 @@ def fetch_version(ctx):
     if as_text(ftl.get("version")):
         parts.append("FTL " + as_text(ftl.get("version")))
     return ", ".join(parts)
-
 
 def fetch_leases(ctx):
     """Index the active DHCP leases by MAC and by address.
@@ -261,7 +256,6 @@ def fetch_leases(ctx):
     print("pihole: read {} DHCP leases".format(len(leases)))
     return by_mac, by_ip
 
-
 def collect_addresses(device):
     """Split a device's ips[] array into routable addresses and hostnames.
 
@@ -285,7 +279,6 @@ def collect_addresses(device):
         if type(seen) == "int" and seen > last_seen:
             last_seen = seen
     return ips, names, last_seen
-
 
 def build_asset(ctx, device):
     """Convert one row of Pi-hole's network table into a runZero asset, or None
@@ -377,7 +370,6 @@ def build_asset(ctx, device):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_and_report_devices(ctx):
     """Read the network table and stream it into runZero.
 
@@ -430,7 +422,6 @@ def fetch_and_report_devices(ctx):
             ctx["ip_only_skipped"]))
     print("pihole: reported {} assets".format(reported))
     return reported
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url", default="").strip().rstrip("/")

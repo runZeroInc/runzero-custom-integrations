@@ -60,8 +60,8 @@ load('runzero.types', 'ImportAsset', 'Vulnerability', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_duration', 'parse_ts')
-load('re', re_match='match', re_find_all='find_all')
+load('time', 'now', 'parse_duration', 'parse_ts')
+load('re', re_find_all='find_all')
 
 HOSTS_PATH = "/api/scanresults/active/hosts/"
 VULNERABILITIES_PATH = "/api/scanresults/active/vulnerabilities/"
@@ -86,7 +86,6 @@ CHILD_LIMIT = 99
 HTTP_RETRIES = 3
 HTTP_RETRY_BACKOFF = 2.0
 
-
 def _tenant_host(base_url):
     """Return the Frontline hostname, which is the tenant scope for host ids.
 
@@ -94,7 +93,6 @@ def _tenant_host(base_url):
     https does not change the identity of already-imported assets.
     """
     return base_url.split("://")[-1]
-
 
 def _index_filters(filters):
     """Rewrite filter keys into the positional _<n>_<key> form Frontline requires.
@@ -109,7 +107,6 @@ def _index_filters(filters):
         indexed["_{}_{}".format(position, key)] = filters[key]
         position += 1
     return indexed
-
 
 def _get_page(url, http_options, params):
     """Fetch one page, omitting `params` entirely when there is nothing to send.
@@ -127,7 +124,6 @@ def _cutoff_date(days):
     cutoff = now() - parse_duration("{}h".format(days * 24))
     return cutoff.in_location("UTC").format("2006-01-02T15:04:05Z")
 
-
 def _first_cve(title, info):
     """Return the first CVE identifier present in the title or data blob.
 
@@ -142,7 +138,6 @@ def _first_cve(title, info):
     if not matches:
         return ""
     return matches[0].upper()
-
 
 def _vulnerability_key(record):
     """Return the single join key a vulnerability record is indexed under.
@@ -160,7 +155,6 @@ def _vulnerability_key(record):
         return "name:" + hostname.lower()
     return ""
 
-
 def _host_keys(record):
     """Return the join keys for a host, most specific first."""
     keys = []
@@ -172,7 +166,6 @@ def _host_keys(record):
         if name:
             keys.append("name:" + name.lower())
     return keys
-
 
 def _hostnames(record):
     """Return the host and DNS names, de-duplicated case-insensitively."""
@@ -188,7 +181,6 @@ def _hostnames(record):
         names.append(value)
     return names
 
-
 def _severity_counts(record):
     """Return the weighted DDI severity count map from an active-view host record."""
     counts = record.get("active_view_vulnerability_severity_counts", {})
@@ -199,7 +191,6 @@ def _severity_counts(record):
     if type(counts) != "dict":
         return {}
     return counts
-
 
 def build_vulnerability(record):
     """Convert one active-view vulnerability record into a Vulnerability object."""
@@ -253,7 +244,6 @@ def build_vulnerability(record):
 
     return Vulnerability(**vuln_args)
 
-
 def build_asset(record, host_id, tenant_host, vulns):
     """Build a single ImportAsset from one active-view host record."""
     nic = network_interface(mac=str(record.get("mac_address", "") or ""),
@@ -295,7 +285,6 @@ def build_asset(record, host_id, tenant_host, vulns):
 
     return ImportAsset(**asset_args)
 
-
 def build_assets(records, tenant_host, vuln_map):
     """Build one page of ImportAssets, attaching each host's vulnerabilities."""
     assets = []
@@ -317,7 +306,6 @@ def build_assets(records, tenant_host, vuln_map):
 
         assets.append(build_asset(record, host_id, tenant_host, vulns))
     return assets
-
 
 def fetch_vulnerability_map(base_url, http_options, min_severity):
     """Fetch active-view vulnerabilities and index them by host IP and hostname.
@@ -376,7 +364,6 @@ def fetch_vulnerability_map(base_url, http_options, min_severity):
         print("frontline-vm: dropped {} vulnerabilities with no IP or hostname to join on".format(unjoinable))
     return vuln_map
 
-
 def fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_map):
     """Fetch and stream hosts one page at a time so the full set is never held
     in memory at once."""
@@ -409,7 +396,6 @@ def fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_ma
         params = {}
 
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

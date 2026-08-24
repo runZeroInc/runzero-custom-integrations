@@ -76,7 +76,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'Software', 'Vulnerability', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip', 'clean_hostnames')
+load('net', 'network_interface', 'normalize_mac', 'routable_ip', 'clean_hostnames')
 load('http', 'get_json', http_post='post', 'url_encode', 'url_parse')
 load('json', json_encode='encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
@@ -205,7 +205,6 @@ def _usable_mac(value):
         return None
     return mac
 
-
 def _leaf(value):
     """Return the most specific segment of a Forescout tree-path classification
     value. The classification properties are typed tree_path and serialize as
@@ -218,7 +217,6 @@ def _leaf(value):
         return ""
     return parts[-1]
 
-
 def _root(value):
     """Return the least specific segment of a tree-path classification value."""
     text = as_text(value, join=",").strip()
@@ -228,7 +226,6 @@ def _root(value):
     if not parts:
         return ""
     return parts[0]
-
 
 def _values(fields, name):
     """Read one host property out of the per-host document. The Web API wraps
@@ -257,7 +254,6 @@ def _values(fields, name):
         return out
     return [entry]
 
-
 def _value(fields, name):
     """Read one host property as a single trimmed string."""
     values = _values(fields, name)
@@ -265,11 +261,9 @@ def _value(fields, name):
         return ""
     return as_text(values[0], join=",").strip()
 
-
 def _is_true(fields, name):
     """Read a boolean host property. The Web API serializes these as strings."""
     return _value(fields, name).lower() in ("true", "yes", "1")
-
 
 def _safe_field(name):
     """Return a property name that is safe to append to a query string, or an
@@ -282,7 +276,6 @@ def _safe_field(name):
         if text[index] not in FIELD_NAME_CHARS:
             return ""
     return text
-
 
 def _extract_cves(values):
     """Pull CVE identifiers out of arbitrary property values. Identifiers are
@@ -297,7 +290,6 @@ def _extract_cves(values):
     if not text.strip():
         return []
     return dedupe(re_find_all(CVE_PATTERN, text.upper()))
-
 
 def _parse_open_port(entry):
     """Extract (port, transport) from one openports entry. Transport is an empty
@@ -335,7 +327,6 @@ def _parse_open_port(entry):
                 port = candidate
     return port, transport
 
-
 def _split_product_version(text):
     """Split an application string such as "7-Zip 23.01" into (product,
     version). Only a trailing token that starts with a digit is treated as a
@@ -347,7 +338,6 @@ def _split_product_version(text):
     if tail and tail[0] in DIGITS:
         return " ".join(parts[:-1]).strip(), tail.strip()
     return text, ""
-
 
 def login(ctx):
     """Exchange the Web API credentials for a JWT and install it on the shared
@@ -392,7 +382,6 @@ def login(ctx):
     ctx["token_at"] = now()
     return True
 
-
 def api_get(ctx, url, label):
     """GET one Web API resource, refreshing the JWT before it expires and once
     more if the Enterprise Manager rejects it anyway. Returns (data, err)."""
@@ -409,7 +398,6 @@ def api_get(ctx, url, label):
             return None, err
         data, err = get_json(url, **ctx["http_options"])
     return data, err
-
 
 def build_field_list(ctx):
     """Ask the Enterprise Manager which host properties it exposes and build the
@@ -462,7 +450,6 @@ def build_field_list(ctx):
     print("forescout-counteract: the deployment exposes {} host properties, requesting {} per host ({} software, {} vulnerability)".format(
         len(available), len(ctx["fields"]), len(software), len(vulns)))
 
-
 def fetch_host_detail(ctx, host_id):
     """Fetch the property document for one host. A failure is reported and
     treated as an empty document so a single unreadable host cannot end the run.
@@ -483,7 +470,6 @@ def fetch_host_detail(ctx, host_id):
     if type(host) != "dict":
         return {}
     return host
-
 
 def build_vulnerabilities(ctx, host_id, fields):
     """Convert any CVE identifier the deployment records against a host into a
@@ -508,7 +494,6 @@ def build_vulnerabilities(ctx, host_id, fields):
                 }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
             ))
     return vulns
-
 
 def build_software(ctx, host_id, address, fields):
     """Convert the installed-application properties into Software records. The
@@ -568,7 +553,6 @@ def build_software(ctx, host_id, address, fields):
             software.append(Software(**params))
     return software
 
-
 def build_services(ctx, address, fields):
     """Build Service objects from the host open-port properties. Only concrete
     port numbers become services: the classification properties name an OS or a
@@ -601,7 +585,6 @@ def build_services(ctx, address, fields):
                 }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
             ))
     return services
-
 
 def build_asset(ctx, record):
     """Convert one CounterACT host index row into a runZero asset, optionally
@@ -727,7 +710,6 @@ def build_asset(ctx, record):
     params["customAttributes"] = to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     return ImportAsset(**params)
 
-
 def build_assets(ctx, records):
     """Convert a chunk of CounterACT host index rows into runZero assets."""
     assets = []
@@ -746,7 +728,6 @@ def build_assets(ctx, records):
         if asset:
             assets.append(asset)
     return assets
-
 
 def fetch_and_report_hosts(ctx):
     """Fetch the host index and stream it in chunks. The Web API publishes no
@@ -788,7 +769,6 @@ def fetch_and_report_hosts(ctx):
         print("forescout-counteract: detail limit of {} reached; classification, services, and software were not imported for {} of {} hosts".format(
             ctx["detail_limit"], ctx["detail_skipped"], reported))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

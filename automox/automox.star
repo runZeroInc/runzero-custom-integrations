@@ -41,7 +41,7 @@ CONFIG = {
 
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface')
-load('http', 'get_json', 'bearer')
+load('http', 'get_json')
 load('kwargs', 'get_http_options')
 load('coerce', 'as_dict', 'as_list', 'as_text')
 

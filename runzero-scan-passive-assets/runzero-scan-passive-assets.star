@@ -62,7 +62,7 @@ CONFIG = {
     },
 }
 load('requests', 'Session')
-load('json', json_encode='encode', json_decode='decode')
+load('json', json_decode='decode')
 load('net', 'ip_address')
 load('http', 'url_encode')
 load('kwargs', 'get_url_base', 'get_bool', 'get_int')
@@ -238,7 +238,6 @@ def main(*args, **kwargs):
                 agent_ip_map[agent_id].append(ip)
                 if asset["id"] not in agent_asset_map[agent_id]:
                     agent_asset_map[agent_id].append(asset["id"])
-
 
     # Step 3: Create scan task per explorer/agent
     task_agents = {}  # {task_id: agent_id}

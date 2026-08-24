@@ -72,8 +72,7 @@ load('net', 'network_interface')
 load('http', http_get='get', 'basic', 'url_encode', 'url_parse')
 load('jsonstream', 'iter_array')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_bool')
-load('time', 'parse_time', 'parse_ts', 'sleep')
-load('re', re_match='match')
+load('time', 'parse_ts', 'sleep')
 
 # Every ePO remote command is an RPC name used as a path segment under /remote/.
 REMOTE_PATH = "/remote/"
@@ -119,13 +118,11 @@ def _text(value):
         return ""
     return text
 
-
 def _int(value):
     """Return an integer column, or None when the column is unset or non-numeric."""
     if type(value) != "int":
         return None
     return value
-
 
 def _count(value):
     """Return a hardware counter column, dropping the zero ePO uses for unknown."""
@@ -145,7 +142,6 @@ def _appliance_scope(base_url):
         return str(parsed.hostname).lower()
     return base_url.split("://")[-1].split("/")[0].split(":")[0].lower()
 
-
 def _ipv4_from_column(value):
     """Convert the biased signed IPV4x column into a dotted quad."""
     packed = _int(value)
@@ -162,7 +158,6 @@ def _ipv4_from_column(value):
     if quad == "0.0.0.0":
         return ""
     return quad
-
 
 def _parse_envelope(body):
     """Split ePO's status line off the response body, returning (payload, err).
@@ -181,7 +176,6 @@ def _parse_envelope(body):
         return "", "{}: {}".format(status.strip(), payload[:200])
     return payload, None
 
-
 def _decode_rows(payload):
     """Return an iterator over an ePO result array, rejecting other payloads.
 
@@ -198,7 +192,6 @@ def _decode_rows(payload):
     if not payload.startswith("["):
         return [], "expected a JSON array, got: " + payload[:120]
     return iter_array(payload), None
-
 
 def _command_url(base_url, command, params):
     """Build a remote command URL with `:output=json` written in literally.
@@ -217,7 +210,6 @@ def _command_url(base_url, command, params):
             encoded[key] = str(params[key])
         query = query + "&" + url_encode(encoded).replace("+", "%20")
     return "{}{}{}?{}".format(base_url, REMOTE_PATH, command, query)
-
 
 def run_command(base_url, command, params, http_options):
     """Run one ePO remote command and return its rows as (rows, err).
@@ -250,7 +242,6 @@ def run_command(base_url, command, params, http_options):
         return [], err
     return _decode_rows(payload)
 
-
 def build_hostnames(row):
     """Collect the distinct names ePO reports for one system."""
     names = []
@@ -259,7 +250,6 @@ def build_hostnames(row):
         if name and name not in names:
             names.append(name)
     return names
-
 
 def build_os_version(row):
     """Compose an OS version from ePO's separate version, build, and pack columns."""
@@ -273,7 +263,6 @@ def build_os_version(row):
     if service_pack:
         version = "{} {}".format(version, service_pack)
     return version
-
 
 def build_tags(row, group_path, managed):
     """Build the runZero tag list from ePO's comma-joined tag column."""
@@ -289,7 +278,6 @@ def build_tags(row, group_path, managed):
         if name and name not in tags:
             tags.append(name)
     return tags[:TAG_LIMIT]
-
 
 def build_asset(row, scope, node_id, group_paths):
     """Convert one EPOComputerProperties result row into an ImportAsset."""
@@ -381,7 +369,6 @@ def build_asset(row, scope, node_id, group_paths):
         asset.lastSeenTS = last_update
     return asset
 
-
 def report_systems(rows, scope, group_paths, include_unmanaged):
     """Build and stream one asset per ePO result row, returning the count.
 
@@ -410,7 +397,6 @@ def report_systems(rows, scope, group_paths, include_unmanaged):
         reported += report_asset(build_asset(row, scope, node_id, group_paths))
     return reported
 
-
 def fetch_group_paths(base_url, http_options):
     """Fetch the System Tree as a {group id: group path} map.
 
@@ -433,7 +419,6 @@ def fetch_group_paths(base_url, http_options):
         group_paths[group_id] = _text(row.get("groupPath", ""))
     return group_paths
 
-
 def fetch_and_report_search(base_url, http_options, search_text, scope, group_paths,
                             include_unmanaged):
     """Fetch every matching system with a single system.find call.
@@ -453,7 +438,6 @@ def fetch_and_report_search(base_url, http_options, search_text, scope, group_pa
         return 0
     return report_systems(rows, scope, group_paths, include_unmanaged)
 
-
 def fetch_and_report_tree(base_url, http_options, scope, group_paths, include_unmanaged):
     """Fetch and stream the System Tree one group at a time so the full estate
     is never held in memory at once."""
@@ -467,7 +451,6 @@ def fetch_and_report_tree(base_url, http_options, scope, group_paths, include_un
             continue
         reported += report_systems(rows, scope, group_paths, include_unmanaged)
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

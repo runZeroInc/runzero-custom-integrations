@@ -48,7 +48,7 @@ load("runzero.types", "ImportAsset", "NetworkInterface", "to_custom_attributes")
 load("json", json_decode="decode")
 load("http", "get_json", "bearer")
 load("kwargs", "get_http_options", "get_http_tls")
-load("net", "network_interface", "routable_ip")
+load("net", "routable_ip")
 def _parse_bool(value, default_value):
     if value == None:
         return default_value

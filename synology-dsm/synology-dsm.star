@@ -107,7 +107,7 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "post_json", "url_parse", "url_encode")
 load("kwargs", "get_http_options", "get_bool", "get_int", "get_string")
 
@@ -171,7 +171,6 @@ def _pick(record, keys):
             return value
     return ""
 
-
 def _mac_key(value):
     """Return a MAC as lowercase colon-separated hex, or "" when it is not one.
 
@@ -201,7 +200,6 @@ def _mac_key(value):
 # real DHCP and NetBIOS names carry it, even though strict DNS does not.
 HOSTNAME_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789-._"
 
-
 def _hostname(value):
     """Return a value fit to import as a hostname, or "".
 
@@ -223,7 +221,6 @@ def _hostname(value):
             return ""
     return text
 
-
 def _to_int(value):
     if type(value) == "int":
         return value
@@ -234,7 +231,6 @@ def _to_int(value):
         if text[index] not in DIGITS:
             return -1
     return int(text)
-
 
 def options(ctx, extra_headers):
     """Build HTTP options carrying the current session's headers.
@@ -254,7 +250,6 @@ def options(ctx, extra_headers):
         headers[key] = extra_headers[key]
     return get_http_options(ctx["kwargs"], headers=headers)
 
-
 def _base(url):
     """Return <configured url>/webapi.
 
@@ -266,13 +261,11 @@ def _base(url):
     """
     return as_text(url, join=",").strip().rstrip("/") + "/webapi"
 
-
 def _scope(url):
     parsed = url_parse(url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return as_text(url, join=",").split("://")[-1].split("/")[0].split(":")[0]
-
 
 def _describe_error(payload, authenticating):
     """Turn a webapi failure body into a sentence, or return "" on success."""
@@ -300,7 +293,6 @@ def _describe_error(payload, authenticating):
     if known:
         return "error {}: {}{}".format(code, known, detail)
     return "error {}{}".format(code, detail)
-
 
 def discover(ctx):
     """Query SYNO.API.Info for every API this DSM publishes.
@@ -340,7 +332,6 @@ def discover(ctx):
         }
     return apis
 
-
 def api_version(ctx, name, preferred):
     """Clamp a preferred version into the range this DSM advertises."""
     entry = as_dict(ctx["apis"].get(name))
@@ -356,10 +347,8 @@ def api_version(ctx, name, preferred):
         return low
     return preferred
 
-
 def has_api(ctx, name):
     return name in ctx["apis"]
-
 
 def first_api(ctx, names):
     """Return the first API name this DSM actually publishes."""
@@ -367,7 +356,6 @@ def first_api(ctx, names):
         if name in ctx["apis"]:
             return name
     return ""
-
 
 def login(ctx, username, password, otp):
     """Exchange credentials for a session id.
@@ -434,7 +422,6 @@ def login(ctx, username, password, otp):
     ctx["synotoken"] = as_text(data.get("synotoken"), join=",").strip()
     return True
 
-
 def logout(ctx):
     """End the session.
 
@@ -451,7 +438,6 @@ def logout(ctx):
         "session": "runzero",
         "_sid": ctx["sid"],
     }, **options(ctx, {}))
-
 
 def call(ctx, name, method, preferred_version, extra, label):
     """Call one webapi method and return its data object, or None.
@@ -504,13 +490,11 @@ def call(ctx, name, method, preferred_version, extra, label):
         return None
     return None
 
-
 def room(ctx):
     """Report whether another asset may be emitted under the cap."""
     if not ctx["max_assets"]:
         return True
     return ctx["emitted"] < ctx["max_assets"]
-
 
 def emit(ctx, assets):
     if not assets:
@@ -518,7 +502,6 @@ def emit(ctx, assets):
     report_assets(assets)
     ctx["emitted"] += len(assets)
     return len(assets)
-
 
 def nas_interfaces(ctx):
     """Return (network_interfaces, hostname, attributes) for the NAS.
@@ -560,7 +543,6 @@ def nas_interfaces(ctx):
         "interfaces": summary,
     }
     return netifs, own, as_text(data.get("hostname"), join=",").strip(), attrs
-
 
 def build_nas_asset(ctx, info, system, netifs, network_attrs, network_hostname):
     serial = as_text(info.get("serial"), join=",").strip() or as_text(system.get("serial"), join=",").strip()
@@ -637,7 +619,6 @@ def build_nas_asset(ctx, info, system, netifs, network_attrs, network_hostname):
         params["model"] = model
     return ImportAsset(**params)
 
-
 def collect_vms(ctx):
     """Import Virtual Machine Manager guests.
 
@@ -712,7 +693,6 @@ def collect_vms(ctx):
     if skipped:
         print("synology: {} virtual machines had no virtual NIC and were skipped".format(skipped))
     return count
-
 
 def collect_cameras(ctx):
     """Import Surveillance Station cameras.
@@ -790,7 +770,6 @@ def collect_cameras(ctx):
     if skipped:
         print("synology: {} cameras had no usable address and were skipped".format(skipped))
     return count
-
 
 def collect_backup_devices(ctx):
     """Import the machines Active Backup for Business protects.
@@ -872,7 +851,6 @@ def collect_backup_devices(ctx):
     if skipped:
         print("synology: {} backup devices had no usable identifier, address, or hostname and were skipped".format(skipped))
     return count
-
 
 def collect_dhcp_leases(ctx, interfaces):
     """Import DHCP leases when the NAS is running the DHCP server.
@@ -960,7 +938,6 @@ def collect_dhcp_leases(ctx, interfaces):
             customAttributes=to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
         ))
     return emit(ctx, batch)
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url", default="")

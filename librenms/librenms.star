@@ -106,7 +106,7 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", http_get="get", "get_json", "url_parse")
 load("json", json_decode="decode")
 load("jsonstream", "iter_array")
@@ -176,13 +176,11 @@ def _hostname(value):
         return ""
     return text
 
-
 def _scope(base_url):
     parsed = url_parse(base_url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
-
 
 def _base(url):
     """Return the configured URL with any trailing slash removed.
@@ -193,7 +191,6 @@ def _base(url):
     installs.
     """
     return as_text(url, join=",").strip().rstrip("/")
-
 
 def _api_error(body):
     """Render a LibreNMS error body as one line.
@@ -209,7 +206,6 @@ def _api_error(body):
     if type(decoded) != "dict":
         return head[:200]
     return as_text(decoded.get("message"), join=",").strip() or head[:200]
-
 
 def stream(ctx, path, key, params):
     """GET one endpoint and walk its collection without decoding it whole.
@@ -258,7 +254,6 @@ def stream(ctx, path, key, params):
         return []
     return iter_array(text, path=key)
 
-
 def fetch(ctx, path, key, params):
     """GET one small endpoint and return its collection as a list.
 
@@ -284,7 +279,6 @@ def fetch(ctx, path, key, params):
         return []
     return dicts(rows)
 
-
 def device_addresses(ctx, device_id):
     """Return the addresses bound to a device's ports.
 
@@ -303,7 +297,6 @@ def device_addresses(ctx, device_id):
             if address and address not in addresses:
                 addresses.append(address)
     return addresses
-
 
 def device_ports(ctx, device_id):
     """Return a device's ports, with the columns actually needed.
@@ -327,7 +320,6 @@ def device_ports(ctx, device_id):
         ctx["collect_ports"] = False
         return []
     return rows
-
 
 def build_device_asset(ctx, record, addresses, ports):
     """Convert one LibreNMS device row into a runZero asset."""
@@ -465,7 +457,6 @@ def build_device_asset(ctx, record, addresses, ports):
     params["customAttributes"] = to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     return ImportAsset(**params)
 
-
 def _endpoint(index, order, ctx, mac):
     if mac not in index:
         if ctx["max_discovered"] and len(order) >= ctx["max_discovered"]:
@@ -482,12 +473,10 @@ def _endpoint(index, order, ctx, mac):
         order.append(mac)
     return index[mac]
 
-
 def _append(record, key, value):
     text = as_text(value, join=",").strip()
     if text and text not in record[key]:
         record[key].append(text)
-
 
 def _fold_arp_row(ctx, index, order, row):
     """Fold one ARP row into the endpoint index. Returns 1 when it counted."""
@@ -507,7 +496,6 @@ def _fold_arp_row(ctx, index, order, row):
     _append(record, "port_ids", row.get("port_id"))
     _append(record, "contexts", row.get("context_name"))
     return 1
-
 
 def collect_arp(ctx, index, order):
     """Fold the estate-wide ARP table into the endpoint index.
@@ -535,7 +523,6 @@ def collect_arp(ctx, index, order):
                 seen += _fold_arp_row(ctx, index, order, row)
     return seen
 
-
 def collect_fdb(ctx, index, order):
     """Fold the estate-wide MAC forwarding table into the endpoint index.
 
@@ -560,7 +547,6 @@ def collect_fdb(ctx, index, order):
         _append(record, "vlans", row.get("vlan_id"))
         seen += 1
     return seen
-
 
 def build_endpoint_asset(ctx, record):
     """Convert one merged ARP/FDB endpoint into a runZero asset."""
@@ -603,7 +589,6 @@ def build_endpoint_asset(ctx, record):
         customAttributes=to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
     )
 
-
 def collect_devices(ctx):
     """Stream /devices and report each batch of device assets."""
     params = {}
@@ -639,7 +624,6 @@ def collect_devices(ctx):
         report_asset(asset)
         reported += 1
     return reported, skipped
-
 
 def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))

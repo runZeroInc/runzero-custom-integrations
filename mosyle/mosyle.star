@@ -60,7 +60,7 @@ load('net', 'network_interface')
 load('flatten_json', 'flatten')
 load('kwargs', 'get_bool', 'get_http_options')
 load('http', 'post_json')
-load('coerce', 'as_dict', 'as_list', 'dicts')
+load('coerce', 'as_dict', 'dicts')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or self-hosted deployment can be reached
@@ -81,7 +81,6 @@ MAX_RECORDS = 10000000
 MOSYLE_PAGE_SIZE = 500
 MAX_PAGES = (MAX_RECORDS + MOSYLE_PAGE_SIZE - 1) // MOSYLE_PAGE_SIZE
 
-
 def page_signature(devices):
     """A fingerprint of one page's rows, used to notice a server that answers
     every page number with the same page."""
@@ -89,7 +88,6 @@ def page_signature(devices):
     for d in devices:
         ids.append(str(d.get("deviceudid") or d.get("serial_number") or ""))
     return ",".join(ids)
-
 
 def parse_credentials(secret):
     """
@@ -116,7 +114,6 @@ def parse_credentials(secret):
             return None, None
 
     return None, None
-
 
 def get_bearer_token(session, base_url, access_token, email, password):
     """
@@ -147,7 +144,6 @@ def get_bearer_token(session, base_url, access_token, email, password):
         return None
 
 
-
 # Mosyle manages Apple hardware only, and the model name is the one field that
 # separates the form factors inside a platform family: the "ios" family covers
 # iPhone, iPad and iPod alike, and "mac" covers both portable and desktop Macs.
@@ -173,7 +169,6 @@ OS_FAMILY_DEVICE_TYPES = {
     "tvos": "Smart TV",
 }
 
-
 def device_type(os_family, model):
     """Return the runZero device type for a Mosyle device, or None if unknown."""
     # Model names are spaced and cased inconsistently between the marketing
@@ -189,7 +184,6 @@ def device_type(os_family, model):
             return mapped
     return OS_FAMILY_DEVICE_TYPES.get(os_family, None)
 
-
 def collect_hostnames(device):
     names = []
     for key in ["device_name", "devicename", "HostName", "LocalHostName", "hostname"]:
@@ -203,7 +197,6 @@ def collect_hostnames(device):
             names.append(safe_name)
     return names
 
-
 def parse_tags(raw_tags, asset_tag):
     tags = []
     if raw_tags and type(raw_tags) == "string":
@@ -216,7 +209,6 @@ def parse_tags(raw_tags, asset_tag):
         tags.append(asset_tag)
     return tags if tags else None
 
-
 def build_custom_attributes(device, used_keys):
     flat = flatten(device)
     attrs = {}
@@ -228,7 +220,6 @@ def build_custom_attributes(device, used_keys):
             continue
         attrs[key] = "{}".format(value)
     return attrs if attrs else None
-
 
 def main(*args, **kwargs):
     """

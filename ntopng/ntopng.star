@@ -90,7 +90,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'post_json', 'basic', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool', 'get_list')
 load('time', 'now', 'from_timestamp')
@@ -182,7 +182,6 @@ def _num(value):
         return int(value)
     return None
 
-
 def _epoch(value, ceiling):
     """Convert a Unix epoch into a time value, clamped to the current time.
 
@@ -218,7 +217,6 @@ def _real_mac(value):
         return ""
     return text
 
-
 def _hostname(value):
     """Return a value fit to be imported as a hostname, or an empty string.
 
@@ -244,7 +242,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _names_from(value):
     """Split active.lua's decorated name field into candidate hostnames.
 
@@ -267,7 +264,6 @@ def _names_from(value):
         if name and name not in names:
             names.append(name)
     return names
-
 
 def call(ctx, path, payload, what):
     """Run one ntopng REST v2 read.
@@ -301,7 +297,6 @@ def call(ctx, path, payload, what):
         return None, "{}: {} ({})".format(what, label, as_text(data.get("rc_str")))
     return data, None
 
-
 def fetch_interfaces(ctx):
     """List the interfaces ntopng is monitoring.
 
@@ -325,7 +320,6 @@ def fetch_interfaces(ctx):
             "name": as_text(entry.get("name")),
         })
     return interfaces
-
 
 def fetch_macs(ctx, ifid):
     """Index the layer 2 device table for one interface.
@@ -378,7 +372,6 @@ def fetch_macs(ctx, ifid):
         if len(rows) < ctx["page_size"]:
             break
     return macs
-
 
 def build_asset(ctx, record, interface, macs):
     """Convert one ntopng host record into a runZero asset, or None when the
@@ -482,7 +475,6 @@ def build_asset(ctx, record, interface, macs):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_and_report_interface(ctx, interface):
     """Page one interface's active-host table and stream it into runZero.
 
@@ -550,7 +542,6 @@ def fetch_and_report_interface(ctx, interface):
         print("ntopng: skipped {} records on interface {} that were not addressable endpoints".format(skipped, ifid))
     print("ntopng: reported {} assets from interface {}".format(reported, ifid))
     return reported
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url", default="").strip().rstrip("/")

@@ -75,7 +75,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'post_json', 'url_encode', 'url_parse')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('requests', 'Session')
@@ -167,7 +167,6 @@ SENSOR_ATTRS = [
     "status", "upTime", "version",
 ]
 
-
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     if value == None:
@@ -178,7 +177,6 @@ def _clean(value):
         return ""
     return str(value).strip()
 
-
 def _is_true(value):
     """Read a flag that the API serializes as either a bool or a quoted bool.
 
@@ -188,7 +186,6 @@ def _is_true(value):
     if type(value) == "bool":
         return value
     return _clean(value).lower() == "true"
-
 
 def _to_int(value):
     """Convert an int or an all-digit string to an int, or -1 when it is neither."""
@@ -203,7 +200,6 @@ def _to_int(value):
         if text[index] not in DIGITS:
             return -1
     return int(text)
-
 
 def _timestamp(value, ceiling):
     """Convert an epoch-milliseconds field to a time, or None when it is absent.
@@ -240,7 +236,6 @@ def _hostnames(sensor):
         seen[key] = True
         names.append(value)
     return names
-
 
 def _pylum_mac(sensor):
     """Recover the endpoint MAC that Cybereason embeds in pylumId, or "".
@@ -300,14 +295,12 @@ def _pylum_mac(sensor):
         octets.append(token[index * 2:index * 2 + 2])
     return ":".join(octets)
 
-
 def _domain(sensor):
     """Return the DNS domain when fqdn is genuinely qualified."""
     fqdn = _clean(sensor.get("fqdn"))
     if "." not in fqdn:
         return ""
     return fqdn[fqdn.find(".") + 1:].strip(".")
-
 
 def split_os(sensor):
     """Split osType and osVersionType into an OS name and, when one is really
@@ -338,7 +331,6 @@ def split_os(sensor):
             version = remainder
     return name, version
 
-
 def _custom_tags(value):
     """Coerce the customTags field into a list of strings.
 
@@ -355,7 +347,6 @@ def _custom_tags(value):
         if text and text not in tags:
             tags.append(text)
     return tags
-
 
 def _simple_value(element, name):
     """Read one scalar out of an investigation graph element.
@@ -374,7 +365,6 @@ def _simple_value(element, name):
     if type(values) != "list" or not values:
         return ""
     return _clean(values[0])
-
 
 def build_services(elements, addresses):
     """Build Service objects from the connections an endpoint accepted.
@@ -428,7 +418,6 @@ def build_services(elements, addresses):
             }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
         ))
     return services, inbound, skipped
-
 
 def build_asset(ctx, sensor):
     """Convert one Cybereason sensor record into a runZero asset."""
@@ -544,7 +533,6 @@ def build_asset(ctx, sensor):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(ctx, sensors):
     """Convert one page of sensor records into runZero assets."""
     assets = []
@@ -561,7 +549,6 @@ def build_assets(ctx, sensors):
             continue
         assets.append(build_asset(ctx, sensor))
     return assets
-
 
 def login(ctx):
     """Log in with the form login and capture the session cookie.
@@ -610,7 +597,6 @@ def login(ctx):
                               SESSION_REFRESH_MARGIN_SECONDS)
     return True
 
-
 def _auth_failure(err):
     """Report whether a request error means the session is no longer good.
 
@@ -623,7 +609,6 @@ def _auth_failure(err):
     if err.startswith("status 401") or err.startswith("status 403"):
         return True
     return err.startswith("status 200") and "invalid JSON" in err
-
 
 def _post(ctx, path, payload):
     """POST one JSON request, refreshing the session when it has aged out and
@@ -650,7 +635,6 @@ def _post(ctx, path, payload):
             return None, "authentication rejected, check the username and password"
         return None, err
     return None, "request failed"
-
 
 def fetch_connections(ctx, machine_name):
     """Fetch the connections the investigation graph holds for one machine.
@@ -702,7 +686,6 @@ def fetch_connections(ctx, machine_name):
         return []
     return [elements[key] for key in elements]
 
-
 def fetch_and_report_sensors(ctx):
     """Fetch and stream sensors one page at a time so the whole fleet is never
     held in memory at once."""
@@ -752,7 +735,6 @@ def fetch_and_report_sensors(ctx):
 
     print("cybereason: reported {} sensors from {}".format(reported, ctx["host"]))
     return reported
-
 
 def main(**kwargs):
     require(kwargs, "url", "username", "password")

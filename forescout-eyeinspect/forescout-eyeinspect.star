@@ -79,7 +79,7 @@ load('net', 'network_interface', 'clean_hostname')
 load('http', 'get_json', 'basic', 'url_parse')
 load('json', json_encode='encode')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_duration', 'parse_ts')
+load('time', 'now', 'parse_duration', 'parse_ts')
 load('re', re_find_all='find_all')
 
 load('coerce', 'as_text', 'dedupe')
@@ -120,7 +120,6 @@ def _results(data):
             return results
     return []
 
-
 def _list(value):
     """Coerce a field documented as a list into one, so a scalar cannot abort the
     run. A comma-separated string is split, since eyeInspect types several of
@@ -143,7 +142,6 @@ def _extract_cves(value):
     else:
         text = json_encode(value)
     return dedupe(re_find_all(CVE_PATTERN, text.upper()))
-
 
 def _parse_open_port(entry):
     """Extract (port, transport) from one open_ports entry. Transport is an empty
@@ -181,7 +179,6 @@ def _parse_open_port(entry):
                 port = candidate
     return port, transport
 
-
 def fetch_cve_detail(ctx, cve_id):
     """Look up one CVE in the eyeInspect CVE database, caching every lookup so a
     CVE seen on many hosts costs a single request."""
@@ -199,7 +196,6 @@ def fetch_cve_detail(ctx, cve_id):
     cache[cve_id] = data
     return data
 
-
 def fetch_host_alerts(ctx, host_id):
     """Fetch one page of alerts for a single host. The Command Center resolves
     host_id against both the IP and the MAC addresses of the host, which is more
@@ -211,7 +207,6 @@ def fetch_host_alerts(ctx, host_id):
         print("forescout-eyeinspect: failed to fetch alerts for host {}: {}".format(host_id, err))
         return []
     return _results(data or {})
-
 
 def apply_cve_detail(ctx, params, attrs, cve_id, rank_from_cvss):
     """Fold an eyeInspect cve_info record into a Vulnerability. The CVSS scores
@@ -270,7 +265,6 @@ def apply_cve_detail(ctx, params, attrs, cve_id, rank_from_cvss):
     attrs["cve_vendor_specific_id"] = detail.get("vendor_specific_id")
     attrs["cve_remediation_level"] = detail.get("cvss_remediation_level")
 
-
 def build_cve_vulnerability(ctx, vuln_id, cve_id, category, base_attrs):
     """Build a CVE-backed Vulnerability, enriched from cve_info when enabled."""
     params = {
@@ -283,7 +277,6 @@ def build_cve_vulnerability(ctx, vuln_id, cve_id, category, base_attrs):
     apply_cve_detail(ctx, params, attrs, cve_id, True)
     params["customAttributes"] = to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     return Vulnerability(**params)
-
 
 def build_alert_vulnerability(ctx, host_ip, alert):
     """Convert one eyeInspect alert into a Vulnerability on its host."""
@@ -350,7 +343,6 @@ def build_alert_vulnerability(ctx, host_ip, alert):
     params["customAttributes"] = to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     return Vulnerability(**params)
 
-
 def build_vulnerabilities(ctx, host, host_ip, alerts):
     """Build the findings for one host: every alert the Command Center ties to it,
     plus any CVE the host record itself carries."""
@@ -375,7 +367,6 @@ def build_vulnerabilities(ctx, host, host_ip, alerts):
 
     return vulns
 
-
 def build_software(ctx, host, host_ip):
     """Build a firmware Software record, but only when the host record actually
     carries vendor/model or firmware detail. eyeInspect documents these as host
@@ -399,7 +390,6 @@ def build_software(ctx, host, host_ip):
     if firmware:
         params["version"] = firmware
     return [Software(**params)]
-
 
 def build_services(host_ip, open_ports):
     """Build Service objects from the host open_ports list. eyeInspect documents
@@ -433,7 +423,6 @@ def build_services(host_ip, open_ports):
             }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
         ))
     return services
-
 
 def build_asset(ctx, host):
     """Convert one eyeInspect host record into a runZero asset."""
@@ -530,7 +519,6 @@ def build_asset(ctx, host):
         asset.lastSeenTS = last_ts
     return asset
 
-
 def build_assets(ctx, hosts):
     """Convert a page of eyeInspect hosts into runZero assets."""
     assets = []
@@ -543,7 +531,6 @@ def build_assets(ctx, hosts):
             continue
         assets.append(build_asset(ctx, host))
     return assets
-
 
 def fetch_and_report_hosts(ctx):
     """Fetch and stream hosts one page at a time so the full inventory is never
@@ -576,7 +563,6 @@ def fetch_and_report_hosts(ctx):
 
     print("forescout-eyeinspect: reported {} assets".format(reported))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

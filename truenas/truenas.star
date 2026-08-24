@@ -88,7 +88,7 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "Service", "ServiceProtocolData", "Software", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "bearer", "url_parse")
 load("kwargs", "get_url_base", "get_http_options", "get_bool", "get_int", "get_string")
 
@@ -152,7 +152,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _dns_name(value):
     """Return a value only when it is shaped like a DNS name.
 
@@ -172,14 +171,12 @@ def _dns_name(value):
         return ""
     return text
 
-
 def _serial(value):
     """Return a chassis serial worth recording, or "" for an SMBIOS placeholder."""
     text = as_text(value, join=",").strip()
     if not text or text.lower() in PLACEHOLDER_SERIALS:
         return ""
     return text
-
 
 def _is_virtual_interface(name):
     """Report whether an interface name belongs to container or guest plumbing."""
@@ -195,7 +192,6 @@ def _is_virtual_interface(name):
                 return True
     return False
 
-
 def _appliance_host(base_url):
     """Return the TrueNAS hostname from the configured URL, which scopes every
     imported id. The scheme and port are dropped so that reaching the same
@@ -204,7 +200,6 @@ def _appliance_host(base_url):
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
-
 
 def _version(raw):
     """Normalize the version reported by system/info.
@@ -222,7 +217,6 @@ def _version(raw):
             return text[len(prefix):]
     return text
 
-
 def _major(version):
     """Return the leading major version as an int, or 0 when it is not numeric."""
     head = as_text(version, join=",").split(".")[0].split("-")[0].strip()
@@ -233,7 +227,6 @@ def _major(version):
         if character not in "0123456789":
             return 0
     return int(head)
-
 
 def fetch(ctx, path, params):
     """Call one TrueNAS endpoint. Failures are reported and returned as None so
@@ -247,7 +240,6 @@ def fetch(ctx, path, params):
         print("truenas: {} failed: {}".format(path, err))
         return None
     return data
-
 
 def fetch_collection(ctx, path):
     """Read a whole collection endpoint through its documented limit and offset
@@ -288,7 +280,6 @@ def fetch_collection(ctx, path):
         if len(data) < want:
             break
     return rows
-
 
 def collect_interfaces(ctx):
     """Return the NAS's own interfaces as (NetworkInterface list, names, macs).
@@ -336,7 +327,6 @@ def collect_interfaces(ctx):
             if mac and mac not in macs:
                 macs.append(mac)
     return netifs, names, macs
-
 
 def build_app_children(ctx, address):
     """Turn the application list into software and services for the NAS asset.
@@ -410,7 +400,6 @@ def build_app_children(ctx, address):
                 ))
     return software, services, names
 
-
 def collect_storage(ctx):
     """Summarize pools and disks onto the NAS asset.
 
@@ -448,7 +437,6 @@ def collect_storage(ctx):
         attrs["disk_models"] = models
         attrs["disk_serials"] = serials
     return attrs
-
 
 def build_system_asset(ctx, info, network):
     """Build the asset for the TrueNAS system itself."""
@@ -541,7 +529,6 @@ def build_system_asset(ctx, info, network):
         params["services"] = services[:CHILD_CAP]
     return ImportAsset(**params), macs
 
-
 def _nic_mac(device):
     """Return the MAC of a VM device row when it is a NIC, else "".
 
@@ -557,7 +544,6 @@ def _nic_mac(device):
     if dtype.upper() != "NIC":
         return ""
     return _mac_key(attributes.get("mac"))
-
 
 def _vm_device_macs(ctx):
     """Index virtual NIC MACs by the VM they are attached to.
@@ -583,7 +569,6 @@ def _vm_device_macs(ctx):
             index[owner].append(mac)
     return index
 
-
 def _vm_inline_macs(entry):
     """Return the NIC MACs embedded on one VM row."""
     macs = []
@@ -592,7 +577,6 @@ def _vm_inline_macs(entry):
         if mac and mac not in macs:
             macs.append(mac)
     return macs
-
 
 def build_vm_asset(ctx, entry, macs):
     """Convert one VM row into a runZero asset, or None when it has no id."""
@@ -651,7 +635,6 @@ def build_vm_asset(ctx, entry, macs):
         customAttributes=to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
     )
 
-
 def report_vms(ctx):
     """Stream VM assets to runZero in bounded batches."""
     rows = fetch_collection(ctx, "/vm")
@@ -687,7 +670,6 @@ def report_vms(ctx):
         report_asset(asset)
         reported += 1
     return reported, skipped
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

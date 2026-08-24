@@ -123,10 +123,10 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "post_json", "basic", "url_parse")
 load("kwargs", "get_url_base", "get_http_options", "get_bool", "get_int", "get_string")
-load("time", "now", "parse_time", 'parse_ts')
+load("time", "now", 'parse_ts')
 
 load('coerce', 'as_text', 'dedupe', 'dicts')
 VENDOR = "netdisco"
@@ -181,7 +181,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _mac_key(value):
     """Return a MAC as lowercase colon-separated hex, or "" when it is not one.
 
@@ -227,13 +226,11 @@ def _age_days(value, current):
         return 0
     return delta // 86400
 
-
 def _netdisco_host(base_url):
     parsed = url_parse(base_url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
-
 
 def _base(url):
     """Return the configured URL with any trailing slash removed.
@@ -244,7 +241,6 @@ def _base(url):
     send every request to the wrong place on those installs.
     """
     return as_text(url, join=",").strip().rstrip("/")
-
 
 def login(base_url, username, password, http_options):
     """Exchange Basic credentials for an API token.
@@ -269,7 +265,6 @@ def login(base_url, username, password, http_options):
         return ""
     return token
 
-
 def refresh_token(ctx):
     """Re-login once when the API token is refused mid-run.
 
@@ -289,7 +284,6 @@ def refresh_token(ctx):
         return False
     ctx["http_options"]["headers"]["Authorization"] = token
     return True
-
 
 def fetch_list(ctx, path, params):
     """Call an endpoint documented to return a JSON array.
@@ -315,7 +309,6 @@ def fetch_list(ctx, path, params):
     print("netdisco: {} returned an unexpected shape".format(path))
     return None
 
-
 def device_ips(ctx, ip):
     """Return the extra addresses a device answers to, from the device_ip table
     ({ip, alias, subnet, port, dns, creation})."""
@@ -333,7 +326,6 @@ def device_ips(ctx, ip):
             names.append(name)
     return dedupe(addresses), dedupe(names)
 
-
 def device_port_macs(ctx, ip):
     """Return the interface MACs on a device's ports, from the device_port
     table. Ports carry no addresses of their own in Netdisco."""
@@ -346,7 +338,6 @@ def device_port_macs(ctx, ip):
         if mac and mac not in macs:
             macs.append(mac)
     return macs
-
 
 def build_device_asset(ctx, record, extra_ips, extra_names, port_macs):
     """Convert one Netdisco device row into a runZero asset."""
@@ -460,7 +451,6 @@ def build_device_asset(ctx, record, extra_ips, extra_names, port_macs):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def collect_nodes(ctx, ip, device_name, index, order):
     """Fold one device's located nodes into the MAC index.
 
@@ -535,7 +525,6 @@ def collect_nodes(ctx, ip, device_name, index, order):
         kept += 1
     return kept, aged_out
 
-
 def collect_ip_inventory(ctx, index, order):
     """Attach IP and DNS data to located nodes from the IP Inventory report.
 
@@ -573,7 +562,6 @@ def collect_ip_inventory(ctx, index, order):
             if not record["vendor"]:
                 record["vendor"] = as_text(row.get("vendor"), join=",").strip()
     return attached
-
 
 def build_node_asset(ctx, record):
     """Convert one located node into a runZero asset."""
@@ -623,7 +611,6 @@ def build_node_asset(ctx, record):
     if last_seen != None and last_seen.unix > 0:
         asset.lastSeenTS = last_seen
     return asset
-
 
 def collect_devices(ctx):
     """Page /api/v1/search/device and stream each page of devices.
@@ -681,7 +668,6 @@ def collect_devices(ctx):
             break
 
     return devices, reported, skipped
-
 
 def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))

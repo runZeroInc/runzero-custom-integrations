@@ -106,7 +106,7 @@ CONFIG = {
     },
 }
 
-load('runzero.types', 'ImportAsset', 'NetworkInterface', 'Software')
+load('runzero.types', 'ImportAsset', 'NetworkInterface')
 load('json', json_decode='decode')
 load('net', 'ip_address', 'routable_ip')
 load('http', http_post='post', http_get='get', 'url_parse')
@@ -369,7 +369,6 @@ def get_agent_network_interfaces(host, token, agent_id, config):
 
     return response_data.get('data', {}).get('affected_items', []), response.status_code
 
-
 # NEW FUNCTION: get network addresses (IPs) for interfaces
 def get_agent_network_addresses(host, token, agent_id, config):
     """
@@ -405,7 +404,6 @@ def get_agent_network_addresses(host, token, agent_id, config):
 
     return response_data.get('data', {}).get('affected_items', []), response.status_code
 
-
 # --- NEW: Helper function to validate MAC addresses ---
 def is_valid_mac(mac_address):
     """
@@ -416,7 +414,6 @@ def is_valid_mac(mac_address):
     # List of known invalid MAC addresses
     invalid_macs = ["00:00:00:00:00:00", "ee:ee:ee:ee:ee:ee"]
     return mac_address.lower() not in invalid_macs
-
 
 def is_kubernetes_interface(iface_name):
     """
@@ -491,7 +488,6 @@ def is_kubernetes_interface(iface_name):
         return True
    
     return False
-
 
 def build_network_interface(network_interfaces_data, network_addresses_data, primary_ip_str):
     """
@@ -604,7 +600,6 @@ def manager_namespace(host):
     bare = host.replace("https://", "").replace("http://", "")
     return bare.split("/")[0].split(":")[0]
 
-
 def registration_key(date_add):
     """Reduce a registration timestamp to its digits, or "" when there is none.
 
@@ -615,7 +610,6 @@ def registration_key(date_add):
     reduce to the same key here.
     """
     return re_sub(r"[^0-9]", "", str(date_add or ""))
-
 
 def build_asset_id(namespace, agent_id, date_add):
     """Compose the foreign id for one agent.

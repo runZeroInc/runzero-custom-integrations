@@ -34,10 +34,10 @@ CONFIG = {
         "http_": OPTIONS_HTTP,
     },
 }
-load('runzero.types', 'ImportAsset', 'NetworkInterface')
+
 load('json', json_encode='encode')
-load('net', 'ip_address')
-load('http', 'post_json', 'get_json', 'bearer', 'url_encode')
+
+load('http', 'post_json', 'get_json', 'url_encode')
 load('kwargs', 'get_url_base', 'get_string', 'get_http_options')
 
 SEARCH = "alive:t"
@@ -91,7 +91,6 @@ def sync_to_sumo(dst_url, assets, http_options):
     else:
         print("No assets found")
     return rejected
-
 
 def main(*args, **kwargs):
     # The two URLs are read differently on purpose. src_url is a console the

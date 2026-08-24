@@ -99,7 +99,7 @@ load('runzero.types', 'ImportAsset', 'Software', 'Service', 'ServiceProtocolData
 load('net', 'network_interface')
 load('http', 'post_json', 'bearer')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_bool', 'get_int')
-load('time', 'now', 'parse_time', 'parse_duration', 'parse_ts')
+load('time', 'now', 'parse_duration', 'parse_ts')
 load('jwt', jwt_encode='encode')
 load('re', re_sub='sub', re_match='match')
 
@@ -166,7 +166,6 @@ VIRTUAL_INTERFACE_PREFIXES = [
     "vethernet", "awdl", "llw", "bridge", "gpd", "nordlynx", "ham",
 ]
 
-
 def _is_virtual_interface(name):
     """Report whether an osquery interface name is a virtual adapter."""
     lowered = name.strip().lower()
@@ -209,7 +208,6 @@ VULN_ALIASES = {
     "package_version": ["package_version", "installed_version"],
 }
 
-
 def _auth_headers(api_key, api_secret):
     """Mint a short-lived HS256 JWT and return the Uptycs request headers."""
     issued = now().in_location("UTC")
@@ -221,7 +219,6 @@ def _auth_headers(api_key, api_secret):
         "Accept": "application/json",
     }
 
-
 def _sql_id_list(values):
     """Render ids as a SQL IN list, dropping any character outside the Uptycs id
     alphabet so API data can never alter the shape of a query."""
@@ -232,7 +229,6 @@ def _sql_id_list(values):
             quoted.append("'" + clean + "'")
     return ",".join(quoted)
 
-
 def _run_query(query_url, http_options, sql):
     """Run one global SQL query and return (items, err). Callers treat a
     non-nil err as a missing or unauthorized table and continue without it."""
@@ -242,7 +238,6 @@ def _run_query(query_url, http_options, sql):
         return [], err
     data = data or {}
     return data.get("items", []) or [], None
-
 
 def _collect_rows(query_url, http_options, label, select_sql, order_sql):
     """Page one data lake table with LIMIT/OFFSET and return (rows, err).
@@ -268,7 +263,6 @@ def _collect_rows(query_url, http_options, label, select_sql, order_sql):
         offset += ROW_PAGE_SIZE
     return rows, None
 
-
 def _collect_osquery_rows(query_url, http_options, table, select_clause, order_sql, asset_ids, day_min):
     """Collect distinct rows from one osquery table for a page of assets.
 
@@ -290,7 +284,6 @@ def _collect_osquery_rows(query_url, http_options, table, select_clause, order_s
     print("uptycs: {} rejected the upt_day filter, queried without a time bound".format(table))
     return rows, None
 
-
 def _first_value(row, names):
     """Return the first non-empty value among the candidate column names."""
     for name in names:
@@ -303,7 +296,6 @@ def _partition_day(lookback_days):
     cutoff = now().in_location("UTC") - parse_duration("{}h".format(lookback_days * 24))
     return int(cutoff.format("20060102"))
 
-
 def _to_float(value):
     """Coerce a score to a float, returning None for anything non-numeric."""
     text = str(value).strip()
@@ -312,7 +304,6 @@ def _to_float(value):
     if not re_match(r"^-?[0-9]+(\.[0-9]+)?$", text):
         return None
     return float(text)
-
 
 def _to_int(value):
     """Coerce a numeric column to an int, returning None when it is not one.
@@ -325,7 +316,6 @@ def _to_int(value):
     if not matched:
         return None
     return int(matched.groups[1])
-
 
 def build_vulnerabilities(query_url, http_options, asset_ids, table):
     """Collect vulnerability findings keyed by Uptycs asset id."""
@@ -410,7 +400,6 @@ def build_vulnerabilities(query_url, http_options, asset_ids, table):
 
     return findings
 
-
 def build_software(query_url, http_options, asset_ids, day_min):
     """Collect installed software keyed by Uptycs asset id."""
     installed = {}
@@ -454,7 +443,6 @@ def build_software(query_url, http_options, asset_ids, day_min):
             ))
 
     return installed
-
 
 def build_services(query_url, http_options, asset_ids, primary_ips, day_min):
     """Collect listening ports as runZero services keyed by Uptycs asset id."""
@@ -511,7 +499,6 @@ def build_services(query_url, http_options, asset_ids, primary_ips, day_min):
 
     return listening
 
-
 def build_interfaces(query_url, http_options, asset_ids, day_min):
     """Collect MACs and IPs per interface, keyed by Uptycs asset id."""
     interfaces = {}
@@ -563,7 +550,6 @@ def build_interfaces(query_url, http_options, asset_ids, day_min):
 
     return interfaces
 
-
 def build_system_info(query_url, http_options, asset_ids, day_min):
     """Collect hardware serials and system UUIDs keyed by Uptycs asset id."""
     details = {}
@@ -588,7 +574,6 @@ def build_system_info(query_url, http_options, asset_ids, day_min):
 
     return details
 
-
 def primary_ip_map(interfaces):
     """Pick one routable IPv4-looking address per asset for service addresses."""
     primary = {}
@@ -599,7 +584,6 @@ def primary_ip_map(interfaces):
                     primary[asset_id] = address
     return primary
 
-
 # os_flavor is osquery's platform value, which on Linux is the os-release ID.
 # These distributions ship only as server platforms, so the flavor alone is a
 # fair statement of role. Deliberately absent are ubuntu, debian, fedora, arch,
@@ -609,7 +593,6 @@ SERVER_OS_FLAVORS = [
     "rhel", "redhat", "centos", "rocky", "almalinux", "alma",
     "amzn", "ol", "oraclelinux", "sles",
 ]
-
 
 def _device_type(item):
     """Return a runZero device type for one upt_assets row, or "".
@@ -636,7 +619,6 @@ def _device_type(item):
     if flavor in SERVER_OS_FLAVORS:
         return "Server"
     return ""
-
 
 def build_asset(item, customer_id, extras):
     """Build one ImportAsset from an upt_assets row plus its enrichment rows."""
@@ -716,7 +698,6 @@ def build_asset(item, customer_id, extras):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(items, customer_id, extras):
     """Build the ImportAssets for one page of upt_assets rows."""
     assets = []
@@ -725,7 +706,6 @@ def build_assets(items, customer_id, extras):
         if asset:
             assets.append(asset)
     return assets
-
 
 def collect_extras(query_url, http_options, asset_ids, options):
     """Run the enabled enrichment queries for one page of asset ids. Every
@@ -747,7 +727,6 @@ def collect_extras(query_url, http_options, asset_ids, options):
         extras["vulnerabilities"] = build_vulnerabilities(query_url, http_options, asset_ids,
                                                           options["vulnerability_table"])
     return extras
-
 
 def fetch_and_report_assets(query_url, config_kwargs, api_key, api_secret, customer_id, options):
     """Fetch and stream upt_assets one page at a time so the full inventory is
@@ -779,7 +758,6 @@ def fetch_and_report_assets(query_url, config_kwargs, api_key, api_secret, custo
             break
         offset += ASSET_PAGE_SIZE
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

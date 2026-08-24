@@ -108,8 +108,8 @@ load("runzero.types", "ImportAsset", "Software", "to_custom_attributes")
 load("net", "network_interface")
 load("http", "post_json", "url_encode", "url_parse")
 load("jwt", jwt_encode="encode")
-load("time", "parse_time", "now", 'parse_ts')
-load("re", re_match="match")
+load("time", "now", 'parse_ts')
+
 load("kwargs", "require", "get_string", "get_bool", "get_int", "get_url_base", "get_http_options")
 
 # Every v3 call is a signed envelope POSTed here as text/plain; the real method,
@@ -218,13 +218,11 @@ SOFTWARE_SORT = "deviceUid:asc,appId:asc"
 # these placeholders show up in the address fields when a lookup failed.
 UNUSABLE_IPS = ["", "0.0.0.0", "::", "unknown", "n/a"]
 
-
 def _encode_value(value):
     """Percent-encode one query-string value the way Absolute canonicalizes it."""
     # url_encode returns "v=<escaped>" and escapes a space as "+", but Absolute
     # documents %20, so drop the key and convert the one differing character.
     return url_encode({"v": str(value)})[2:].replace("+", "%20")
-
 
 def _region_scope(base_url):
     """Return the regional API hostname used to namespace asset ids."""
@@ -235,7 +233,6 @@ def _region_scope(base_url):
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     return str(value or "").strip()
-
 
 def build_query_string(select, page_size, sort_by, agent_status, next_page):
     """Assemble the canonical query string that gets signed into the JOSE header."""
@@ -250,7 +247,6 @@ def build_query_string(select, page_size, sort_by, agent_status, next_page):
         # opaque token is appended verbatim exactly as the docs show it.
         query += "&nextPage=" + next_page
     return query
-
 
 def sign_request(token_id, secret_key, method, uri, query_string):
     """Build the compact HS256 JWS that carries one Absolute API request."""
@@ -267,7 +263,6 @@ def sign_request(token_id, secret_key, method, uri, query_string):
     # GET requests carry an empty payload, still wrapped in the data key.
     return jwt_encode({"data": {}}, secret_key, algorithm="HS256", headers=header)
 
-
 def fetch_page(base_url, http_options, token_id, secret_key, uri, query_string):
     """Sign one request, POST it to the JWS validator, and return (data, next_page, err)."""
     signed = sign_request(token_id, secret_key, "GET", uri, query_string)
@@ -283,7 +278,6 @@ def fetch_page(base_url, http_options, token_id, secret_key, uri, query_string):
         return [], "", "unexpected data shape: " + type(rows)
     pagination = (body.get("metadata", {}) or {}).get("pagination", {}) or {}
     return rows, _clean(pagination.get("nextPage")), None
-
 
 def build_software(rows):
     """Convert the software report rows for one device into Software objects."""
@@ -327,7 +321,6 @@ def build_software(rows):
         software.append(Software(**params))
     return software
 
-
 def build_network_interfaces(device):
     """Build interfaces from the reported network adapters, falling back to localIp."""
     netifs = []
@@ -360,7 +353,6 @@ def build_network_interfaces(device):
     # every device behind one gateway, and attaching it to an interface would
     # invite unrelated laptops to merge together.
     return netifs
-
 
 def build_asset(scope, device):
     """Convert one device report record into an ImportAsset."""
@@ -467,7 +459,6 @@ def build_asset(scope, device):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(scope, devices, seen_uids=None):
     """Convert one page of device report records into ImportAsset objects.
 
@@ -489,7 +480,6 @@ def build_assets(scope, devices, seen_uids=None):
                 seen_uids[_clean(device.get("deviceUid"))] = True
     return assets
 
-
 def build_software_asset(scope, device_uid, rows):
     """Build an enrichment asset that carries one device's installed software."""
     software = build_software(rows)
@@ -499,7 +489,6 @@ def build_software_asset(scope, device_uid, rows):
         id="absolute:{}:{}".format(scope, device_uid),
         software=software[:MAX_SOFTWARE_PER_ASSET],
     )
-
 
 def retrieved_of(reported, total):
     """The retrieved/available half of a truncation message.
@@ -514,7 +503,6 @@ def retrieved_of(reported, total):
     if type(total) == "int" and total > 0:
         return "retrieved {}/{} available assets".format(reported, total)
     return "retrieved {} assets, total not reported".format(reported)
-
 
 def page_ceiling(config_kwargs, page_size):
     """The paging ceiling for one walk.
@@ -531,7 +519,6 @@ def page_ceiling(config_kwargs, page_size):
     if page_size > 0:
         return (MAX_RECORDS + page_size - 1) // page_size
     return MAX_PAGES
-
 
 def fetch_and_report_devices(base_url, http_options, token_id, secret_key, scope,
                              page_size, agent_status, max_pages, seen_uids=None):
@@ -563,7 +550,6 @@ def fetch_and_report_devices(base_url, http_options, token_id, secret_key, scope
         next_page = cursor
     return reported
 
-
 def report_software_group(scope, device_uid, rows, only_uids):
     """Emit one device's software group, honoring the active-only device set.
 
@@ -578,7 +564,6 @@ def report_software_group(scope, device_uid, rows, only_uids):
     if asset:
         return report_assets(asset), 0
     return 0, 0
-
 
 def fetch_and_report_software(base_url, http_options, token_id, secret_key, scope,
                               page_size, max_pages, only_uids=None):
@@ -634,7 +619,6 @@ def fetch_and_report_software(base_url, http_options, token_id, secret_key, scop
     if skipped:
         print("absolute: skipped software for {} devices excluded by active_only".format(skipped))
     return reported
-
 
 def main(**kwargs):
     require(kwargs, "api_host", "token_id", "secret_key")

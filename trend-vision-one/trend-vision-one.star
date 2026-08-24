@@ -82,10 +82,10 @@ CONFIG = {
 }
 
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'bearer', 'url_parse')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_dict', 'dicts')
@@ -117,7 +117,6 @@ ISOLATION_NORMAL = "off"
 # value is a UUID; anything outside this set simply skips the detail lookup.
 PATH_SAFE_RE = r"^[A-Za-z0-9._~-]+$"
 
-
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     return str(value or "").strip()
@@ -141,7 +140,6 @@ def _scope(base_url):
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url
-
 
 def build_software(scope, agent_guid, endpoint):
     """Convert the Trend products installed on one endpoint into Software records.
@@ -177,7 +175,6 @@ def build_software(scope, agent_guid, endpoint):
             # binding, so a hand-built string would fail validation.
             software.append(Software(**params))
     return software
-
 
 def build_network_interfaces(endpoint, detail):
     """Build one interface per reported adapter, falling back to the flat address
@@ -216,7 +213,6 @@ def build_network_interfaces(endpoint, detail):
     # Gateway, a proxy, or a NAT gateway is the shared egress address rather
     # than an address the endpoint owns. It is kept as an attribute instead.
     return netifs
-
 
 def build_asset(scope, endpoint, detail, import_software):
     """Convert one endpoint record, optionally merged with its detailed profile,
@@ -351,7 +347,6 @@ def build_asset(scope, endpoint, detail, import_software):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_endpoint_detail(base_url, http_options, agent_guid):
     """Fetch the detailed profile of one endpoint, which is where the adapter
     list, and with it the MAC addresses, lives."""
@@ -360,7 +355,6 @@ def fetch_endpoint_detail(base_url, http_options, agent_guid):
     if err:
         return {}, err
     return as_dict(data), None
-
 
 def build_assets(base_url, detail_options, scope, rows, import_software,
                  fetch_interfaces, budget):
@@ -395,7 +389,6 @@ def build_assets(base_url, detail_options, scope, rows, import_software,
         if asset:
             assets.append(asset)
     return assets, spent, no_adapters
-
 
 def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, page_size,
                                import_software, fetch_interfaces, interface_limit):
@@ -466,7 +459,6 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
         first = False
         url = next_link
     return reported, detailed, adapterless
-
 
 def main(**kwargs):
     require(kwargs, "api_host", "api_token")

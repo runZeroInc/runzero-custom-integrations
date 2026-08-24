@@ -90,12 +90,12 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'network_interface', 'ip_address', 'ip_in_network', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'get_json', 'post_json', 'bearer', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('json', json_encode='encode')
-load('re', re_match='match')
-load('time', 'parse_time', 'now', 'parse_ts')
+
+load('time', 'now', 'parse_ts')
 
 load('coerce', 'as_dict')
 OAUTH_PATH = "/api/oauth"
@@ -224,7 +224,6 @@ INSIGHT_TAG_DEVICE_TYPES = [
     ("switch", "Switch"),
 ]
 
-
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     return str(value or "").strip()
@@ -249,7 +248,6 @@ def _mac_key(value):
     for index in range(6):
         octets.append(text[index * 2:index * 2 + 2])
     return ":".join(octets)
-
 
 def _cppm_host(base_url):
     """Return the ClearPass hostname, which is the scope every imported id sits under.
@@ -281,7 +279,6 @@ def _insight_tags(value):
             tags.append(entry)
     return tags
 
-
 def _device_type(category, insight_tags):
     """Return a runZero device type for the classifications that name one outright."""
     mapped = DEVICE_CATEGORY_TYPES.get(category.upper(), "")
@@ -294,7 +291,6 @@ def _device_type(category, insight_tags):
                 return entry[1]
     return ""
 
-
 def _endpoint_filter(status):
     """Build the JSON filter expression sent as the endpoint read's filter param.
 
@@ -305,7 +301,6 @@ def _endpoint_filter(status):
     if value:
         return json_encode({"status": value})
     return EMPTY_FILTER
-
 
 def _page_params(filter_expression, sort, offset, page_size):
     """Build the query for one paged read."""
@@ -318,7 +313,6 @@ def _page_params(filter_expression, sort, offset, page_size):
         # appliance and nothing here needs the total.
         "calculate_count": "false",
     }
-
 
 def retrieved_of(reported, total):
     """The retrieved/available half of a truncation message.
@@ -334,7 +328,6 @@ def retrieved_of(reported, total):
     if type(total) == "int" and total > 0:
         return "retrieved {}/{} available assets".format(reported, total)
     return "retrieved {} assets, total not reported".format(reported)
-
 
 def page_ceiling(config_kwargs, page_size):
     """The paging ceiling for one walk.
@@ -352,7 +345,6 @@ def page_ceiling(config_kwargs, page_size):
         return (MAX_RECORDS + page_size - 1) // page_size
     return MAX_PAGES
 
-
 def _page_signature(items):
     """A cheap fingerprint of one page: its length and the ids at either end.
 
@@ -369,7 +361,6 @@ def _page_signature(items):
     first_id = str(first.get("id", "")) if type(first) == "dict" else ""
     last_id = str(last.get("id", "")) if type(last) == "dict" else ""
     return "{}|{}|{}".format(len(items), first_id, last_id)
-
 
 def _get_page(url, http_options, params):
     """Fetch one page and return (items, has_next, err).
@@ -390,12 +381,10 @@ def _get_page(url, http_options, params):
         return [], False, "unexpected items of type " + type(items)
     return items, bool(as_dict(data.get("_links")).get("next")), None
 
-
 def _auth_hint(err):
     """Print a credential hint for the statuses that mean ClearPass rejected the client."""
     if err.startswith("status 401") or err.startswith("status 403"):
         print("aruba-clearpass: check that the API client is enabled and its operator profile grants read access")
-
 
 def _session_rank(record):
     """Rank a session so the most recent one wins when a MAC has several.
@@ -407,7 +396,6 @@ def _session_rank(record):
     started = parse_ts(record.get("acctstarttime"))
     stamp = started.unix if started else 0
     return (stamp, _clean(record.get("id")))
-
 
 def build_asset(record, cppm_host, session, max_profile_age_hours):
     """Build one ImportAsset from an endpoint row and its optional session join."""
@@ -544,7 +532,6 @@ def build_asset(record, cppm_host, session, max_profile_age_hours):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_access_token(base_url, client_id, client_secret, config_kwargs):
     """Exchange the API client credentials for a bearer token.
 
@@ -576,7 +563,6 @@ def fetch_access_token(base_url, client_id, client_secret, config_kwargs):
     if type(lifetime) == "int" and lifetime > 0 and lifetime < SHORT_TOKEN_LIFETIME:
         print("aruba-clearpass: access token expires in {}s; raise the API client's token lifetime if a large import fails partway".format(lifetime))
     return token
-
 
 def fetch_session_index(base_url, http_options, page_size, max_pages):
     """Index the active RADIUS sessions by client MAC.
@@ -651,7 +637,6 @@ def fetch_session_index(base_url, http_options, page_size, max_pages):
     print("aruba-clearpass: indexed {} active sessions ({} rows ignored)".format(len(sessions), skipped))
     return sessions
 
-
 def fetch_and_report_endpoints(base_url, http_options, page_size, cppm_host, status,
                                session_index, max_profile_age_hours, max_pages):
     """Fetch and stream endpoints one page at a time so the whole endpoint
@@ -714,7 +699,6 @@ def fetch_and_report_endpoints(base_url, http_options, page_size, cppm_host, sta
             max_pages, retrieved_of(reported, None)))
 
     return reported, skipped
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

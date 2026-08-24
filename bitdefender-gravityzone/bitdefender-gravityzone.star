@@ -98,7 +98,7 @@ CONFIG = {
 }
 
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'network_interface', 'routable_ip')
 load('http', 'post_json', 'basic', 'url_parse')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'parse_ts')
@@ -175,7 +175,6 @@ RPC_ERROR_NAMES = {
     "-32003": "too many requests",
 }
 
-
 def _clean(value):
     """Return a trimmed string, or an empty string when there is nothing usable."""
     return str(value or "").strip()
@@ -185,14 +184,12 @@ def _strings(value):
         return []
     return [_clean(item) for item in value if _clean(item)]
 
-
 def _console(base_url):
     """Return the Control Center hostname used to namespace asset ids."""
     parsed = url_parse(base_url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url
-
 
 def rpc(base_url, service, http_options, method, params):
     """Issue one JSON-RPC 2.0 call and return (result, err).
@@ -226,7 +223,6 @@ def rpc(base_url, service, http_options, method, params):
         return None, "json-rpc error: " + _clean(data.get("error"))
     return data.get("result"), None
 
-
 def build_network_interfaces(details):
     """Build interfaces from the endpoint's MAC list and primary address.
 
@@ -259,7 +255,6 @@ def build_network_interfaces(details):
         if nic:
             netifs.append(nic)
     return netifs
-
 
 def build_asset(console, item, detail):
     """Convert one network inventory item, optionally merged with its detailed
@@ -404,7 +399,6 @@ def build_asset(console, item, detail):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_endpoint_detail(base_url, http_options, endpoint_id):
     """Fetch the detailed profile of one endpoint, which is where the check-in
     time, agent versions, protection modules, and logged-in users live."""
@@ -423,7 +417,6 @@ def fetch_endpoint_detail(base_url, http_options, endpoint_id):
     if err:
         return {}, err
     return as_dict(result), None
-
 
 def build_assets(base_url, http_options, console, items, ctx):
     """Convert one page of network inventory items into ImportAsset objects,
@@ -468,7 +461,6 @@ def build_assets(base_url, http_options, console, items, ctx):
             assets.append(asset)
     return assets
 
-
 def fetch_parent_id(base_url, http_options):
     """Resolve the network inventory node to walk.
 
@@ -486,7 +478,6 @@ def fetch_parent_id(base_url, http_options):
     print("bitdefender-gravityzone: importing under company {} ({})".format(
         company_id, _clean(company.get("name")) or "unnamed"))
     return company_id, None
-
 
 def fetch_and_report_endpoints(base_url, http_options, console, parent_id, ctx):
     """Fetch and stream the network inventory one page at a time so the full set
@@ -565,7 +556,6 @@ def fetch_and_report_endpoints(base_url, http_options, console, parent_id, ctx):
         elif len(items) < ctx["page_size"]:
             break
     return reported
-
 
 def main(**kwargs):
     require(kwargs, "url", "api_key")

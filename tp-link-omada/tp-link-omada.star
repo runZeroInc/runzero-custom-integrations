@@ -102,7 +102,7 @@ CONFIG = {
 }
 
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "post_json")
 load("kwargs", "require", "get_http_options", "get_string", "get_bool", "get_int", "get_list")
 load("time", "now", "from_timestamp")
@@ -157,7 +157,6 @@ INVALID_MACS = ["00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"]
 # ~1.8e12, which this threshold separates cleanly for any date this century.
 MS_THRESHOLD = 100000000000
 
-
 def _clean(value):
     """Return a trimmed string for a scalar, or "" for anything else."""
     if type(value) == "string":
@@ -197,7 +196,6 @@ def _addresses(record, keys):
                 found.append(canonical)
     return found
 
-
 def _hostname(value, mac):
     """Return a usable hostname, or "".
 
@@ -219,7 +217,6 @@ def _hostname(value, mac):
         return ""
     return text
 
-
 def _last_seen(value, ceiling):
     """Return lastSeen as a time clamped to now, or None.
 
@@ -239,7 +236,6 @@ def _last_seen(value, ceiling):
         return ceiling
     return parsed
 
-
 def _envelope(payload):
     """Split an Open API response into (result, errorCode, msg).
 
@@ -253,7 +249,6 @@ def _envelope(payload):
     if type(code) != "int":
         return None, None, "response carried no errorCode"
     return payload.get("result"), code, _clean(payload.get("msg"))
-
 
 def mint_token(ctx):
     """Run the client_credentials grant and store the access token.
@@ -285,7 +280,6 @@ def mint_token(ctx):
         return False
     ctx["token"] = token
     return True
-
 
 def api_get(ctx, path, label):
     """GET one Open API path, refreshing the access token once if it has expired.
@@ -322,7 +316,6 @@ def api_get(ctx, path, label):
         print("{}: {} returned errorCode {}: {}".format(VENDOR, label, code, msg))
         return None, code
     return None, None
-
 
 def walk_pages(ctx, path, label, build):
     """Page through one Open API collection, streaming each page as it arrives.
@@ -371,7 +364,6 @@ def walk_pages(ctx, path, label, build):
         if len(rows) < ctx["page_size"]:
             break
     return reported
-
 
 def build_devices(ctx, rows):
     """Convert one page of Omada devices into ImportAssets."""
@@ -447,7 +439,6 @@ def build_devices(ctx, rows):
 
         assets.append(asset)
     return assets
-
 
 def build_clients(ctx, rows):
     """Convert one page of Omada clients into ImportAssets."""
@@ -532,7 +523,6 @@ def build_clients(ctx, rows):
         assets.append(asset)
     return assets
 
-
 def list_sites(ctx):
     """Return the sites to walk as a list of (siteId, name).
 
@@ -577,7 +567,6 @@ def list_sites(ctx):
         if len(rows) < ctx["page_size"]:
             break
     return sites
-
 
 def main(*args, **kwargs):
     require(kwargs, "url", "omadac_id", "client_id", "client_secret")

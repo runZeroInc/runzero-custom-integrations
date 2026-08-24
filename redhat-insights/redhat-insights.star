@@ -106,10 +106,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'Vulnerability', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'get_json', 'post_json', 'bearer', 'url_encode', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_dict', 'as_text', 'dedupe', 'dicts')
@@ -233,7 +233,6 @@ def _usable_mac(value):
         return ""
     return text
 
-
 def _score_rank(score):
     """Convert a CVSS score to a runZero 0-4 rank using the standard bands."""
     if score < 0.1:
@@ -245,7 +244,6 @@ def _score_rank(score):
     if score < 9.0:
         return 3
     return 4
-
 
 def parse_nevra(nevra):
     """Split an RPM NEVRA string into (name, epoch, version, release, arch).
@@ -295,7 +293,6 @@ def parse_nevra(nevra):
     if not name or not version or not release:
         return None
     return (name, epoch, version, release, arch)
-
 
 def build_vulnerabilities(ctx, scope, host_id, records):
     """Convert the CVE report the Vulnerability service publishes for one system
@@ -376,7 +373,6 @@ def build_vulnerabilities(ctx, scope, host_id, records):
         findings.append((rank, Vulnerability(**params)))
     return findings
 
-
 def fetch_vulnerabilities(ctx, host_id):
     """Fetch the CVE report for one system. The Vulnerability service has no
     endpoint that returns findings for several systems at once, so this is one
@@ -399,7 +395,6 @@ def fetch_vulnerabilities(ctx, host_id):
         return []
     data = data or {}
     return dicts(as_dict(data).get("data"))
-
 
 def build_software(ctx, scope, host_id, profile):
     """Convert the NEVRA strings in installed_packages into Software records.
@@ -439,7 +434,6 @@ def build_software(ctx, scope, host_id, profile):
         }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
         software.append(Software(**params))
     return software
-
 
 def build_interfaces(record, profile):
     """Build runZero network interfaces for one system, and return them with the
@@ -498,7 +492,6 @@ def build_interfaces(record, profile):
         macs.append(mac)
         interfaces.append(nic)
     return interfaces[:MAX_INTERFACES], names, macs
-
 
 def build_asset(ctx, record):
     """Convert one Insights inventory record into a runZero asset."""
@@ -689,7 +682,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(ctx, records):
     """Convert a page of inventory records into runZero assets."""
     assets = []
@@ -703,7 +695,6 @@ def build_assets(ctx, records):
             continue
         assets.append(build_asset(ctx, record))
     return assets
-
 
 def list_params(ctx, page):
     """Build the query parameters for one page of the host list.
@@ -723,7 +714,6 @@ def list_params(ctx, page):
         params["fields[system_profile]"] = ",".join(fields)
     return params
 
-
 def refresh_token(ctx):
     """Mint a new service account token and rebuild the request options.
 
@@ -741,7 +731,6 @@ def refresh_token(ctx):
         "Authorization": bearer(token),
     })
     return True
-
 
 def fetch_hosts_page(ctx, page):
     """Fetch one page of the host list, returning (records, total, err).
@@ -779,7 +768,6 @@ def fetch_hosts_page(ctx, page):
     total = data.get("total")
     return dicts(data.get("results")), total if type(total) == "int" else 0, None
 
-
 def fetch_and_report_hosts(ctx):
     """Fetch and stream systems one page at a time so the full inventory is
     never held in memory at once. The system profile travels with the host list
@@ -816,7 +804,6 @@ def fetch_and_report_hosts(ctx):
             ctx["package_skipped"]))
     return reported
 
-
 def fetch_access_token(token_url, client_id, client_secret, scope, config_kwargs):
     """Exchange service account credentials for a bearer token."""
     options = get_http_options(config_kwargs, headers={
@@ -839,7 +826,6 @@ def fetch_access_token(token_url, client_id, client_secret, scope, config_kwargs
     if not token:
         print("redhat-insights: the token response contained no access_token")
     return token
-
 
 def main(**kwargs):
     console_url = get_url_base(kwargs).rstrip("/")

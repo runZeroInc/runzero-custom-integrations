@@ -68,10 +68,10 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "bearer", "url_parse")
 load("kwargs", "get_http_options", "get_bool", "get_int", "get_string")
-load("time", "now", "parse_time", 'parse_ts')
+load("time", "now", 'parse_ts')
 
 load('coerce', 'as_text', 'dedupe', 'dicts')
 VENDOR = "slurpit"
@@ -116,14 +116,12 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _clean(value):
     """A field value with Slurp'it's license placeholders removed."""
     text = as_text(value, join=",").strip()
     if not text or text.lower() in LICENSE_PLACEHOLDERS:
         return ""
     return text
-
 
 def _truthy(value):
     """Slurp'it sends booleans as the STRINGS '0' and '1', not as JSON bools."""
@@ -144,7 +142,6 @@ def _scope(base_url):
         return parsed.hostname
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
 
-
 def _base(url):
     """Return the configured URL with any trailing slash removed.
 
@@ -154,7 +151,6 @@ def _base(url):
     SDK does with its base_url.
     """
     return as_text(url, join=",").strip().rstrip("/")
-
 
 def fetch(ctx, path, params):
     """GET one Slurp'it endpoint.
@@ -182,7 +178,6 @@ def fetch(ctx, path, params):
     print("slurpit: {} returned an unexpected shape".format(path))
     return None
 
-
 def preflight(ctx):
     """Confirm the portal is reachable and the key is accepted.
 
@@ -206,7 +201,6 @@ def preflight(ctx):
         if status and status != "up":
             print("slurpit: the portal reports status '{}' rather than 'up'; continuing anyway".format(status))
     return True
-
 
 def collect_sites(ctx):
     """Read the site table once and index it by site name.
@@ -233,7 +227,6 @@ def collect_sites(ctx):
             "status": row.get("status"),
         }
     return index
-
 
 def build_asset(ctx, record):
     """Convert one Slurp'it device into a runZero asset."""
@@ -358,7 +351,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def collect_devices(ctx):
     """Page /api/devices and stream each page.
 
@@ -405,7 +397,6 @@ def collect_devices(ctx):
             break
 
     return reported, skipped_disabled, capped
-
 
 def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))

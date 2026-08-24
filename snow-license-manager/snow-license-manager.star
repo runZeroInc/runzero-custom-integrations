@@ -45,13 +45,12 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('base64', base64_encode='encode', base64_decode='decode')
+load('base64', base64_encode='encode')
 load('coerce', 'as_text', 'as_dict', 'as_list', 'dicts', 'as_int')
-load('http', 'get_json', 'url_encode')
+load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
 load('net', 'network_interface')
 load('time', 'parse_ts')
-
 
 def _ts_attr(value, default=''):
     """Unix epoch for a Snow timestamp attribute, or the raw value when it
@@ -72,7 +71,6 @@ def _is_true(value):
         return value.strip().lower() in ["true", "1", "yes"]
     return False
 
-
 def device_type(item):
     """Return the runZero device type for a Snow computer, or None.
 
@@ -90,7 +88,6 @@ def device_type(item):
         return "Laptop"
     return None
 
-
 def _indexed_attrs(custom_attributes, prefix, value):
     """Flatten a hardware sub-collection (disks, drives, adapters, monitors)
     into indexed custom attribute keys. The collection arrives as a list of
@@ -99,7 +96,6 @@ def _indexed_attrs(custom_attributes, prefix, value):
     for index in range(len(entries)):
         for k, v in entries[index].items():
             custom_attributes[prefix + '.' + str(index) + '.' + str(k)] = v
-
 
 def get_computer_detail(base_url, customer_id, asset_id, creds, config_kwargs):
     """Fetch one computer's full record and return its Body dict, or {}.
@@ -115,7 +111,6 @@ def get_computer_detail(base_url, customer_id, asset_id, creds, config_kwargs):
         print('failed to retrieve computer detail for ' + str(asset_id) + ': ' + err)
         return {}
     return as_dict(as_dict(data).get('Body'))
-
 
 def build_assets(base_url, customer_id, assets, creds, config_kwargs):
     assets_import = []

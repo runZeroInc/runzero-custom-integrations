@@ -112,10 +112,10 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "post_json", "basic", "url_parse")
 load("kwargs", "get_http_options", "get_bool", "get_int", "get_string")
-load("time", "now", "parse_time", 'parse_ts')
+load("time", "now", 'parse_ts')
 
 load('coerce', 'as_text', 'dedupe', 'dicts')
 VENDOR = "phpipam"
@@ -170,7 +170,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _mac_key(value):
     """Return a MAC as lowercase colon-separated hex, or "" when it is not one.
 
@@ -204,7 +203,6 @@ def _scope(base_url):
         return parsed.hostname
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
 
-
 def _base(url):
     """Return the configured URL with any trailing slash removed.
 
@@ -214,7 +212,6 @@ def _base(url):
     dropping the path would send every request to the wrong place.
     """
     return as_text(url, join=",").strip().rstrip("/")
-
 
 def login(ctx, username, password):
     """Exchange Basic credentials for a phpIPAM API token.
@@ -254,7 +251,6 @@ def login(ctx, username, password):
         return ""
     return token
 
-
 def fetch(ctx, path):
     """Call a phpIPAM API endpoint and return its `data` payload, or None.
 
@@ -289,13 +285,11 @@ def fetch(ctx, path):
         return []
     return payload
 
-
 def fetch_list(ctx, path):
     payload = fetch(ctx, path)
     if payload == None:
         return None
     return dicts(payload)
-
 
 def _lookup(ctx, path, key_field, value_field):
     """Build an id -> name map from one of phpIPAM's small reference tables."""
@@ -309,7 +303,6 @@ def _lookup(ctx, path, key_field, value_field):
         if key and value:
             out[key] = value
     return out
-
 
 def _location_name(ctx, value):
     """Resolve a location, which phpIPAM returns in three different shapes.
@@ -327,7 +320,6 @@ def _location_name(ctx, value):
         return ""
     return ctx["locations"].get(key, "")
 
-
 def _wanted(selectors, ident, name):
     """True when no filter is configured, or this row matches one by id or name."""
     if not selectors:
@@ -337,7 +329,6 @@ def _wanted(selectors, ident, name):
     if as_text(name, join=",").strip().lower() in selectors:
         return True
     return False
-
 
 def build_address_asset(ctx, record, subnet):
     """Convert one phpIPAM address row into a runZero asset."""
@@ -446,7 +437,6 @@ def build_address_asset(ctx, record, subnet):
             asset.lastSeenTS = last_seen
     return asset
 
-
 def build_device_asset(ctx, record):
     """Convert one phpIPAM registered device into a runZero asset."""
     device_id = as_text(record.get("id"), join=",").strip()
@@ -522,7 +512,6 @@ def build_device_asset(ctx, record):
         asset.lastSeenTS = edited
     return asset
 
-
 def collect_addresses(ctx):
     """Walk subnets and stream each subnet's addresses.
 
@@ -577,7 +566,6 @@ def collect_addresses(ctx):
 
     return reported, skipped
 
-
 def collect_devices(ctx):
     """Import the registered device inventory.
 
@@ -602,7 +590,6 @@ def collect_devices(ctx):
         reported += 1
     return reported
 
-
 def _selectors(raw):
     """Lower-cased include-filter terms. Matched against both ids and names."""
     out = []
@@ -611,7 +598,6 @@ def _selectors(raw):
         if value and value not in out:
             out.append(value)
     return out
-
 
 def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))

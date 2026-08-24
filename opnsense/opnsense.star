@@ -89,7 +89,7 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "post_json", "basic", "url_parse")
 load("kwargs", "get_url_base", "get_http_options", "get_bool", "get_int", "get_string")
 
@@ -147,7 +147,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _appliance_host(base_url):
     """Return the OPNsense hostname, which scopes every imported id.
 
@@ -158,7 +157,6 @@ def _appliance_host(base_url):
     if parsed and parsed.hostname:
         return parsed.hostname
     return base_url.split("://")[-1].split("/")[0].split(":")[0]
-
 
 def fetch(ctx, path, method, payload):
     """Call one OPNsense API endpoint. Failures are reported and returned as
@@ -172,7 +170,6 @@ def fetch(ctx, path, method, payload):
         print("opnsense: {} failed: {}".format(path, err))
         return None
     return data
-
 
 def search_rows(ctx, path, payload):
     """Call an OPNsense bootgrid "search" endpoint and return its rows.
@@ -188,7 +185,6 @@ def search_rows(ctx, path, payload):
     if type(rows) != "list":
         return None
     return dicts(rows)
-
 
 def parse_version(versions):
     """Pull the product name and version out of systemInformation's versions[].
@@ -214,7 +210,6 @@ def parse_version(versions):
     if "-" in version:
         version = version.split("-")[0]
     return name, version
-
 
 def build_firewall_asset(ctx):
     """Build the asset for the firewall itself from its system information and
@@ -302,7 +297,6 @@ def build_firewall_asset(ctx):
         params["osVersion"] = os_version
     return ImportAsset(**params), own_macs
 
-
 def _record(index, order, mac):
     """Return the accumulating record for one MAC, creating it on first sight."""
     if mac not in index:
@@ -316,7 +310,6 @@ def _record(index, order, mac):
         }
         order.append(mac)
     return index[mac]
-
 
 def _merge(record, source, ips, hostnames, interfaces, attrs):
     """Fold one observation of a MAC into its accumulating record."""
@@ -337,7 +330,6 @@ def _merge(record, source, ips, hostnames, interfaces, attrs):
             continue
         if key not in record["attrs"]:
             record["attrs"][key] = value
-
 
 def collect_arp(ctx, index, order, own_macs):
     """Fold the IPv4 ARP table into the MAC index.
@@ -376,7 +368,6 @@ def collect_arp(ctx, index, order, own_macs):
         seen += 1
     return seen
 
-
 def collect_ndp(ctx, index, order, own_macs):
     """Fold the IPv6 NDP table into the MAC index.
 
@@ -403,7 +394,6 @@ def collect_ndp(ctx, index, order, own_macs):
                })
         seen += 1
     return seen
-
 
 def collect_leases(ctx, index, order, own_macs, path, source, payload):
     """Fold one DHCP lease table into the MAC index.
@@ -438,7 +428,6 @@ def collect_leases(ctx, index, order, own_macs, path, source, payload):
         seen += 1
     return seen
 
-
 def build_host_asset(ctx, record):
     """Convert one merged MAC record into a runZero asset."""
     mac = record["mac"]
@@ -470,7 +459,6 @@ def build_host_asset(ctx, record):
         customAttributes=to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
     )
 
-
 def report_hosts(ctx, index, order):
     """Stream the merged host records to runZero, one asset per call."""
     limit = ctx["max_hosts"]
@@ -489,7 +477,6 @@ def report_hosts(ctx, index, order):
         report_asset(build_host_asset(ctx, record))
         reported += 1
     return reported, skipped
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

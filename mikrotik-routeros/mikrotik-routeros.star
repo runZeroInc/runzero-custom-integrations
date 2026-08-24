@@ -143,12 +143,12 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "get_json", "basic", "url_parse")
 load("kwargs", "get_http_options", "get_bool", "get_int", "get_string")
 load("time", "now", "from_timestamp")
 
-load('coerce', 'as_text', 'dedupe', 'dicts')
+load('coerce', 'as_text', 'dicts')
 VENDOR = "mikrotik"
 ATTR_PREFIX = "mikrotik"
 ATTR_SEPARATOR = "_"
@@ -203,7 +203,6 @@ def _pick(record, keys):
             return value
     return ""
 
-
 def _flag(record, key):
     """Read a RouterOS boolean.
 
@@ -212,7 +211,6 @@ def _flag(record, key):
     Testing truthiness the obvious way inverts the meaning of every flag.
     """
     return as_text(record.get(key), join=",").strip().lower() == "true"
-
 
 def _mac_key(value):
     """Return a MAC as lowercase colon-separated hex, or "" when it is not one.
@@ -282,7 +280,6 @@ def _duration_seconds(value):
         return -1
     return total
 
-
 def _seen_time(ctx, value):
     """Convert a RouterOS 'time since' duration into an absolute timestamp.
 
@@ -300,7 +297,6 @@ def _seen_time(ctx, value):
         return None
     return from_timestamp(int(stamp))
 
-
 def _base(url):
     """Return the configured URL with any trailing slash removed.
 
@@ -311,13 +307,11 @@ def _base(url):
     """
     return as_text(url, join=",").strip().rstrip("/")
 
-
 def _scope(url):
     parsed = url_parse(url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return as_text(url, join=",").split("://")[-1].split("/")[0].split(":")[0]
-
 
 def rest_get(ctx, path, required):
     """GET one RouterOS menu and return its rows, or None when unavailable.
@@ -358,7 +352,6 @@ def rest_get(ctx, path, required):
         return None
     return dicts(data)
 
-
 def touch(index, order, ctx, mac):
     if mac in index:
         return index[mac]
@@ -385,29 +378,24 @@ def touch(index, order, ctx, mac):
     order.append(mac)
     return record
 
-
 def add_source(record, source):
     if source not in record["sources"]:
         record["sources"].append(source)
-
 
 def add_ip(record, value):
     address = routable_ip(value)
     if address and address not in record["ips"]:
         record["ips"].append(address)
 
-
 def add_name(record, value):
     name = _hostname(value)
     if name and name not in record["hostnames"]:
         record["hostnames"].append(name)
 
-
 def note(record, key, value):
     text = as_text(value, join=",").strip()
     if text:
         record["attrs"][key] = text
-
 
 def collect_arp(ctx, index, order):
     """Fold /ip/arp into the MAC index.
@@ -442,7 +430,6 @@ def collect_arp(ctx, index, order):
         note(record, "arp_published", row.get("published"))
         kept += 1
     return kept, incomplete
-
 
 def collect_leases(ctx, index, order):
     """Fold /ip/dhcp-server/lease into the MAC index.
@@ -487,7 +474,6 @@ def collect_leases(ctx, index, order):
             record["last_seen"] = seen
         kept += 1
     return kept, filtered
-
 
 def collect_neighbors(ctx, index, order):
     """Fold /ip/neighbor - the CDP, LLDP, and MNDP table - into the MAC index.
@@ -548,7 +534,6 @@ def collect_neighbors(ctx, index, order):
         kept += 1
     return kept, skipped
 
-
 def wireless_ssids(ctx):
     """Map legacy wireless interface name to SSID.
 
@@ -567,7 +552,6 @@ def wireless_ssids(ctx):
         if name and ssid:
             ssids[name] = ssid
     return ssids
-
 
 def collect_wireless(ctx, index, order):
     """Fold whichever registration tables this router has into the MAC index."""
@@ -615,7 +599,6 @@ def collect_wireless(ctx, index, order):
                 record["last_seen"] = seen
             kept += 1
     return kept, tables
-
 
 def router_interfaces(ctx):
     """Return (network_interfaces, own_macs, summary) for the router itself.
@@ -666,7 +649,6 @@ def router_interfaces(ctx):
             netifs.append(nic)
         summary.append("{}[{}]={}".format(name, kind, mac or ",".join(ips)))
     return netifs, own, summary
-
 
 def build_router_asset(ctx, resource, routerboard, identity, netifs, summary):
     serial = as_text(routerboard.get("serial-number"), join=",").strip()
@@ -743,7 +725,6 @@ def build_router_asset(ctx, resource, routerboard, identity, netifs, summary):
         asset.firstSeenTS = uptime
     return asset
 
-
 def build_host_asset(ctx, record):
     mac = record["mac"]
     nic = network_interface(mac=mac, ips=record["ips"])
@@ -790,13 +771,11 @@ def build_host_asset(ctx, record):
         asset.lastSeenTS = record["last_seen"]
     return asset
 
-
 def one_row(rows):
     """RouterOS returns an array even for a single-record menu."""
     if rows == None or not rows:
         return {}
     return rows[0]
-
 
 def main(**kwargs):
     base = _base(get_string(kwargs, "url", default=""))

@@ -121,10 +121,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'ServiceProtocolData', 'Software', 'Vulnerability', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'get_json', 'post_json', 'bearer', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_dict', 'as_text', 'dedupe', 'dicts')
@@ -211,7 +211,6 @@ def _to_int(value):
         return -1
     return int(matched.groups[1])
 
-
 def _to_float(value):
     """Return a numeric value as a float, or -1.0 when it is absent or not a
     number. Fleet serializes an unset score as null."""
@@ -229,7 +228,6 @@ def _score_rank(score):
     if score < 9.0:
         return 3
     return 4
-
 
 def split_os_version(os_version, platform):
     """Split Fleet's combined os_version string into an OS name and a version.
@@ -249,7 +247,6 @@ def split_os_version(os_version, platform):
         if re_match(VERSION_RE, parts[index]):
             return " ".join(parts[:index]), " ".join(parts[index:])
     return text, ""
-
 
 def build_vulnerabilities(ctx, host_id, entry, software_id):
     """Convert the CVEs Fleet matched against one installed software version
@@ -310,7 +307,6 @@ def build_vulnerabilities(ctx, host_id, entry, software_id):
         rank = params.get("severityRank", 0)
         findings.append((rank, Vulnerability(**params)))
     return findings
-
 
 def build_software(ctx, host_id, address, host):
     """Convert the software inventory Fleet collected for one host into
@@ -384,7 +380,6 @@ def build_software(ctx, host_id, address, host):
         vulns.extend(buckets[rank])
     return software, vulns
 
-
 def build_services(ctx, address, host):
     """Build Service objects from the listening_ports rows Fleet collected
     through its additional-query mechanism. Fleet stores each additional query
@@ -428,7 +423,6 @@ def build_services(ctx, address, host):
         ))
     return services
 
-
 def build_policy_state(host):
     """Summarize the host's policy results into (tags, attrs)."""
     failing = []
@@ -455,7 +449,6 @@ def build_policy_state(host):
     }
     return tags, attrs
 
-
 def build_label_state(host):
     """Summarize the host's label membership into (tags, attrs). Only the
     user-created labels become tags; Fleet's builtin labels are membership
@@ -471,7 +464,6 @@ def build_label_state(host):
             tags.append("label:" + name)
     return tags, {"labels": dedupe(names)}
 
-
 def fetch_host_detail(ctx, host_id):
     """Fetch one per-host detail document. Software is excluded because the
     list response already carries it. A failure is reported and treated as an
@@ -482,7 +474,6 @@ def fetch_host_detail(ctx, host_id):
         print("fleet-osquery: failed to fetch detail for host {}: {}".format(host_id, err))
         return {}
     return as_dict(as_dict(data).get("host"))
-
 
 def build_asset(ctx, record):
     """Convert one Fleet host record into a runZero asset."""
@@ -655,7 +646,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(ctx, records):
     """Convert a page of Fleet host records into runZero assets."""
     assets = []
@@ -668,7 +658,6 @@ def build_assets(ctx, records):
             continue
         assets.append(build_asset(ctx, record))
     return assets
-
 
 def list_params(ctx, page):
     """Build the query parameters for one page of the host list."""
@@ -701,14 +690,12 @@ def list_params(ctx, page):
         params["additional_info_filters"] = ctx["ports_query"]
     return params
 
-
 def _param_rejected(err):
     """Report whether the error means Fleet refused a query parameter."""
     for prefix in PARAM_REJECTED:
         if err.startswith(prefix):
             return True
     return False
-
 
 def fetch_hosts_page(ctx, page):
     """Fetch one page of hosts, returning (records, err).
@@ -732,7 +719,6 @@ def fetch_hosts_page(ctx, page):
     if err:
         return [], err
     return dicts(as_dict(data).get("hosts")), None
-
 
 def fetch_and_report_hosts(ctx):
     """Fetch and stream hosts one page at a time so the full inventory is never
@@ -763,7 +749,6 @@ def fetch_and_report_hosts(ctx):
             ctx["detail_limit"], ctx["detail_skipped"], reported))
     return reported
 
-
 def login(base_url, http_options, email, password):
     """Exchange Fleet user credentials for a session token."""
     # A retried login mints an extra session, so only the statuses that mean the
@@ -775,7 +760,6 @@ def login(base_url, http_options, email, password):
         print("fleet-osquery: login failed:", err)
         return ""
     return as_text(as_dict(data).get("token"), join=",").strip()
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

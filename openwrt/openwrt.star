@@ -90,11 +90,11 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "post_json", "url_parse")
 load("kwargs", "get_http_options", "get_bool", "get_int", "get_string")
 
-load('coerce', 'as_text', 'dedupe', 'dicts')
+load('coerce', 'as_text', 'dicts')
 VENDOR = "openwrt"
 ATTR_PREFIX = "openwrt"
 ATTR_SEPARATOR = "_"
@@ -194,7 +194,6 @@ def _is_virtual_device(name):
                 return True
     return False
 
-
 def _ubus_endpoint(url):
     """Return <configured url>/ubus.
 
@@ -204,13 +203,11 @@ def _ubus_endpoint(url):
     """
     return as_text(url, join=",").strip().rstrip("/") + "/ubus"
 
-
 def _scope(url):
     parsed = url_parse(url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return as_text(url, join=",").split("://")[-1].split("/")[0].split(":")[0]
-
 
 def ubus_call(ctx, obj, method, params):
     """Make one ubus JSON-RPC call and return (payload, error).
@@ -265,7 +262,6 @@ def ubus_call(ctx, obj, method, params):
         return {}, None
     return body, None
 
-
 def login(ctx, username, password, timeout):
     """Exchange a username and password for a ubus session id."""
     ctx["session"] = NULL_SESSION
@@ -293,7 +289,6 @@ def login(ctx, username, password, timeout):
     ctx["granted"] = granted
     return True
 
-
 def permitted(ctx, obj, method):
     """Report whether the session's ACLs list this object and method.
 
@@ -316,7 +311,6 @@ def permitted(ctx, obj, method):
             return True
     return False
 
-
 def call_guarded(ctx, obj, method, params, why):
     """Call an object, skipping it with an explanation when the ACL forbids it.
 
@@ -336,7 +330,6 @@ def call_guarded(ctx, obj, method, params, why):
         return None
     return payload
 
-
 def touch(index, order, ctx, mac):
     """Return the accumulator for one observed MAC, creating it if needed."""
     if mac in index:
@@ -355,11 +348,9 @@ def touch(index, order, ctx, mac):
     order.append(mac)
     return record
 
-
 def add_source(record, source):
     if source not in record["sources"]:
         record["sources"].append(source)
-
 
 def collect_host_hints(ctx, index, order):
     """Fold luci-rpc getHostHints into the MAC index.
@@ -398,7 +389,6 @@ def collect_host_hints(ctx, index, order):
             record["hostnames"].append(name)
         added += 1
     return added
-
 
 def collect_leases(ctx, index, order):
     """Fold luci-rpc getDHCPLeases into the MAC index.
@@ -454,7 +444,6 @@ def collect_leases(ctx, index, order):
             added += 1
     return added
 
-
 def wireless_interfaces(ctx):
     """Return [(ifname, ssid, radio)] for every configured wireless interface.
 
@@ -486,7 +475,6 @@ def wireless_interfaces(ctx):
             found.append((name, ssid, as_text(radio, join=",")))
     return found
 
-
 def collect_wireless(ctx, index, order):
     """Fold each wireless interface's association list into the MAC index."""
     interfaces = wireless_interfaces(ctx)
@@ -517,7 +505,6 @@ def collect_wireless(ctx, index, order):
             }
             added += 1
     return added, len(interfaces)
-
 
 def router_devices(ctx):
     """Return (network_interfaces, own_macs, device_attributes) for the router.
@@ -563,7 +550,6 @@ def router_devices(ctx):
             netifs.append(nic)
         summary.append("{}={}".format(name, mac or ",".join(addresses)))
     return netifs, own, {"devices": summary}
-
 
 def build_router_asset(ctx, board, info, netifs, device_attrs):
     release = board.get("release")
@@ -627,7 +613,6 @@ def build_router_asset(ctx, board, info, netifs, device_attrs):
         params["model"] = model
     return ImportAsset(**params)
 
-
 def build_host_asset(ctx, record):
     mac = record["mac"]
     nic = network_interface(mac=mac, ips=record["ips"])
@@ -661,7 +646,6 @@ def build_host_asset(ctx, record):
         tags=tags,
         customAttributes=to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
     )
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url", default="")

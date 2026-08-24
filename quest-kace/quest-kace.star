@@ -75,11 +75,11 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'routable_ip')
 load('http', http_post='post', 'get_json', 'url_encode', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('json', json_encode='encode')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'now', 'parse_ts')
 
 load('coerce', 'as_text')
 VENDOR = "quest-kace"
@@ -183,7 +183,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _fields(record):
     """Normalize one API record's keys to lower_snake_case.
 
@@ -199,11 +198,9 @@ def _fields(record):
         fields[str(key).strip().lower().replace(" ", "_")] = record[key]
     return fields
 
-
 def _string(fields, name):
     """Read one normalized field as a trimmed string."""
     return as_text(fields.get(name), join=",").strip()
-
 
 def _first(fields, names):
     """Read the first of several normalized fields that holds a value."""
@@ -213,13 +210,11 @@ def _first(fields, names):
             return value
     return ""
 
-
 def _ts(value):
     """parse_ts with KACE's zeroed never-set MySQL datetime filtered first."""
     if as_text(value, join=",").strip() == NULL_TIMESTAMP:
         return None
     return parse_ts(value)
-
 
 def _hostname(value):
     """Return a value fit to import as a hostname, or "".
@@ -233,7 +228,6 @@ def _hostname(value):
     if ip_address(text) != None:
         return ""
     return text
-
 
 def _sub_records(value):
     """Coerce a sub-entity field documented as a list of objects into one,
@@ -252,7 +246,6 @@ def _query(pairs):
     """
     return url_encode(pairs).replace("+", "%20")
 
-
 def _header_values(headers, name):
     """Read one response header as a list of values.
 
@@ -266,7 +259,6 @@ def _header_values(headers, name):
     if type(value) == "list":
         return [str(item) for item in value]
     return [str(value)]
-
 
 def parse_cookies(headers):
     """Assemble the session cookies out of the login response.
@@ -290,7 +282,6 @@ def parse_cookies(headers):
             names.append(name)
         values[name] = value
     return names, values
-
 
 def build_software(scope, machine_id, address, entries):
     """Convert the software sub-entity of one machine into Software records.
@@ -339,7 +330,6 @@ def build_software(scope, machine_id, address, entries):
         }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
         software.append(Software(**params))
     return software
-
 
 def build_asset(ctx, record):
     """Convert one KACE machine record into a runZero asset."""
@@ -429,7 +419,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(ctx, records):
     """Convert one page of machine records into runZero assets."""
     assets = []
@@ -444,7 +433,6 @@ def build_assets(ctx, records):
             continue
         assets.append(build_asset(ctx, record))
     return assets
-
 
 def login(ctx):
     """Log in and refresh the session headers.
@@ -518,7 +506,6 @@ def login(ctx):
     ctx["scope"] = "{}:{}".format(ctx["host"], ctx["org"])
     return True
 
-
 def fetch_page(ctx, path, wrapper, shaping, offset):
     """Fetch one page of a KACE collection, re-authenticating once if the
     session has expired. The wrapper name is given in lower case because the
@@ -554,7 +541,6 @@ def fetch_page(ctx, path, wrapper, shaping, offset):
         print("quest-kace: failed to fetch {} at offset {}: {}".format(path, offset, err))
         return [], False
     return [], False
-
 
 def fetch_assets(ctx):
     """Index the asset CMDB by the inventory machine each record is mapped to.
@@ -604,7 +590,6 @@ def fetch_assets(ctx):
         print("quest-kace: {} extra CMDB assets map to a machine that already has one".format(collisions))
     return index
 
-
 def fetch_and_report_machines(ctx):
     """Fetch and stream machines one page at a time so the full inventory is
     never held in memory at once.
@@ -643,7 +628,6 @@ def fetch_and_report_machines(ctx):
 
     print("quest-kace: reported {} assets from organization {}".format(reported, ctx["org"]))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

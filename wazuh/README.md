@@ -264,9 +264,16 @@ server, so it proves the script initializes, declares its parameters correctly,
 and issues a request. It does not prove the manager issues a JWT, that the user
 holds a role covering syscollector, or that any agent is parsed.
 
-There are no fixtures in `wazuh/tests/fixtures/`, so there is no offline parsing
-test to run for this integration — the command-line run against a real manager is
-the test.
+The fixtures in `wazuh/tests/fixtures/` do test the parsing offline — eight
+scenarios covering the happy path, an empty inventory, malformed records, device
+types, identity stability, mid-run token refresh, and both pagination guards:
+
+```bash
+python3 tests/run.py wazuh
+```
+
+They do not replace a run against a real manager, which is the only thing that
+proves the JWT exchange and the syscollector role.
 
 The same script also runs under the `scan` command, which is what the platform
 itself invokes for a scheduled task:

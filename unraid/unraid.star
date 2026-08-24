@@ -95,7 +95,7 @@ CONFIG = {
     },
 }
 load("runzero.types", "ImportAsset", "Service", "to_custom_attributes")
-load("net", "ip_address", "ip_in_network", "network_interface", 'routable_ip')
+load("net", "ip_address", "network_interface", 'routable_ip')
 load("http", "post_json", "url_parse")
 load("kwargs", "get_http_options", "get_bool", "get_int", "get_string")
 load("time", "now", "parse_time")
@@ -142,7 +142,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _mac_key(value):
     """Return a MAC as lowercase colon-separated hex, or "" when it is not one.
 
@@ -173,7 +172,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _strip_prefixed_id(value):
     """Drop the server prefix from a PrefixedID.
 
@@ -185,7 +183,6 @@ def _strip_prefixed_id(value):
     if ":" in text:
         return text.split(":", 1)[1]
     return text
-
 
 def _is_virtual_interface(name):
     lowered = as_text(name, join=",").strip().lower()
@@ -199,7 +196,6 @@ def _is_virtual_interface(name):
             if tail in "0123456789-_.":
                 return True
     return False
-
 
 def _parse_iso(value, current):
     """Parse an RFC3339 timestamp, or return None.
@@ -228,7 +224,6 @@ def _parse_iso(value, current):
         return current
     return parsed
 
-
 def _base(url):
     """Return <configured url>/graphql.
 
@@ -238,13 +233,11 @@ def _base(url):
     """
     return as_text(url, join=",").strip().rstrip("/") + "/graphql"
 
-
 def _scope(url):
     parsed = url_parse(url)
     if parsed and parsed.hostname:
         return parsed.hostname
     return as_text(url, join=",").split("://")[-1].split("/")[0].split(":")[0]
-
 
 def _error_messages(payload):
     """Collect error text from BOTH envelopes this endpoint produces.
@@ -265,7 +258,6 @@ def _error_messages(payload):
             messages.append(text)
     return messages
 
-
 def _is_unknown_field(messages):
     """True when a GraphQL error list is a schema-validation refusal.
 
@@ -284,7 +276,6 @@ def _is_unknown_field(messages):
         if "doesn't exist on type" in lowered:
             return True
     return False
-
 
 def graphql(ctx, query, label, required, errors_out=None):
     """Run one GraphQL query and return its data object, or None.
@@ -335,7 +326,6 @@ def graphql(ctx, query, label, required, errors_out=None):
     if messages:
         print("unraid: {} returned partial data: {}".format(label, "; ".join(messages)))
     return data
-
 
 QUERY_INFO = """query RunZeroUnraidInfo {
   info {
@@ -404,7 +394,6 @@ QUERY_STORAGE = """query RunZeroUnraidStorage {
   disks { id device type name vendor size serialNum firmwareRevision interfaceType smartStatus temperature }
 }"""
 
-
 def server_interfaces(info):
     """Return (network_interfaces, summary) for the Unraid server.
 
@@ -442,7 +431,6 @@ def server_interfaces(info):
             netifs.append(nic)
         summary.append("{}[{}]={}".format(name, as_text(entry.get("operstate"), join=","), mac or ",".join(addresses)))
     return netifs, summary
-
 
 def build_server_asset(ctx, info, extras, netifs, summary):
     os_info = as_dict(info.get("os"))
@@ -542,7 +530,6 @@ def build_server_asset(ctx, info, extras, netifs, summary):
         asset.firstSeenTS = boot
     return asset
 
-
 def container_endpoints(container):
     """Return (mac, ips, networks) from a container's networkSettings.
 
@@ -567,7 +554,6 @@ def container_endpoints(container):
             if address and address not in ips:
                 ips.append(address)
     return mac, ips, names
-
 
 def container_services(container, ips):
     """Turn published ports into Service objects bound to the container."""
@@ -601,7 +587,6 @@ def container_services(container, ips):
             customAttributes=attributes,
         ))
     return services
-
 
 def build_container_asset(ctx, container, mac, ips, networks):
     names = container.get("names")
@@ -664,7 +649,6 @@ def build_container_asset(ctx, container, mac, ips, networks):
             params["services"] = services
     return ImportAsset(**params)
 
-
 def collect_containers(ctx):
     """Emit assets for containers that hold an address of their own.
 
@@ -719,7 +703,6 @@ def collect_containers(ctx):
         emitted += 1
     return emitted, shared_stack, [as_text(c.get("image"), join=",").strip() for c in containers]
 
-
 def collect_vms(ctx):
     """Summarize the VM inventory.
 
@@ -741,7 +724,6 @@ def collect_vms(ctx):
             continue
         summary.append("{}={}".format(name, as_text(domain.get("state"), join=",").strip() or "UNKNOWN"))
     return summary
-
 
 def collect_storage(ctx):
     """Return array and disk detail for the server asset."""
@@ -774,7 +756,6 @@ def collect_storage(ctx):
         "disks": disk_summary,
         "disk_serials": serials,
     }
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url", default="")

@@ -87,7 +87,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'post_json', 'basic', 'url_encode', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool', 'get_list')
 load('json', json_encode='encode')
@@ -197,7 +197,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _parse_date(value, ceiling):
     """Parse an iTop date or datetime, clamped to the current time.
 
@@ -257,11 +256,9 @@ def _hostname(value):
         return ""
     return text
 
-
 def _fields_for(class_name):
     """Return the attribute list to request for a class."""
     return BASE_FIELDS + CLASS_FIELDS.get(class_name, [])
-
 
 def call(ctx, payload, what):
     """Run one core/get and return the decoded response.
@@ -287,7 +284,6 @@ def call(ctx, payload, what):
         label = ERROR_CODES.get(code, "code {}".format(code))
         return None, "{}: {} - {}".format(what, label, as_text(data.get("message")))
     return data, None
-
 
 def build_interface_map(ctx):
     """Index every IPInterface by the id of the CI that owns it.
@@ -344,7 +340,6 @@ def build_interface_map(ctx):
             print("itop: indexed {} {} records".format(count, class_name))
     return interfaces
 
-
 def build_interfaces(records):
     """Build one runZero interface per iTop interface record.
 
@@ -363,7 +358,6 @@ def build_interfaces(records):
         if nic:
             nics.append(nic)
     return nics
-
 
 def build_asset(ctx, class_name, object_id, fields, records):
     """Convert one iTop CI into a runZero asset, or None when it carries nothing
@@ -486,7 +480,6 @@ def build_asset(ctx, class_name, object_id, fields, records):
         attributes, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
     return ImportAsset(**params)
 
-
 def fetch_and_report_class(ctx, class_name):
     """Page through one iTop class and stream each page into runZero."""
     fields = _fields_for(class_name)
@@ -563,7 +556,6 @@ def fetch_and_report_class(ctx, class_name):
 
     print("itop: reported {} assets from {}".format(reported, class_name))
     return reported
-
 
 def main(**kwargs):
     # get_url_base would drop the path, and iTop is very often installed in a

@@ -67,11 +67,11 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'routable_ip')
 load('http', http_get='get', 'url_encode', 'url_parse', 'basic')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int')
 load('xml', xml_parse='parse')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 
 load('coerce', 'as_text')
 VENDOR = "bigfix"
@@ -168,7 +168,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _is_version(text):
     """Report whether a token looks like a dotted release or build number."""
     if "." not in text or text.startswith(".") or text.endswith("."):
@@ -177,7 +176,6 @@ def _is_version(text):
         if text[index] != "." and text[index] not in DIGITS:
             return False
     return True
-
 
 def _attr_key(name):
     """Fold a BigFix property name into a custom attribute key."""
@@ -191,7 +189,6 @@ def _attr_key(name):
     if key.endswith("_"):
         key = key[:-1]
     return key
-
 
 def _matches(name, hints):
     """Report whether a lower-cased property name contains any of the hints."""
@@ -218,7 +215,6 @@ def _split_os(value):
     name = " ".join(parts).strip()
     return OS_NAMES.get(name.lower(), name), version
 
-
 def _split_values(value):
     """Split one joined multi-value property result back into its values."""
     values = []
@@ -229,7 +225,6 @@ def _split_values(value):
         if len(values) >= MAX_VALUES:
             break
     return values
-
 
 def _property_term(name):
     """Build the tuple member that reads one named property for a computer.
@@ -242,7 +237,6 @@ def _property_term(name):
     return 'concatenation "{}" of (values of results (it, bes property "{}") ; "")'.format(
         VALUE_SEPARATOR, name)
 
-
 def build_relevance(properties, low, high):
     """Build the session relevance for one range of computer ids."""
     terms = [] + CORE_TERMS
@@ -250,7 +244,6 @@ def build_relevance(properties, low, high):
         terms.append(_property_term(name))
     return "({}) of bes computers whose (id of it >= {} and id of it <= {})".format(
         ", ".join(terms), low, high)
-
 
 def build_software(scope, computer_id, address, entries):
     """Convert the values of the configured software property into Software.
@@ -296,7 +289,6 @@ def build_software(scope, computer_id, address, entries):
         if len(software) >= MAX_CHILDREN:
             break
     return software
-
 
 def build_asset(ctx, record):
     """Convert one computer's query row into a runZero asset."""
@@ -407,7 +399,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(ctx, records):
     """Convert one range of computer rows into runZero assets."""
     assets = []
@@ -417,7 +408,6 @@ def build_assets(ctx, records):
             continue
         assets.append(build_asset(ctx, record))
     return assets
-
 
 def run_query(ctx, relevance):
     """Run one session relevance query and return (rows, err).
@@ -453,7 +443,6 @@ def run_query(ctx, relevance):
             rows.append([as_text(answer.text)])
     return rows, None
 
-
 def fetch_computer_ids(ctx):
     """Read every computer id in the deployment as a sorted list of ints.
 
@@ -481,7 +470,6 @@ def fetch_computer_ids(ctx):
         print("bigfix: skipped {} computers with an unreadable id".format(skipped))
     return sorted(ids)
 
-
 def build_records(ctx, rows, properties):
     """Turn the answer rows of one range query into per-computer records."""
     width = len(CORE_FIELDS) + len(properties)
@@ -500,7 +488,6 @@ def build_records(ctx, rows, properties):
     if malformed:
         print("bigfix: skipped {} rows that did not match the requested tuple width".format(malformed))
     return records
-
 
 def fetch_range(ctx, low, high):
     """Fetch one range of computers, falling back to the core relevance once if
@@ -532,7 +519,6 @@ def fetch_range(ctx, low, high):
         return [], False
     return build_records(ctx, rows, []), True
 
-
 def fetch_and_report_computers(ctx, ids):
     """Fetch and stream computers one id range at a time so the whole
     deployment is never held in memory at once."""
@@ -558,7 +544,6 @@ def fetch_and_report_computers(ctx, ids):
         print("bigfix: {} of {} id ranges could not be read".format(failed, ranges))
     print("bigfix: reported {} assets from {}".format(reported, ctx["host"]))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

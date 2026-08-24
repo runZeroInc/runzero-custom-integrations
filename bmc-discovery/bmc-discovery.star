@@ -77,7 +77,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'routable_ip')
 load('http', 'post_json', 'bearer', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'parse_ts')
@@ -238,7 +238,6 @@ def _to_int(value):
             return -1
     return int(text)
 
-
 def _list(value):
     """Coerce a field documented as a list into one, so a scalar cannot abort the
     run. BMC serializes an empty multi-valued attribute as null."""
@@ -260,7 +259,6 @@ def _last_seen_ts(value):
         return parse_ts(value // TICKS_PER_SECOND)
     return parse_ts(value)
 
-
 def _node_id(value):
     """Return a datastore node id that is safe to interpolate into a query, or an
     empty string. Node ids are hex, so anything else is rejected outright rather
@@ -272,7 +270,6 @@ def _node_id(value):
         if text[index] not in HEX_DIGITS:
             return ""
     return text
-
 
 def _foreign_id(record):
     """Return the identity of a host and how it was derived. BMC documents the
@@ -287,7 +284,6 @@ def _foreign_id(record):
     if node_id:
         return "node:" + node_id, "node-id"
     return "", ""
-
 
 def _names(record):
     """Collect the usable hostnames of a host. BMC reports local_fqdn as
@@ -314,7 +310,6 @@ def _names(record):
             out.append(text)
     return out[:MAX_HOSTNAMES]
 
-
 def _device_type(record):
     """Map the free-text BMC host type onto the runZero device type vocabulary."""
     text = as_text(record.get("type"), join=",").strip().lower()
@@ -325,7 +320,6 @@ def _device_type(record):
             return device_type
     return ""
 
-
 def _envelopes(data):
     """Unwrap a /data/search response. The response is a list of per-kind
     envelopes, each carrying its own results and cursor, not a single object."""
@@ -335,14 +329,12 @@ def _envelopes(data):
         return [data]
     return []
 
-
 def _rows(envelopes):
     """Collect the result rows of every envelope in one response."""
     rows = []
     for envelope in envelopes:
         rows = rows + dicts(envelope.get("results"))
     return rows
-
 
 def build_query(kind, where, traversals, attrs):
     """Assemble one BMC Query Language search."""
@@ -352,7 +344,6 @@ def build_query(kind, where, traversals, attrs):
     for traversal in traversals:
         query += " TRAVERSE " + traversal
     return query + " SHOW " + ", ".join(attrs)
-
 
 def run_search(ctx, query, offset, results_id, limit):
     """Run one page of a search. The cursor is the (offset, results_id) pair the
@@ -364,7 +355,6 @@ def run_search(ctx, query, offset, results_id, limit):
         params["offset"] = str(offset)
         params["results_id"] = results_id
     return post_json(ctx["search_url"], json={"query": query}, params=params, **ctx["http_options"])
-
 
 def fetch_detail_rows(ctx, node_id, traversals, attrs, label):
     """Traverse from one host to a related kind and return the rows. Only the
@@ -379,7 +369,6 @@ def fetch_detail_rows(ctx, node_id, traversals, attrs, label):
         print("bmc-discovery: failed to fetch {} for host {}: {}".format(label, node_id, err))
         return None
     return _rows(_envelopes(data or []))
-
 
 def build_software(ctx, foreign_id, address, rows):
     """Convert the software instances running on one host into Software records.
@@ -425,7 +414,6 @@ def build_software(ctx, foreign_id, address, rows):
         software.append(Software(**params))
     return software
 
-
 def _port_row(row):
     """Extract (port, transport, address) from one listening port row. BMC names
     the socket attributes local_port, protocol, and local_ip_addr, but the
@@ -461,7 +449,6 @@ def _port_row(row):
 
     return port, transport, address
 
-
 def _add_service(services, seen, address, port, transport, source, extra):
     """Append one Service, skipping a socket already recorded for this host."""
     if port < 1 or port > 65535:
@@ -484,7 +471,6 @@ def _add_service(services, seen, address, port, transport, source, extra):
         transport=transport,
         customAttributes=to_custom_attributes(attrs, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR),
     ))
-
 
 def build_services(host_ips, port_rows, software_rows):
     """Build Service objects for one host. The discovered listening ports come
@@ -520,7 +506,6 @@ def build_services(host_ips, port_rows, software_rows):
             })
 
     return services
-
 
 def build_asset(ctx, record, foreign_id, id_source):
     """Convert one BMC Host node into a runZero asset, optionally enriched with
@@ -688,7 +673,6 @@ def build_asset(ctx, record, foreign_id, id_source):
         asset.lastSeenTS = last_ts
     return asset
 
-
 def build_assets(ctx, records):
     """Convert a page of BMC Host rows into runZero assets."""
     assets = []
@@ -704,7 +688,6 @@ def build_assets(ctx, records):
             print("bmc-discovery: at least one host published no key; falling back to the datastore node id, which BMC does not guarantee to be stable across a rescan")
         assets.append(build_asset(ctx, record, foreign_id, id_source))
     return assets
-
 
 def fetch_and_report_hosts(ctx):
     """Fetch and stream hosts one page at a time so the full inventory is never
@@ -775,7 +758,6 @@ def fetch_and_report_hosts(ctx):
         print("bmc-discovery: detail limit of {} reached; software and listening ports were not imported for {} of {} assets".format(
             ctx["detail_limit"], ctx["detail_skipped"], reported))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

@@ -94,10 +94,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Service', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'routable_ip')
 load('http', http_get='get', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'now', 'parse_time', 'sleep', 'parse_ts')
+load('time', 'sleep', 'parse_ts')
 load('re', re_search='search')
 load('jsonstream', 'iter_array')
 
@@ -158,7 +158,6 @@ VIRTUAL_INTERFACE_PREFIXES = [
     "lo",
 ]
 
-
 def _log(msg):
     """Emit one prefixed log line."""
     print("{}: {}".format(VENDOR, msg))
@@ -184,7 +183,6 @@ def _is_virtual_interface(name):
             return True
     return False
 
-
 def _header(response, name):
     """Read one response header value. The header map is keyed by the Go
     canonical name and every value is a list, so the lookup is done on both
@@ -201,7 +199,6 @@ def _header(response, name):
         return as_text(value, join=",").strip()
     return ""
 
-
 def _api_url(ctx, href):
     """Resolve an href returned by the PCE into an absolute API URL. The PCE
     returns org-scoped hrefs such as /orgs/1/jobs/<uuid> which are relative to
@@ -217,7 +214,6 @@ def _api_url(ctx, href):
         return ctx["base_url"] + text
     return ctx["base_url"] + API_BASE + text
 
-
 def _index_label(index, label):
     """Add one label record to the href index."""
     record = as_dict(label)
@@ -226,7 +222,6 @@ def _index_label(index, label):
     value = as_text(record.get("value"), join=",").strip()
     if href and key:
         index[href] = "{}:{}".format(key, value) if value else key
-
 
 def build_label_index(ctx):
     """Index the organization's labels by href so a workload that only carries
@@ -270,7 +265,6 @@ def build_label_index(ctx):
     _log("asynchronous label collection returned {} labels".format(total))
     return index
 
-
 def build_label_tags(ctx, labels):
     """Convert a workload's labels into runZero key:value tags, resolving bare
     href references through the label catalog."""
@@ -285,7 +279,6 @@ def build_label_tags(ctx, labels):
         if resolved:
             tags.append(resolved)
     return dedupe(tags)
-
 
 def build_interfaces(record):
     """Split the workload interfaces into (ips, raw, skipped). The PCE reports
@@ -319,7 +312,6 @@ def build_interfaces(record):
             continue
         ips.append(routable)
     return dedupe(ips), dedupe(raw), dedupe(skipped)
-
 
 def build_services(record, address):
     """Build Service objects from services.open_service_ports. These are the
@@ -378,7 +370,6 @@ def build_services(record, address):
 
     return services, unmapped
 
-
 def fetch_workload_detail(ctx, href):
     """Fetch one workload individually. A collection response never carries
     services, because a PCE with thousands of workloads each running dozens of
@@ -391,7 +382,6 @@ def fetch_workload_detail(ctx, href):
         ctx["detail_failed"] += 1
         return {}
     return as_dict(data)
-
 
 def build_asset(ctx, record):
     """Convert one Illumio workload into a runZero asset, optionally enriched
@@ -539,7 +529,6 @@ def build_asset(ctx, record):
         asset.lastSeenTS = last_ts
     return asset
 
-
 def report_one(ctx, record):
     """Validate and report one workload record, returning the count reported.
     A malformed, href-less, or deleted record is counted and skipped so one bad
@@ -557,7 +546,6 @@ def report_one(ctx, record):
         return 0
     return report_asset(build_asset(ctx, record))
 
-
 def report_workloads(ctx, records):
     """Report a workload collection to runZero one record at a time, so only
     one ImportAsset object exists at a time."""
@@ -565,7 +553,6 @@ def report_workloads(ctx, records):
     for record in records:
         reported += report_one(ctx, record)
     return reported
-
 
 def fetch_sync(ctx):
     """Fetch a workload collection with an ordinary synchronous GET."""
@@ -576,7 +563,6 @@ def fetch_sync(ctx):
     if err:
         return [], err
     return (data if type(data) == "list" else []), None
-
 
 def start_async_job(ctx, path, params):
     """Ask the PCE to run one collection as an offline job and return the job
@@ -603,7 +589,6 @@ def start_async_job(ctx, path, params):
     if retry_after < 1 or retry_after > MAX_RETRY_AFTER:
         retry_after = DEFAULT_RETRY_AFTER
     return location, retry_after, None
-
 
 def poll_async_job(ctx, location, retry_after):
     """Poll an asynchronous collection job until it reports done or failed, and
@@ -634,7 +619,6 @@ def poll_async_job(ctx, location, retry_after):
         # documented maximum polling interval.
         delay = delay + 1 if delay < MAX_RETRY_AFTER else MAX_RETRY_AFTER
     return "", "the collection job did not finish within {} polls".format(MAX_POLLS)
-
 
 def stream_async_result(ctx, href, sync_hrefs):
     """Download the asynchronous collection datafile and stream it record by
@@ -667,7 +651,6 @@ def stream_async_result(ctx, href, sync_hrefs):
                 sync_hrefs[record_href] = True
         reported += report_one(ctx, record)
     return reported, streamed, None
-
 
 def fetch_and_report_workloads(ctx):
     """Fetch every workload and stream it to runZero. A synchronous collection
@@ -713,7 +696,6 @@ def fetch_and_report_workloads(ctx):
 
     _log("WARNING: the asynchronous GET collection failed ({}), so only the first {} workloads were imported and an unknown number were skipped. Every workload past the cap is missing from runZero until this is resolved.".format(err, len(records)))
     return report_workloads(ctx, records)
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

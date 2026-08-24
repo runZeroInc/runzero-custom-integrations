@@ -79,7 +79,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', http_post='post', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('json', json_encode='encode')
@@ -153,7 +153,6 @@ def _num(value):
         return int(value)
     return None
 
-
 def _epoch(value, ceiling):
     """Convert an Icinga timestamp into a time value, clamped to the current
     time. Icinga serializes timestamps as a Unix epoch with fractional seconds
@@ -208,7 +207,6 @@ def _hostname(value):
         return ""
     return text
 
-
 def _array_at(body, key):
     """Report whether the body is a JSON object with an array at the given
     top-level key.
@@ -232,7 +230,6 @@ def _array_at(body, key):
     if not rest.startswith(":"):
         return False
     return rest[1:].lstrip().startswith("[")
-
 
 def _query(ctx, path, payload, what):
     """Run one Icinga object query and return the raw response body.
@@ -263,7 +260,6 @@ def _query(ctx, path, payload, what):
     if resp.status_code < 200 or resp.status_code >= 300:
         return "", "status {}: {}".format(resp.status_code, as_text(resp.body)[:200])
     return resp.body, None
-
 
 def build_check_summary(ctx):
     """Index the Service objects by the host they are attached to.
@@ -308,7 +304,6 @@ def build_check_summary(ctx):
     print("icinga2: summarized {} service checks across {} hosts".format(total, len(summary)))
     return summary
 
-
 def collect_addresses(attrs):
     """Split the address attributes into routable IPs and hostnames.
 
@@ -336,7 +331,6 @@ def collect_addresses(attrs):
             names.append(name)
     return ips, names
 
-
 def find_mac(variables):
     """Recover a MAC address from the host's custom variables, returning the
     value and the variable it came from.
@@ -352,7 +346,6 @@ def find_mac(variables):
             if value and normalize_mac(value) != None:
                 return value, candidate
     return "", ""
-
 
 def build_asset(ctx, entry, name, checks):
     """Convert one Icinga Host object into a runZero asset, or None when the
@@ -471,7 +464,6 @@ def build_asset(ctx, entry, name, checks):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_filter(kwargs):
     """Build the server-side filter expression and its variables.
 
@@ -493,7 +485,6 @@ def build_filter(kwargs):
     if not expressions:
         return "", {}
     return " && ".join(expressions), variables
-
 
 def fetch_and_report_hosts(ctx, host_filter, filter_vars):
     """Stream the host inventory into runZero.
@@ -543,7 +534,6 @@ def fetch_and_report_hosts(ctx, host_filter, filter_vars):
     print("icinga2: reported {} assets".format(reported))
     return reported
 
-
 def fetch_version(ctx):
     """Read the Icinga version so every asset records which server it came from.
     This one is small enough to go through the JSON helper, which brings the
@@ -560,7 +550,6 @@ def fetch_version(ctx):
     status = as_dict(as_dict(results[0]).get("status"))
     app = as_dict(as_dict(status.get("icingaapplication")).get("app"))
     return as_text(app.get("version"))
-
 
 def main(**kwargs):
     url = get_string(kwargs, "url", default="").strip().rstrip("/")

@@ -90,10 +90,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip', 'clean_hostname')
+load('net', 'network_interface', 'normalize_mac', 'routable_ip', 'clean_hostname')
 load('http', 'get_json', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'now', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_dict', 'as_text', 'dedupe', 'dicts')
@@ -183,7 +183,6 @@ def _clean_mac(value):
         return ""
     return mac
 
-
 def _mac_of(record):
     """Return the MAC on an interface record.
 
@@ -192,7 +191,6 @@ def _mac_of(record):
     2.x or 3.x release - and netaddr serializes it colon-separated and
     upper-case. normalize_mac accepts that form and every other."""
     return _clean_mac(record.get("mac_address"))
-
 
 def _ips_of(record):
     """Collect every routable IP on an interface record.
@@ -211,7 +209,6 @@ def _ips_of(record):
                 break
     return ips
 
-
 def build_query(pairs, extra):
     """Assemble a query string from ordered key/value pairs.
 
@@ -227,7 +224,6 @@ def build_query(pairs, extra):
     if extra:
         parts.append(extra)
     return "&".join(parts)
-
 
 def fetch_page(ctx, path, query, label):
     """Fetch one page of a Nautobot collection, returning (results, next_query, err).
@@ -256,7 +252,6 @@ def fetch_page(ctx, path, query, label):
         if parsed and parsed.raw_query:
             following = parsed.raw_query
     return dicts(data["results"]), following, None
-
 
 def fetch_interfaces(ctx, path, filter_key, ids, label):
     """Index the interfaces belonging to one page of parents, keyed by parent id.
@@ -304,7 +299,6 @@ def fetch_interfaces(ctx, path, filter_key, ids, label):
             query = following
     return index
 
-
 def fetch_manufacturers(ctx):
     """Index every manufacturer by its UUID, once, for the whole run.
 
@@ -335,7 +329,6 @@ def fetch_manufacturers(ctx):
         query = following
     return index
 
-
 def _manufacturer(ctx, record):
     """Resolve a device's manufacturer name.
 
@@ -359,7 +352,6 @@ def _manufacturer(ctx, record):
         return _named(nested) or ctx["manufacturers"].get(as_text(nested.get("id"), join=",").strip(), "")
     return ""
 
-
 def _software_version(record):
     """Return the running software version.
 
@@ -373,7 +365,6 @@ def _software_version(record):
     if version:
         return version
     return _named(nested)
-
 
 def build_interfaces(records, primary_ips):
     """Build one runZero network interface per Nautobot interface.
@@ -441,7 +432,6 @@ def build_interfaces(records, primary_ips):
             netifs.append(nic)
     return netifs
 
-
 def device_attributes(ctx, record, interfaces, primary_ips):
     """Everything worth keeping from a Nautobot device record, before it is
     coerced to the string->string shape custom attributes require."""
@@ -484,7 +474,6 @@ def device_attributes(ctx, record, interfaces, primary_ips):
         "primary_ip_count": len(primary_ips),
     }
 
-
 def vm_attributes(record, interfaces, primary_ips):
     """Everything worth keeping from a Nautobot virtual machine record."""
     return {
@@ -510,7 +499,6 @@ def vm_attributes(record, interfaces, primary_ips):
         "interface_count": len(interfaces),
         "primary_ip_count": len(primary_ips),
     }
-
 
 def build_asset(ctx, record, kind, interfaces):
     """Convert one Nautobot device or virtual machine into a runZero asset."""
@@ -605,7 +593,6 @@ def build_asset(ctx, record, kind, interfaces):
         asset.lastSeenTS = updated
     return asset
 
-
 def collect(ctx, kind, path, iface_path, filter_key, extra_filter):
     """Walk one Nautobot collection, streaming each page as it is built.
 
@@ -656,7 +643,6 @@ def collect(ctx, kind, path, iface_path, filter_key, extra_filter):
     if skipped:
         print("nautobot: skipped {} {} records with no usable id".format(skipped, kind))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

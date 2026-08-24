@@ -85,7 +85,7 @@ load('runzero.types', 'ImportAsset', 'Service', 'ServiceProtocolData', 'Vulnerab
 load('net', 'network_interface', 'ip_address', 'ip_in_network', 'normalize_mac')
 load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_text')
@@ -133,7 +133,6 @@ def _number(value):
         return float(value)
     return None
 
-
 def _tenant_host(base_url):
     """Return the Kenna API hostname, which is the tenant scope for asset ids.
 
@@ -153,7 +152,6 @@ def _cve(value):
     if not re_match(CVE_RE, cve):
         return ""
     return cve
-
 
 def _usable_addresses(values):
     """Return the addresses that are safe to place on a NetworkInterface.
@@ -183,7 +181,6 @@ def _usable_addresses(values):
         usable.append(text)
     return usable
 
-
 def _hostnames(record):
     """Return hostname, fqdn, and netbios, de-duplicated case-insensitively."""
     names = []
@@ -199,14 +196,12 @@ def _hostnames(record):
         names.append(value)
     return names
 
-
 def _mac(record):
     """Return the normalized MAC address, or "" when the value is unusable."""
     mac = normalize_mac(as_text(record.get("mac_address")).strip())
     if mac == None:
         return ""
     return mac
-
 
 def _network_ports(record):
     """Return network_ports as a list of dicts.
@@ -225,7 +220,6 @@ def _network_ports(record):
             entries.append(entry)
     return entries
 
-
 def _port_transports(record):
     """Return a port number to transport map built from the asset's open ports."""
     transports = {}
@@ -237,7 +231,6 @@ def _port_transports(record):
         if transport == "tcp" or transport == "udp":
             transports[port] = transport
     return transports
-
 
 def _vulnerability_ports(record):
     """Return the distinct ports a finding was observed on.
@@ -263,7 +256,6 @@ def _vulnerability_ports(record):
             ports.append(value)
     return ports
 
-
 def _severity_score(record):
     """Return the 0-10 score that drives severityRank.
 
@@ -278,7 +270,6 @@ def _severity_score(record):
                 return score
     return _number(record.get("severity"))
 
-
 def _severity_rank(score):
     """Map a 0-10 CVSS-style score onto runZero's 0-4 severity rank."""
     if score == None:
@@ -292,7 +283,6 @@ def _severity_rank(score):
     if score > 0:
         return 1
     return 0
-
 
 def _risk_rank(score):
     """Map Kenna's 0-100 vulnerability risk meter score onto a runZero rank.
@@ -311,7 +301,6 @@ def _risk_rank(score):
         return 1
     return 0
 
-
 def _connector_field(record, key):
     """Return one field from every connector that reported a finding."""
     values = []
@@ -326,7 +315,6 @@ def _connector_field(record, key):
             values.append(value)
     return values
 
-
 def _last_page(data, page, count, page_size):
     """Report whether `page` was the final page of a Kenna search response.
 
@@ -340,7 +328,6 @@ def _last_page(data, page, count, page_size):
             return page >= pages
     return count < page_size
 
-
 def _asset_id_query(asset_ids):
     """Return the asset[id][] query string for one batch of asset ids.
 
@@ -353,7 +340,6 @@ def _asset_id_query(asset_ids):
     for asset_id in asset_ids:
         parts.append("asset%5Bid%5D%5B%5D=" + asset_id)
     return "&".join(parts)
-
 
 def build_vulnerability(record, tenant_host, address, port_transports):
     """Convert one Kenna vulnerability record into a Vulnerability object."""
@@ -469,7 +455,6 @@ def build_vulnerability(record, tenant_host, address, port_transports):
 
     return Vulnerability(**vuln_args)
 
-
 def build_vulnerabilities(records, tenant_host, address, port_transports):
     """Build the Vulnerability objects for one asset."""
     vulns = []
@@ -478,7 +463,6 @@ def build_vulnerabilities(records, tenant_host, address, port_transports):
         if vuln:
             vulns.append(vuln)
     return vulns
-
 
 def build_services(record, address):
     """Build Service objects from an asset's network_ports entries.
@@ -515,7 +499,6 @@ def build_services(record, address):
             service_args["protocolData"] = [ServiceProtocolData(name=name)]
         services.append(Service(**service_args))
     return services
-
 
 def build_asset(record, asset_id, tenant_host, vuln_records):
     """Build a single ImportAsset from one Kenna asset record."""
@@ -595,7 +578,6 @@ def build_asset(record, asset_id, tenant_host, vuln_records):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def build_assets(records, tenant_host, vuln_map):
     """Build one page of ImportAssets, attaching each asset's vulnerabilities."""
     assets = []
@@ -604,7 +586,6 @@ def build_assets(records, tenant_host, vuln_map):
         assets.append(build_asset(record, asset_id, tenant_host,
                                   vuln_map.get(asset_id, [])))
     return assets
-
 
 def select_assets(records, include_non_network, min_risk, skipped):
     """Return the records that can become runZero assets, counting the rest.
@@ -646,7 +627,6 @@ def select_assets(records, include_non_network, min_risk, skipped):
                 continue
         kept.append(record)
     return kept
-
 
 def fetch_vulnerability_map(base_url, http_options, asset_ids, page_size):
     """Fetch the vulnerabilities for one page of assets, indexed by asset id.
@@ -700,7 +680,6 @@ def fetch_vulnerability_map(base_url, http_options, asset_ids, page_size):
 
     print("kenna: indexed {} vulnerabilities across {} assets".format(total, len(vuln_map)))
     return vuln_map
-
 
 def fetch_and_report_assets(base_url, http_options, params, page_size,
                             include_vulnerabilities, include_non_network,
@@ -760,7 +739,6 @@ def fetch_and_report_assets(base_url, http_options, params, page_size,
     if skipped["malformed"]:
         print("kenna: skipped {} malformed asset records".format(skipped["malformed"]))
     return reported
-
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)

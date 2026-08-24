@@ -100,7 +100,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'network_interface', 'ip_address', 'ip_in_network', 'routable_ip')
+load('net', 'network_interface', 'ip_address', 'routable_ip')
 load('http', http_post='post', 'get_json', 'url_encode', 'url_parse')
 load('kwargs', 'get_string', 'get_http_options', 'get_bool', 'get_int')
 load('time', 'parse_ts')
@@ -285,7 +285,6 @@ def _server_host(url):
     parsed = url_parse(url)
     return parsed.hostname if parsed else ""
 
-
 def _app_base(base_url, app_path):
     """Return the application base, e.g. https://oa.example.com/open-audit."""
     path = as_text(app_path)
@@ -297,9 +296,7 @@ def _app_base(base_url, app_path):
         path = path[:-1]
     return base_url + path
 
-
 DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-
 
 def _days_in_month(year, month):
     """Return the real length of a month, so an impossible date never reaches
@@ -318,7 +315,6 @@ def _is_virtual_adapter(row):
                 return True
     return False
 
-
 def _hostname(value):
     """Return a usable hostname, dropping placeholders and bare addresses."""
     text = as_text(value)
@@ -329,7 +325,6 @@ def _hostname(value):
     if ip_address(text) != None:
         return ""
     return text
-
 
 def _device_type(record):
     """Translate the Open-AudIT type, then class, into a runZero device type."""
@@ -344,7 +339,6 @@ def _device_type(record):
         return oa_type.title()
     return DEVICE_CLASSES.get(as_text(record.get("class")).lower(), "")
 
-
 def _hostnames(record):
     """Return the device's names, most specific first, de-duplicated."""
     names = []
@@ -358,7 +352,6 @@ def _hostnames(record):
         seen[candidate.lower()] = True
         names.append(candidate)
     return names[:MAX_HOSTNAMES]
-
 
 def collect_interfaces(record, included):
     """Build the network interfaces for one device.
@@ -451,7 +444,6 @@ def collect_interfaces(record, included):
 
     return netifs[:MAX_CHILDREN], macs, virtual
 
-
 def collect_software(included, scope, device_id, address):
     """Build Software objects from the device's software sub-table.
 
@@ -488,7 +480,6 @@ def collect_software(included, scope, device_id, address):
             break
     return entries
 
-
 def _tags(record, virtual_adapters):
     """Return the search tags for one device."""
     tags = [VENDOR]
@@ -501,7 +492,6 @@ def _tags(record, virtual_adapters):
     if virtual_adapters:
         tags.append("open-audit-virtual-adapters")
     return tags
-
 
 def build_asset(record, included, scope):
     """Build one ImportAsset from a devices row and its optional sub-tables."""
@@ -613,7 +603,6 @@ def build_asset(record, included, scope):
             asset.lastSeenTS = last_seen
     return asset
 
-
 def _cookie_from_headers(headers, name):
     """Extract one cookie's value from the Set-Cookie response headers. The
     http module exposes response headers as a dict of canonically cased names
@@ -631,7 +620,6 @@ def _cookie_from_headers(headers, name):
         if eq > 0 and first[:eq].strip() == name:
             return first[eq + 1:].strip()
     return ""
-
 
 def login(ctx):
     """Exchange the username and password for a ci_session cookie.
@@ -682,7 +670,6 @@ def login(ctx):
     ctx["http_options"] = options
     return True
 
-
 def _auth_failure(err):
     """Report whether a request error means the session is no longer valid.
 
@@ -695,7 +682,6 @@ def _auth_failure(err):
     if err.startswith("status 401") or err.startswith("status 403"):
         return True
     return err.startswith("status 200") and "invalid JSON" in err
-
 
 def _get(ctx, url, params):
     """Issue one authenticated GET, logging in again once if the session died."""
@@ -713,7 +699,6 @@ def _get(ctx, url, params):
         return None, err
     return None, "request failed"
 
-
 def _envelope_rows(data):
     """Return the data array of an Open-AudIT response envelope.
 
@@ -728,7 +713,6 @@ def _envelope_rows(data):
         return []
     return rows
 
-
 def _attributes(row):
     """Return the attributes object of one data item, or None."""
     if type(row) != "dict":
@@ -737,7 +721,6 @@ def _attributes(row):
     if type(attributes) != "dict":
         return None
     return attributes
-
 
 def _included(data):
     """Return the included sub-tables of a read response.
@@ -753,7 +736,6 @@ def _included(data):
         return {}
     return included
 
-
 def fetch_detail(ctx, device_id):
     """Read one device with its sub-tables, returning the included block."""
     url = "{}{}/{}".format(ctx["base"], DEVICES_PATH, device_id)
@@ -763,7 +745,6 @@ def fetch_detail(ctx, device_id):
         print("open-audit: failed to read device {}: {}".format(device_id, err))
         return {}
     return _included(data)
-
 
 def fetch_and_report(ctx):
     """Page the devices collection, streaming each page as it is parsed."""
@@ -856,7 +837,6 @@ def fetch_and_report(ctx):
     if retired:
         print("open-audit: excluded {} retired devices client-side".format(retired))
     return reported, skipped, detailed, capped
-
 
 def main(**kwargs):
     base_url = get_string(kwargs, "url", default="").strip()

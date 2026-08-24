@@ -106,10 +106,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'network_interface', 'normalize_mac', 'routable_ip')
 load('http', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_http_options', 'get_string', 'get_int', 'get_bool', 'get_list')
-load('time', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 
 load('coerce', 'as_dict', 'as_text', 'dedupe', 'dicts')
@@ -270,7 +270,6 @@ def _fact(facts, names):
             return text
     return ""
 
-
 def _clean_mac(value):
     """Return a canonical MAC, or an empty string when it is unusable. The
     all-zero MAC is treated as absent because every host that fails to read one
@@ -279,7 +278,6 @@ def _clean_mac(value):
     if not mac or mac == EMPTY_MAC:
         return ""
     return mac
-
 
 def split_os_version(combined):
     """Split Foreman's combined operatingsystem_name into a name and a version.
@@ -294,7 +292,6 @@ def split_os_version(combined):
         if re_match(VERSION_RE, parts[index]):
             return " ".join(parts[:index]), " ".join(parts[index:])
     return " ".join(parts), ""
-
 
 def split_nvra(name, nvra):
     """Split a Katello package NVRA into version, release, and architecture.
@@ -318,7 +315,6 @@ def split_nvra(name, nvra):
         release = rest[dash + 1:]
         rest = rest[:dash]
     return rest, release, arch
-
 
 def build_software(ctx, host_id, address, packages):
     """Convert the installed packages Katello records against one host into
@@ -358,7 +354,6 @@ def build_software(ctx, host_id, address, packages):
         }, prefix=ATTR_PREFIX, separator=ATTR_SEPARATOR)
         software.append(Software(**params))
     return software
-
 
 def collect_interfaces(facts, entries):
     """Group everything known about each of a host's interfaces into one entry
@@ -402,7 +397,6 @@ def collect_interfaces(facts, entries):
             if routable and routable not in item["ips"]:
                 item["ips"].append(routable)
     return ifaces
-
 
 def merge_interfaces(ifaces, host_mac, host_ips):
     """Reduce the per-device entries to the set that becomes network interfaces.
@@ -453,7 +447,6 @@ def merge_interfaces(ifaces, host_mac, host_ips):
         merged.append({"identifiers": ["primary"], "mac": mac, "ips": remaining})
     return merged
 
-
 def build_interfaces(merged):
     """Build one runZero network interface per Foreman interface, so a
     multi-homed host keeps its per-NIC addressing instead of being collapsed
@@ -464,7 +457,6 @@ def build_interfaces(merged):
         if nic:
             netifs.append(nic)
     return netifs
-
 
 def build_asset(ctx, record, facts, detail, packages):
     """Convert one Foreman host record into a runZero asset."""
@@ -685,7 +677,6 @@ def build_asset(ctx, record, facts, detail, packages):
         asset.lastSeenTS = last_seen
     return asset
 
-
 def fetch_collection(ctx, path, params, page_size, label):
     """Fetch one page of a Foreman collection, returning (results, err).
 
@@ -703,7 +694,6 @@ def fetch_collection(ctx, path, params, page_size, label):
         return None, "{} response carried no results node".format(label)
     return data["results"], None
 
-
 def fetch_host_detail(ctx, host_id):
     """Fetch one host's own record for its interface list. Foreman returns the
     interfaces array only on the single-host response, never on the host list.
@@ -714,7 +704,6 @@ def fetch_host_detail(ctx, host_id):
         print("foreman: failed to fetch detail for host {}: {}".format(host_id, err))
         return {}
     return as_dict(data)
-
 
 def fetch_packages(ctx, host_id):
     """Fetch the packages Katello has recorded for one host.
@@ -746,7 +735,6 @@ def fetch_packages(ctx, host_id):
             break
     return packages
 
-
 def _clean_fact_names(names):
     """Drop user-supplied fact names that cannot be interpolated into the
     scoped-search string. A double quote would end the quoted term early,
@@ -760,7 +748,6 @@ def _clean_fact_names(names):
         cleaned.append(name)
     return cleaned
 
-
 def fact_search(ctx):
     """Build the Foreman search that limits the fact walk to the facts that are
     actually mapped. Exact names cover the flat facts; the per-interface facts
@@ -772,7 +759,6 @@ def fact_search(ctx):
     for prefix in FACT_PREFIXES:
         terms.append('fact ~ "{}"'.format(prefix))
     return " or ".join(terms)
-
 
 def fetch_facts(ctx):
     """Index every host's facts in one paged walk over the fact_values endpoint.
@@ -818,7 +804,6 @@ def fetch_facts(ctx):
     print("foreman: indexed {} fact values for {} hosts".format(values, hosts))
     return facts
 
-
 def build_assets(ctx, records, facts):
     """Convert a page of Foreman host records into runZero assets, enriching
     each with its facts and, when enabled, its interface list and packages."""
@@ -846,7 +831,6 @@ def build_assets(ctx, records, facts):
         host_facts = facts.get(as_text(record.get("name"), join=",").strip(), {})
         assets.append(build_asset(ctx, record, host_facts, detail, packages))
     return assets
-
 
 def fetch_and_report_hosts(ctx, facts):
     """Fetch and stream hosts one page at a time so the full inventory is never
@@ -880,7 +864,6 @@ def fetch_and_report_hosts(ctx, facts):
         print("foreman: per-host request limit of {} reached; interfaces and packages were not fetched for {} hosts".format(
             ctx["detail_limit"], ctx["detail_skipped"]))
     return reported
-
 
 def main(**kwargs):
     base_url = _base_url(kwargs)

@@ -35,7 +35,7 @@ CONFIG = {
     },
 }
 load('requests', 'Session')
-load('json', json_encode='encode', json_decode='decode')
+load('json', json_decode='decode')
 load('runzero.types', 'ImportAsset')
 load('base64', base64_encode='encode')
 load('coerce', 'dicts')
@@ -45,7 +45,6 @@ load('net', 'network_interface', 'routable_ips')
 INSECURE_ALLOWED = False
 # See the comment at the ImportAsset call below for why this is knowable here.
 VM_DEVICE_TYPE = "Virtual Machine"
-
 
 def try_login(ctx):
     """Authenticate via POST /rest/v1/login and rely on the session cookie.
@@ -65,7 +64,6 @@ def try_login(ctx):
     print("scale-computing: the /rest/v1/login fallback also failed (status {})".format(
         resp.status_code if resp else "no response"))
     return False
-
 
 def get_rows(ctx, path, label):
     """GET one HC3 collection and return (rows, ok).
@@ -89,7 +87,6 @@ def get_rows(ctx, path, label):
         print("scale-computing: could not {}: the response body was not a JSON list".format(label))
         return [], False
     return dicts(json_decode(resp.body)), True
-
 
 def main(*args, **kwargs):
     # Prefer structured top-level kwargs (params[] schema). Fall back
