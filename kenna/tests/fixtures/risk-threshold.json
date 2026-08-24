@@ -1,0 +1,67 @@
+{
+  "name": "risk-threshold",
+  "integration": "kenna",
+  "description": "A server that ignores the min_risk_meter_score query parameter. The parameter is not a documented /assets/search filter, so the script cannot rely on it alone: this fixture returns one asset above the configured threshold and one below it in the same page, exactly what a server that ignored the filter would send. The below-threshold asset must be dropped client-side and counted, the above-threshold asset must import, and the parameter must still be sent so a server that does honor it saves the transfer.\n\ncheck_determinism is off because the Kenna asset id is scoped by the API host AND port and the fixture server binds a fresh random port on each run.",
+  "check_determinism": false,
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-risk-token",
+    "include_vulnerabilities": "false",
+    "min_risk_meter_score": "500"
+  },
+  "routes": [
+    {
+      "name": "assets-search",
+      "match": {"method": "GET", "path": "/assets/search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "meta": {"page": 1, "pages": 1, "total_count": 2},
+            "assets": [
+              {
+                "id": 4001,
+                "primary_locator": "ip_address",
+                "locator": "10.94.0.1",
+                "ip_address": "10.94.0.1",
+                "hostname": "high-risk-host",
+                "status": "active",
+                "risk_meter_score": 820,
+                "last_seen_time": "2026-08-10T00:00:00Z"
+              },
+              {
+                "id": 4002,
+                "primary_locator": "ip_address",
+                "locator": "10.94.0.2",
+                "ip_address": "10.94.0.2",
+                "hostname": "low-risk-host",
+                "status": "active",
+                "risk_meter_score": 120,
+                "last_seen_time": "2026-08-10T00:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "kenna:$BASE_HOST:4001",
+        "fields": {"hostnames": "high-risk-host"}
+      }
+    ],
+    "ids_absent": ["kenna:$BASE_HOST:4002"],
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/assets/search", "query_contains": "min_risk_meter_score=500"}
+    ],
+    "log_contains": [
+      "kenna: skipped 1 assets below the configured minimum risk meter score"
+    ]
+  },
+  "invariants": {"skip": []}
+}

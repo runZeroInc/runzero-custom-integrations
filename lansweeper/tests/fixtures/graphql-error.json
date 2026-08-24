@@ -1,7 +1,7 @@
 {
   "name": "graphql-error",
   "integration": "lansweeper",
-  "description": "GraphQL reports failure inside a 200 response, so an integration that only checks the HTTP status imports an empty estate and calls it success. Proves the errors array is read: the first site's asset query returns an error and is logged by message and abandoned, while the second site is still walked and imported. One unreadable site must not cost the whole run.",
+  "description": "GraphQL reports failure inside a 200 response, so an integration that only checks the HTTP status imports an empty estate and calls it success. Proves the errors array is read: the first site's asset query returns an error and is logged by message and abandoned, while the second site is still walked and imported. One unreadable site must not cost the whole run. The first error entry is deliberately a bare string rather than the spec's object shape: reading .get off it used to abort the script, so the error summary must tolerate both shapes.",
   "kwargs": {
     "url": "$BASE",
     "application_identity_code": "fixture-identity-code",
@@ -54,6 +54,7 @@
               "site": null
             },
             "errors": [
+              "Not authorized to read assetResources for this site",
               {
                 "message": "Not authorized to read assetResources for this site",
                 "path": [

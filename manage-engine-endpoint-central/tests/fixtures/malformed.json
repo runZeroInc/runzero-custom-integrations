@@ -1,0 +1,48 @@
+{
+  "name": "malformed",
+  "integration": "manage-engine-endpoint-central",
+  "description": "One page carrying a healthy row, a null row, a bare-string row, and a row whose ip_address arrives as an ARRAY rather than the documented comma-separated string. A non-dict row used to abort the script inside page_signature or build_assets at the first .get, and an array ip_address aborted it at .split -- either way the whole task died on the first bad row. The malformed rows must be skipped with a log line, the array addressing must import both addresses, and the healthy row must import untouched. namespaced_ids is skipped: the id is the bare Endpoint Central resource_id with no server scope, the same pre-existing defect the happy scenario records.",
+  "kwargs": {
+    "url": "$BASE",
+    "oauth_token": "fixture-onprem-token"
+  },
+  "routes": [
+    {
+      "name": "scancomputers",
+      "match": {"method": "GET", "path": "/api/1.4/inventory/scancomputers"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "message_response": {
+              "scancomputers": [
+                {"resource_id": "501", "resource_name": "syn-ec-good", "ip_address": "10.95.1.11", "mac_address": "00:50:56:00:e1:01", "os_name": "Windows 11 Enterprise"},
+                null,
+                "this row is a string, not an object",
+                {"resource_id": "502", "resource_name": "syn-ec-array-ips", "ip_address": ["10.95.1.12", "10.95.2.12"], "mac_address": "00:50:56:00:e1:02"}
+              ]
+            }
+          }
+        },
+        {"status": 200, "json": {"message_response": {"scancomputers": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": ["501", "502"],
+    "assets": [
+      {
+        "id": "502",
+        "fields": {"ipAddresses": "10.95.1.12\t10.95.2.12", "macAddresses": "00:50:56:00:e1:02"}
+      }
+    ],
+    "request_count": 1,
+    "log_contains": [
+      "endpoint-central: skipping non-object device record:"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]},
+  "check_determinism": true
+}

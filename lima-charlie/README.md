@@ -70,15 +70,17 @@ LimaCharlie's own CLI and API for any authenticated user.
    ```
 
    The integration performs the same exchange, passing the organization as a
-   query parameter and the secret in an `X-LC-Secret` header rather than in a
-   form body. Either form reaches the same endpoint; the body form above is the
-   one LimaCharlie documents, so it is the better shape for a manual test.
+   query parameter and the secret BOTH in an `X-LC-Secret` header and in the
+   form body shown above. The header form is undocumented but accepted; the
+   body form is the one LimaCharlie documents and both official SDKs use.
+   Sending both means a vendor-side tightening to the documented contract
+   cannot break the exchange.
 
 ### runZero configuration
 
 1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
     - Set CUSTOM_ATTRIBS_TO_IGNORE. By default, sid, hostname, mac_addr, int_ip and ext_ip are ignored because they are redundant with core runZero attributes. All other attributes returned by API will be imported.
-    - Set boolean values in ARCHITECTURE to control what sensor architectures are imported. By default, chromium and usp_adapter sensors are not imported because they do not represent traditional cyber assets. 
+    - Set boolean values in ARCHITECTURE to control what sensor architectures are imported. By default, chromium and usp_adapter sensors are not imported because they do not represent traditional cyber assets. Only architectures explicitly set to False are filtered; a sensor with no arch field, or a value the map does not list, is imported. 
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
     - **Organization ID (OID)** (`organization_id`): the UUID of the LimaCharlie organization to import.

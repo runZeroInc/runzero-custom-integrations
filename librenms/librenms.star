@@ -229,10 +229,12 @@ def stream(ctx, path, key, params):
     which is a normal outcome rather than a failure.
     """
     url = ctx["base_url"] + API_BASE + path
+    ctx["last_stream_status"] = 0
     resp = http_get(url, params=params, **ctx["raw_options"]) if params else http_get(url, **ctx["raw_options"])
     if resp == None:
         print("librenms: {} produced no response".format(path))
         return []
+    ctx["last_stream_status"] = resp.status_code
     if resp.status_code == 404:
         print("librenms: {} returned 404 ({}); treating it as empty".format(path, _api_error(resp.body)))
         return []
@@ -246,7 +248,12 @@ def stream(ctx, path, key, params):
 
     text = as_text(resp.body, join=",")
     marker = '"' + key + '"'
-    if marker not in text[:400]:
+    # The whole body is scanned for the collection key, not a fixed head
+    # window: LibreNMS can put a long message or count block ahead of the
+    # collection, and a key past a short window used to make a populated
+    # response look empty and be silently skipped. The presence check itself
+    # stays, because iter_array ABORTS the script when its path is absent.
+    if marker not in text:
         print("librenms: {} returned no {} collection: {}".format(path, key, _api_error(text)))
         return []
     return iter_array(text, path=key)
@@ -482,6 +489,26 @@ def _append(record, key, value):
         record[key].append(text)
 
 
+def _fold_arp_row(ctx, index, order, row):
+    """Fold one ARP row into the endpoint index. Returns 1 when it counted."""
+    if type(row) != "dict":
+        return 0
+    mac = _mac_key(row.get("mac_address"))
+    if not mac:
+        return 0
+    record = _endpoint(index, order, ctx, mac)
+    if record == None:
+        return 0
+    _append(record, "sources", "arp")
+    ip = routable_ip(row.get("ipv4_address"))
+    if ip:
+        _append(record, "ips", ip)
+    _append(record, "device_ids", row.get("device_id"))
+    _append(record, "port_ids", row.get("port_id"))
+    _append(record, "contexts", row.get("context_name"))
+    return 1
+
+
 def collect_arp(ctx, index, order):
     """Fold the estate-wide ARP table into the endpoint index.
 
@@ -491,25 +518,21 @@ def collect_arp(ctx, index, order):
     ipv4_address, context_name}. Note that the per-device form documented
     elsewhere as /devices/{id}/arp/all does NOT exist: there is no arp route
     under /devices at all, and the catch-all graph route would swallow it.
+
+    Older LibreNMS releases follow the published docs instead and answer 400
+    when arp/all is asked for without a device parameter. That used to end the
+    endpoint collection with one log line and zero endpoints; those releases do
+    accept the per-device form, so the walk falls back to one request per
+    already-imported device.
     """
     seen = 0
     for row in stream(ctx, "/resources/ip/arp/all", "arp", None):
-        if type(row) != "dict":
-            continue
-        mac = _mac_key(row.get("mac_address"))
-        if not mac:
-            continue
-        record = _endpoint(index, order, ctx, mac)
-        if record == None:
-            continue
-        _append(record, "sources", "arp")
-        ip = routable_ip(row.get("ipv4_address"))
-        if ip:
-            _append(record, "ips", ip)
-        _append(record, "device_ids", row.get("device_id"))
-        _append(record, "port_ids", row.get("port_id"))
-        _append(record, "contexts", row.get("context_name"))
-        seen += 1
+        seen += _fold_arp_row(ctx, index, order, row)
+    if ctx.get("last_stream_status") == 400:
+        print("librenms: this LibreNMS requires a device parameter with arp/all; retrying once per device")
+        for device_id in ctx["device_names"]:
+            for row in stream(ctx, "/resources/ip/arp/all", "arp", {"device": device_id}):
+                seen += _fold_arp_row(ctx, index, order, row)
     return seen
 
 
@@ -651,6 +674,9 @@ def main(**kwargs):
         "max_discovered": max_discovered if max_discovered > 0 else 0,
         "device_names": {},
         "port_names": {},
+        # Status of the most recent stream() response, read by collect_arp to
+        # notice the older-release 400 on arp/all without a device parameter.
+        "last_stream_status": 0,
     }
 
     devices, device_skipped = collect_devices(ctx)

@@ -42,7 +42,7 @@ load("runzero.types", "ImportAsset", "NetworkInterface", "Service",
 load("net",  "ip_address", "network_interface", "normalize_mac", "mac_key",
              "ip_network", "ip_in_network", "resolve",
              "routable_ip", "routable_ips", "hostname", "hostnames")
-load("coerce", "text", "as_dict", "as_list", "dicts",
+load("coerce", "as_text", "as_dict", "as_list", "dicts",
                "as_int", "as_float", "as_bool", "dedupe")
 load("http", http_get="get", http_post="post",
               "head", "put", "patch", "delete",
@@ -464,9 +464,9 @@ Supported kwargs:
   ```python
   asset = ImportAsset(
       id=asset_id,
-      os=text(record.get("os")),               # skipped when ""
-      osVersion=text(record.get("os_version")),
-      manufacturer=text(record.get("vendor")),
+      os=as_text(record.get("os")),               # skipped when ""
+      osVersion=as_text(record.get("os_version")),
+      manufacturer=as_text(record.get("vendor")),
       hostnames=names,                          # skipped when []
       firstSeenTS=parse_ts(record.get("created")),   # skipped when None
       lastSeenTS=parse_ts(record.get("last_seen")),
@@ -569,18 +569,18 @@ Nothing in `coerce` raises. Each function returns the requested type or
 the supplied default, so calls chain without guarding.
 
 ```python
-load("coerce", "text", "as_dict", "as_list", "dicts", "as_int", "as_float",
+load("coerce", "as_text", "as_dict", "as_list", "dicts", "as_int", "as_float",
      "as_bool", "dedupe")
 
 result = as_dict(data.get("result"))          # {} when the API sent null
 for record in dicts(result.get("devices")):   # skips nulls and stray strings
-    name  = text(record.get("hostname"))      # "" when absent
+    name  = as_text(record.get("hostname"))      # "" when absent
     count = as_int(record.get("num_queries")) # 0 when absent or unparseable
 ```
 
 | Function | Returns |
 | --- | --- |
-| `text(value, default="")` | Trimmed string. `None` → default; `True` → `"true"` (not Starlark's `"True"`); a whole float `42.0` → `"42"`; a dict or list → default, rather than a Go-syntax dump. |
+| `as_text(value, default="")` | Trimmed string. `None` → default; `True` → `"true"` (not Starlark's `"True"`); a whole float `42.0` → `"42"`; a dict or list → default, rather than a Go-syntax dump. |
 | `as_dict(value)` | The dict, or `{}`. |
 | `as_list(value, wrap=True)` | The list. `None` → `[]`; a tuple converts; any other value is wrapped in a one-element list (a string is never split into characters). `wrap=False` yields `[]` instead. |
 | `dicts(value)` | Only the dict members of an iterable. A bare dict yields a one-element list. |

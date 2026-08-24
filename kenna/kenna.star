@@ -606,7 +606,7 @@ def build_assets(records, tenant_host, vuln_map):
     return assets
 
 
-def select_assets(records, include_non_network, skipped):
+def select_assets(records, include_non_network, min_risk, skipped):
     """Return the records that can become runZero assets, counting the rest.
 
     Kenna aggregates other scanners, so most of its assets are machines runZero
@@ -629,6 +629,17 @@ def select_assets(records, include_non_network, skipped):
         if not include_non_network and locator in NON_NETWORK_LOCATORS:
             skipped["non_network"] = skipped["non_network"] + 1
             continue
+        # The min_risk_meter_score query parameter is also sent to the server,
+        # but it is not a documented /assets/search filter, so it cannot be
+        # relied on alone: a server that ignores it would import the whole
+        # estate despite the operator's threshold. This client-side check makes
+        # the threshold hold either way. A record with no numeric score is kept
+        # rather than guessed at.
+        if min_risk > 0:
+            score = _number(record.get("risk_meter_score"))
+            if score != None and score < min_risk:
+                skipped["below_risk"] = skipped["below_risk"] + 1
+                continue
         if not _usable_addresses([record.get("ip_address"), record.get("ipv6")]):
             if not _hostnames(record) and not _mac(record):
                 skipped["no_correlator"] = skipped["no_correlator"] + 1
@@ -648,11 +659,16 @@ def fetch_vulnerability_map(base_url, http_options, asset_ids, page_size):
     """
     vuln_map = {}
     total = 0
+    # One pager bounds the whole join, not one per batch: a fresh guard per
+    # 100-id batch would reset the page budget every batch and let the walk
+    # grow unbounded with the estate. Kenna numbers pages per search, so the
+    # page parameter restarts at 1 for each batch while the guard accumulates.
+    p = pager("kenna-vulnerabilities")
     for start in range(0, len(asset_ids), VULN_BATCH):
         query = _asset_id_query(asset_ids[start:start + VULN_BATCH])
-        _pager1 = pager("kenna-1")
-        while _pager1.next():
-            page = _pager1.page
+        page = 0
+        while p.next():
+            page += 1
             url = "{}{}?{}&page={}&per_page={}".format(
                 base_url, VULNERABILITIES_SEARCH_PATH, query, page, page_size)
             # The query is already in the URL; passing params= would replace it.
@@ -687,20 +703,22 @@ def fetch_vulnerability_map(base_url, http_options, asset_ids, page_size):
 
 
 def fetch_and_report_assets(base_url, http_options, params, page_size,
-                            include_vulnerabilities, include_non_network):
+                            include_vulnerabilities, include_non_network,
+                            min_risk):
     """Fetch and stream assets one page at a time so the full set is never
     held in memory at once."""
     reported = 0
     truncated = False
     tenant_host = _tenant_host(base_url)
     url = base_url + ASSETS_SEARCH_PATH
-    skipped = {"malformed": 0, "no_id": 0, "non_network": 0, "no_correlator": 0}
+    skipped = {"malformed": 0, "no_id": 0, "non_network": 0, "no_correlator": 0,
+               "below_risk": 0}
 
-    _pager2 = pager("kenna-2")
+    p = pager("kenna-assets")
 
-    while _pager2.next():
+    while p.next():
 
-        page = _pager2.page
+        page = p.page
         page_params = dict(params)
         page_params["page"] = page
         page_params["per_page"] = page_size
@@ -716,7 +734,7 @@ def fetch_and_report_assets(base_url, http_options, params, page_size,
         if not records:
             break
 
-        kept = select_assets(records, include_non_network, skipped)
+        kept = select_assets(records, include_non_network, min_risk, skipped)
         if kept:
             vuln_map = {}
             if include_vulnerabilities:
@@ -737,6 +755,8 @@ def fetch_and_report_assets(base_url, http_options, params, page_size,
         print("kenna: skipped {} assets with no usable MAC, hostname, or routable address".format(skipped["no_correlator"]))
     if skipped["non_network"]:
         print("kenna: skipped {} assets whose primary locator is not a network host".format(skipped["non_network"]))
+    if skipped["below_risk"]:
+        print("kenna: skipped {} assets below the configured minimum risk meter score".format(skipped["below_risk"]))
     if skipped["malformed"]:
         print("kenna: skipped {} malformed asset records".format(skipped["malformed"]))
     return reported
@@ -766,7 +786,8 @@ def main(**kwargs):
     http_options["retry_backoff"] = HTTP_RETRY_BACKOFF
 
     reported = fetch_and_report_assets(base_url, http_options, params, page_size,
-                                       include_vulnerabilities, include_non_network)
+                                       include_vulnerabilities, include_non_network,
+                                       min_risk_meter_score)
     if not reported:
         print("kenna: no assets retrieved")
     return None

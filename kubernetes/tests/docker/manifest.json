@@ -6,33 +6,42 @@
   "service": "k3s",
   "port": 6443,
   "scheme": "https",
-
   "ready": [
     {
       "name": "apiserver port published",
-      "http": {"path": "/livez", "status": [200, 401, 403], "insecure": true},
+      "http": {
+        "path": "/livez",
+        "status": [
+          200,
+          401,
+          403
+        ],
+        "insecure": true
+      },
       "timeout": 300,
       "interval": 3
     },
     {
       "name": "node reports Ready",
-      "exec": ["kubectl", "get", "nodes", "-o",
-               "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"],
+      "exec": [
+        "kubectl",
+        "get",
+        "nodes",
+        "-o",
+        "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"
+      ],
       "contains": "True",
       "timeout": 300,
       "interval": 3
     }
   ],
-
   "seed": "seed.py",
-
   "kwargs": {
     "url": "$BASE",
     "bearer_token": "${seed.token}",
     "include_loadbalancer_services": "true",
     "tls_disable_validation": "true"
   },
-
   "expect": {
     "asset_count": 2,
     "assets": [
@@ -60,16 +69,16 @@
       }
     ],
     "log_contains": [
-      "nodes: imported 1 asset(s)",
-      "services: imported 1 asset(s)"
+      "kubernetes: imported 1 nodes",
+      "kubernetes: imported 1 services"
     ]
   },
-
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": [
+      "namespaced_ids"
+    ]
   },
   "_invariants_skip_reason": "Kubernetes object UIDs are RFC 4122 UUIDs, globally unique by construction, so `k8s-node-<uid>` cannot collide across clusters. The invariant looks for a ':' separator that this id scheme has no need of.",
-
   "check_determinism": true,
   "startup_timeout": 900,
   "timeout": 600

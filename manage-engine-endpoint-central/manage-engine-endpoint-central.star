@@ -8,6 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # The repo-wide record target for a bounded walk: no integration should
+    # import more than ten million records in one run, so the page ceiling is
+    # that target divided by the 1000-row page size.
+    "maxPages": 10000,
     "params": [
         {
             "key": "url",
@@ -17,10 +21,16 @@ CONFIG = {
             "placeholder": "https://ec.example.com",
         },
         {
+            # The key stays "oauth_token" so existing credentials keep working,
+            # but the value is the ON-PREM auth token, sent as a bare
+            # Authorization header. It is NOT a Zoho OAuth token: Endpoint
+            # Central Cloud requires "Authorization: Zoho-oauthtoken" and a
+            # full OAuth exchange this script does not perform.
             "key": "oauth_token",
-            "label": "OAuth token",
+            "label": "API auth token (on-prem)",
             "type": "secret",
             "required": True,
+            "description": "On-premises Endpoint Central auth token, sent verbatim as the Authorization header. Not a Zoho OAuth token; Endpoint Central Cloud is not supported and will answer 401.",
         },
     ],
     "includes": {
@@ -37,25 +47,23 @@ API_VERSION     = '1.4'
 SCAN_ENDPOINT   = '/api/' + API_VERSION + '/inventory/scancomputers'
 PAGE_LIMIT      = 1000
 
-# The repo-wide record target for a bounded walk: no integration should import
-# more than ten million records in one run, so every page ceiling is that target
-# divided by the page size. At 1000 rows a page that is 10,000 pages.
-#
-# The ceiling is a backstop, not the working guard. The walk's two exits are an
-# empty page and a short page, and a server that ignores `page` produces
-# neither -- it just keeps answering with the same full page -- so the
-# no-progress check below catches that on the first repeat. Either stop is
-# logged, because a truncated import that says nothing looks exactly like a
-# complete one.
-MAX_RECORDS     = 10000000
-MAX_PAGES       = (MAX_RECORDS + PAGE_LIMIT - 1) // PAGE_LIMIT
+# CONFIG["maxPages"] bounds the walk through pager() below. The ceiling is a
+# backstop, not the working guard: the walk's two exits are an empty page and a
+# short page, and a server that ignores `page` produces neither -- it just
+# keeps answering with the same full page -- so the no-progress check below
+# catches that on the first repeat and logs the stop, because a truncated
+# import that says nothing looks exactly like a complete one. Exhausting
+# maxPages itself raises, naming the label and the key.
 
 def page_signature(devices):
     """A fingerprint of one page's rows, used to notice a server that answers
     every page number with the same page."""
     ids = []
     for d in devices:
-        ids.append(str(d.get('resource_id') or d.get('id') or ''))
+        if type(d) == 'dict':
+            ids.append(str(d.get('resource_id') or d.get('id') or ''))
+        else:
+            ids.append(str(d))
     return ','.join(ids)
 
 def reported_total(body):
@@ -92,10 +100,16 @@ def build_network_interfaces(device):
     interface through net.network_interface answers None in exactly that case,
     and the guard turns it into no interface at all rather than an empty one.
     """
-    ip_field = device.get('ip_address') or ''
+    ip_field = device.get('ip_address')
     mac = device.get('mac_address')
-    # support comma-separated IPs if ever present
-    ips = [p.strip() for p in ip_field.split(',') if p.strip()]
+    # ip_address is documented as a comma-separated string, but a release that
+    # returned it as an array would abort the whole task at .split, so both
+    # shapes are accepted.
+    if type(ip_field) == 'list':
+        parts = ip_field
+    else:
+        parts = str(ip_field or '').split(',')
+    ips = [str(p).strip() for p in parts if str(p).strip()]
     # network_interface classifies v4/v6 itself, strips port and zone suffixes,
     # dedupes, and caps each family at 99. It also replaces the previous
     # hand-rolled loop, which read .version off ip_address()'s return value --
@@ -108,6 +122,11 @@ def build_network_interfaces(device):
 def build_assets(devices):
     assets = []
     for d in devices:
+        # A non-dict row -- null, a bare string -- would abort the script at
+        # the first .get, losing the rest of the page. Skip it and say so.
+        if type(d) != 'dict':
+            print('endpoint-central: skipping non-object device record: ' + str(d))
+            continue
         raw_id = d.get('resource_id') or d.get('id')
         if not raw_id:
             print("endpoint-central: skipping device with no resource_id/id: name=" + str(d.get('resource_name', '')))
@@ -146,10 +165,10 @@ def main(**kwargs):
 
     page        = 1
     reported    = 0
-    capped      = True
     total       = None
     last_signature = None
-    for _page in range(0, MAX_PAGES):
+    p = pager('endpoint-central-computers')
+    while p.next():
         url = base_url + SCAN_ENDPOINT
         params = {"pagelimit": PAGE_LIMIT, "page": page}
         body, err = get_json(url, params=params, timeout=3600, **http_options)
@@ -163,13 +182,11 @@ def main(**kwargs):
         # the walk rather than end the run silently.
         if type(body) != 'dict' or type(body.get('message_response', {})) != 'dict':
             print('endpoint-central: unexpected response shape, wanted an object')
-            capped = False
             break
         total   = reported_total(body) if total == None else total
         msg     = body.get('message_response', {})
         devices = msg.get('scancomputers', [])
-        if not devices:
-            capped = False
+        if type(devices) != 'list' or not devices:
             break
 
         # A page identical to the one before it means the server stopped
@@ -181,7 +198,6 @@ def main(**kwargs):
         if signature == last_signature:
             print('endpoint-central: pagination stopped making progress at page {}; the server repeated the previous page. {}'.format(
                 page, retrieved_of(reported, total)))
-            capped = False
             break
         last_signature = signature
 
@@ -189,13 +205,8 @@ def main(**kwargs):
         # is never held in memory.
         reported += report_assets(build_assets(devices))
         if len(devices) < PAGE_LIMIT:
-            capped = False
             break
         page += 1
-
-    if capped:
-        print('endpoint-central: page limit of {} hit (integration safety limit). {}'.format(
-            MAX_PAGES, retrieved_of(reported, total)))
 
     if not reported:
         print('No devices returned')

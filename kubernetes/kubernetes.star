@@ -8,6 +8,9 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Backstop for the chunked LIST walks below: at 500 objects per page this
+    # is the repo-wide ten-million-record target per collection.
+    "maxPages": 20000,
     "params": [
         {
             "key": "url",
@@ -90,44 +93,17 @@ DEFAULT_REQUEST_TIMEOUT = 300
 # ImportAsset caps software, services and vulnerabilities at 99 per asset.
 MAX_SOFTWARE_PER_ASSET = 99
 
+# Objects requested per LIST page. The Kubernetes API supports chunked lists
+# via limit/continue; without them the whole pod list of a large cluster
+# arrives as one decoded response and can exhaust the script's memory ceiling.
+LIST_PAGE_LIMIT = 500
+
 
 def _log(msg):
     print("kubernetes: " + msg)
 
 
-def _collect(items, convert, kind, assets):
-    """Convert one collection, appending to assets and TALLYING the drops.
-
-    A record with no metadata.uid has no stable identity, so it cannot be
-    imported. Logging each one costs a line per record on a large cluster, so
-    the count is what gets reported and one name is carried along for
-    diagnosis.
-    """
-    imported = 0
-    skipped = 0
-    first_skipped = ""
-    for item in items:
-        meta = item.get("metadata") or {}
-        if not meta.get("uid"):
-            skipped += 1
-            if skipped == 1:
-                first_skipped = str(meta.get("name", ""))
-            continue
-        asset = convert(item)
-        # A None from the converter here is a deliberate filter -- a
-        # ClusterIP-only Service, say -- not a defect, so it is not tallied as
-        # a skip. Only the identity gate above counts.
-        if asset:
-            assets.append(asset)
-            imported += 1
-    _log("imported {} {}".format(imported, kind))
-    if skipped > 0:
-        _log("skipped {} {} with no metadata.uid (first name: {})".format(
-            skipped, kind, first_skipped))
-    return imported
-
-
-def _api_get(base_url, path, token, timeout_seconds, config_kwargs):
+def _api_get(base_url, path, token, timeout_seconds, config_kwargs, params):
     url = base_url.rstrip("/") + path
     headers = {
         "Authorization": bearer(token),
@@ -135,9 +111,72 @@ def _api_get(base_url, path, token, timeout_seconds, config_kwargs):
     }
     return get_json(
         url,
+        params=params,
         timeout=timeout_seconds,
         **get_http_options(config_kwargs, headers=headers)
     )
+
+
+def _collect(base_url, path, token, timeout_seconds, config_kwargs,
+             convert, kind, label):
+    """Walk one collection in limit/continue chunks, reporting each asset as
+    it is built so nothing accumulates, and TALLYING the drops.
+
+    A record with no metadata.uid has no stable identity, so it cannot be
+    imported. Logging each one costs a line per record on a large cluster, so
+    the count is what gets reported and one name is carried along for
+    diagnosis. Returns (imported, err); err ends the walk with whatever was
+    already reported standing.
+    """
+    imported = 0
+    skipped = 0
+    malformed = 0
+    first_skipped = ""
+    cont = ""
+    p = pager(label)
+    while p.next():
+        params = {"limit": str(LIST_PAGE_LIMIT)}
+        if cont:
+            params["continue"] = cont
+        resp, err = _api_get(base_url, path, token, timeout_seconds,
+                             config_kwargs, params)
+        if err:
+            return imported, err
+        if type(resp) != "dict":
+            resp = {}
+        items = resp.get("items")
+        if type(items) != "list":
+            items = []
+        for item in items:
+            if type(item) != "dict":
+                malformed += 1
+                continue
+            meta = item.get("metadata")
+            if type(meta) != "dict":
+                meta = {}
+            if not meta.get("uid"):
+                skipped += 1
+                if skipped == 1:
+                    first_skipped = str(meta.get("name", ""))
+                continue
+            asset = convert(item)
+            # A None from the converter here is a deliberate filter -- a
+            # ClusterIP-only Service, say -- not a defect, so it is not
+            # tallied as a skip. Only the identity gate above counts.
+            imported += report_asset(asset)
+        list_meta = resp.get("metadata")
+        if type(list_meta) != "dict":
+            list_meta = {}
+        cont = str(list_meta.get("continue") or "")
+        if not cont:
+            break
+    _log("imported {} {}".format(imported, kind))
+    if skipped > 0:
+        _log("skipped {} {} with no metadata.uid (first name: {})".format(
+            skipped, kind, first_skipped))
+    if malformed > 0:
+        _log("skipped {} non-object {} records".format(malformed, kind))
+    return imported, None
 
 
 def _node_to_asset(node):
@@ -441,29 +480,33 @@ def main(*args, **kwargs):
         _log("bearer_token (ServiceAccount bearer token) is required")
         return []
 
-    assets = []
+    # Each collection is walked in limit/continue chunks and every asset is
+    # reported as it is built, so neither a decoded LIST response nor the
+    # ImportAsset set is ever resident whole.
+    total = 0
 
-    nodes_resp, err = _api_get(base_url, "/api/v1/nodes", token, timeout_seconds, kwargs)
+    imported, err = _collect(base_url, "/api/v1/nodes", token, timeout_seconds,
+                             kwargs, _node_to_asset, "nodes", "k8s-nodes")
+    total += imported
     if err:
         _log("failed to list nodes: " + err)
-        return []
-    _collect((nodes_resp or {}).get("items", []), _node_to_asset, "nodes", assets)
+        return None
 
     if include_loadbalancer_services:
-        svcs_resp, err = _api_get(base_url, "/api/v1/services", token, timeout_seconds, kwargs)
+        imported, err = _collect(base_url, "/api/v1/services", token,
+                                 timeout_seconds, kwargs, _service_to_asset,
+                                 "services", "k8s-services")
+        total += imported
         if err:
             _log("failed to list services: " + err)
-        else:
-            _collect((svcs_resp or {}).get("items", []), _service_to_asset, "services", assets)
 
     if include_pods:
-        pods_resp, err = _api_get(base_url, "/api/v1/pods", token, timeout_seconds, kwargs)
+        imported, err = _collect(base_url, "/api/v1/pods", token,
+                                 timeout_seconds, kwargs, _pod_to_asset,
+                                 "pods", "k8s-pods")
+        total += imported
         if err:
             _log("failed to list pods: " + err)
-        else:
-            _collect((pods_resp or {}).get("items", []), _pod_to_asset, "pods", assets)
 
-    # Stream assets to runZero via report_assets instead of returning a list.
-    reported = report_assets(assets)
-    _log("reported {} assets".format(reported))
+    _log("reported {} assets".format(total))
     return None

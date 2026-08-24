@@ -1,0 +1,31 @@
+{
+  "name": "auth-failure",
+  "integration": "kandji",
+  "description": "A revoked or mistyped API token. Kandji answers 401 on the device list; the run must end with the error printed and zero assets, not an abort, and no detail request may be attempted. 401 is not in get_json's retryable status list, so exactly one request is made.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-revoked-token"
+  },
+  "routes": [
+    {
+      "name": "device-list-unauthorized",
+      "match": {"method": "GET", "path": "/devices"},
+      "responses": [
+        {"status": 401, "json": {"detail": "Invalid token."}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/details"}
+    ],
+    "log_contains": [
+      "Error fetching device list from Kandji: status 401",
+      "No assets found in Kandji"
+    ]
+  },
+  "invariants": {"skip": []}
+}

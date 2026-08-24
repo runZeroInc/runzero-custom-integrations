@@ -8,6 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "alpha",
     "minVersion": "5.1.260818.0",
+    # Backstop for the per-site cursor walk, enforced by pager(). At the
+    # 200-asset default page size this is well past the repo-wide
+    # ten-million-record target.
+    "maxPages": 100000,
     # Lansweeper is a discovery source: the site-scoped key is authoritative
     # while the single primary MAC/IP it reports churn with DHCP and NIC
     # changes, so network churn must not disqualify a merge.
@@ -102,6 +106,11 @@ SITES_QUERY = """query getAuthorizedSites {
 }"""
 
 ASSET_FIELDS = [
+    # The site-scoped asset key is the foreign id. It is requested explicitly
+    # rather than assumed present: vendor examples that consume `key` name it
+    # in `fields`, and if a Lansweeper release returned only the requested
+    # fields, every item would arrive keyless and the run would import nothing.
+    "key",
     "assetBasicInfo.name",
     "assetBasicInfo.domain",
     "assetBasicInfo.userName",
@@ -342,6 +351,20 @@ def build_assets(site_id, site_name, items):
     return assets
 
 
+def graphql_error_message(errors):
+    """Return the first GraphQL error's message as printable text.
+
+    The spec says each entry is an object carrying `message`, but a bare
+    string here would abort the script at .get, so the shape is checked.
+    """
+    if not errors:
+        return ""
+    entry = errors[0]
+    if type(entry) == "dict":
+        return str(entry.get("message", "") or "")[:200]
+    return str(entry)[:200]
+
+
 def fetch_sites(endpoint, http_options):
     """Fetch the sites the application identity code is authorized for."""
     data, err = post_json(endpoint, json={"query": SITES_QUERY}, retries=HTTP_RETRIES,
@@ -353,7 +376,7 @@ def fetch_sites(endpoint, http_options):
     errors = data.get("errors", []) or []
     if errors:
         print("lansweeper: authorized site query returned an error:",
-              str(errors[0].get("message", ""))[:200])
+              graphql_error_message(errors))
         return []
     authorized = (data.get("data") or {}).get("authorizedSites") or {}
     return authorized.get("sites", []) or []
@@ -386,7 +409,8 @@ def fetch_and_report_site_assets(endpoint, http_options, site, page_size, includ
     total = 0
     cursor = None
 
-    for _page in range(1, 100001):
+    p = pager("lansweeper-site-assets")
+    while p.next():
         query = next_query
         pagination = {"limit": page_size, "page": "NEXT", "cursor": cursor}
         if not cursor:
@@ -404,7 +428,7 @@ def fetch_and_report_site_assets(endpoint, http_options, site, page_size, includ
         errors = data.get("errors", []) or []
         if errors:
             print("lansweeper: asset query returned an error for site {}: {}".format(
-                site_id, str(errors[0].get("message", ""))[:200]))
+                site_id, graphql_error_message(errors)))
             return reported
 
         resources = ((data.get("data") or {}).get("site") or {}).get("assetResources") or {}

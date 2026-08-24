@@ -36,7 +36,7 @@
    - **API token** (`api_token`): the Kenna API key, sent as the `X-Risk-Token` header.
    - **Import vulnerabilities** (`include_vulnerabilities`): optional; fetch vulnerabilities for each page of assets and attach them to the matching asset (default: enabled).
    - **Asset status** (`asset_status`): optional; one of `active`, `inactive`, or `all` (default: `active`).
-   - **Minimum asset risk meter score** (`min_risk_meter_score`): optional; only import assets scoring at or above this value on Kenna's 0-1000 asset scale (default: 0, meaning all assets).
+   - **Minimum asset risk meter score** (`min_risk_meter_score`): optional; only import assets scoring at or above this value on Kenna's 0-1000 asset scale (default: 0, meaning all assets). The threshold is sent as a query parameter and also enforced client-side, so it holds even on a server that ignores the parameter; an asset reporting no numeric score is kept rather than guessed at.
    - **Import non-network assets** (`include_non_network_assets`): optional; import assets whose primary locator is a URL, file, database, or application (default: disabled).
    - **Page size** (`page_size`): optional; records requested per page, 1-5000 (default: 500).
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).

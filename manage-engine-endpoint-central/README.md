@@ -96,9 +96,10 @@ script does not work against an MSP installation.
     - Select the type `Custom Integration Script Secrets`.
     - **Endpoint Central URL** (`url`): the server origin including port, for example
       `https://ec.example.com:8383`.
-    - **OAuth token** (`oauth_token`): despite the field name, this is the on-prem
-      `auth_token` from step 3, sent verbatim as the `Authorization` header. It is not an
-      OAuth bearer token and must not be prefixed with `Bearer` or `Zoho-oauthtoken`.
+    - **API auth token (on-prem)** (`oauth_token`): the on-prem `auth_token` from step 3,
+      sent verbatim as the `Authorization` header. Despite the parameter key -- kept as
+      `oauth_token` so existing credentials continue to work -- it is not an OAuth bearer
+      token and must not be prefixed with `Bearer` or `Zoho-oauthtoken`.
     - **TLS options** (`tls_*`): an on-prem server usually presents a certificate no public
       trust store contains; set `tls_ca_cert` rather than disabling validation.
 

@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "librenms",
-  "description": "Junk in every payload must be skipped without losing the run. The devices array holds a string element, a device with a null device_id, and a device whose only address is 127.0.0.1 and whose hostname is therefore its only correlator. The ports response is an object where an array is documented and one port's ifPhysAddress is a MAC with the wrong number of digits. The ARP array holds a string, a null mac_address, an all-zeros MAC, a multicast MAC with an odd first octet, and an entry whose ipv4_address is an APIPA address - which the platform deliberately KEEPS, so an integration that does not filter it itself would correlate every DHCP-failed host onto one asset. Only the real endpoint survives.",
+  "description": "Junk in every payload must be skipped without losing the run. The devices array holds a string element, a device with a null device_id, and a device whose only address is 127.0.0.1 and whose hostname is therefore its only correlator. The ports response is an object where an array is documented and one port's ifPhysAddress is a MAC with the wrong number of digits. The ARP array holds a string, a null mac_address, an all-zeros MAC, a multicast MAC with an odd first octet, and an entry whose ipv4_address is an APIPA address - which the platform deliberately KEEPS, so an integration that does not filter it itself would correlate every DHCP-failed host onto one asset. Only the real endpoint survives. The devices envelope also carries a long message field ahead of the devices key, pushing the collection key past the first 400 bytes of the body: a fixed-window sniff used to treat exactly this response as an empty collection and silently skip every device.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "fixture-auth-token",
@@ -10,16 +10,37 @@
   "routes": [
     {
       "name": "devices",
-      "match": {"method": "GET", "path": "/api/v0/devices"},
+      "match": {
+        "method": "GET",
+        "path": "/api/v0/devices"
+      },
       "responses": [
         {
           "status": 200,
           "json": {
             "status": "ok",
+            "message": "This synthetic notice pads the envelope so the devices key appears beyond the first 400 bytes of the body. This synthetic notice pads the envelope so the devices key appears beyond the first 400 bytes of the body. This synthetic notice pads the envelope so the devices key appears beyond the first 400 bytes of the body. This synthetic notice pads the envelope so the devices key appears beyond the first 400 bytes of the body. This synthetic notice pads the envelope so the devices key appears beyond the first 400 bytes of the body.",
             "devices": [
               "this row is a string",
-              {"device_id": null, "hostname": "ghost.example.com", "sysName": "ghost", "status": 1},
-              {"device_id": 21, "hostname": "loopback-only.example.com", "sysName": "loopback-only", "ip": "127.0.0.1", "os": "linux", "version": "6.8.0", "hardware": "generic", "type": "not-a-known-type", "status": 1, "status_reason": "", "last_polled": "2026-08-15 03:00:00"}
+              {
+                "device_id": null,
+                "hostname": "ghost.example.com",
+                "sysName": "ghost",
+                "status": 1
+              },
+              {
+                "device_id": 21,
+                "hostname": "loopback-only.example.com",
+                "sysName": "loopback-only",
+                "ip": "127.0.0.1",
+                "os": "linux",
+                "version": "6.8.0",
+                "hardware": "generic",
+                "type": "not-a-known-type",
+                "status": 1,
+                "status_reason": "",
+                "last_polled": "2026-08-15 03:00:00"
+              }
             ],
             "count": 3
           }
@@ -29,15 +50,28 @@
     },
     {
       "name": "ports",
-      "match": {"method": "GET", "path": "/api/v0/devices/21/ports"},
+      "match": {
+        "method": "GET",
+        "path": "/api/v0/devices/21/ports"
+      },
       "responses": [
         {
           "status": 200,
           "json": {
             "status": "ok",
             "ports": [
-              {"port_id": 90, "ifName": "eth0", "ifPhysAddress": "00112233445", "ifOperStatus": "up"},
-              {"port_id": 91, "ifName": "eth1", "ifPhysAddress": null, "ifOperStatus": "down"},
+              {
+                "port_id": 90,
+                "ifName": "eth0",
+                "ifPhysAddress": "00112233445",
+                "ifOperStatus": "up"
+              },
+              {
+                "port_id": 91,
+                "ifName": "eth1",
+                "ifPhysAddress": null,
+                "ifOperStatus": "down"
+              },
               "a string where an object belongs"
             ],
             "count": 3
@@ -48,7 +82,10 @@
     },
     {
       "name": "arp",
-      "match": {"method": "GET", "path": "/api/v0/resources/ip/arp/all"},
+      "match": {
+        "method": "GET",
+        "path": "/api/v0/resources/ip/arp/all"
+      },
       "responses": [
         {
           "status": 200,
@@ -56,11 +93,41 @@
             "status": "ok",
             "arp": [
               "a string where an object belongs",
-              {"port_id": 90, "device_id": 21, "mac_address": null, "ipv4_address": "192.0.2.70", "context_name": ""},
-              {"port_id": 90, "device_id": 21, "mac_address": "000000000000", "ipv4_address": "192.0.2.71", "context_name": ""},
-              {"port_id": 90, "device_id": 21, "mac_address": "01005e000001", "ipv4_address": "224.0.0.1", "context_name": ""},
-              {"port_id": 90, "device_id": 21, "mac_address": "0050569abbcc", "ipv4_address": "169.254.11.22", "context_name": ""},
-              {"port_id": 90, "device_id": 21, "mac_address": "0050569abbcd", "ipv4_address": "192.0.2.72", "context_name": ""}
+              {
+                "port_id": 90,
+                "device_id": 21,
+                "mac_address": null,
+                "ipv4_address": "192.0.2.70",
+                "context_name": ""
+              },
+              {
+                "port_id": 90,
+                "device_id": 21,
+                "mac_address": "000000000000",
+                "ipv4_address": "192.0.2.71",
+                "context_name": ""
+              },
+              {
+                "port_id": 90,
+                "device_id": 21,
+                "mac_address": "01005e000001",
+                "ipv4_address": "224.0.0.1",
+                "context_name": ""
+              },
+              {
+                "port_id": 90,
+                "device_id": 21,
+                "mac_address": "0050569abbcc",
+                "ipv4_address": "169.254.11.22",
+                "context_name": ""
+              },
+              {
+                "port_id": 90,
+                "device_id": 21,
+                "mac_address": "0050569abbcd",
+                "ipv4_address": "192.0.2.72",
+                "context_name": ""
+              }
             ],
             "count": 6
           }
@@ -69,7 +136,13 @@
       "when_exhausted": "repeat_last"
     }
   ],
-  "default_response": {"status": 404, "json": {"status": "error", "message": "This API route doesn't exist."}},
+  "default_response": {
+    "status": 404,
+    "json": {
+      "status": "error",
+      "message": "This API route doesn't exist."
+    }
+  },
   "expect": {
     "asset_count": 3,
     "ids": [
@@ -88,15 +161,23 @@
           "hostnames": "loopback-only\tloopback-only.example.com",
           "librenms_type": "not-a-known-type"
         },
-        "fields_absent": ["ipAddresses", "macAddresses", "deviceType"]
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses",
+          "deviceType"
+        ]
       },
       {
         "id": "librenms:$HOST:endpoint:00:50:56:9a:bb:cc",
-        "fields_absent": ["ipAddresses"]
+        "fields_absent": [
+          "ipAddresses"
+        ]
       },
       {
         "id": "librenms:$HOST:endpoint:00:50:56:9a:bb:cd",
-        "fields": {"ipAddresses": "192.0.2.72"}
+        "fields": {
+          "ipAddresses": "192.0.2.72"
+        }
       }
     ],
     "log_contains": [
@@ -106,7 +187,9 @@
     ]
   },
   "invariants": {
-    "skip": ["no_mac_in_id"]
+    "skip": [
+      "no_mac_in_id"
+    ]
   },
   "check_determinism": true
 }

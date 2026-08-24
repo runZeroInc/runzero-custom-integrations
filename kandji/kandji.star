@@ -8,6 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # The repo-wide record target for a bounded walk: no integration should
+    # import more than ten million records in one run, so the page ceiling is
+    # that target divided by the 300-device page size.
+    "maxPages": 33334,
     "params": [
         {
             "key": "url",
@@ -37,18 +41,13 @@ load('net', 'network_interface')
 
 PAGE_LIMIT = 300  # Number of devices to fetch per request
 
-# The repo-wide record target for a bounded walk: no integration should import
-# more than ten million records in one run, so every page ceiling is that target
-# divided by the page size. At 300 devices a page that is 33,334 pages.
-#
-# The ceiling is a backstop, not the working guard. Its only exit is a page that
-# comes back empty, so a Kandji that ignores `offset` -- or a proxy that replays
-# one response -- would otherwise fetch the same page forever; the no-progress
-# check in stream_devices catches that on the first repeat. Either stop is
-# logged, because a truncated import that says nothing looks exactly like a
-# complete one.
-MAX_RECORDS = 10000000
-MAX_PAGES = (MAX_RECORDS + PAGE_LIMIT - 1) // PAGE_LIMIT
+# CONFIG["maxPages"] bounds the walk through pager() below. The ceiling is a
+# backstop, not the working guard: the walk's only exit is a page that comes
+# back empty, so a Kandji that ignores `offset` -- or a proxy that replays one
+# response -- would otherwise fetch the same page forever; the no-progress
+# check in stream_devices catches that on the first repeat and logs the stop,
+# because a truncated import that says nothing looks exactly like a complete
+# one. Exhausting maxPages itself raises, naming the label and the key.
 
 # Kandji names the device family rather than the operating system, and the set
 # is closed because Kandji only manages Apple hardware. An unmapped value is
@@ -100,6 +99,15 @@ def _model_device_type(model):
             return entry[1]
     return ""
 
+def _section(details, key):
+    """Return one object-valued section of the details document, or {} when the
+    section is null, absent, or not an object -- reading .get off any of those
+    would abort the script."""
+    value = details.get(key)
+    if type(value) != "dict":
+        return {}
+    return value
+
 def _auth_headers(api_token):
     return {
         "Authorization": bearer(api_token),
@@ -112,7 +120,10 @@ def _page_signature(devices):
     every offset with the same page."""
     ids = []
     for device in devices:
-        ids.append(str(device.get("device_id", "")))
+        if type(device) == "dict":
+            ids.append(str(device.get("device_id", "")))
+        else:
+            ids.append(str(device))
     return ",".join(ids)
 
 def stream_devices(api_url, api_token, config_kwargs):
@@ -123,17 +134,15 @@ def stream_devices(api_url, api_token, config_kwargs):
     http_options = get_http_options(config_kwargs, headers=headers)
     reported = 0
     offset = 0
-    capped = True
     last_signature = None
-    for _page in range(0, MAX_PAGES):
+    p = pager("kandji-devices")
+    while p.next():
         params = {"limit": str(PAGE_LIMIT), "offset": str(offset)}
         data, err = get_json(api_url + "/devices", params=params, **http_options)
         if err:
             print("Error fetching device list from Kandji:", err)
-            capped = False
             break
         if not data:
-            capped = False
             break
 
         # A page identical to the one before it means the server stopped
@@ -144,16 +153,11 @@ def stream_devices(api_url, api_token, config_kwargs):
         if signature == last_signature:
             print("kandji: pagination stopped making progress at offset {}; the server repeated the previous page. Retrieved {} assets; the API does not report a total".format(
                 offset, reported))
-            capped = False
             break
         last_signature = signature
 
         reported += report_assets(build_assets(api_url, api_token, data, config_kwargs))
         offset += PAGE_LIMIT
-
-    if capped:
-        print("kandji: page limit of {} hit (integration safety limit). Retrieved {} assets; the API does not report a total".format(
-            MAX_PAGES, reported))
 
     return reported
 
@@ -164,6 +168,11 @@ def get_device_details(api_url, api_token, device_id, config_kwargs):
     if err:
         print("Error fetching details for device:", device_id, err)
         return None
+    # The details document is an object. A list-shaped 2xx body would abort the
+    # script at the first .get, so the shape is checked rather than assumed.
+    if type(data) != "dict":
+        print("kandji: unexpected details shape for device {}; wanted an object".format(device_id))
+        return None
     return data
 
 def build_assets(api_url, api_token, devices, config_kwargs):
@@ -171,6 +180,11 @@ def build_assets(api_url, api_token, devices, config_kwargs):
     assets = []
 
     for device in devices:
+        # A non-dict row -- null, a bare string -- would abort the script at
+        # the first .get, losing the rest of the page. Skip it and say so.
+        if type(device) != "dict":
+            print("kandji: skipping non-object device record: " + str(device))
+            continue
         device_id = device.get("device_id", "")
         # Without this, an id-less row was passed to get_device_details anyway,
         # which requested /devices//details -- a URL for no device -- and the
@@ -183,9 +197,9 @@ def build_assets(api_url, api_token, devices, config_kwargs):
         if not details:
             continue
 
-        general = details.get("general", {}) or {}
-        network = details.get("network", {}) or {}
-        hardware = details.get("hardware_overview", {}) or {}
+        general = _section(details, "general")
+        network = _section(details, "network")
+        hardware = _section(details, "hardware_overview")
 
         # network_interface() classifies v4/v6 automatically, strips
         # ports/zones, dedupes, and returns None when nothing usable

@@ -1,0 +1,61 @@
+{
+  "name": "malformed-rows",
+  "integration": "lima-charlie",
+  "description": "One page whose sensors array carries a null entry, a bare-string entry, a sensor with no arch field, and a healthy sensor. A non-dict entry used to abort the script at the first .get, losing the rest of the page; it must now be skipped with a log line. The arch-less sensor used to be silently dropped by the architecture allowlist behind a message implying the operator had excluded it; only architectures explicitly set to False are filtered now, so it must import. namespaced_ids is skipped: id=sid is the bare LimaCharlie sensor uuid with no organization scope, the same defect happy.json records.",
+  "kwargs": {
+    "url": "$BASE",
+    "jwt_url": "$BASE",
+    "organization_id": "8bd1f0e2-0000-4000-8000-000000000001",
+    "api_token": "fixture-lc-secret"
+  },
+  "routes": [
+    {
+      "name": "jwt-exchange",
+      "match": {"method": "POST", "path": "/", "query_contains": "oid=8bd1f0e2-0000-4000-8000-000000000001"},
+      "responses": [{"status": 200, "json": {"jwt": "fixture-lc-jwt"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "sensors",
+      "match": {"method": "GET", "path": "/sensors/8bd1f0e2-0000-4000-8000-000000000001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "sensors": [
+              {
+                "sid": "cccc0001-0000-4000-8000-000000000001",
+                "hostname": "syn-lc-good",
+                "arch": 2,
+                "int_ip": "192.0.2.30",
+                "mac_addr": "00-11-22-33-46-01"
+              },
+              null,
+              "this row is a string, not an object",
+              {
+                "sid": "cccc0002-0000-4000-8000-000000000002",
+                "hostname": "syn-lc-no-arch",
+                "int_ip": "192.0.2.31",
+                "mac_addr": "00-11-22-33-46-02"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cccc0001-0000-4000-8000-000000000001",
+      "cccc0002-0000-4000-8000-000000000002"
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "lima-charlie: skipping non-object sensor record:",
+      "Reported 2 assets from 4 sensors"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

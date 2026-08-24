@@ -1,0 +1,103 @@
+{
+  "name": "arp-requires-device",
+  "integration": "librenms",
+  "description": "An older LibreNMS that follows the published API docs and answers 400 when /resources/ip/arp/all is asked for without a device parameter. That used to end the endpoint collection with one log line and zero endpoints; the walk must now fall back to one arp/all request per already-imported device, which those releases accept, and import the endpoints it finds there. Port and address collection are disabled to keep the walk to the calls under test. no_mac_in_id is skipped for the reason the other librenms scenarios record: an ARP endpoint has no identifier but its MAC, and the endpoint assetType is declared no-id-match no-id-break so the id never drives a merge.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-auth-token",
+    "collect_addresses": "false",
+    "collect_ports": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v0/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "devices": [
+              {
+                "device_id": 31,
+                "hostname": "edge-sw.example.com",
+                "sysName": "edge-sw",
+                "ip": "10.96.0.1",
+                "os": "ios",
+                "version": "15.2",
+                "hardware": "C2960X",
+                "type": "network",
+                "status": 1
+              }
+            ],
+            "count": 1
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp-per-device",
+      "match": {"method": "GET", "path": "/api/v0/resources/ip/arp/all", "query_contains": "device=31"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "status": "ok",
+            "arp": [
+              {
+                "port_id": 130,
+                "device_id": 31,
+                "mac_address": "0050561111aa",
+                "ipv4_address": "10.96.0.50",
+                "context_name": ""
+              }
+            ],
+            "count": 1
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "arp-estate-wide-refused",
+      "match": {"method": "GET", "path": "/api/v0/resources/ip/arp/all"},
+      "responses": [
+        {
+          "status": 400,
+          "json": {"status": "error", "message": "Device argument is required"}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "json": {"status": "error", "message": "This API route doesn't exist."}
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "librenms:$HOST:device:31",
+      "librenms:$HOST:endpoint:00:50:56:11:11:aa"
+    ],
+    "assets": [
+      {
+        "id": "librenms:$HOST:endpoint:00:50:56:11:11:aa",
+        "fields": {"ipAddresses": "10.96.0.50"}
+      }
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v0/resources/ip/arp/all", "query_contains": "device=31"}
+    ],
+    "log_contains": [
+      "librenms: /resources/ip/arp/all failed with status 400: Device argument is required",
+      "librenms: this LibreNMS requires a device parameter with arp/all; retrying once per device",
+      "librenms: ARP entries read: 1",
+      "librenms: reported 1 discovered endpoints"
+    ]
+  },
+  "invariants": {"skip": ["no_mac_in_id"]},
+  "check_determinism": true
+}

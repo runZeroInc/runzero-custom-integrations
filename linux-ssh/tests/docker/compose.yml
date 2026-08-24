@@ -40,14 +40,11 @@ services:
     # is a constant. Docker otherwise mints a random address per container and
     # the emitted MAC would differ on every run.
     #
-    # The 02 prefix sets the locally-administered bit, and unlike the
-    # adguard-home and pihole stacks the asset here carries it UNCHANGED:
-    # 02:42:0a:de:09:02, not 00:42:0a:de:09:02. Those integrations build
-    # interfaces with the platform's network_interface() helper, which clears
-    # that bit; linux-ssh.star constructs runzero.types.NetworkInterface
-    # directly, and no normalisation happens at the ImportAsset boundary. The
-    # manifest asserts the raw value, and the contrast is the point -- the two
-    # code paths do not agree, and only one of them is visible in a fixture.
+    # The 02 prefix sets the locally-administered bit. The asset emits the
+    # LAA-cleared canonical form (00:42:0a:de:09:02): the runtime's
+    # NetworkInterface constructor now normalises MACs through the same
+    # CleanMACString call the network_interface() helper uses, so the two
+    # construction paths agree. The manifest asserts the normalised value.
     mac_address: "02:42:0a:de:09:02"
     ports:
       # The image's sshd listens on 2222, not 22.

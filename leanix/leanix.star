@@ -55,8 +55,7 @@ CONFIG = {
 }
 
 load("runzero.types", "ImportAsset", "to_custom_attributes")
-load("http", http_post="post", "post_json", "bearer", "basic", "url_encode")
-load("json", json_decode="decode")
+load("http", "post_json", "bearer", "basic", "url_encode")
 load("kwargs", "require", "get_string", "get_int", "get_url_base", "get_http_options")
 load("net", "clean_hostname")
 load("runzero.progress", progress_report="report")
@@ -88,25 +87,26 @@ def fetch_token(base_url, api_token, config):
     LeanIX documents this as HTTP Basic with the literal username "apitoken"
     and the API token as the password, so the exchange is built by hand rather
     than with oauth2_token, which would put the credentials in the form body.
+
+    post_json carries the exchange so it gets the default transient-failure
+    retries: this is the very first request of every run, the grant is
+    idempotent, and a single 502/503 blip here used to end the entire scheduled
+    import before it started.
     """
     options = get_http_options(config, headers={
         "Authorization": basic("apitoken", api_token),
         "Content-Type": "application/x-www-form-urlencoded",
     })
-    response = http_post(base_url + TOKEN_PATH,
-                         body=bytes(url_encode({"grant_type": "client_credentials"})),
-                         **options)
-    if response.status_code != 200:
-        print("leanix: token exchange failed with status {}".format(response.status_code))
-        if response.status_code in [401, 403]:
+    data, err = post_json(base_url + TOKEN_PATH,
+                          body=bytes(url_encode({"grant_type": "client_credentials"})),
+                          **options)
+    if err:
+        print("leanix: token exchange failed: {}".format(err))
+        if err.startswith("status 401") or err.startswith("status 403"):
             print("leanix: check the API token; it is exchanged as Basic apitoken:<token>")
         return ""
-    body = response.body
-    if not body or not str(body).startswith("{"):
-        print("leanix: token endpoint returned a non-JSON body")
-        return ""
-    data = json_decode(body)
     if type(data) != "dict":
+        print("leanix: token endpoint returned an unexpected body")
         return ""
     token = str(data.get("access_token", "") or "")
     if not token:

@@ -15,6 +15,7 @@ CONFIG = {
         {"key": "private_key", "label": "Private key (PEM)", "type": "textarea", "required": False},
         {"key": "private_key_passphrase", "label": "Private key passphrase", "type": "secret", "required": False},
         {"key": "host_key", "label": "Expected host public key (authorized_keys format)", "type": "textarea", "required": False},
+        {"key": "insecure_ignore_host_key", "label": "Skip host key verification (insecure)", "type": "bool", "required": False, "default": False, "description": "Connect without verifying the server's host key. The runtime has no trust-on-first-use cache, so host_key is required unless this is enabled. Only use on a trusted network path."},
         {"key": "timeout", "label": "Connection timeout (seconds)", "type": "int", "required": False, "default": 30, "min": 1, "max": 600},
     ],
 }
@@ -22,7 +23,7 @@ CONFIG = {
 load("runzero.types", "ImportAsset", "NetworkInterface")
 load("runzero.ssh", ssh_dial="dial")
 load("net", "ip_address")
-load("kwargs", "require", "get_string", "get_int")
+load("kwargs", "require", "get_string", "get_int", "get_bool")
 
 
 # SMBIOS System Enclosure type (DMTF SMBIOS 3.x, Type 3 field 05h). The kernel
@@ -136,7 +137,12 @@ def _macs_and_ips(session):
             chunks = line.split()
             if len(chunks) < 2:
                 continue
-            iface = chunks[1].rstrip(":")
+            # `ip -o link` names a VLAN sub-interface, veth end, or bond/bridge
+            # slave as "eth0@if262:", while `ip addr` reports plain "eth0" --
+            # so the parent name is everything before the "@", or the join
+            # against the address maps below never matches and every address on
+            # such an interface is silently dropped.
+            iface = chunks[1].split("@")[0].rstrip(":")
             if "link/ether" in line:
                 idx = chunks.index("link/ether")
                 if idx + 1 < len(chunks):
@@ -185,11 +191,25 @@ def main(*args, **kwargs):
     private_key = get_string(kwargs, "private_key", default="")
     private_key_passphrase = get_string(kwargs, "private_key_passphrase", default="")
     host_key = get_string(kwargs, "host_key", default="")
+    insecure_ignore_host_key = get_bool(kwargs, "insecure_ignore_host_key", default=False)
     timeout = get_int(kwargs, "timeout", default=30)
 
     if not password and not private_key:
         print("either password or private_key is required")
         return []
+
+    # The runtime requires a pinned host key or an explicit opt-out -- there is
+    # no trust-on-first-use -- and dial() raises on the missing-key default,
+    # which would end the task as an error. Check it here and say what to do.
+    if not host_key and not insecure_ignore_host_key:
+        print("host_key is required unless insecure_ignore_host_key is enabled. " +
+              "Capture it on the target with: cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub")
+        return []
+    if host_key and insecure_ignore_host_key:
+        # dial() rejects the combination outright; the pin is the stronger
+        # statement, so it wins.
+        print("both host_key and insecure_ignore_host_key are set; verifying against the pinned host key")
+        insecure_ignore_host_key = False
 
     session = ssh_dial(
         host=host,
@@ -199,6 +219,7 @@ def main(*args, **kwargs):
         private_key=private_key,
         private_key_passphrase=private_key_passphrase,
         host_key=host_key,
+        insecure_ignore_host_key=insecure_ignore_host_key,
         timeout=timeout,
     )
     hostname = _hostname(session)

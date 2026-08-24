@@ -39,9 +39,13 @@ You may also supply a passphrase for an encrypted key.
 
 The `host_key` field accepts the server's public key in
 `authorized_keys` format (e.g. `ssh-ed25519 AAAA…`). When supplied, the
-script pins the host key and refuses to connect to any other key. If
-left blank, the host key is not verified — only use that mode in
-trusted networks where the SSH endpoint identity is otherwise enforced.
+script pins the host key and refuses to connect to any other key. The
+runtime has no trust-on-first-use cache, so a host key is **required**:
+a run with `host_key` blank stops with a clear message unless
+`insecure_ignore_host_key` is enabled, which connects without verifying
+the server's identity — only use that mode on a trusted network path
+where the SSH endpoint identity is otherwise enforced. Setting both
+keeps the pin and ignores the insecure flag.
 
 ## Required tools on the target
 
@@ -120,9 +124,9 @@ privilege that gets a shell.
 
 5. **Capture the host key.** This integration does not read a `known_hosts`
    file and has no trust-on-first-use cache — the `host_key` parameter is the
-   entire host-verification story, and leaving it blank means the connection
-   is unauthenticated in the server-to-client direction. Read the key from the
-   target's own console, where you can trust it:
+   entire host-verification story, and a run without it stops before
+   connecting unless `insecure_ignore_host_key` is deliberately enabled.
+   Read the key from the target's own console, where you can trust it:
 
    ```bash
    # on the target
@@ -167,7 +171,8 @@ privilege that gets a shell.
    - **Password** (`password`): only if you are not using a key.
    - **Private key (PEM)** (`private_key`): the full private key file, including the BEGIN and END lines.
    - **Private key passphrase** (`private_key_passphrase`): only if the key is encrypted.
-   - **Expected host public key** (`host_key`): the target's public host key in `authorized_keys` format. Strongly recommended.
+   - **Expected host public key** (`host_key`): the target's public host key in `authorized_keys` format. Required unless host key verification is explicitly skipped.
+   - **Skip host key verification (insecure)** (`insecure_ignore_host_key`): connect without verifying the server's host key. Off by default; only for trusted network paths.
    - **Connection timeout (seconds)** (`timeout`): optional, default 30.
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
    - Select the Credential and Custom Integration created in steps 1 and 2.

@@ -8,6 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Backstop for the continuation-token walk, enforced by pager(). The
+    # repeated-token guard below is the working stop for a server that stops
+    # advancing; this ceiling only ends an adversarially rotating one.
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -47,7 +51,7 @@ CONFIG = {
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
-load('http', 'get_json', 'post_json', 'bearer')
+load('http', 'get_json', 'post_json', 'bearer', 'url_encode')
 load('kwargs', 'get_http_options')
 
 # Used when the jwt_url and url parameters are unset. LimaCharlie serves the
@@ -83,8 +87,8 @@ CUSTOM_ATTRIBS_TO_IGNORE = [
 # Source: refractionPOINT/python-limacharlie, Organization.list_sensors(), which
 # loops on `qp["continuation_token"] = continuation_token` until `not
 # continuation_token`; and refractionPOINT/go-limacharlie sensor.go, whose page
-# struct is `{"continuation_token": string, "sensors": ...}`.
-SENSOR_PAGE_CAP = 100000
+# struct is `{"continuation_token": string, "sensors": ...}`. The walk is
+# bounded by CONFIG["maxPages"] through pager().
 
 # Filter based on what architectures you want to import into runZero
 # By default, Chromium browsed based extensions are excluded from import
@@ -127,12 +131,20 @@ def platform_device_type(plat):
 
 def get_token(jwt_url, oid, token, config_kwargs):
     url = '{}/?oid={}'.format(jwt_url, oid)
+    # The secret is sent BOTH ways: as the X-LC-Secret header (undocumented,
+    # but confirmed accepted by a live probe of jwt.limacharlie.io and by this
+    # integration's history) and as the form body the vendor docs and both
+    # official SDKs use. Whichever contract the endpoint honors, the exchange
+    # works -- and a vendor-side tightening to the documented form no longer
+    # breaks every deployment at the first request.
     headers = {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'X-LC-Secret': token
     }
+    body = bytes(url_encode({'oid': oid, 'secret': token}))
 
-    response_json, err = post_json(url, **get_http_options(config_kwargs, headers=headers))
+    response_json, err = post_json(url, body=body,
+                                   **get_http_options(config_kwargs, headers=headers))
     if err:
         print('Failed to fetch token:', err)
         return None
@@ -146,6 +158,11 @@ def get_token(jwt_url, oid, token, config_kwargs):
 def build_assets(sensors):
     assets = []
     for item in sensors:
+        # A non-dict entry -- null, or a bare string -- would abort the script
+        # at the first .get, losing the rest of the page. Skip it and say so.
+        if type(item) != 'dict':
+            print('lima-charlie: skipping non-object sensor record: ' + str(item))
+            continue
         sid = item.get('sid')
         hostname = item.get('hostname', '')
         arch_id = item.get('arch', '')
@@ -158,7 +175,11 @@ def build_assets(sensors):
             print('lima-charlie: skipping sensor with no sid: hostname=' + str(hostname))
         elif hostname in SENSORS_TO_IGNORE:
             print('Skipping sensor because it has been explicitly ignored in custom integration script:', sid, hostname)
-        elif not ARCHITECTURE.get(arch_id):
+        # Only an architecture explicitly mapped to False is filtered. A sensor
+        # with no arch field, or one carrying a value the map has never heard
+        # of, is imported rather than silently dropped behind a message
+        # implying the operator configured the exclusion.
+        elif ARCHITECTURE.get(arch_id, True) == False:
             print('Skipping sensor because sensor architecture', arch_id, 'has been set to False in custom integration script:', sid, hostname)
         else:
             # Parse IPs and mac addresses and build network interfaces.
@@ -236,7 +257,9 @@ def main(**kwargs):
     continuation_token = None
     seen_tokens = {}
 
-    for page in range(1, SENSOR_PAGE_CAP + 1):
+    p = pager('limacharlie-sensors')
+    while p.next():
+        page = p.page
         params = {}
         if continuation_token:
             params['continuation_token'] = continuation_token

@@ -1,0 +1,110 @@
+{
+  "name": "token-retry",
+  "integration": "leanix",
+  "description": "A transient gateway failure at the very first request of the run. The token exchange answers 503 once and then succeeds; post_json's default retries must carry the exchange through rather than the whole scheduled import ending at its first request. The GraphQL walk then proceeds normally with the token the retry obtained. Invariant has_correlator is skipped for the reason happy.json records: LeanIX is a logical inventory and a product-named IT component genuinely carries no MAC, IP, or hostname.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-leanix-token"
+  },
+  "routes": [
+    {
+      "name": "token-exchange",
+      "match": {
+        "method": "POST",
+        "path": "/services/mtm/v1/oauth2/token"
+      },
+      "responses": [
+        {
+          "status": 503,
+          "headers": {
+            "Retry-After": "1"
+          },
+          "text": "upstream connect error"
+        },
+        {
+          "status": 200,
+          "json": {
+            "access_token": "bearer-tok-retry",
+            "token_type": "bearer",
+            "expires_in": 3599
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "graphql",
+      "match": {
+        "method": "POST",
+        "path": "/services/pathfinder/v1/graphql"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "allFactSheets": {
+                "totalCount": 1,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "c1"
+                },
+                "edges": [
+                  {
+                    "node": {
+                      "id": "55555555-5555-4555-8555-555555555555",
+                      "name": "PostgreSQL 16",
+                      "displayName": "PostgreSQL 16",
+                      "type": "ITComponent",
+                      "description": "",
+                      "status": "ACTIVE",
+                      "updatedAt": "2026-08-01T00:00:00Z",
+                      "tags": [],
+                      "lifecycle": {
+                        "asString": "active"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "leanix:$HOST:55555555-5555-4555-8555-555555555555"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/services/mtm/v1/oauth2/token",
+        "header_contains": "Basic "
+      },
+      {
+        "method": "POST",
+        "path": "/services/pathfinder/v1/graphql",
+        "header_contains": "bearer-tok-retry"
+      }
+    ],
+    "log_contains": [
+      "leanix: reported 1 assets"
+    ],
+    "requests_absent": []
+  },
+  "invariants": {
+    "skip": [
+      "has_correlator"
+    ]
+  },
+  "check_determinism": true
+}

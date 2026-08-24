@@ -195,7 +195,7 @@ assets, with the reason recorded in each. It exists to catch a MAC used as an id
 | `GET /api/v0/devices` | always | The device table. `?type=` applies the device filter |
 | `GET /api/v0/devices/{id}/ip` | `collect_addresses` | Every address bound to the device's ports |
 | `GET /api/v0/devices/{id}/ports?columns=…` | `collect_ports` | Port names and `ifPhysAddress` |
-| `GET /api/v0/resources/ip/arp/all` | `collect_arp` | The estate-wide ARP table, in one request |
+| `GET /api/v0/resources/ip/arp/all` | `collect_arp` | The estate-wide ARP table, in one request. An older LibreNMS that answers 400 without a `device` parameter is retried once per imported device |
 | `GET /api/v0/resources/fdb` | `collect_fdb` | The estate-wide MAC forwarding table, in one request |
 
 Only `ImportAsset` objects are produced. LibreNMS is an SNMP monitoring system:
