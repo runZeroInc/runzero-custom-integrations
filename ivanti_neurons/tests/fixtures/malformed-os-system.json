@@ -2,7 +2,7 @@
   "name": "malformed-os-system",
   "integration": "ivanti_neurons",
   "script": "ivanti_neurons/ivanti_neurons.star",
-  "description": "Present-but-null nested objects and non-object rows must degrade, never abort. The first device carries \"OS\": null and \"System\": null -- the shape .get('OS', {}) does not defend, because the default only applies when the key is absent -- and it must import with its address and hostname, carrying no os and no model. The second element of value[] is a bare string where an object is documented, and must be counted and skipped. The third device is the control: fully-formed, and must import typed from its server OS. One abort here would lose the whole page.\n\nnamespaced_ids is skipped for the reason recorded in paged: the id is the bare Ivanti DiscoveryId with no tenant scope.",
+  "description": "Present-but-null nested objects and non-object rows must degrade, never abort. The first device carries \"OS\": null and \"System\": null -- the shape .get('OS', {}) does not defend, because the default only applies when the key is absent -- and it must import with its address and hostname, carrying no os and no model. The second element of value[] is a bare string where an object is documented, and must be counted and skipped. The third device is the control: fully-formed, and must import typed from its server OS. One abort here would lose the whole page.",
   "kwargs": {
     "url": "$BASE",
     "tenant_id": "fixture-tenant",
@@ -74,13 +74,13 @@
   "expect": {
     "asset_count": 2,
     "ids": [
-      "33330000-4a11-4c31-9c31-1a2b3c4d5e01",
-      "33330000-4a11-4c31-9c31-1a2b3c4d5e02"
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e02"
     ],
     "request_count": 2,
     "assets": [
       {
-        "id": "33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+        "id": "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e01",
         "fields": {
           "hostnames": "neurons-null-os.example.com",
           "ipAddresses": "192.0.2.31"
@@ -91,7 +91,7 @@
         ]
       },
       {
-        "id": "33330000-4a11-4c31-9c31-1a2b3c4d5e02",
+        "id": "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e02",
         "fields": {
           "deviceType": "Server",
           "ipAddresses": "192.0.2.32"
@@ -104,8 +104,6 @@
     ]
   },
   "invariants": {
-    "skip": [
-      "namespaced_ids"
-    ]
+    "skip": []
   }
 }

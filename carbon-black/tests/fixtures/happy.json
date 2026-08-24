@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "carbon-black",
-  "description": "One scroll page of devices with the per-device vulnerability search behind it. Proves devices parse into assets, that the CVE search is issued once per device, that its own start/rows pagination is walked to exhaustion, and that the returned CVEs land as findings on the right asset.\n\nnamespaced_ids is skipped because this integration is defective in exactly that way: build_assets sets id=device_id, a bare Carbon Black device number with no organization_key scope, so two tenants importing device 1001 collide on one runZero asset. Reported as a bug rather than fixed here.\n\nIt also pins the deployment_type -> deviceType mapping in both directions. WORKLOAD and the cloud deployment types are servers and VDI is a virtual desktop, so those three assets carry a type; the aws row is lower-case on purpose, so a case-sensitive lookup would drop it. ENDPOINT and a device reporting no deployment_type at all must carry NO deviceType: ENDPOINT covers desktops and laptops without separating them, and an empty string is still a value that would displace runZero's own hardware fingerprint.",
+  "description": "One scroll page of devices with the per-device vulnerability search behind it. Proves devices parse into assets, that the CVE search is issued once per device, that its own start/rows pagination is walked to exhaustion, and that the returned CVEs land as findings on the right asset.\n\nThe foreign id is scoped by the Org Key -- carbon-black:<org_key>:<device id> -- so two organizations importing device 1001 no longer collide on one runZero asset, and the namespaced_ids invariant enforces the scheme rather than being skipped.\n\nIt also pins the deployment_type -> deviceType mapping in both directions. WORKLOAD and the cloud deployment types are servers and VDI is a virtual desktop, so those three assets carry a type; the aws row is lower-case on purpose, so a case-sensitive lookup would drop it. ENDPOINT and a device reporting no deployment_type at all must carry NO deviceType: ENDPOINT covers desktops and laptops without separating them, and an empty string is still a value that would displace runZero's own hardware fingerprint.",
   "kwargs": {
     "url": "$BASE",
     "organization_key": "SYNORG01",
@@ -202,18 +202,43 @@
   "expect": {
     "asset_count": 5,
     "ids": [
-      "1001",
-      "1002",
-      "1003",
-      "1004",
-      "1005"
+      "carbon-black:SYNORG01:1001",
+      "carbon-black:SYNORG01:1002",
+      "carbon-black:SYNORG01:1003",
+      "carbon-black:SYNORG01:1004",
+      "carbon-black:SYNORG01:1005"
     ],
     "assets": [
-      {"id": "1002", "fields": {"deviceType": "Server"}},
-      {"id": "1005", "fields": {"deviceType": "Server"}},
-      {"id": "1004", "fields": {"deviceType": "Desktop"}},
-      {"id": "1001", "fields_absent": ["deviceType"]},
-      {"id": "1003", "fields_absent": ["deviceType"]}
+      {
+        "id": "carbon-black:SYNORG01:1002",
+        "fields": {
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:1005",
+        "fields": {
+          "deviceType": "Server"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:1004",
+        "fields": {
+          "deviceType": "Desktop"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:1001",
+        "fields_absent": [
+          "deviceType"
+        ]
+      },
+      {
+        "id": "carbon-black:SYNORG01:1003",
+        "fields_absent": [
+          "deviceType"
+        ]
+      }
     ],
     "min_requests": 6,
     "requests_include": [
@@ -244,11 +269,6 @@
         "method": "POST",
         "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/1004/vulnerabilities/_search"
       }
-    ]
-  },
-  "invariants": {
-    "skip": [
-      "namespaced_ids"
     ]
   }
 }

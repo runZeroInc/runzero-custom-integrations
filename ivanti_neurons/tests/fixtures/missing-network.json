@@ -2,7 +2,7 @@
   "name": "missing-network",
   "integration": "ivanti_neurons",
   "script": "ivanti_neurons/ivanti_neurons.star",
-  "description": "A device with no Network.TCPIP block, and one whose Network key is present but null, alongside a healthy device. The token route answers with the documented JSON object, so the Bearer assertion below also locks in that the access_token field is unwrapped rather than the whole document being sent. network_interface returns None when no address survives, and ImportAsset(networkInterfaces=[None]) aborts the entire run -- so a single agent that has checked in without reporting an adapter used to lose every device already parsed. All three must import, the addressless pair correlating on hostname alone.\n\nThe three also bracket the device-type hint. The documented device object carries no chassis or asset-class field, so OS.Name is the only statement of role there is: server-03 reports 'Windows Server 2022' and must come out typed Server, while the Windows 11 and Windows 10 hosts must carry NO deviceType, because a client OS says nothing about desktop versus laptop. Skips namespaced_ids: this integration keys assets on the bare Ivanti DiscoveryId, which carries no tenant scope; changing that would move every existing asset's identity and is a separate fix.",
+  "description": "A device with no Network.TCPIP block, and one whose Network key is present but null, alongside a healthy device. The token route answers with the documented JSON object, so the Bearer assertion below also locks in that the access_token field is unwrapped rather than the whole document being sent. network_interface returns None when no address survives, and ImportAsset(networkInterfaces=[None]) aborts the entire run -- so a single agent that has checked in without reporting an adapter used to lose every device already parsed. All three must import, the addressless pair correlating on hostname alone.\n\nThe three also bracket the device-type hint. The documented device object carries no chassis or asset-class field, so OS.Name is the only statement of role there is: server-03 reports 'Windows Server 2022' and must come out typed Server, while the Windows 11 and Windows 10 hosts must carry NO deviceType, because a client OS says nothing about desktop versus laptop.",
   "kwargs": {
     "url": "$BASE",
     "tenant_id": "fixture-tenant",
@@ -69,13 +69,13 @@
   "expect": {
     "asset_count": 3,
     "ids": [
-      "11110000-4a11-4c31-9c31-1a2b3c4d5e01",
-      "11110000-4a11-4c31-9c31-1a2b3c4d5e02",
-      "11110000-4a11-4c31-9c31-1a2b3c4d5e03"
+      "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e02",
+      "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e03"
     ],
     "assets": [
       {
-        "id": "11110000-4a11-4c31-9c31-1a2b3c4d5e01",
+        "id": "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e01",
         "fields": {
           "hostnames": "workstation-01.example.com",
           "os": "Windows 11 Pro 10.0.22631",
@@ -84,12 +84,12 @@
         "fields_absent": ["deviceType"]
       },
       {
-        "id": "11110000-4a11-4c31-9c31-1a2b3c4d5e02",
+        "id": "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e02",
         "fields": {"hostnames": "laptop-02.example.com"},
         "fields_absent": ["ipAddresses", "macAddresses", "deviceType"]
       },
       {
-        "id": "11110000-4a11-4c31-9c31-1a2b3c4d5e03",
+        "id": "ivanti-neurons:fixture-tenant:11110000-4a11-4c31-9c31-1a2b3c4d5e03",
         "fields": {"hostnames": "server-03.example.com", "deviceType": "Server"},
         "fields_absent": ["ipAddresses", "macAddresses"]
       }
@@ -101,6 +101,6 @@
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

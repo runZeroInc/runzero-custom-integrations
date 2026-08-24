@@ -1,6 +1,6 @@
 {
   "name": "happy",
-  "description": "Proves the url parameter reaches the API and that assets parse. The third row is the regression test for the drop that used to be here: `syn-no-mac` reports Stairwell's `-` MAC placeholder and a perfectly good address, and it must arrive as an asset carrying that address and no MAC. It was previously skipped outright -- the `continue` sat in the ASSET loop rather than an interface loop -- so an environment of hosts with no reported MAC imported as nothing at all. namespaced_ids is still skipped: the id is the bare Stairwell asset number with no tenant scope (reported defect, see README).",
+  "description": "Proves the url parameter reaches the API and that assets parse. The third row is the regression test for the drop that used to be here: `syn-no-mac` reports Stairwell's `-` MAC placeholder and a perfectly good address, and it must arrive as an asset carrying that address and no MAC. It was previously skipped outright -- the `continue` sat in the ASSET loop rather than an interface loop -- so an environment of hosts with no reported MAC imported as nothing at all. Ids are asserted in the scoped form stairwell:<environment id>:<asset number>: the environment id is the tenant unit the API itself keys on (it sits in every request path and verbatim in every asset's resource name), so two Stairwell environments imported into one runZero org cannot collide.",
   "kwargs": {
     "url": "$BASE",
     "environment_id": "env-1",
@@ -48,21 +48,21 @@
   ],
   "expect": {
     "asset_count": 3,
-    "ids": ["1001", "1002", "1003"],
+    "ids": ["stairwell:env-1:1001", "stairwell:env-1:1002", "stairwell:env-1:1003"],
     "requests_include": [{"header_contains": "fixture-token"}],
     "assets": [
       {
-        "id": "1001",
+        "id": "stairwell:env-1:1001",
         "fields": {"ipAddresses": "10.70.0.10", "os": "Ubuntu 22.04"}
       },
       {
-        "id": "1003",
+        "id": "stairwell:env-1:1003",
         "fields": {"ipAddresses": "10.70.0.12", "hostnames": "syn-no-mac", "os": "Linux"},
         "fields_absent": ["macAddresses"]
       }
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

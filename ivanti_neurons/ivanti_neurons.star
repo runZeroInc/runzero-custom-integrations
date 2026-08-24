@@ -99,7 +99,7 @@ def _dict_field(record, key):
     return value if type(value) == "dict" else {}
 
 
-def build_assets(assets):
+def build_assets(tenant_id, assets):
     assets_import = []
     # A device with neither id has nothing stable to key on. Counted rather
     # than logged per record, with one name kept for diagnosis, so a degraded
@@ -155,9 +155,16 @@ def build_assets(assets):
                              'system.model': model
                             }
 
-        # Build assets for import
+        # Build assets for import. The foreign id is scoped by the tenant id so
+        # two Neurons tenants imported into one runZero org cannot collide --
+        # Neurons has no per-tenant subdomain, so the DiscoveryId alone carried
+        # no tenant scope at all. The tenant id arrives through CONFIG, but it
+        # is the immutable tenant key the gateway itself routes on (sent as
+        # X-TenantId on the token call): changing it points the credential at a
+        # different tenant outright, which SHOULD re-identify. The
+        # DiscoveryId/DeviceID leaf is unchanged.
         asset_params = {
-            'id': asset_id,
+            'id': 'ivanti-neurons:{}:{}'.format(tenant_id, asset_id),
             'hostnames': [hostname],
             'os': os,
             'model': model,
@@ -180,7 +187,7 @@ def build_assets(assets):
         print("ivanti-neurons: skipped {} non-object records in the device list".format(malformed))
     return assets_import
 
-def get_and_report_assets(base_url, token, config_kwargs):
+def get_and_report_assets(base_url, tenant_id, token, config_kwargs):
     """Walk the device scroll and stream each page to runZero as it arrives, so
     memory stays bounded by one page and an interrupted walk keeps everything
     already reported. Returns the count reported."""
@@ -223,7 +230,7 @@ def get_and_report_assets(base_url, token, config_kwargs):
         if not assets:
             break  # the empty response Ivanti documents as the end of the walk
         collected += len(assets)
-        reported += report_assets(build_assets(assets))
+        reported += report_assets(build_assets(tenant_id, assets))
 
         # Only adopted when it is actually a number; an absent @odata.count
         # leaves the walk to terminate on the next link instead of aborting.
@@ -294,7 +301,7 @@ def main(*args, **kwargs):
 
     # Each page is built and streamed inside the walk, so nothing is buffered
     # across pages.
-    reported = get_and_report_assets(base_url, token, kwargs)
+    reported = get_and_report_assets(base_url, tenant_id, token, kwargs)
     print('ivanti-neurons: reported {} assets'.format(reported))
 
     return None

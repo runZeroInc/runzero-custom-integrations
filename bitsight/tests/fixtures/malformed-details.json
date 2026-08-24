@@ -1,7 +1,7 @@
 {
   "name": "malformed-details",
   "integration": "bitsight",
-  "description": "REGRESSION LOCK on the .get-default-vs-null class inside build_vuln and build_asset. Every field here is PRESENT but null or re-typed, which .get defaults do not cover: a finding with 'dest_port': null used to die in int(None), an explicit-null cvss died in None.get('base'), a null remediation message died in string concatenation, and a non-string threat_groups member died in '\\n'.join. On the asset side a null hosted_by/findings/threats block, a non-string tag, a non-dict product, a non-dict row, and a row with no asset name are all served together. One record like any of these used to end the run with zero assets imported; now the malformed row is skipped with a count and every finding still becomes a vulnerability.\n\nnamespaced_ids and no_placeholder_hostnames are skipped for the reasons the happy scenario records.",
+  "description": "REGRESSION LOCK on the .get-default-vs-null class inside build_vuln and build_asset. Every field here is PRESENT but null or re-typed, which .get defaults do not cover: a finding with 'dest_port': null used to die in int(None), an explicit-null cvss died in None.get('base'), a null remediation message died in string concatenation, and a non-string threat_groups member died in '\\n'.join. On the asset side a null hosted_by/findings/threats block, a non-string tag, a non-dict product, a non-dict row, and a row with no asset name are all served together. One record like any of these used to end the run with zero assets imported; now the malformed row is skipped with a count and every finding still becomes a vulnerability.\n\nno_placeholder_hostnames is skipped for the reason the happy scenario records.",
   "kwargs": {
     "url": "$BASE",
     "company_id": "co-fixture",
@@ -116,7 +116,7 @@
   "default_response": {"status": 404, "text": "no fixture route"},
   "expect": {
     "asset_count": 1,
-    "ids": ["bitsight:ip:198.51.100.30"],
+    "ids": ["bitsight:co-fixture:198.51.100.30"],
     "min_vulnerabilities_total": 4,
     "request_count": 2,
     "log_contains": [
@@ -126,7 +126,6 @@
   },
   "invariants": {
     "skip": [
-      "namespaced_ids",
       "no_placeholder_hostnames"
     ]
   }

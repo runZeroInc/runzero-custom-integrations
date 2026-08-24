@@ -1,6 +1,6 @@
 {
   "name": "happy",
-  "description": "Proves the new url parameter reaches the API and that IP-based assets and their findings parse. The country assertion is a regression lock on a typo: the attribute was read from asset.get('coutry'), so it was always empty while countryCode beside it worked. namespaced_ids is skipped: the id is bitsight:<asset_type>:<asset_name> with no company_id scope, so two portfolio companies sharing an asset name collide, and a reclassification re-identifies the asset (reported defect). no_placeholder_hostnames is skipped: a Bitsight asset IS an internet-facing address, so the address is legitimately the name here.",
+  "description": "Proves the new url parameter reaches the API and that IP-based assets and their findings parse. The country assertion is a regression lock on a typo: the attribute was read from asset.get('coutry'), so it was always empty while countryCode beside it worked. The id is bitsight:<company_guid>:<asset_name>: the company GUID scope keeps two portfolio companies sharing an address apart, and asset_type is kept out of the id (it is the assetType attribute) so a Bitsight reclassification cannot re-identify the asset. no_placeholder_hostnames is skipped: a Bitsight asset IS an internet-facing address, so the address is legitimately the name here.",
   "kwargs": {
     "url": "$BASE",
     "company_id": "co-fixture",
@@ -76,7 +76,7 @@
     "min_assets": 2,
     "assets": [
       {
-        "id": "bitsight:ip:198.51.100.10",
+        "id": "bitsight:co-fixture:198.51.100.10",
         "fields": {"country": "United States"}
       }
     ],
@@ -91,7 +91,6 @@
   },
   "invariants": {
     "skip": [
-      "namespaced_ids",
       "no_placeholder_hostnames"
     ]
   }

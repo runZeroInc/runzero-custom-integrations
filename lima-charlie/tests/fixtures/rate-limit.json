@@ -1,7 +1,7 @@
 {
   "name": "rate-limit",
   "integration": "lima-charlie",
-  "description": "LimaCharlie answers the token exchange and the sensors call with 429 once each, then relents. get_json/post_json retry transient statuses three times by default, so the script must absorb both without hand-rolling a retry loop and still import the sensor. Proves the retry re-sends the same request (the oid query on the exchange, the bearer on the data call).\n\nnamespaced_ids is skipped: id=sid carries no organization scope, a previously reported defect.",
+  "description": "LimaCharlie answers the token exchange and the sensors call with 429 once each, then relents. get_json/post_json retry transient statuses three times by default, so the script must absorb both without hand-rolling a retry loop and still import the sensor. Proves the retry re-sends the same request (the oid query on the exchange, the bearer on the data call).",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -43,12 +43,12 @@
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["aaaa0009-0000-4000-8000-000000000009"],
+    "ids": ["lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0009-0000-4000-8000-000000000009"],
     "request_count": 4,
     "requests_include": [
       {"method": "POST", "query_contains": "oid=8bd1f0e2-0000-4000-8000-000000000001"},
       {"method": "GET", "header_contains": "fixture-lc-jwt"}
     ]
   },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "invariants": {"skip": []}
 }

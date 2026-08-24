@@ -2,7 +2,7 @@
   "name": "paged",
   "integration": "ivanti_neurons",
   "script": "ivanti_neurons/ivanti_neurons.star",
-  "description": "A three-page OData scroll whose pages carry 2, 2 and 1 devices against a reported @odata.count of 5.\n\nTwo regressions are locked here. First, the bearer token: the token endpoint answers with a JSON object holding access_token, and get_token used to return the whole response body, so /devices was called with 'Bearer {\"access_token\":...}'. The Bearer assertion below only matches the unwrapped value.\n\nSecond, the final page. The walk used to be bounded by len(assets_all) < @odata.count - 1, which stops one record short of the tenant's own total -- with 5 devices arriving 2+2+1 it halted after page two with four of them and never issued the third request. The walk is now driven by @odata.nextLink, as Ivanti documents, so all five arrive and the request count is exact.\n\nSkips namespaced_ids: this integration keys assets on the bare Ivanti DiscoveryId, which carries no tenant scope, as the missing-network scenario records.",
+  "description": "A three-page OData scroll whose pages carry 2, 2 and 1 devices against a reported @odata.count of 5.\n\nTwo regressions are locked here. First, the bearer token: the token endpoint answers with a JSON object holding access_token, and get_token used to return the whole response body, so /devices was called with 'Bearer {\"access_token\":...}'. The Bearer assertion below only matches the unwrapped value.\n\nSecond, the final page. The walk used to be bounded by len(assets_all) < @odata.count - 1, which stops one record short of the tenant's own total -- with 5 devices arriving 2+2+1 it halted after page two with four of them and never issued the third request. The walk is now driven by @odata.nextLink, as Ivanti documents, so all five arrive and the request count is exact.\n\nIds are asserted in the scoped form ivanti-neurons:<tenant id>:<DiscoveryId>: Neurons has no per-tenant subdomain, and the tenant id is the immutable key the gateway routes on (sent as X-TenantId), so two Neurons tenants imported into one runZero org cannot collide.",
   "kwargs": {
     "url": "$BASE",
     "tenant_id": "fixture-tenant",
@@ -115,15 +115,15 @@
   "expect": {
     "asset_count": 5,
     "ids": [
-      "22220000-4a11-4c31-9c31-1a2b3c4d5e01",
-      "22220000-4a11-4c31-9c31-1a2b3c4d5e02",
-      "22220000-4a11-4c31-9c31-1a2b3c4d5e03",
-      "22220000-4a11-4c31-9c31-1a2b3c4d5e04",
-      "22220000-4a11-4c31-9c31-1a2b3c4d5e05"
+      "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e02",
+      "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e03",
+      "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e04",
+      "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e05"
     ],
     "assets": [
       {
-        "id": "22220000-4a11-4c31-9c31-1a2b3c4d5e05",
+        "id": "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e05",
         "fields": {"hostnames": "kiosk-05.example.com", "ipAddresses": "192.0.2.15"}
       }
     ],
@@ -136,6 +136,6 @@
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

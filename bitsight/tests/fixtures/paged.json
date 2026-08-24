@@ -1,7 +1,7 @@
 {
   "name": "paged",
   "integration": "bitsight",
-  "description": "REGRESSION LOCK on both cursor walks. Bitsight's links.next is an absolute URL carrying its own limit and offset, and the HTTP helper REPLACES a URL's query string with params= rather than merging into it -- so re-sending the filter on the cursor threw the offset away and asked for page one again. get_assets did that with is_ip=true and get_findings with assets.asset=<address>.\n\nThe assets walk is what shows the re-fetch: page one is served by a route with when_exhausted=repeat_last, so a cursor request that has lost its offset lands back on page one and returns the same two assets a second time. Only a request that actually carries offset=2 can produce 198.51.100.12 and 198.51.100.13, which is why they are asserted by id. The findings walk behind 198.51.100.10 is the same shape one level down, and min_vulnerabilities_total=2 is reachable only if its second page arrives too.\n\nrequest_count is exact at 7 -- two asset pages, two finding pages for .10, and one empty finding page for each of the other three assets. That is the assertion that no request repeats: a walk that re-fetches page one issues more than seven, and one that stops early issues fewer.\n\nThe second asset page still carries a next link even though its count is already satisfied -- a paginator that does not know it is on the last page. The walk has to stop on the count there rather than follow the cursor past the end, which is what requests_absent on offset=4 pins. The route behind offset=4 exists only so a regression fails on the request count in one extra request rather than by looping to MAX_PAGES.\n\nnamespaced_ids is skipped: the id is bitsight:<asset_type>:<asset_name> with no company_id scope, the defect the happy scenario records. no_placeholder_hostnames is skipped: a Bitsight asset IS an internet-facing address, so the address is legitimately the name.",
+  "description": "REGRESSION LOCK on both cursor walks. Bitsight's links.next is an absolute URL carrying its own limit and offset, and the HTTP helper REPLACES a URL's query string with params= rather than merging into it -- so re-sending the filter on the cursor threw the offset away and asked for page one again. get_assets did that with is_ip=true and get_findings with assets.asset=<address>.\n\nThe assets walk is what shows the re-fetch: page one is served by a route with when_exhausted=repeat_last, so a cursor request that has lost its offset lands back on page one and returns the same two assets a second time. Only a request that actually carries offset=2 can produce 198.51.100.12 and 198.51.100.13, which is why they are asserted by id. The findings walk behind 198.51.100.10 is the same shape one level down, and min_vulnerabilities_total=2 is reachable only if its second page arrives too.\n\nrequest_count is exact at 7 -- two asset pages, two finding pages for .10, and one empty finding page for each of the other three assets. That is the assertion that no request repeats: a walk that re-fetches page one issues more than seven, and one that stops early issues fewer.\n\nThe second asset page still carries a next link even though its count is already satisfied -- a paginator that does not know it is on the last page. The walk has to stop on the count there rather than follow the cursor past the end, which is what requests_absent on offset=4 pins. The route behind offset=4 exists only so a regression fails on the request count in one extra request rather than by looping to MAX_PAGES.\n\nno_placeholder_hostnames is skipped: a Bitsight asset IS an internet-facing address, so the address is legitimately the name. Ids are bitsight:<company_guid>:<asset_name>, asserted exactly.",
   "kwargs": {
     "url": "$BASE",
     "company_id": "co-fixture",
@@ -204,13 +204,13 @@
   "expect": {
     "asset_count": 4,
     "ids": [
-      "bitsight:ip:198.51.100.10",
-      "bitsight:ip:198.51.100.11",
-      "bitsight:ip:198.51.100.12",
-      "bitsight:ip:198.51.100.13"
+      "bitsight:co-fixture:198.51.100.10",
+      "bitsight:co-fixture:198.51.100.11",
+      "bitsight:co-fixture:198.51.100.12",
+      "bitsight:co-fixture:198.51.100.13"
     ],
     "assets": [
-      {"id": "bitsight:ip:198.51.100.12", "fields": {"country": "Germany", "countryCode": "DE"}}
+      {"id": "bitsight:co-fixture:198.51.100.12", "fields": {"country": "Germany", "countryCode": "DE"}}
     ],
     "min_vulnerabilities_total": 2,
     "request_count": 7,
@@ -225,7 +225,6 @@
   },
   "invariants": {
     "skip": [
-      "namespaced_ids",
       "no_placeholder_hostnames"
     ]
   }

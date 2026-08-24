@@ -1,7 +1,7 @@
 {
   "name": "device-types",
   "integration": "lima-charlie",
-  "description": "The `plat` platform constant is the only form-factor signal a LimaCharlie sensor carries -- the sensor object has no chassis, role, or server/workstation field at all -- and only two of its values imply one. This scenario pins both halves of that.\n\nThe iOS (0x40000000) and Android (0x50000000) sensors must come out as Mobile. The Windows (0x10000000), Linux (0x20000000) and macOS (0x30000000) sensors must come out with NO deviceType: those platforms run on desktops, laptops and servers alike, so claiming a form factor from them would override runZero's own fingerprinting with a guess. The sensor reporting no `plat` at all covers the same path for a field that is absent rather than uninteresting.\n\nnamespaced_ids is skipped: id=sid is the bare LimaCharlie sensor uuid with no organization scope, the same defect happy.json records.",
+  "description": "The `plat` platform constant is the only form-factor signal a LimaCharlie sensor carries -- the sensor object has no chassis, role, or server/workstation field at all -- and only two of its values imply one. This scenario pins both halves of that.\n\nThe iOS (0x40000000) and Android (0x50000000) sensors must come out as Mobile. The Windows (0x10000000), Linux (0x20000000) and macOS (0x30000000) sensors must come out with NO deviceType: those platforms run on desktops, laptops and servers alike, so claiming a form factor from them would override runZero's own fingerprinting with a guess. The sensor reporting no `plat` at all covers the same path for a field that is absent rather than uninteresting.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -80,14 +80,14 @@
   "expect": {
     "asset_count": 6,
     "assets": [
-      {"id": "bbbb0001-0000-4000-8000-000000000001", "fields": {"hostnames": "syn-lc-iphone", "deviceType": "Mobile"}},
-      {"id": "bbbb0002-0000-4000-8000-000000000002", "fields": {"hostnames": "syn-lc-android", "deviceType": "Mobile"}},
-      {"id": "bbbb0003-0000-4000-8000-000000000003", "fields": {"hostnames": "syn-lc-windows"}, "fields_absent": ["deviceType"]},
-      {"id": "bbbb0004-0000-4000-8000-000000000004", "fields": {"hostnames": "syn-lc-linux"}, "fields_absent": ["deviceType"]},
-      {"id": "bbbb0005-0000-4000-8000-000000000005", "fields": {"hostnames": "syn-lc-macos"}, "fields_absent": ["deviceType"]},
-      {"id": "bbbb0006-0000-4000-8000-000000000006", "fields": {"hostnames": "syn-lc-no-plat"}, "fields_absent": ["deviceType"]}
+      {"id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0001-0000-4000-8000-000000000001", "fields": {"hostnames": "syn-lc-iphone", "deviceType": "Mobile"}},
+      {"id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0002-0000-4000-8000-000000000002", "fields": {"hostnames": "syn-lc-android", "deviceType": "Mobile"}},
+      {"id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0003-0000-4000-8000-000000000003", "fields": {"hostnames": "syn-lc-windows"}, "fields_absent": ["deviceType"]},
+      {"id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0004-0000-4000-8000-000000000004", "fields": {"hostnames": "syn-lc-linux"}, "fields_absent": ["deviceType"]},
+      {"id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0005-0000-4000-8000-000000000005", "fields": {"hostnames": "syn-lc-macos"}, "fields_absent": ["deviceType"]},
+      {"id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0006-0000-4000-8000-000000000006", "fields": {"hostnames": "syn-lc-no-plat"}, "fields_absent": ["deviceType"]}
     ],
     "request_count": 2
   },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "invariants": {"skip": []}
 }

@@ -74,7 +74,11 @@ def build_asset(asset, base_url, company_id, http_options, ctx):
     asset_type = text(asset.get('asset_type'))
     if not asset_name:
         return None
-    asset_id = "bitsight:{}:{}".format(asset_type or "unknown", asset_name)
+    # Scoped by the company GUID so two portfolio companies imported into one
+    # runZero organization cannot collide on a shared address. asset_type is
+    # deliberately NOT part of the id: Bitsight reclassifying a record would
+    # re-identify the asset. It stays available as the assetType attribute.
+    asset_id = "bitsight:{}:{}".format(company_id, asset_name)
     app_grade = str(asset.get('app_grade', ''))
     country_code = str(asset.get('country_code', ''))
     country = str(asset.get('country') or '')

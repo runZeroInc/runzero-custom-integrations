@@ -1,6 +1,6 @@
 {
   "name": "software-cap",
-  "description": "A device whose package table carries 120 rows. The platform rejects an asset with more than 99 software children, so the list must be capped at 99 with a printed note rather than emitted whole -- the child_caps invariant fails an uncapped emission, and log_contains pins the truncation message. namespaced_ids is skipped: ids are the bare org-local device number (reported defect).",
+  "description": "A device whose package table carries 120 rows. The platform rejects an asset with more than 99 software children, so the list must be capped at 99 with a printed note rather than emitted whole -- the child_caps invariant fails an uncapped emission, and log_contains pins the truncation message. Ids are emitted in the scoped automox:<org id>:<device id> form, enforced by the namespaced_ids invariant.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "fixture-token",
@@ -1622,16 +1622,11 @@
   "expect": {
     "asset_count": 1,
     "ids": [
-      "3001"
+      "automox:4242:3001"
     ],
     "min_software_total": 99,
     "log_contains": [
       "automox: device 3001 reports 120 software entries; importing the first 99"
-    ]
-  },
-  "invariants": {
-    "skip": [
-      "namespaced_ids"
     ]
   }
 }

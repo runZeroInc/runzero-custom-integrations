@@ -1,7 +1,7 @@
 {
   "name": "addressless-sensor",
   "integration": "lima-charlie",
-  "description": "REGRESSION LOCK on the networkInterfaces=[None] abort. A sensor that has checked in with no int_ip, no ext_ip and no mac_addr -- routine for a freshly enrolled or offline agent -- makes network_interface() return None, and build_assets used to pass networkInterfaces=[None] to ImportAsset regardless. The runtime rejects that with \"network_interfaces must be an iterable of NetworkInterface objects\" and the WHOLE run died: the healthy sensor in the same page was lost too, and zero assets were exported.\n\nThe fix builds the list only when network_interface returns a value, so the addressless sensor imports with no interface and correlates on its hostname. Both sensors must survive.\n\nSkips namespaced_ids: the foreign id is the bare LimaCharlie sid with no organization scope, the same defect the happy scenario records.",
+  "description": "REGRESSION LOCK on the networkInterfaces=[None] abort. A sensor that has checked in with no int_ip, no ext_ip and no mac_addr -- routine for a freshly enrolled or offline agent -- makes network_interface() return None, and build_assets used to pass networkInterfaces=[None] to ImportAsset regardless. The runtime rejects that with \"network_interfaces must be an iterable of NetworkInterface objects\" and the WHOLE run died: the healthy sensor in the same page was lost too, and zero assets were exported.\n\nThe fix builds the list only when network_interface returns a value, so the addressless sensor imports with no interface and correlates on its hostname. Both sensors must survive.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -48,20 +48,20 @@
   "expect": {
     "asset_count": 2,
     "ids": [
-      "bbbb0001-0000-4000-8000-000000000001",
-      "bbbb0002-0000-4000-8000-000000000002"
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0001-0000-4000-8000-000000000001",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0002-0000-4000-8000-000000000002"
     ],
     "assets": [
       {
-        "id": "bbbb0001-0000-4000-8000-000000000001",
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0001-0000-4000-8000-000000000001",
         "fields": {"hostnames": "syn-lc-never-checked-in.example.com"},
         "fields_absent": ["ipAddresses", "macAddresses"]
       },
       {
-        "id": "bbbb0002-0000-4000-8000-000000000002",
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:bbbb0002-0000-4000-8000-000000000002",
         "fields": {"hostnames": "syn-lc-healthy.example.com", "ipAddresses": "192.0.2.60", "macAddresses": "00:11:22:33:44:60"}
       }
     ]
   },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "invariants": {"skip": []}
 }

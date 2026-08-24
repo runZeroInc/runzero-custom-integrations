@@ -1,61 +1,176 @@
 {
   "name": "malformed",
-  "description": "A page mixing a device with no id, a device whose detail block is a string instead of an object, a NIC with a MAC but no IPS, a bare string where a device object belongs, a device whose \"status\" key is present but null, and a device whose ip_addrs/ip_addrs_private/os fields are present but null. Each must be handled without aborting: the id-less device and the string row are skipped and logged, the string detail falls back to ip_addrs, the IP-less NIC still yields a MAC-only interface, the null status yields an empty agent_status, and the null address lists yield an asset that correlates on its hostname. namespaced_ids is skipped: ids are the bare org-local device number (reported defect).",
-  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "description": "A page mixing a device with no id, a device whose detail block is a string instead of an object, a NIC with a MAC but no IPS, a bare string where a device object belongs, a device whose \"status\" key is present but null, and a device whose ip_addrs/ip_addrs_private/os fields are present but null. Each must be handled without aborting: the id-less device and the string row are skipped and logged, the string detail falls back to ip_addrs, the IP-less NIC still yields a MAC-only interface, the null status yields an empty agent_status, and the null address lists yield an asset that correlates on its hostname. Ids are emitted in the scoped automox:<org id>:<device id> form, enforced by the namespaced_ids invariant.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
   "routes": [
     {
       "name": "packages",
-      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
-      "responses": [{"status": 200, "json": []}],
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
       "when_exhausted": "empty"
     },
     {
       "name": "orgs",
-      "match": {"method": "GET", "path": "/api/orgs"},
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
       "responses": [
-        {"status": 200, "json": [{"id": 4242, "name": "Fixture Org"}]},
-        {"status": 200, "json": []}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 4242,
+              "name": "Fixture Org"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     },
     {
       "name": "servers",
-      "match": {"method": "GET", "path": "/api/servers"},
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
       "responses": [
-        {"status": 200, "json": [
-          {"id": 2001, "name": "fixture-ok", "os_family": "Linux", "os_name": "Debian 12",
-           "status": {"agent_status": "connected"}, "ip_addrs": ["192.0.2.31"]},
-          {"id": 2002, "name": "fixture-string-detail", "detail": "unavailable",
-           "ip_addrs": ["192.0.2.32"]},
-          {"name": "fixture-no-id", "ip_addrs": ["192.0.2.33"]},
-          "not a device object at all",
-          {"id": 2004, "name": "fixture-nic-without-ips",
-           "detail": {"NICS": [{"MAC": "00:11:22:aa:00:04"}]}},
-          {"id": 2005, "name": "fixture-null-status", "status": null,
-           "ip_addrs": ["192.0.2.35"]},
-          {"id": 2006, "name": "fixture-null-fields", "status": {"agent_status": null},
-           "ip_addrs": null, "ip_addrs_private": null,
-           "os_family": null, "os_name": null, "os_version": null,
-           "last_logged_in_user": null, "serial_number": null}
-        ]},
-        {"status": 200, "json": []}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 2001,
+              "name": "fixture-ok",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "status": {
+                "agent_status": "connected"
+              },
+              "ip_addrs": [
+                "192.0.2.31"
+              ]
+            },
+            {
+              "id": 2002,
+              "name": "fixture-string-detail",
+              "detail": "unavailable",
+              "ip_addrs": [
+                "192.0.2.32"
+              ]
+            },
+            {
+              "name": "fixture-no-id",
+              "ip_addrs": [
+                "192.0.2.33"
+              ]
+            },
+            "not a device object at all",
+            {
+              "id": 2004,
+              "name": "fixture-nic-without-ips",
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:aa:00:04"
+                  }
+                ]
+              }
+            },
+            {
+              "id": 2005,
+              "name": "fixture-null-status",
+              "status": null,
+              "ip_addrs": [
+                "192.0.2.35"
+              ]
+            },
+            {
+              "id": 2006,
+              "name": "fixture-null-fields",
+              "status": {
+                "agent_status": null
+              },
+              "ip_addrs": null,
+              "ip_addrs_private": null,
+              "os_family": null,
+              "os_name": null,
+              "os_version": null,
+              "last_logged_in_user": null,
+              "serial_number": null
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     }
   ],
   "expect": {
     "asset_count": 5,
-    "ids": ["2001", "2002", "2004", "2005", "2006"],
+    "ids": [
+      "automox:4242:2001",
+      "automox:4242:2002",
+      "automox:4242:2004",
+      "automox:4242:2005",
+      "automox:4242:2006"
+    ],
     "assets": [
-      {"id": "2002", "fields": {"ipAddresses": "192.0.2.32"}, "fields_absent": ["macAddresses"]},
-      {"id": "2004", "fields": {"macAddresses": "00:11:22:aa:00:04"}, "fields_absent": ["ipAddresses"]},
-      {"id": "2005", "fields": {"ipAddresses": "192.0.2.35"}},
-      {"id": "2006", "fields": {"hostnames": "fixture-null-fields"}, "fields_absent": ["ipAddresses", "macAddresses"]}
+      {
+        "id": "automox:4242:2002",
+        "fields": {
+          "ipAddresses": "192.0.2.32"
+        },
+        "fields_absent": [
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "automox:4242:2004",
+        "fields": {
+          "macAddresses": "00:11:22:aa:00:04"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
+      },
+      {
+        "id": "automox:4242:2005",
+        "fields": {
+          "ipAddresses": "192.0.2.35"
+        }
+      },
+      {
+        "id": "automox:4242:2006",
+        "fields": {
+          "hostnames": "fixture-null-fields"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      }
     ],
     "log_contains": [
       "automox: skipping device with no id: name=fixture-no-id",
       "automox: skipping non-dict device record: string"
     ]
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  }
 }

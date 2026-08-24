@@ -1,7 +1,7 @@
 {
   "name": "non-dict-row",
   "integration": "carbon-black",
-  "description": "REGRESSION LOCK. A non-dict entry in the _scroll results array used to abort the run: build_assets loops the array and calls device.get(...) on every entry, so a bare string -- what this endpoint returns when it degrades into an error document, and what a partially written scroll page looks like -- died with 'string has no .get field or method'. Starlark has no exception handling, so the abort ended the whole run and the two healthy devices on the same page were lost. The row must now be skipped with a log line while both healthy devices import.\n\nSkips namespaced_ids: the foreign id is the bare Carbon Black device number with no organization_key scope, a separate defect recorded with the malformed scenario.",
+  "description": "REGRESSION LOCK. A non-dict entry in the _scroll results array used to abort the run: build_assets loops the array and calls device.get(...) on every entry, so a bare string -- what this endpoint returns when it degrades into an error document, and what a partially written scroll page looks like -- died with 'string has no .get field or method'. Starlark has no exception handling, so the abort ended the whole run and the two healthy devices on the same page were lost. The row must now be skipped with a log line while both healthy devices import.",
   "kwargs": {
     "url": "$BASE",
     "organization_key": "SYNORG01",
@@ -11,38 +11,88 @@
   "routes": [
     {
       "name": "scroll-page-1",
-      "match": {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"},
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"
+      },
       "responses": [
         {
           "status": 200,
           "json": {
             "num_found": 3,
             "results": [
-              {"id": 7001, "name": "syn-healthy-7001", "os": "LINUX", "last_internal_ip_address": "192.0.2.11", "mac_address": "00:50:56:00:70:01"},
+              {
+                "id": 7001,
+                "name": "syn-healthy-7001",
+                "os": "LINUX",
+                "last_internal_ip_address": "192.0.2.11",
+                "mac_address": "00:50:56:00:70:01"
+              },
               "device row served as a bare string",
-              {"id": 7002, "name": "syn-healthy-7002", "os": "WINDOWS", "last_internal_ip_address": "192.0.2.12", "mac_address": "00:50:56:00:70:02"}
+              {
+                "id": 7002,
+                "name": "syn-healthy-7002",
+                "os": "WINDOWS",
+                "last_internal_ip_address": "192.0.2.12",
+                "mac_address": "00:50:56:00:70:02"
+              }
             ]
           }
         },
-        {"status": 200, "json": {"num_found": 3, "results": []}}
+        {
+          "status": 200,
+          "json": {
+            "num_found": 3,
+            "results": []
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "vulns",
-      "match": {"method": "POST", "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"},
-      "responses": [{"status": 200, "json": {"num_found": 0, "results": []}}],
+      "match": {
+        "method": "POST",
+        "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "num_found": 0,
+            "results": []
+          }
+        }
+      ],
       "when_exhausted": "repeat_last"
     }
   ],
   "expect": {
     "asset_count": 2,
-    "ids": ["7001", "7002"],
-    "assets": [
-      {"id": "7001", "fields": {"hostnames": "syn-healthy-7001", "ipAddresses": "192.0.2.11", "macAddresses": "00:50:56:00:70:01"}},
-      {"id": "7002", "fields": {"hostnames": "syn-healthy-7002", "ipAddresses": "192.0.2.12", "macAddresses": "00:50:56:00:70:02"}}
+    "ids": [
+      "carbon-black:SYNORG01:7001",
+      "carbon-black:SYNORG01:7002"
     ],
-    "log_contains": ["carbon-black: skipped 1 non-object device rows"]
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+    "assets": [
+      {
+        "id": "carbon-black:SYNORG01:7001",
+        "fields": {
+          "hostnames": "syn-healthy-7001",
+          "ipAddresses": "192.0.2.11",
+          "macAddresses": "00:50:56:00:70:01"
+        }
+      },
+      {
+        "id": "carbon-black:SYNORG01:7002",
+        "fields": {
+          "hostnames": "syn-healthy-7002",
+          "ipAddresses": "192.0.2.12",
+          "macAddresses": "00:50:56:00:70:02"
+        }
+      }
+    ],
+    "log_contains": [
+      "carbon-black: skipped 1 non-object device rows"
+    ]
+  }
 }

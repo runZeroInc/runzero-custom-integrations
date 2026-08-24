@@ -326,7 +326,13 @@ def build_assets(base_url, org_key, api_key, api_id, devices, config_kwargs, ski
         }
 
         params = {
-            "id": device_id,
+            # The device id is an org-local integer: two Carbon Black
+            # organizations both number devices from the same low values, so the
+            # bare id collides when two orgs are imported into one runZero
+            # organization. The Org Key is Carbon Black's own stable identifier
+            # for the organization -- the same value the API puts in every
+            # request path -- so it scopes the id without adding a request.
+            "id": "carbon-black:{}:{}".format(org_key, device_id),
             "hostnames": [hostname],
             "os": os,
             "osVersion": os_version,

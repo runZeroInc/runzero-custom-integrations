@@ -32,6 +32,20 @@ CONFIG = {
             "required": True,
             "description": "On-premises Endpoint Central auth token, sent verbatim as the Authorization header. Not a Zoho OAuth token; Endpoint Central Cloud is not supported and will answer 401.",
         },
+        {
+            # Endpoint Central's on-prem API exposes no installation or server
+            # identifier anywhere this script can reach cheaply -- scancomputers
+            # rows carry only per-resource fields and the metadata block only
+            # paging totals -- so the scope has to be operator-chosen. The
+            # empty default keeps the legacy unscoped ids.
+            "key": "server_scope",
+            "label": "Server scope",
+            "type": "string",
+            "required": False,
+            "default": "",
+            "placeholder": "ec-hq",
+            "description": "Optional label naming this Endpoint Central server, e.g. ec-hq. When set, foreign ids become manage-engine-endpoint-central:<server_scope>:<resource_id>, so two servers imported into one runZero organization cannot collide on their small integer resource ids. Leave empty to keep the legacy unscoped ids. Setting or changing it re-identifies this integration's existing assets once; they re-merge via MAC/IP/hostname or age out.",
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -41,11 +55,14 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json')
-load('kwargs', 'get_url_base', 'get_http_options')
+load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
 
 API_VERSION     = '1.4'
 SCAN_ENDPOINT   = '/api/' + API_VERSION + '/inventory/scancomputers'
 PAGE_LIMIT      = 1000
+
+# The foreign-id namespace used when server_scope is set.
+VENDOR          = 'manage-engine-endpoint-central'
 
 # CONFIG["maxPages"] bounds the walk through pager() below. The ceiling is a
 # backstop, not the working guard: the walk's two exits are an empty page and a
@@ -119,7 +136,7 @@ def build_network_interfaces(device):
         return []
     return [iface]
 
-def build_assets(devices):
+def build_assets(devices, scope):
     assets = []
     for d in devices:
         # A non-dict row -- null, a bare string -- would abort the script at
@@ -131,7 +148,15 @@ def build_assets(devices):
         if not raw_id:
             print("endpoint-central: skipping device with no resource_id/id: name=" + str(d.get('resource_name', '')))
             continue
-        asset_id = str(raw_id)
+        # resource_id is a small per-server integer, so two Endpoint Central
+        # servers imported into one runZero organization collide on it. When
+        # the operator sets server_scope the id becomes
+        # <slug>:<server_scope>:<resource_id>; the empty default keeps the
+        # legacy unscoped id so existing deployments are not re-identified.
+        if scope:
+            asset_id = '{}:{}:{}'.format(VENDOR, scope, raw_id)
+        else:
+            asset_id = str(raw_id)
         hostname = d.get('resource_name') or d.get('resource_name', '') or ''
         # build networkInterfaces
         net_ifaces = build_network_interfaces(d)
@@ -157,6 +182,7 @@ def main(**kwargs):
     # oauth_token is your auth token.
     base_url = get_url_base(kwargs)
     token = kwargs['oauth_token']
+    scope = get_string(kwargs, 'server_scope', default='')
     headers = {
         'Authorization': token,
         'Accept':        'application/json',
@@ -203,7 +229,7 @@ def main(**kwargs):
 
         # Build and stream each page via report_assets so the full device set
         # is never held in memory.
-        reported += report_assets(build_assets(devices))
+        reported += report_assets(build_assets(devices, scope))
         if len(devices) < PAGE_LIMIT:
             break
         page += 1

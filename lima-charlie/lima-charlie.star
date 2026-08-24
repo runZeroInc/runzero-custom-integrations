@@ -155,7 +155,7 @@ def get_token(jwt_url, oid, token, config_kwargs):
         return None
     return response_json.get('jwt')
 
-def build_assets(sensors):
+def build_assets(oid, sensors):
     assets = []
     for item in sensors:
         # A non-dict entry -- null, or a bare string -- would abort the script
@@ -221,7 +221,15 @@ def build_assets(sensors):
 
             assets.append(
                 ImportAsset(
-                    id=sid,
+                    # The foreign id is scoped by the organization id so two
+                    # LimaCharlie organizations imported into one runZero org
+                    # cannot collide. The oid arrives through CONFIG, but it is
+                    # the tenant identity the API itself keys on -- it sits in
+                    # every request path and the JWT is minted for exactly that
+                    # oid -- so it is immutable per tenant: changing it points
+                    # the credential at a different organization outright, which
+                    # SHOULD re-identify. The sid leaf is unchanged.
+                    id='lima-charlie:{}:{}'.format(oid, sid),
                     hostnames=[hostname],
                     networkInterfaces=interfaces,
                     deviceType=platform_device_type(item.get('plat')),
@@ -278,7 +286,7 @@ def main(**kwargs):
         sensors_json = data.get('sensors', []) or []
         total_sensors += len(sensors_json)
         if sensors_json:
-            reported += report_assets(build_assets(sensors_json))
+            reported += report_assets(build_assets(oid, sensors_json))
 
         continuation_token = data.get('continuation_token')
         if not continuation_token:

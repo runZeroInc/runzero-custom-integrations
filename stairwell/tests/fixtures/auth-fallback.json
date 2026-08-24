@@ -1,7 +1,7 @@
 {
   "name": "auth-fallback",
   "integration": "stairwell",
-  "description": "Stairwell's quickstart shows `Authorization: Bearer <token>` while its own OpenAPI declares the raw token with no prefix; a tenant enforcing the OpenAPI form answers 401 to the Bearer spelling. The script must retry the SAME request once with the raw token and keep that form for the rest of the run rather than failing the import. The first route matches only the Bearer form and answers 401 twice (get_json does not retry 401, but the route stays deterministic if that changes); the fallthrough route answers the raw form with a real page. namespaced_ids is skipped for the reason recorded in happy: the id is the bare Stairwell asset number with no tenant scope.",
+  "description": "Stairwell's quickstart shows `Authorization: Bearer <token>` while its own OpenAPI declares the raw token with no prefix; a tenant enforcing the OpenAPI form answers 401 to the Bearer spelling. The script must retry the SAME request once with the raw token and keep that form for the rest of the run rather than failing the import. The first route matches only the Bearer form and answers 401 twice (get_json does not retry 401, but the route stays deterministic if that changes); the fallthrough route answers the raw form with a real page.",
   "kwargs": {
     "url": "$BASE",
     "environment_id": "env-1",
@@ -48,7 +48,7 @@
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["4001"],
+    "ids": ["stairwell:env-1:4001"],
     "request_count": 2,
     "requests_include": [
       {"header_contains": "Bearer fixture-token"},
@@ -59,6 +59,6 @@
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

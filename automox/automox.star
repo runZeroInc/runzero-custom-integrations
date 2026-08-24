@@ -315,13 +315,26 @@ def build_network_interfaces_from_device(device):
         return [iface]
     return []
 
-def build_device_asset(device, sw_by_server):
+def build_device_asset(device, sw_by_server, org_scope):
     if type(device) != "dict":
         print("automox: skipping non-dict device record: " + type(device))
         return None
     device_id = device.get("id")
     if not device_id:
         print("automox: skipping device with no id: name=" + str(device.get("name", "")))
+        return None
+
+    # The device id is an org-local integer, so two Automox organizations both
+    # number devices from the same low values and the bare id collides when two
+    # tenants are imported into one runZero organization. The scope is the
+    # Automox organization id: the row's own organization_id when the API
+    # reports it (right even when the listing runs unscoped), else the
+    # organization resolved from /api/orgs. A device with neither is skipped
+    # rather than emitted under an id that would collide or later change.
+    row_org = device.get("organization_id")
+    scope = str(row_org) if row_org != None and str(row_org) != "" else (org_scope or "")
+    if not scope:
+        print("automox: skipping device {}: no organization_id on the record and no resolved organization to scope a stable id".format(device_id))
         return None
 
     custom_attrs = {
@@ -344,7 +357,7 @@ def build_device_asset(device, sw_by_server):
         software = software[:MAX_SOFTWARE_PER_ASSET]
 
     return ImportAsset(
-        id=str(device_id),
+        id="automox:{}:{}".format(scope, device_id),
         networkInterfaces=build_network_interfaces_from_device(device),
         hostnames=[as_text(device.get("name"))],
         os_version=as_text(device.get("os_version")),
@@ -372,10 +385,11 @@ def build_device_asset(device, sw_by_server):
         # answer here rather than a guess from the OS family.
     )
 
-def stream_device_assets(base_url, http_options, scope_org_id, sw_by_server):
+def stream_device_assets(base_url, http_options, scope_org_id, sw_by_server, id_scope):
     """Paginate Automox devices, building and streaming each page of assets via
-    report_assets so the full device set is never held in memory. Returns the
-    number of assets reported."""
+    report_assets so the full device set is never held in memory. id_scope is
+    the resolved organization id used to scope ids for rows that do not carry
+    their own organization_id. Returns the number of assets reported."""
     reported = 0
     page = 0
     limit = 500
@@ -415,7 +429,7 @@ def stream_device_assets(base_url, http_options, scope_org_id, sw_by_server):
 
         page_assets = []
         for device in batch:
-            asset = build_device_asset(device, sw_by_server)
+            asset = build_device_asset(device, sw_by_server, id_scope)
             if asset:
                 page_assets.append(asset)
         reported += report_assets(page_assets)
@@ -441,7 +455,7 @@ def build_assets(base_url, api_token, org_hint, config_kwargs):
         packages = fetch_org_packages(base_url, http_options, org_id)
         sw_by_server = index_software_by_server(packages)
 
-    return stream_device_assets(base_url, http_options, scope_org_id, sw_by_server)
+    return stream_device_assets(base_url, http_options, scope_org_id, sw_by_server, org_id)
 
 def main(**kwargs):
     org_hint = kwargs.get("organization_hint", None)

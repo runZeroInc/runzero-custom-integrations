@@ -2,7 +2,7 @@
  "name": "page-ceiling",
  "integration": "ivanti_neurons",
  "script": "ivanti_neurons/ivanti_neurons.star",
- "description": "A landscape whose scroll never ends: every page hands back an @odata.nextLink, none of them ever repeats, and no @odata.count is reported. That is the shape the walk has no answer for -- it is driven by the next link alone, so it used to spin until the task timed out with nothing in the log. The repeated-link check cannot help here because each link is new, which is exactly why the page ceiling exists behind it. CONFIG maxPages (500) backs the walk via pager(); reaching the ceiling RAISES with a message naming the label and the page count, which is what log_contains pins -- an incomplete import is reported as an error rather than silently truncated. The real device streamed on page one must still be present in the output, because pages are streamed as they arrive.\n\nThe 501st scripted response carries no next link. It exists ONLY as a terminator for a regression: a scroll that never ends would otherwise fail this scenario by timing out rather than by failing an assertion, and with it an uncapped walk stops one request later and fails on request_count and the missing log line instead.\n\nPage one carries a real device so the scenario still proves rows are parsed and reported; every later page carries a record with neither DiscoveryId nor DeviceID, which build_assets skips -- that is what keeps the ids unique across 499 pages.\n\ncheck_determinism is off: the scenario already costs 500 requests, and a second identical run would only re-assert an id paged already pins.\n\nnamespaced_ids is skipped for the reason recorded in paged: the id is the bare Ivanti DiscoveryId with no tenant scope.",
+ "description": "A landscape whose scroll never ends: every page hands back an @odata.nextLink, none of them ever repeats, and no @odata.count is reported. That is the shape the walk has no answer for -- it is driven by the next link alone, so it used to spin until the task timed out with nothing in the log. The repeated-link check cannot help here because each link is new, which is exactly why the page ceiling exists behind it. CONFIG maxPages (500) backs the walk via pager(); reaching the ceiling RAISES with a message naming the label and the page count, which is what log_contains pins -- an incomplete import is reported as an error rather than silently truncated. The real device streamed on page one must still be present in the output, because pages are streamed as they arrive.\n\nThe 501st scripted response carries no next link. It exists ONLY as a terminator for a regression: a scroll that never ends would otherwise fail this scenario by timing out rather than by failing an assertion, and with it an uncapped walk stops one request later and fails on request_count and the missing log line instead.\n\nPage one carries a real device so the scenario still proves rows are parsed and reported; every later page carries a record with neither DiscoveryId nor DeviceID, which build_assets skips -- that is what keeps the ids unique across 499 pages.\n\ncheck_determinism is off: the scenario already costs 500 requests, and a second identical run would only re-assert an id paged already pins.",
  "kwargs": {
   "url": "$BASE",
   "tenant_id": "fixture-tenant",
@@ -5565,7 +5565,7 @@
  "expect": {
   "asset_count": 1,
   "ids": [
-   "22220000-4a11-4c31-9c31-1a2b3c4d5e99"
+   "ivanti-neurons:fixture-tenant:22220000-4a11-4c31-9c31-1a2b3c4d5e99"
   ],
   "request_count": 501,
   "requests_include": [
@@ -5588,9 +5588,7 @@
  },
  "check_determinism": false,
  "invariants": {
-  "skip": [
-   "namespaced_ids"
-  ]
+  "skip": []
  },
  "timeout": 600
 }

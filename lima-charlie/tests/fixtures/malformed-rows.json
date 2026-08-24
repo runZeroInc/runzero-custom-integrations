@@ -1,7 +1,7 @@
 {
   "name": "malformed-rows",
   "integration": "lima-charlie",
-  "description": "One page whose sensors array carries a null entry, a bare-string entry, a sensor with no arch field, and a healthy sensor. A non-dict entry used to abort the script at the first .get, losing the rest of the page; it must now be skipped with a log line. The arch-less sensor used to be silently dropped by the architecture allowlist behind a message implying the operator had excluded it; only architectures explicitly set to False are filtered now, so it must import. namespaced_ids is skipped: id=sid is the bare LimaCharlie sensor uuid with no organization scope, the same defect happy.json records.",
+  "description": "One page whose sensors array carries a null entry, a bare-string entry, a sensor with no arch field, and a healthy sensor. A non-dict entry used to abort the script at the first .get, losing the rest of the page; it must now be skipped with a log line. The arch-less sensor used to be silently dropped by the architecture allowlist behind a message implying the operator had excluded it; only architectures explicitly set to False are filtered now, so it must import.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -48,8 +48,8 @@
   "expect": {
     "asset_count": 2,
     "ids": [
-      "cccc0001-0000-4000-8000-000000000001",
-      "cccc0002-0000-4000-8000-000000000002"
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:cccc0001-0000-4000-8000-000000000001",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:cccc0002-0000-4000-8000-000000000002"
     ],
     "request_count": 2,
     "log_contains": [
@@ -57,5 +57,5 @@
       "Reported 2 assets from 4 sensors"
     ]
   },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "invariants": {"skip": []}
 }

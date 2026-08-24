@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "lima-charlie",
-  "description": "Proves the new url and jwt_url parameters both reach the fixture server, that the JWT from the token exchange is what the sensor call carries as a bearer, and that a sensor row parses into an asset. Also covers the two filters: the ARCHITECTURE map drops a chromium sensor, and mac_addr is dash-separated on the wire and must be normalised to colons.\n\nnamespaced_ids is skipped: id=sid is the bare LimaCharlie sensor uuid with no organization scope, a previously reported defect that is not changed here.\n\nAlso pins ext_ip off the interface: sensor a reports int_ip 192.0.2.10 and ext_ip 198.51.100.10, and only the internal address may reach ipAddresses. ext_ip is the NAT egress address of the gateway the sensor sits behind -- LimaCharlie documents it as the \"External (public-facing) IP address of the endpoint\" -- so every endpoint in one office reports the same value, and attaching it to an interface beside the endpoint's own MAC correlates unrelated machines onto one address. It is carried as a custom attribute.",
+  "description": "Proves the new url and jwt_url parameters both reach the fixture server, that the JWT from the token exchange is what the sensor call carries as a bearer, and that a sensor row parses into an asset. Also covers the two filters: the ARCHITECTURE map drops a chromium sensor, and mac_addr is dash-separated on the wire and must be normalised to colons.\n\nIds are asserted in the scoped form lima-charlie:<oid>:<sid>: the organization id is the tenant identity the API itself keys on (it sits in every request path and the JWT is minted for it), so two LimaCharlie organizations imported into one runZero org cannot collide.\n\nAlso pins ext_ip off the interface: sensor a reports int_ip 192.0.2.10 and ext_ip 198.51.100.10, and only the internal address may reach ipAddresses. ext_ip is the NAT egress address of the gateway the sensor sits behind -- LimaCharlie documents it as the \"External (public-facing) IP address of the endpoint\" -- so every endpoint in one office reports the same value, and attaching it to an interface beside the endpoint's own MAC correlates unrelated machines onto one address. It is carried as a custom attribute.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -76,11 +76,11 @@
   "expect": {
     "asset_count": 2,
     "ids": [
-      "aaaa0001-0000-4000-8000-000000000001",
-      "aaaa0002-0000-4000-8000-000000000002"
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0001-0000-4000-8000-000000000001",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0002-0000-4000-8000-000000000002"
     ],
     "ids_absent": [
-      "aaaa0003-0000-4000-8000-000000000003"
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0003-0000-4000-8000-000000000003"
     ],
     "request_count": 2,
     "requests_include": [
@@ -102,7 +102,7 @@
     ],
     "assets": [
       {
-        "id": "aaaa0001-0000-4000-8000-000000000001",
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0001-0000-4000-8000-000000000001",
         "fields": {
           "hostnames": "syn-lc-a.example.com",
           "macAddresses": "00:11:22:33:44:01",
@@ -113,8 +113,6 @@
     ]
   },
   "invariants": {
-    "skip": [
-      "namespaced_ids"
-    ]
+    "skip": []
   }
 }

@@ -1,51 +1,101 @@
 {
   "name": "page-ceiling",
-  "description": "A console whose /api/servers listing never returns an empty page -- because it ignores page= and keeps re-serving one batch. The walk's only exit used to be that empty page, so this shape spun until the task timed out with nothing in the log to say why. MAX_PAGES stops it at 2000 pages and prints the truncation, which is the assertion: log_contains pins the message, and requests_absent on page=2000 pins that the 2001st page was never asked for.\n\nThe route matching page=2000 exists ONLY as a terminator for a regression. Serving the stuck batch with when_exhausted=repeat_last alone would make an uncapped walk run forever and fail this scenario by timing out rather than by failing an assertion; with the terminator, an uncapped walk stops one request later and fails on request_count and the missing log line instead.\n\nPage 0 carries a real device so the scenario still proves rows are parsed and reported; every page after it carries a record with no id, which build_device_asset skips. That is what keeps the ids unique despite 1999 repeats of the same page -- the stuck batch contributes no asset at all, so asset_count is exactly 1 and no invariant has to be waived for a defect the scenario is deliberately simulating.\n\ncheck_determinism is off: the scenario costs 2000 requests and a second identical run would only double that to re-assert an id the happy scenario already pins.\n\nnamespaced_ids is skipped for the reason recorded in happy: Automox ids are the bare org-local device number with no tenant scope.",
-  "kwargs": {"url": "$BASE", "api_token": "fixture-token", "organization_hint": "4242"},
+  "description": "A console whose /api/servers listing never returns an empty page -- because it ignores page= and keeps re-serving one batch. The walk's only exit used to be that empty page, so this shape spun until the task timed out with nothing in the log to say why. MAX_PAGES stops it at 2000 pages and prints the truncation, which is the assertion: log_contains pins the message, and requests_absent on page=2000 pins that the 2001st page was never asked for.\n\nThe route matching page=2000 exists ONLY as a terminator for a regression. Serving the stuck batch with when_exhausted=repeat_last alone would make an uncapped walk run forever and fail this scenario by timing out rather than by failing an assertion; with the terminator, an uncapped walk stops one request later and fails on request_count and the missing log line instead.\n\nPage 0 carries a real device so the scenario still proves rows are parsed and reported; every page after it carries a record with no id, which build_device_asset skips. That is what keeps the ids unique despite 1999 repeats of the same page -- the stuck batch contributes no asset at all, so asset_count is exactly 1 and no invariant has to be waived for a defect the scenario is deliberately simulating.\n\ncheck_determinism is off: the scenario costs 2000 requests and a second identical run would only double that to re-assert an id the happy scenario already pins.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "organization_hint": "4242"
+  },
   "routes": [
     {
       "name": "servers-terminator",
-      "match": {"method": "GET", "path": "/api/servers", "query_contains": "page=2000"},
-      "responses": [{"status": 200, "json": []}],
+      "match": {
+        "method": "GET",
+        "path": "/api/servers",
+        "query_contains": "page=2000"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
       "when_exhausted": "empty"
     },
     {
       "name": "servers-stuck",
-      "match": {"method": "GET", "path": "/api/servers"},
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
       "responses": [
-        {"status": 200, "json": [
-          {"id": 7001, "name": "fixture-ceiling-host", "os_family": "Linux", "os_name": "Debian 12",
-           "os_version": "12.5", "ip_addrs_private": ["192.0.2.201"]}
-        ]},
-        {"status": 200, "json": [
-          {"name": "fixture-stuck-page-no-id"}
-        ]}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 7001,
+              "name": "fixture-ceiling-host",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "os_version": "12.5",
+              "ip_addrs_private": [
+                "192.0.2.201"
+              ]
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "name": "fixture-stuck-page-no-id"
+            }
+          ]
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "packages",
-      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
-      "responses": [{"status": 200, "json": []}],
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
       "when_exhausted": "empty"
     }
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["7001"],
+    "ids": [
+      "automox:4242:7001"
+    ],
     "request_count": 2001,
     "requests_include": [
-      {"path": "/api/servers", "query_contains": "page=0"},
-      {"path": "/api/servers", "query_contains": "page=1999"}
+      {
+        "path": "/api/servers",
+        "query_contains": "page=0"
+      },
+      {
+        "path": "/api/servers",
+        "query_contains": "page=1999"
+      }
     ],
     "requests_absent": [
-      {"path": "/api/servers", "query_contains": "page=2000"}
+      {
+        "path": "/api/servers",
+        "query_contains": "page=2000"
+      }
     ],
     "log_contains": [
       "stopped reading devices at the 2000 page ceiling"
     ]
   },
   "check_determinism": false,
-  "invariants": {"skip": ["namespaced_ids"]},
   "timeout": 300
 }

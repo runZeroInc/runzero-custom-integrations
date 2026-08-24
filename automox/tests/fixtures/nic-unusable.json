@@ -1,88 +1,187 @@
 {
   "name": "nic-unusable",
-  "description": "Automox reports NICS entries with nothing usable on them -- an empty IPS list next to a null, missing, or unparseable MAC. network_interface() answers None for all of those, and the unguarded out.append() put that None into networkInterfaces, which ImportAsset rejects by ABORTING the whole run: 3001 carries such a NIC, so 3002/3003/3004 later on the same page and 3005 on the following page were all lost with it. Covers both places the None could reach ImportAsset: the NICS loop, and -- once the loop correctly drops every NIC -- the ip_addrs fallback below it, which builds network_interface(ips=[], mac=\"\") and is itself None for a device with no addresses at all (3003). All five assets must import, unusable NICs must be dropped rather than emitted, 3002 must fall through to its ip_addrs, and 3003 must import on its hostname alone. namespaced_ids is skipped: Automox ids are the bare org-local device number with no tenant scope, so two Automox tenants collide (separate reported defect, as in the happy scenario).",
-  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "description": "Automox reports NICS entries with nothing usable on them -- an empty IPS list next to a null, missing, or unparseable MAC. network_interface() answers None for all of those, and the unguarded out.append() put that None into networkInterfaces, which ImportAsset rejects by ABORTING the whole run: 3001 carries such a NIC, so 3002/3003/3004 later on the same page and 3005 on the following page were all lost with it. Covers both places the None could reach ImportAsset: the NICS loop, and -- once the loop correctly drops every NIC -- the ip_addrs fallback below it, which builds network_interface(ips=[], mac=\"\") and is itself None for a device with no addresses at all (3003). All five assets must import, unusable NICs must be dropped rather than emitted, 3002 must fall through to its ip_addrs, and 3003 must import on its hostname alone. Ids are emitted in the scoped automox:<org id>:<device id> form, enforced by the namespaced_ids invariant.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
   "routes": [
     {
       "name": "packages",
-      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
-      "responses": [{"status": 200, "json": []}],
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
       "when_exhausted": "empty"
     },
     {
       "name": "orgs",
-      "match": {"method": "GET", "path": "/api/orgs"},
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
       "responses": [
-        {"status": 200, "json": [{"id": 4242, "name": "Fixture Org"}]},
-        {"status": 200, "json": []}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 4242,
+              "name": "Fixture Org"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     },
     {
       "name": "servers",
-      "match": {"method": "GET", "path": "/api/servers"},
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
       "responses": [
-        {"status": 200, "json": [
-          {
-            "id": 3001,
-            "name": "syn-automox-3001",
-            "os_family": "Windows",
-            "os_name": "Windows 11 Pro",
-            "os_version": "10.0.22631",
-            "status": {"agent_status": "connected"},
-            "detail": {"NICS": [
-              {"MAC": "00:11:22:aa:00:01", "IPS": ["192.0.2.11"]},
-              {"MAC": null, "IPS": []}
-            ]}
-          },
-          {
-            "id": 3002,
-            "name": "syn-automox-3002",
-            "os_family": "Linux",
-            "os_name": "Ubuntu 24.04",
-            "status": {"agent_status": "connected"},
-            "detail": {"NICS": [{"MAC": "not-a-mac", "IPS": []}]},
-            "ip_addrs": ["203.0.113.22"],
-            "ip_addrs_private": ["192.0.2.12"]
-          },
-          {
-            "id": 3003,
-            "name": "syn-automox-3003",
-            "os_family": "Linux",
-            "os_name": "Debian 12",
-            "status": {"agent_status": "disconnected"},
-            "detail": {"NICS": [{"MAC": "", "IPS": []}]}
-          },
-          {
-            "id": 3004,
-            "name": "syn-automox-3004",
-            "os_family": "Windows",
-            "os_name": "Windows 10 Pro",
-            "status": {"agent_status": "connected"},
-            "detail": {"NICS": [{"MAC": "00:11:22:aa:00:04", "IPS": ["192.0.2.14"]}]}
-          }
-        ]},
-        {"status": 200, "json": [
-          {
-            "id": 3005,
-            "name": "syn-automox-3005",
-            "os_family": "Linux",
-            "os_name": "Rocky Linux 9",
-            "status": {"agent_status": "connected"},
-            "detail": {"NICS": [{"MAC": "00:11:22:aa:00:05", "IPS": ["192.0.2.15"]}]}
-          }
-        ]},
-        {"status": 200, "json": []}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 3001,
+              "name": "syn-automox-3001",
+              "os_family": "Windows",
+              "os_name": "Windows 11 Pro",
+              "os_version": "10.0.22631",
+              "status": {
+                "agent_status": "connected"
+              },
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:aa:00:01",
+                    "IPS": [
+                      "192.0.2.11"
+                    ]
+                  },
+                  {
+                    "MAC": null,
+                    "IPS": []
+                  }
+                ]
+              }
+            },
+            {
+              "id": 3002,
+              "name": "syn-automox-3002",
+              "os_family": "Linux",
+              "os_name": "Ubuntu 24.04",
+              "status": {
+                "agent_status": "connected"
+              },
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "not-a-mac",
+                    "IPS": []
+                  }
+                ]
+              },
+              "ip_addrs": [
+                "203.0.113.22"
+              ],
+              "ip_addrs_private": [
+                "192.0.2.12"
+              ]
+            },
+            {
+              "id": 3003,
+              "name": "syn-automox-3003",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "status": {
+                "agent_status": "disconnected"
+              },
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "",
+                    "IPS": []
+                  }
+                ]
+              }
+            },
+            {
+              "id": 3004,
+              "name": "syn-automox-3004",
+              "os_family": "Windows",
+              "os_name": "Windows 10 Pro",
+              "status": {
+                "agent_status": "connected"
+              },
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:aa:00:04",
+                    "IPS": [
+                      "192.0.2.14"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 3005,
+              "name": "syn-automox-3005",
+              "os_family": "Linux",
+              "os_name": "Rocky Linux 9",
+              "status": {
+                "agent_status": "connected"
+              },
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:aa:00:05",
+                    "IPS": [
+                      "192.0.2.15"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     }
   ],
   "expect": {
     "asset_count": 5,
-    "ids": ["3001", "3002", "3003", "3004", "3005"],
+    "ids": [
+      "automox:4242:3001",
+      "automox:4242:3002",
+      "automox:4242:3003",
+      "automox:4242:3004",
+      "automox:4242:3005"
+    ],
     "assets": [
       {
-        "id": "3001",
+        "id": "automox:4242:3001",
         "fields": {
           "hostnames": "syn-automox-3001",
           "ipAddresses": "192.0.2.11",
@@ -90,31 +189,47 @@
         }
       },
       {
-        "id": "3002",
+        "id": "automox:4242:3002",
         "fields": {
           "hostnames": "syn-automox-3002",
           "ipAddresses": "192.0.2.12\t203.0.113.22"
         },
-        "fields_absent": ["macAddresses"]
+        "fields_absent": [
+          "macAddresses"
+        ]
       },
       {
-        "id": "3003",
-        "fields": {"hostnames": "syn-automox-3003"},
-        "fields_absent": ["ipAddresses", "macAddresses"]
+        "id": "automox:4242:3003",
+        "fields": {
+          "hostnames": "syn-automox-3003"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
       },
       {
-        "id": "3004",
-        "fields": {"ipAddresses": "192.0.2.14", "macAddresses": "00:11:22:aa:00:04"}
+        "id": "automox:4242:3004",
+        "fields": {
+          "ipAddresses": "192.0.2.14",
+          "macAddresses": "00:11:22:aa:00:04"
+        }
       },
       {
-        "id": "3005",
-        "fields": {"ipAddresses": "192.0.2.15", "macAddresses": "00:11:22:aa:00:05"}
+        "id": "automox:4242:3005",
+        "fields": {
+          "ipAddresses": "192.0.2.15",
+          "macAddresses": "00:11:22:aa:00:05"
+        }
       }
     ],
     "request_count": 6,
     "requests_include": [
-      {"method": "GET", "path": "/api/servers", "query_contains": "page=1"}
+      {
+        "method": "GET",
+        "path": "/api/servers",
+        "query_contains": "page=1"
+      }
     ]
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  }
 }

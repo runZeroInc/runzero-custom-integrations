@@ -1,7 +1,7 @@
 {
   "name": "auth-oauth",
   "integration": "tailscale",
-  "description": "OAuth client-credentials mode. Supplying a client_id switches the script off API-key mode and makes it exchange the secret at /api/v2/oauth/token first; this proves the bootstrap call happens, that the returned access token (not the client secret) is what authorizes the device call, and that the devices:core:read scope is requested. namespaced_ids is skipped because the script emits a bare \"tailscale-<device id>\" with no tenant scope, reported separately as a defect.",
+  "description": "OAuth client-credentials mode. Supplying a client_id switches the script off API-key mode and makes it exchange the secret at /api/v2/oauth/token first; this proves the bootstrap call happens, that the returned access token (not the client secret) is what authorizes the device call, and that the devices:core:read scope is requested. namespaced_ids is skipped for the reason recorded in happy: no API-provided tailnet scope exists, and the Tailscale-minted device id is already unique across tailnets.",
   "kwargs": {
     "url": "$BASE",
     "tailnet": "T1234CNTRL",

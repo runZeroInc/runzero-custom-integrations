@@ -1,7 +1,7 @@
 {
   "name": "rate-limit",
   "integration": "carbon-black",
-  "description": "Carbon Black answers the first scroll call with 429 and the first vulnerability search with 429, then relents. post_json retries transient statuses three times by default, so the default must absorb both without the integration hand-rolling a retry loop: the devices still arrive and the CVE still lands on its asset. The 429 also proves the retry re-sends the same POST body, which is what a scroll cursor depends on.\n\nnamespaced_ids is skipped for the same reason as happy: the ids are bare device numbers with no tenant scope, reported as a bug rather than fixed here.",
+  "description": "Carbon Black answers the first scroll call with 429 and the first vulnerability search with 429, then relents. post_json retries transient statuses three times by default, so the default must absorb both without the integration hand-rolling a retry loop: the devices still arrive and the CVE still lands on its asset. The 429 also proves the retry re-sends the same POST body, which is what a scroll cursor depends on.",
   "kwargs": {
     "url": "$BASE",
     "organization_key": "SYNORG01",
@@ -11,9 +11,22 @@
   "routes": [
     {
       "name": "scroll-throttled-then-ok",
-      "match": {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll", "body_contains": "\"criteria\""},
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "\"criteria\""
+      },
       "responses": [
-        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error_code": "TOO_MANY_REQUESTS", "message": "rate limit exceeded"}},
+        {
+          "status": 429,
+          "headers": {
+            "Retry-After": "1"
+          },
+          "json": {
+            "error_code": "TOO_MANY_REQUESTS",
+            "message": "rate limit exceeded"
+          }
+        },
         {
           "status": 200,
           "json": {
@@ -31,15 +44,33 @@
             ]
           }
         },
-        {"status": 200, "json": {"num_found": 1, "results": []}}
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": []
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "vulns-throttled-then-ok",
-      "match": {"method": "POST", "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/6001/vulnerabilities/_search"},
+      "match": {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/6001/vulnerabilities/_search"
+      },
       "responses": [
-        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error_code": "TOO_MANY_REQUESTS", "message": "rate limit exceeded"}},
+        {
+          "status": 429,
+          "headers": {
+            "Retry-After": "1"
+          },
+          "json": {
+            "error_code": "TOO_MANY_REQUESTS",
+            "message": "rate limit exceeded"
+          }
+        },
         {
           "status": 200,
           "json": {
@@ -57,19 +88,34 @@
             ]
           }
         },
-        {"status": 200, "json": {"num_found": 1, "results": []}}
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": []
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     }
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["6001"],
+    "ids": [
+      "carbon-black:SYNORG01:6001"
+    ],
     "min_requests": 5,
     "requests_include": [
-      {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll", "body_contains": "\"rows\":1000"},
-      {"method": "POST", "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/6001/vulnerabilities/_search", "body_contains": "\"start\":0"}
+      {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll",
+        "body_contains": "\"rows\":1000"
+      },
+      {
+        "method": "POST",
+        "path": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/6001/vulnerabilities/_search",
+        "body_contains": "\"start\":0"
+      }
     ]
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  }
 }

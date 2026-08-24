@@ -1,7 +1,7 @@
 {
   "name": "null-sid",
   "integration": "lima-charlie",
-  "description": "A sensor row with a null sid -- the shape the API returns for a partially provisioned or deleted sensor -- must be skipped and logged, and the healthy sensor listed after it must still import.\n\nThis was a whole-run abort: build_assets never checked item.get('sid'), so ImportAsset(id=None) reached the runtime, which rejects it with \"id must be a string\". Starlark has no exceptions, so the run died and ZERO assets were exported -- one malformed record cost every sensor in the response. The guard now sits alongside the existing hostname and architecture filters and uses the house skip-log format.\n\nnamespaced_ids is skipped: id=sid is the bare LimaCharlie sensor UUID, globally unique on shape.",
+  "description": "A sensor row with a null sid -- the shape the API returns for a partially provisioned or deleted sensor -- must be skipped and logged, and the healthy sensor listed after it must still import.\n\nThis was a whole-run abort: build_assets never checked item.get('sid'), so ImportAsset(id=None) reached the runtime, which rejects it with \"id must be a string\". Starlark has no exceptions, so the run died and ZERO assets were exported -- one malformed record cost every sensor in the response. The guard now sits alongside the existing hostname and architecture filters and uses the house skip-log format.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -59,11 +59,11 @@
   "expect": {
     "asset_count": 1,
     "ids": [
-      "cccc0002-0000-4000-8000-000000000002"
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:cccc0002-0000-4000-8000-000000000002"
     ],
     "assets": [
       {
-        "id": "cccc0002-0000-4000-8000-000000000002",
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:cccc0002-0000-4000-8000-000000000002",
         "fields": {
           "hostnames": "syn-lc-healthy.example.com",
           "ipAddresses": "192.0.2.71",
@@ -77,8 +77,6 @@
     ]
   },
   "invariants": {
-    "skip": [
-      "namespaced_ids"
-    ]
+    "skip": []
   }
 }

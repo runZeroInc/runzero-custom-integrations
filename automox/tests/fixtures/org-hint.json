@@ -1,42 +1,111 @@
 {
   "name": "org-hint",
-  "description": "A numeric organization_hint short-circuits the /orgs lookup entirely and is sent as the o= query parameter. The first device page answers 404 for that org, which the script treats as a signal to retry the listing without o= -- proving the fallback path and that the retried page is the one imported. namespaced_ids is skipped: ids are the bare org-local device number (reported defect).",
-  "kwargs": {"url": "$BASE", "api_token": "fixture-token", "organization_hint": "4242"},
+  "description": "A numeric organization_hint short-circuits the /orgs lookup entirely and is sent as the o= query parameter. The first device page answers 404 for that org, which the script treats as a signal to retry the listing without o= -- proving the fallback path and that the retried page is the one imported. The device row carries its own organization_id (5555), and the id must be scoped by THAT rather than the hinted org: the unscoped retry returns whatever organization the key defaults to, which is exactly when the hint (4242) names the wrong scope. The record's own organization_id also keeps the id unchanged when an operator adds or edits the hint.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "organization_hint": "4242"
+  },
   "routes": [
     {
       "name": "packages",
-      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
-      "responses": [{"status": 200, "json": []}],
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
       "when_exhausted": "empty"
     },
     {
       "name": "servers-scoped-404",
-      "match": {"method": "GET", "path": "/api/servers", "query_contains": "o=4242"},
-      "responses": [{"status": 404, "json": {"error": "org not visible to this key"}}],
+      "match": {
+        "method": "GET",
+        "path": "/api/servers",
+        "query_contains": "o=4242"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "error": "org not visible to this key"
+          }
+        }
+      ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "servers-unscoped",
-      "match": {"method": "GET", "path": "/api/servers"},
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
       "responses": [
-        {"status": 200, "json": [
-          {"id": 5001, "name": "fixture-fallback-01", "os_family": "macOS", "os_name": "Sonoma",
-           "detail": {"NICS": [{"MAC": "00:11:22:cc:00:01", "IPS": ["192.0.2.51"]}]}}
-        ]},
-        {"status": 200, "json": []}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 5001,
+              "organization_id": 5555,
+              "name": "fixture-fallback-01",
+              "os_family": "macOS",
+              "os_name": "Sonoma",
+              "detail": {
+                "NICS": [
+                  {
+                    "MAC": "00:11:22:cc:00:01",
+                    "IPS": [
+                      "192.0.2.51"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     }
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["5001"],
-    "assets": [{"id": "5001", "fields": {"ipAddresses": "192.0.2.51", "macAddresses": "00:11:22:cc:00:01"}}],
-    "requests_absent": [{"path": "/api/orgs"}],
+    "ids": [
+      "automox:5555:5001"
+    ],
+    "ids_absent": [
+      "automox:4242:5001",
+      "5001"
+    ],
+    "assets": [
+      {
+        "id": "automox:5555:5001",
+        "fields": {
+          "ipAddresses": "192.0.2.51",
+          "macAddresses": "00:11:22:cc:00:01"
+        }
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/api/orgs"
+      }
+    ],
     "requests_include": [
-      {"path": "/api/servers", "query_contains": "o=4242"},
-      {"path": "/api/orgs/4242/packages"}
+      {
+        "path": "/api/servers",
+        "query_contains": "o=4242"
+      },
+      {
+        "path": "/api/orgs/4242/packages"
+      }
     ]
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  }
 }

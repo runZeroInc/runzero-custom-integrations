@@ -1,42 +1,99 @@
 {
   "name": "rate-limit",
-  "description": "A 429 on the first /api/servers page, then success. get_json retries internally, so the run must survive the throttle and still import the device rather than failing the whole poll. namespaced_ids is skipped: ids are the bare org-local device number (reported defect).",
-  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
+  "description": "A 429 on the first /api/servers page, then success. get_json retries internally, so the run must survive the throttle and still import the device rather than failing the whole poll. Ids are emitted in the scoped automox:<org id>:<device id> form, enforced by the namespaced_ids invariant.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
   "routes": [
     {
       "name": "packages",
-      "match": {"method": "GET", "path": "/api/orgs/4242/packages"},
-      "responses": [{"status": 200, "json": []}],
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs/4242/packages"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
       "when_exhausted": "empty"
     },
     {
       "name": "orgs",
-      "match": {"method": "GET", "path": "/api/orgs"},
+      "match": {
+        "method": "GET",
+        "path": "/api/orgs"
+      },
       "responses": [
-        {"status": 200, "json": [{"id": 4242, "name": "Fixture Org"}]},
-        {"status": 200, "json": []}
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 4242,
+              "name": "Fixture Org"
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     },
     {
       "name": "servers",
-      "match": {"method": "GET", "path": "/api/servers"},
+      "match": {
+        "method": "GET",
+        "path": "/api/servers"
+      },
       "responses": [
-        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "rate limited"}},
-        {"status": 200, "json": [
-          {"id": 4001, "name": "fixture-after-429", "os_family": "Linux", "os_name": "Debian 12",
-           "ip_addrs_private": ["192.0.2.41"]}
-        ]},
-        {"status": 200, "json": []}
+        {
+          "status": 429,
+          "headers": {
+            "Retry-After": "1"
+          },
+          "json": {
+            "error": "rate limited"
+          }
+        },
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 4001,
+              "name": "fixture-after-429",
+              "os_family": "Linux",
+              "os_name": "Debian 12",
+              "ip_addrs_private": [
+                "192.0.2.41"
+              ]
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
       ],
       "when_exhausted": "empty"
     }
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["4001"],
-    "assets": [{"id": "4001", "fields": {"ipAddresses": "192.0.2.41"}}],
+    "ids": [
+      "automox:4242:4001"
+    ],
+    "assets": [
+      {
+        "id": "automox:4242:4001",
+        "fields": {
+          "ipAddresses": "192.0.2.41"
+        }
+      }
+    ],
     "min_requests": 4
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  }
 }

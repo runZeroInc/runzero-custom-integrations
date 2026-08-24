@@ -164,7 +164,7 @@ def stream_assets(base_url, env, token, config_kwargs, max_pages, page_size):
                 p.page, retrieved_of(reported, total)))
             break
 
-        reported += report_assets(build_assets(body.get('assets')))
+        reported += report_assets(build_assets(env, body.get('assets')))
 
         if not next_token:
             break
@@ -183,7 +183,7 @@ def is_loopback(ip):
     families, so the v6 case is a literal compare rather than a second CIDR."""
     return ip == '::1' or ip_in_network(ip, '127.0.0.0/8')
 
-def build_assets(assets_json):
+def build_assets(env, assets_json):
     imported_assets = []
     # `assets` can be present-but-null, and a row can be something other than an
     # object; either used to abort the run mid-walk. as_list turns null into an
@@ -266,7 +266,16 @@ def build_assets(assets_json):
 
         imported_assets.append(
             ImportAsset(
-                id=asset_id,
+                # The foreign id is scoped by the environment id so two
+                # Stairwell environments imported into one runZero org cannot
+                # collide. The environment id arrives through CONFIG, but it is
+                # the tenant unit the API itself keys on -- it sits in every
+                # request path and verbatim in every asset's own resource name
+                # (environments/<env>/assets/<asset>) -- so it is immutable per
+                # tenant: changing it points the credential at a different
+                # environment outright, which SHOULD re-identify. The asset
+                # number leaf is unchanged.
+                id='stairwell:{}:{}'.format(env, asset_id),
                 hostnames=[label],
                 networkInterfaces=networks,
                 os=os,

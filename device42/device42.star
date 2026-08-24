@@ -166,7 +166,14 @@ def build_assets(devices, skipped):
         if type(d) != "dict":
             skipped[0] += 1
             continue
-        raw_id = d.get('id') or d.get('uuid') or d.get('device_id') or d.get('serial_no')
+        # uuid first: Device42 mints it once and it survives renames, merges,
+        # and re-discovery, while the numeric primary key can be reissued after
+        # a delete-and-recreate. The rest of the ladder is unchanged and only
+        # catches records the appliance returns without a uuid. No deployment
+        # scope is prepended: the API exposes no appliance identifier on this
+        # endpoint or a cheap sibling, and scoping on the configured URL would
+        # re-identify the estate on every config edit.
+        raw_id = d.get('uuid') or d.get('id') or d.get('device_id') or d.get('serial_no')
         if not raw_id:
             # Tallied across every page and reported once by main; logging each
             # one costs a line per device on a large estate.

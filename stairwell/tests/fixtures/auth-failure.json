@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "stairwell",
-  "description": "A token both header forms reject. The script tries the Bearer spelling, retries the same request once with the raw token, and when that is also refused it must end with a printed diagnostic and zero assets rather than aborting or spinning: exactly two requests, the fallback log line, and the final error line carrying the 401. namespaced_ids is skipped for the reason recorded in happy: the id is the bare Stairwell asset number with no tenant scope (no asset is emitted here, but the skip keeps the reason with the scenario).",
+  "description": "A token both header forms reject. The script tries the Bearer spelling, retries the same request once with the raw token, and when that is also refused it must end with a printed diagnostic and zero assets rather than aborting or spinning: exactly two requests, the fallback log line, and the final error line carrying the 401.",
   "kwargs": {
     "url": "$BASE",
     "environment_id": "env-1",
@@ -29,6 +29,6 @@
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

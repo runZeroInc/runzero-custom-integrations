@@ -73,31 +73,31 @@
   ],
   "expect": {
     "asset_count": 6,
-    "ids": ["2001", "2002", "2003", "2004", "2005", "2007"],
-    "ids_absent": ["2006"],
+    "ids": ["stairwell:env-1:2001", "stairwell:env-1:2002", "stairwell:env-1:2003", "stairwell:env-1:2004", "stairwell:env-1:2005", "stairwell:env-1:2007"],
+    "ids_absent": ["stairwell:env-1:2006"],
     "assets": [
       {
-        "id": "2002",
+        "id": "stairwell:env-1:2002",
         "fields": {"ipAddresses": "10.70.0.11", "hostnames": "syn-mac-placeholder"},
         "fields_absent": ["macAddresses"]
       },
       {
-        "id": "2003",
+        "id": "stairwell:env-1:2003",
         "fields": {"ipAddresses": "10.70.0.12", "hostnames": "syn-mac-empty"},
         "fields_absent": ["macAddresses"]
       },
       {
-        "id": "2004",
+        "id": "stairwell:env-1:2004",
         "fields": {"macAddresses": "00:11:22:33:44:cc", "hostnames": "syn-no-address"},
         "fields_absent": ["ipAddresses"]
       },
       {
-        "id": "2005",
+        "id": "stairwell:env-1:2005",
         "fields": {"hostnames": "syn-name-only"},
         "fields_absent": ["ipAddresses", "macAddresses"]
       },
       {
-        "id": "2007",
+        "id": "stairwell:env-1:2007",
         "fields": {"hostnames": "syn-loopback"},
         "fields_absent": ["ipAddresses", "macAddresses"]
       }
@@ -107,6 +107,6 @@
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

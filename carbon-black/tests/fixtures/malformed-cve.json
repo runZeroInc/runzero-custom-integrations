@@ -1,7 +1,7 @@
 {
   "name": "malformed-cve",
   "integration": "carbon-black",
-  "description": "REGRESSION LOCK on the vulnerability build path. vuln_info.cve_id used to flow unscreened into Vulnerability(cve=...), and the platform rejects a non-CVE-shaped value by failing the whole ImportAsset -- one vendor advisory id (RHSA-2024:1234 here) aborted the task mid-run. The advisory now imports as a finding named by the advisory id with the cve field withheld, alongside a lower-case cve id that must canonicalize and pass. The same record set locks the re-typed field guards: an integer severity used to die in .upper(), a string risk_meter_score in float(), and a non-dict vulnerability row in .get().\n\nSkips namespaced_ids: the foreign id is the bare Carbon Black device number with no organization_key scope, the defect recorded with the malformed scenario.",
+  "description": "REGRESSION LOCK on the vulnerability build path. vuln_info.cve_id used to flow unscreened into Vulnerability(cve=...), and the platform rejects a non-CVE-shaped value by failing the whole ImportAsset -- one vendor advisory id (RHSA-2024:1234 here) aborted the task mid-run. The advisory now imports as a finding named by the advisory id with the cve field withheld, alongside a lower-case cve id that must canonicalize and pass. The same record set locks the re-typed field guards: an integer severity used to die in .upper(), a string risk_meter_score in float(), and a non-dict vulnerability row in .get().",
   "kwargs": {
     "url": "$BASE",
     "organization_key": "SYNORG01",
@@ -11,24 +11,42 @@
   "routes": [
     {
       "name": "scroll-page-1",
-      "match": {"method": "POST", "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"},
+      "match": {
+        "method": "POST",
+        "path": "/appservices/v6/orgs/SYNORG01/devices/_scroll"
+      },
       "responses": [
         {
           "status": 200,
           "json": {
             "num_found": 1,
             "results": [
-              {"id": 7301, "name": "syn-advisory-vuln", "os": "LINUX", "last_internal_ip_address": "192.0.2.31", "mac_address": "00:50:56:00:73:01"}
+              {
+                "id": 7301,
+                "name": "syn-advisory-vuln",
+                "os": "LINUX",
+                "last_internal_ip_address": "192.0.2.31",
+                "mac_address": "00:50:56:00:73:01"
+              }
             ]
           }
         },
-        {"status": 200, "json": {"num_found": 1, "results": []}}
+        {
+          "status": 200,
+          "json": {
+            "num_found": 1,
+            "results": []
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "vulns",
-      "match": {"method": "POST", "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"},
+      "match": {
+        "method": "POST",
+        "path_prefix": "/vulnerability/assessment/api/v1/orgs/SYNORG01/devices/"
+      },
       "responses": [
         {
           "status": 200,
@@ -57,19 +75,34 @@
             ]
           }
         },
-        {"status": 200, "json": {"num_found": 3, "results": []}}
+        {
+          "status": 200,
+          "json": {
+            "num_found": 3,
+            "results": []
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     }
   ],
   "expect": {
     "asset_count": 1,
-    "ids": ["7301"],
+    "ids": [
+      "carbon-black:SYNORG01:7301"
+    ],
     "assets": [
-      {"id": "7301", "fields": {"hostnames": "syn-advisory-vuln", "ipAddresses": "192.0.2.31"}}
+      {
+        "id": "carbon-black:SYNORG01:7301",
+        "fields": {
+          "hostnames": "syn-advisory-vuln",
+          "ipAddresses": "192.0.2.31"
+        }
+      }
     ],
     "min_vulnerabilities_total": 2,
-    "log_contains": ["carbon-black: reported 1 assets"]
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+    "log_contains": [
+      "carbon-black: reported 1 assets"
+    ]
+  }
 }

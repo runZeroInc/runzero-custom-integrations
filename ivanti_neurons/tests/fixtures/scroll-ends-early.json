@@ -2,7 +2,7 @@
   "name": "scroll-ends-early",
   "integration": "ivanti_neurons",
   "script": "ivanti_neurons/ivanti_neurons.star",
-  "description": "REGRESSION LOCK on the missing @odata.nextLink. The scroll reports an @odata.count of 9 but stops handing out next links after three devices -- what a permission-trimmed result set or an expired five-minute scrollID produces, and Ivanti's own instruction is to keep calling the next link until the response is empty rather than to count rows.\n\nThe walk had no guard for the link being absent: url became None while the row count still said more existed, and the next iteration requested it, aborting the script and losing all three devices. Now the absent link ends the walk and everything collected so far is imported.\n\nSkips namespaced_ids: the bare Ivanti DiscoveryId carries no tenant scope, as the missing-network scenario records.",
+  "description": "REGRESSION LOCK on the missing @odata.nextLink. The scroll reports an @odata.count of 9 but stops handing out next links after three devices -- what a permission-trimmed result set or an expired five-minute scrollID produces, and Ivanti's own instruction is to keep calling the next link until the response is empty rather than to count rows.\n\nThe walk had no guard for the link being absent: url became None while the row count still said more existed, and the next iteration requested it, aborting the script and losing all three devices. Now the absent link ends the walk and everything collected so far is imported.",
   "kwargs": {
     "url": "$BASE",
     "tenant_id": "fixture-tenant",
@@ -81,9 +81,9 @@
   "expect": {
     "asset_count": 3,
     "ids": [
-      "33330000-4a11-4c31-9c31-1a2b3c4d5e01",
-      "33330000-4a11-4c31-9c31-1a2b3c4d5e02",
-      "33330000-4a11-4c31-9c31-1a2b3c4d5e03"
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e01",
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e02",
+      "ivanti-neurons:fixture-tenant:33330000-4a11-4c31-9c31-1a2b3c4d5e03"
     ],
     "request_count": 3,
     "requests_include": [
@@ -92,6 +92,6 @@
     ]
   },
   "invariants": {
-    "skip": ["namespaced_ids"]
+    "skip": []
   }
 }

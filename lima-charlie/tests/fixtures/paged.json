@@ -1,7 +1,7 @@
 {
   "name": "paged",
   "integration": "lima-charlie",
-  "description": "The regression test for the sensor list being fetched once. LimaCharlie pages GET /v1/sensors/{oid} with an opaque continuation token: the response carries `continuation_token` and the next request sends it back under the same query-parameter name, ending when it comes back absent, null, or empty (refractionPOINT/python-limacharlie Organization.list_sensors, refractionPOINT/go-limacharlie sensor.go rawSensorListPage).\n\nThree pages, one sensor each, and each page route matches on the token that the PREVIOUS page returned -- so a walk that failed to send the token, or sent a stale one, starves on route 2 rather than quietly passing. Page 3 returns an empty-string token, the falsy spelling of 'no more'. request_count pins the walk at exactly four calls (one exchange, three pages): a script that treated \"\" as truthy would send it, fall through to the page-1 route again, and both re-import lc-page-1 (failing unique_ids) and make a fifth request. Every page route is when_exhausted:error, so no request may repeat. The sensors from pages 2 and 3 are asserted by id: a single-page walk imports only lc-page-1 and this scenario fails on the other two.\n\nrequests_absent pins is_compressed off. Sending it makes LimaCharlie return `sensors` as a base64-encoded gzip blob rather than a JSON array, which this script does not decode.\n\nPage 2's sensor carries an ext_ip, asserted as a custom attribute and absent from ipAddresses.\n\nnamespaced_ids is skipped: id=sid is the bare LimaCharlie sensor UUID, which is globally unique on shape, so two organizations cannot collide.",
+  "description": "The regression test for the sensor list being fetched once. LimaCharlie pages GET /v1/sensors/{oid} with an opaque continuation token: the response carries `continuation_token` and the next request sends it back under the same query-parameter name, ending when it comes back absent, null, or empty (refractionPOINT/python-limacharlie Organization.list_sensors, refractionPOINT/go-limacharlie sensor.go rawSensorListPage).\n\nThree pages, one sensor each, and each page route matches on the token that the PREVIOUS page returned -- so a walk that failed to send the token, or sent a stale one, starves on route 2 rather than quietly passing. Page 3 returns an empty-string token, the falsy spelling of 'no more'. request_count pins the walk at exactly four calls (one exchange, three pages): a script that treated \"\" as truthy would send it, fall through to the page-1 route again, and both re-import lc-page-1 (failing unique_ids) and make a fifth request. Every page route is when_exhausted:error, so no request may repeat. The sensors from pages 2 and 3 are asserted by id: a single-page walk imports only lc-page-1 and this scenario fails on the other two.\n\nrequests_absent pins is_compressed off. Sending it makes LimaCharlie return `sensors` as a base64-encoded gzip blob rather than a JSON array, which this script does not decode.\n\nPage 2's sensor carries an ext_ip, asserted as a custom attribute and absent from ipAddresses.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -87,13 +87,13 @@
   "expect": {
     "asset_count": 3,
     "ids": [
-      "aaaa0001-0000-4000-8000-000000000001",
-      "aaaa0002-0000-4000-8000-000000000002",
-      "aaaa0003-0000-4000-8000-000000000003"
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0001-0000-4000-8000-000000000001",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0002-0000-4000-8000-000000000002",
+      "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0003-0000-4000-8000-000000000003"
     ],
     "assets": [
       {
-        "id": "aaaa0002-0000-4000-8000-000000000002",
+        "id": "lima-charlie:8bd1f0e2-0000-4000-8000-000000000001:aaaa0002-0000-4000-8000-000000000002",
         "fields": {
           "hostnames": "lc-page-2.example.com",
           "ipAddresses": "192.0.2.22",
@@ -112,5 +112,5 @@
     ],
     "log_contains": ["Reported 3 assets from 3 sensors"]
   },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "invariants": {"skip": []}
 }

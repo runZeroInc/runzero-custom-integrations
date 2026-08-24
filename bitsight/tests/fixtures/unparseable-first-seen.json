@@ -1,7 +1,7 @@
 {
   "name": "unparseable-first-seen",
   "integration": "bitsight",
-  "description": "REGRESSION LOCK on parse_time. build_vuln called parse_time(first_seen) unconditionally, and parse_time ABORTS the script on a value it cannot parse rather than returning an error -- Starlark has no exception handling, so one such finding took down the whole import and lost every asset and finding already built. A `!= None` check after the call is dead code, because the call never returns; the value has to be screened first.\n\nFive findings on one asset cover the shapes that reached it. Only the first is well formed: Bitsight reports first_seen as a bare date, which the script pads to RFC 3339. The other four are the ones that aborted -- an absent key and an explicit null both left first_seen as None and reached parse_time(None); 'not-a-date' and a space-separated timestamp both survived the padding step and arrived at parse_time as 'not-a-dateT00:00:00Z' and '2026-01-05 00:00:00T00:00:00Z'.\n\nAll five must still become vulnerabilities; only the well-formed one carries a firstDetectedTS, which is why the assertion is on the count rather than on the timestamp.\n\nnamespaced_ids and no_placeholder_hostnames are skipped for the reasons the happy scenario records.",
+  "description": "REGRESSION LOCK on parse_time. build_vuln called parse_time(first_seen) unconditionally, and parse_time ABORTS the script on a value it cannot parse rather than returning an error -- Starlark has no exception handling, so one such finding took down the whole import and lost every asset and finding already built. A `!= None` check after the call is dead code, because the call never returns; the value has to be screened first.\n\nFive findings on one asset cover the shapes that reached it. Only the first is well formed: Bitsight reports first_seen as a bare date, which the script pads to RFC 3339. The other four are the ones that aborted -- an absent key and an explicit null both left first_seen as None and reached parse_time(None); 'not-a-date' and a space-separated timestamp both survived the padding step and arrived at parse_time as 'not-a-dateT00:00:00Z' and '2026-01-05 00:00:00T00:00:00Z'.\n\nAll five must still become vulnerabilities; only the well-formed one carries a firstDetectedTS, which is why the assertion is on the count rather than on the timestamp.\n\nno_placeholder_hostnames is skipped for the reason the happy scenario records.",
   "kwargs": {
     "url": "$BASE",
     "company_id": "co-fixture",
@@ -132,13 +132,12 @@
   "default_response": {"status": 404, "text": "no fixture route"},
   "expect": {
     "asset_count": 1,
-    "ids": ["bitsight:ip:198.51.100.20"],
+    "ids": ["bitsight:co-fixture:198.51.100.20"],
     "min_vulnerabilities_total": 5,
     "request_count": 2
   },
   "invariants": {
     "skip": [
-      "namespaced_ids",
       "no_placeholder_hostnames"
     ]
   }
