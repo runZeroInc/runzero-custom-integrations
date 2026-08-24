@@ -162,10 +162,11 @@ Two paths also minted **one asset per finding** instead of one per device, and b
 - The integration fetches investigations updated within the last 30 days by default. Change the **Lookback window (days)** credential field (`days_back`) to adjust this.
 - Each investigation is mapped to a **Vulnerability** on the corresponding asset, including CVE, CVSS scores, exploitability verdict, and root cause analysis.
 - When `related_scanner_findings` data is available, additional metadata (cloud platform, region, scanner type, account ID) is included as custom attributes.
-- Assets are grouped from paginated investigations and streamed to runZero in batches via `report_assets`.
-- Transient API errors (429/5xx) are retried automatically with backoff by the shared HTTP helper.
+- Assets are grouped from paginated investigations (the grouping spans pages, so it cannot stream per record); each finished asset is then streamed to runZero via `report_asset`.
+- Transient API errors (429/5xx) are retried automatically with backoff by the shared HTTP helper. An auth failure (401) is not retried: the page error is printed and the run ends with zero assets.
 - `days_back` is converted to an absolute `updated_from` timestamp before the first request, so every page of a run shares one cutoff and a long run cannot drift.
-- The paging loop is bounded at 100,000 pages of 1,000 investigations. A server that keeps answering `has_more` forever stops there rather than spinning.
+- The paging loop is bounded by `CONFIG["maxPages"]` (5,000 pages of 1,000 investigations). A server that keeps answering `has_more` forever raises there, so an incomplete import is reported as an error rather than truncated silently.
+- `cve_id` is screened against the `CVE-YYYY-NNNN` shape before it reaches the `cve` field. A non-CVE code (a vendor advisory id, a scanner's own key) still imports as a finding, keeping the raw value as the vulnerability name and the `maze_cve_id` attribute.
 
 ## Future
 

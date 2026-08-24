@@ -1,0 +1,31 @@
+{
+  "name": "auth-failure",
+  "integration": "netdata",
+  "description": "A bearer-protected agent refusing the token. In auto mode a 401 from /api/v3/nodes used to be retried against /api/v2/nodes for a guaranteed second 401; a 401 is an answer about the credentials, not a missing endpoint, so the run now fails fast after exactly one request with a credential-shaped message. request_count and the absent v2 request pin that.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "revoked-token"
+  },
+  "routes": [
+    {
+      "name": "nodes-v3-401",
+      "match": {"method": "GET", "path": "/api/v3/nodes"},
+      "responses": [
+        {"status": 401, "json": {"error": "unauthorized"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/api/v2/nodes"}
+    ],
+    "log_contains": [
+      "netdata: could not list nodes: status 401",
+      "the agent requires a bearer token; check api_token"
+    ]
+  }
+}

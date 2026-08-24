@@ -205,7 +205,7 @@ def _fetch_nodes(base_url, api_version, options):
     /api/v3/nodes is the current endpoint; /api/v2/nodes is marked deprecated
     in Netdata's own OpenAPI document but is what agents before Netdata v2
     serve. Both return the same body, so "auto" tries v3 and falls back on any
-    error rather than trying to version-detect the agent first.
+    error except a 401 rather than trying to version-detect the agent first.
     """
     order = ["/api/v3/nodes", "/api/v2/nodes"]
     if api_version == "v3":
@@ -218,6 +218,12 @@ def _fetch_nodes(base_url, api_version, options):
         data, err = _get(base_url, path, options)
         if err:
             last_err = err
+            # A 401 is an answer, not a missing endpoint: the agent is bearer
+            # protected and the credentials were refused. The same credentials
+            # against the older path can only produce a second 401, so fail
+            # fast with a credential-shaped message instead.
+            if "status 401" in err:
+                return [], "", "{} on {} (the agent requires a bearer token; check api_token)".format(err, path)
             _log("{} did not answer ({}); trying the next endpoint".format(path, err))
             continue
         body = as_dict(data)
@@ -270,11 +276,13 @@ def _labels_attributes(labels):
     return auto, custom
 
 
-def _node_asset(node, agent_host, base_url, options, detail_budget, local_ip):
+def _node_asset(node, agent_host, base_url, options, detail_budget, local_ip, name_counts):
     """Build one ImportAsset from a /api/vN/nodes entry.
 
     Returns (asset, detail_used). asset is None when the node carries nothing
-    that can identify it.
+    that can identify it. name_counts maps each usable hostname to how many
+    nodes report it; a child whose name is shared gets no detail fetch, because
+    /host/<name> can only answer for one machine.
     """
     record = as_dict(node)
 
@@ -312,7 +320,16 @@ def _node_asset(node, agent_host, base_url, options, detail_budget, local_ip):
     os_version = ""
     detail_used = False
 
-    if detail_budget > 0:
+    fetch_detail = detail_budget > 0
+    if fetch_detail and not is_local and name_counts.get(hostname, 0) > 1:
+        # /host/<name> is keyed on hostname alone; when two nodes report the
+        # same name, the Parent serves one machine's info body for both GUIDs,
+        # attributing one machine's OS detail to the other. Skip rather than
+        # guess.
+        _log("hostname {} is reported by more than one node; skipping detail for {} rather than attributing another machine's info to it".format(hostname, guid))
+        fetch_detail = False
+
+    if fetch_detail:
         info = _fetch_node_info(base_url, hostname, is_local, options)
         if info != None:
             detail_used = True
@@ -417,6 +434,14 @@ def main(*args, **kwargs):
     detail_remaining = max_detail
     detail_skipped = 0
 
+    # Count each usable hostname across the fleet before the walk, so a child
+    # whose name is duplicated can be recognized before its detail fetch.
+    name_counts = {}
+    for node in nodes:
+        nm = _usable_hostname(as_dict(node).get("nm"))
+        if nm:
+            name_counts[nm] = name_counts.get(nm, 0) + 1
+
     for node in nodes:
         record = as_dict(node)
         state = _clean(record.get("state")).lower()
@@ -427,7 +452,7 @@ def main(*args, **kwargs):
         budget = detail_remaining
         if budget <= 0 and max_detail > 0:
             detail_skipped += 1
-        asset, detail_used = _node_asset(record, agent_host, base_url, options, budget, local_ip)
+        asset, detail_used = _node_asset(record, agent_host, base_url, options, budget, local_ip, name_counts)
         if asset == None:
             skipped_invalid += 1
             continue

@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "maze-security",
-  "description": "Nulls where the API documents objects, plus records missing keys entirely. snapshot, cvss, severity_details, related_scanner_findings and vulnerability_root_cause_analysis all arrive as JSON null on one investigation and are simply absent on another; a related finding carries no asset_name, so it falls back to the scanner_finding_hash asset. This is the null-vs-missing distinction that a bare `.get(k, {})` default does NOT cover -- Maze guards it with `or {}` and survives, and this scenario is the regression test for that guard.\n\nThe last investigation's scanner_finding_hash has no `::` separators at all, so it carries no asset segment. The whole hash used to become the foreign id; since a real hash embeds the CVE that minted one asset per finding, so the record is now skipped and logged.\n\nnamespaced_ids is skipped: Maze ids are bare scanner-supplied names with no tenant scope. Under no-id-match they no longer drive matching.",
+  "description": "Nulls where the API documents objects, plus records missing keys entirely. snapshot, cvss, severity_details, related_scanner_findings and vulnerability_root_cause_analysis all arrive as JSON null on one investigation and are simply absent on another; a related finding carries no asset_name, so it falls back to the scanner_finding_hash asset. This is the null-vs-missing distinction that a bare `.get(k, {})` default does NOT cover -- Maze reads through coerce (as_dict/text) and survives, and this scenario is the regression test for that guard.\n\nThe short-hash investigation's scanner_finding_hash has no `::` separators at all, so it carries no asset segment and is skipped and logged. The data array also carries a bare string and a null where investigation objects are documented -- both are skipped with a print, never a raise -- and one investigation's related_scanner_findings and vulnerability_root_cause_analysis lists carry stray non-object members that dicts() drops.\n\nThe last investigation's cve_id is a vendor advisory code, not a CVE. The platform rejects a Vulnerability whose cve field is not CVE-shaped and fails the WHOLE record, so the code is screened before assignment: the asset still imports, the finding keeps the raw code as its name and maze_cve_id attribute, and its numeric-string base_score and float version exercise the coercion.\n\nnamespaced_ids is skipped: Maze ids are bare scanner-supplied names with no tenant scope. Under no-id-match they no longer drive matching.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "fixture-key"
@@ -39,11 +39,15 @@
                 "maze_severity": "LOW",
                 "scanner_finding_hash": "fixture-scanner::CVE-2024-50003::fallback.corp.example.com",
                 "related_scanner_findings": [
-                  {"asset_name": "", "asset_type": "Server", "region": null}
+                  {"asset_name": "", "asset_type": "Server", "region": null},
+                  "stray-finding-string",
+                  null
                 ],
                 "vulnerability_root_cause_analysis": [
                   {"title": null, "actual_value": "ignored, the title is null"},
-                  {"title": "Operating system", "actual_value": null}
+                  {"title": "Operating system", "actual_value": null},
+                  "stray-rca-string",
+                  null
                 ],
                 "snapshot": {"cve": null, "cvss": {"base_score": null, "version": null}}
               },
@@ -52,6 +56,20 @@
                 "cve_id": "CVE-2024-50004",
                 "maze_severity": "UNRECOGNISED-SEVERITY",
                 "scanner_finding_hash": "no-separators-at-all"
+              },
+              "just-a-string-not-an-investigation",
+              null,
+              {
+                "id": "inv-vendor-code",
+                "cve_id": "MZ-ADVISORY-77",
+                "maze_severity": "HIGH",
+                "exploitability": "exploitable",
+                "scanner_finding_hash": "fixture-scanner::MZ-ADVISORY-77::vendorcode.corp.example.com",
+                "remediation": "Apply the vendor's advisory.",
+                "snapshot": {
+                  "cve": {"description": null},
+                  "cvss": {"base_score": "7.5", "version": 3.1}
+                }
               }
             ]
           }
@@ -61,18 +79,27 @@
     }
   ],
   "expect": {
-    "asset_count": 3,
+    "asset_count": 4,
+    "assets": [
+      {
+        "id": "vendorcode.corp.example.com",
+        "fields": {"hostnames": "vendorcode.corp.example.com", "maze_finding_count": "1"}
+      }
+    ],
     "ids": [
       "null-fields.corp.example.com",
       "missing-fields.corp.example.com",
-      "fallback.corp.example.com"
+      "fallback.corp.example.com",
+      "vendorcode.corp.example.com"
     ],
-    "ids_absent": ["no-separators-at-all", "inv-short-hash"],
-    "min_vulnerabilities_total": 3,
+    "ids_absent": ["no-separators-at-all", "inv-short-hash", "inv-vendor-code"],
+    "min_vulnerabilities_total": 4,
     "request_count": 1,
     "log_contains": [
-      "Reported 3 assets from 4 investigations",
-      "maze: skipping investigation with no asset name or asset segment: id=inv-short-hash scanner_finding_hash=no-separators-at-all"
+      "Reported 4 assets from 7 investigations",
+      "Skipped 3 investigations that named no asset",
+      "maze: skipping investigation with no asset name or asset segment: id=inv-short-hash scanner_finding_hash=no-separators-at-all",
+      "maze: skipping non-object investigation record: just-a-string-not-an-investigation"
     ]
   },
   "invariants": {"skip": ["namespaced_ids"]}

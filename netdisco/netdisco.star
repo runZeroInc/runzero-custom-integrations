@@ -253,7 +253,8 @@ def login(base_url, username, password, http_options):
     Authorization header in PLAIN TEXT - not as a Bearer token. Netdisco
     accepts an optional "Apikey " prefix and nothing else; a "Bearer " prefix
     is not recognised. Tokens expire after api_token_lifetime, one hour by
-    default, which is far longer than a collection run.
+    default, which a run near the device cap can outlive - refresh_token
+    handles that with one mid-run re-login.
     """
     data, err = post_json(base_url + "/login", json={}, **http_options)
     if err:
@@ -269,16 +270,40 @@ def login(base_url, username, password, http_options):
     return token
 
 
+def refresh_token(ctx):
+    """Re-login once when the API token is refused mid-run.
+
+    Netdisco tokens expire after api_token_lifetime (one hour by default), so a
+    run on a large estate can outlive its token: devices keep importing but
+    every later enrichment and node call is refused, one log line each, and the
+    node phase yields nothing. One re-login per run restores the header; a
+    second refusal is a real permission problem and is not retried.
+    """
+    if ctx["relogged"]:
+        return False
+    ctx["relogged"] = True
+    print("netdisco: the API token was refused mid-run (tokens expire after api_token_lifetime); logging in again")
+    token = login(ctx["base_url"], "", "", ctx["login_options"])
+    if not token:
+        print("netdisco: re-login failed; continuing with the refused token")
+        return False
+    ctx["http_options"]["headers"]["Authorization"] = token
+    return True
+
+
 def fetch_list(ctx, path, params):
     """Call an endpoint documented to return a JSON array.
 
     Netdisco answers every /api/ request with application/json and substitutes
     an empty body with "[]", so an empty result is a valid array rather than an
     error. A failure is logged and returned as None so one unreadable device
-    cannot end the run.
+    cannot end the run. An auth refusal triggers one re-login for the whole
+    run, and the refused request is retried once with the fresh token.
     """
     url = ctx["base_url"] + path
     data, err = get_json(url, params=params, **ctx["http_options"]) if params else get_json(url, **ctx["http_options"])
+    if err != None and ("status 401" in err or "status 403" in err) and refresh_token(ctx):
+        data, err = get_json(url, params=params, **ctx["http_options"]) if params else get_json(url, **ctx["http_options"])
     if err:
         print("netdisco: {} failed: {}".format(path, err))
         return None
@@ -488,9 +513,18 @@ def collect_nodes(ctx, ip, device_name, index, order):
             record["sightings"].append(sighting)
         # A node seen by several switches keeps the most recent sighting as its
         # primary location; an uplink port sees every MAC behind it, so the
-        # newest sighting is the closest thing to the access port.
+        # newest sighting is the closest thing to the access port. The
+        # comparison parses both timestamps; the string comparison is only the
+        # fallback for a value parse_ts does not recognize, so a format change
+        # in Netdisco cannot silently pick the wrong sighting.
         seen = as_text(row.get("time_last"), join=",")
-        if not record["switch"] or seen > record["time_last"]:
+        seen_ts = parse_ts(seen)
+        prev_ts = parse_ts(record["time_last"])
+        if seen_ts != None and prev_ts != None:
+            newer = seen_ts.unix > prev_ts.unix
+        else:
+            newer = seen > record["time_last"]
+        if not record["switch"] or newer:
             record["switch"] = switch
             record["switch_name"] = device_name
             record["port"] = port
@@ -681,6 +715,10 @@ def main(**kwargs):
             "Authorization": token,
             "Accept": "application/json",
         }),
+        # Kept for the one mid-run re-login: tokens expire after
+        # api_token_lifetime, and a large estate can outlive one.
+        "login_options": login_options,
+        "relogged": False,
         "current": now(),
         "collect_nodes": get_bool(kwargs, "collect_nodes", default=True),
         "collect_device_ips": get_bool(kwargs, "collect_device_ips", default=True),

@@ -26,7 +26,7 @@ Netdisco authenticates the API with a token, and there are two ways to get one.
 
 1. In Netdisco, go to *Admin → User Management*.
 2. Create a user (or edit an existing one) and tick the **API** role. Leave **Admin** off; this integration only reads.
-3. Give the runZero credential that username and password. Each run exchanges them at `POST /login` for a token that is valid for `api_token_lifetime` — one hour by default, which is far longer than a collection run needs.
+3. Give the runZero credential that username and password. Each run exchanges them at `POST /login` for a token that is valid for `api_token_lifetime` — one hour by default. A run on a large estate can outlive that: if the token is refused mid-run, the script logs in again once and retries the refused request, so a slow walk does not silently lose its enrichment and node phases.
 
 **Option B — a permanent API key (recommended for automation).**
 

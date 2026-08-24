@@ -1,0 +1,95 @@
+{
+  "name": "token-refresh",
+  "integration": "netdisco",
+  "description": "The one-hour API token expires mid-run. The device search succeeds on the first token, then the device_ips enrichment answers 403; the script re-logins ONCE, retries the refused request with the fresh token, and the alias from the retried response lands on the asset -- proving the retry result was used rather than dropped. request_count pins the shape: two logins, one search, the refused call plus its retry. A second refusal would not re-login again (relogged is per-run), so a real permission problem cannot loop.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "page_size": "200",
+    "max_age_days": "0",
+    "collect_nodes": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/login"},
+      "responses": [
+        {"status": 200, "json": {"api_key": "fixture-token-one"}},
+        {"status": 200, "json": {"api_key": "fixture-token-two"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-search",
+      "match": {"method": "GET", "path": "/api/v1/search/device"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "ip": "198.51.100.21",
+              "dns": "edge-sw01.example.com",
+              "name": "edge-sw01",
+              "description": "Cisco IOS Software",
+              "model": "WS-C2960X-24P",
+              "os": "ios",
+              "os_ver": "15.2(7)E7",
+              "vendor": "cisco",
+              "serial": "FDO5678EFGH",
+              "layers": "00000110",
+              "mac": "00:11:22:33:66:77",
+              "num_ports": 28,
+              "is_pseudo": false,
+              "creation": "2023-04-11 09:12:44",
+              "last_discover": "2026-08-15 03:00:11"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "device-ips-expired-then-fresh",
+      "match": {"method": "GET", "path": "/api/v1/object/device/198.51.100.21/device_ips"},
+      "responses": [
+        {"status": 403, "json": {"error": "authentication failed"}},
+        {
+          "status": 200,
+          "json": [
+            {
+              "ip": "198.51.100.21",
+              "alias": "192.0.2.31",
+              "subnet": "192.0.2.0/24",
+              "port": "Vlan30",
+              "dns": "edge-sw01-v30.example.com",
+              "creation": "2023-04-11 09:12:44"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["netdisco:$HOST:device:198.51.100.21"],
+    "assets": [
+      {
+        "id": "netdisco:$HOST:device:198.51.100.21",
+        "fields": {
+          "ipAddresses": "192.0.2.31\t198.51.100.21",
+          "hostnames": "edge-sw01\tedge-sw01-v30.example.com\tedge-sw01.example.com"
+        }
+      }
+    ],
+    "request_count": 5,
+    "requests_include": [
+      {"header_contains": "fixture-token-two"}
+    ],
+    "log_contains": [
+      "netdisco: the API token was refused mid-run (tokens expire after api_token_lifetime); logging in again"
+    ]
+  }
+}

@@ -54,11 +54,13 @@ CONFIG = {
     },
 }
 load('requests', 'Session')
-load('json', json_encode='encode', json_decode='decode')
+load('json', json_decode='decode')
 load('runzero.types', 'ImportAsset')
 load('net', 'network_interface')
 load('flatten_json', 'flatten')
-load('kwargs', 'get_bool')
+load('kwargs', 'get_bool', 'get_http_options')
+load('http', 'post_json')
+load('coerce', 'as_dict', 'as_list', 'dicts')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or self-hosted deployment can be reached
@@ -192,6 +194,10 @@ def collect_hostnames(device):
     names = []
     for key in ["device_name", "devicename", "HostName", "LocalHostName", "hostname"]:
         name = device.get(key, "")
+        # A name that arrives as anything but a string (a number, an object)
+        # must not reach .replace -- a raise here would abort the whole run.
+        if type(name) != "string":
+            continue
         if name and name not in names:
             safe_name = name.replace(" ", "-")
             names.append(safe_name)
@@ -250,7 +256,15 @@ def main(*args, **kwargs):
     if not bearer:
         return []
 
-    session.headers.set("Authorization", "Bearer {}".format(bearer))
+    # The device walk goes through post_json rather than the login Session:
+    # it retries transient failures (429/5xx) with backoff by default, checks
+    # the status, and decodes defensively, so one throttle response or a
+    # non-JSON 200 body no longer truncates an OS family's import. It also
+    # honors the full HTTP/TLS option sets, which the Session cannot carry.
+    walk_options = get_http_options(kwargs, headers={
+        "Authorization": "Bearer {}".format(bearer),
+        "Accept": "application/json",
+    })
 
     reported = 0
 
@@ -270,15 +284,25 @@ def main(*args, **kwargs):
                 },
             }
 
-            device_resp = session.post(list_url, json=list_payload)
-            if not device_resp or device_resp.status_code != 200:
-                print("Device list request failed on page {}: {}".format(page, device_resp.status_code if device_resp else "no response"))
+            data, err = post_json(list_url, json=list_payload, **walk_options)
+            if err:
+                print("Device list request failed on page {}: {}".format(page, err))
                 capped = False
                 break
 
-            data = json_decode(device_resp.body)
-            response = data.get("response", {})
-            devices = response.get("devices", [])
+            data = as_dict(data)
+            response = as_dict(data.get("response"))
+            raw_devices = response.get("devices")
+            if not raw_devices:
+                capped = False
+                break
+
+            # dicts() keeps only the object members: one null or string row in
+            # the devices array must skip, not raise on d.get and abort the run.
+            devices = dicts(raw_devices)
+            if type(raw_devices) == "list" and len(devices) < len(raw_devices):
+                print("mosyle: skipped {} non-object device rows on {} page {}".format(
+                    len(raw_devices) - len(devices), os_type, page))
             if not devices:
                 capped = False
                 break

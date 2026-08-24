@@ -330,7 +330,11 @@ def rest_get(ctx, path, required):
     here into an actionable message, and neither ends the run.
     """
     url = ctx["base"] + "/rest" + path
-    data, err = get_json(url, **ctx["http_options"])
+    # 500 is excluded from the transient retry list: RouterOS answers a missing
+    # policy with 500, not 403, so retrying it burns ~4 backoff attempts per
+    # menu on an account that can never succeed. A wrong-policy account now
+    # fails fast into the remediation message below.
+    data, err = get_json(url, retry_on=[408, 425, 429, 502, 503, 504], **ctx["http_options"])
     if err:
         lowered = as_text(err, join=",").lower()
         if "no such command" in lowered or "no such item" in lowered:
@@ -359,6 +363,10 @@ def touch(index, order, ctx, mac):
     if mac in index:
         return index[mac]
     if ctx["max_hosts"] and len(order) >= ctx["max_hosts"]:
+        # Record that a device was actually declined, so the limit warning only
+        # fires when something was skipped rather than when the count merely
+        # equals the cap.
+        ctx["host_limit_hit"] = True
         return None
     record = {
         "mac": mac,
@@ -808,6 +816,7 @@ def main(**kwargs):
         }),
         "now_unix": current.unix,
         "max_hosts": max_hosts if max_hosts > 0 else 0,
+        "host_limit_hit": False,
         "bound_leases_only": get_bool(kwargs, "bound_leases_only", default=False),
         "router_macs": [],
         "router_name": "",
@@ -862,7 +871,7 @@ def main(**kwargs):
         report_asset(build_host_asset(ctx, index[mac]))
         host_count += 1
 
-    if ctx["max_hosts"] and len(order) >= ctx["max_hosts"]:
+    if ctx["host_limit_hit"]:
         print("mikrotik: host limit of {} reached; further devices were not imported".format(ctx["max_hosts"]))
     print("mikrotik: reported {} router and {} observed devices".format(router_count, host_count))
     if not router_count and not host_count:

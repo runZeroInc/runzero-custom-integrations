@@ -90,7 +90,7 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
-load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip')
+load('net', 'ip_address', 'ip_in_network', 'network_interface', 'normalize_mac', 'routable_ip', 'clean_hostname')
 load('http', 'get_json', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'parse_time', 'now', 'parse_ts')
@@ -556,7 +556,11 @@ def build_asset(ctx, record, kind, interfaces):
         # Nautobot host and by the object class, because a device and a virtual
         # machine are separate tables whose UUIDs could in principle collide.
         "id": "{}:{}:{}:{}".format(VENDOR, ctx["scope"], kind, uuid),
-        "hostnames": dedupe([name]),
+        # Nautobot names for non-network gear routinely carry spaces and
+        # punctuation that cannot appear in a DNS name; clean_hostname screens
+        # those (and IP-shaped or placeholder names) out rather than importing
+        # a merge hazard. The raw name always survives as the "name" attribute.
+        "hostnames": dedupe([clean_hostname(name) or ""]),
         "networkInterfaces": netifs,
         "tags": dedupe(tags),
     }

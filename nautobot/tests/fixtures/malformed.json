@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "nautobot",
-  "description": "Junk rows mixed into good ones. A bare string where a device object is documented, a null id, an id that is not a UUID, a device_type typed as a string, an interface whose ip_addresses is a string rather than a list, an interface that is a bare string, an IP address field holding something that is not an address, and a device whose only address is loopback. Each must be skipped or degraded with the run continuing. Also proves the future-timestamp clamp: a device Nautobot reports as last updated in 2099 is still imported, with lastSeenTS pulled back to now, rather than having the entire record rejected - the platform refuses any asset carrying a timestamp after now, and refuses the whole asset rather than the field.",
+  "description": "Junk rows mixed into good ones. A bare string where a device object is documented, a null id, an id that is not a UUID, a device_type typed as a string, an interface whose ip_addresses is a string rather than a list, an interface that is a bare string, an IP address field holding something that is not an address, and a device whose only address is loopback. Each must be skipped or degraded with the run continuing. Also proves the future-timestamp clamp: a device Nautobot reports as last updated in 2099 is still imported, with lastSeenTS pulled back to now, rather than having the entire record rejected - the platform refuses any asset carrying a timestamp after now, and refuses the whole asset rather than the field. A device named with spaces and punctuation (a rack PDU) must import without that name as a hostname -- clean_hostname screens it -- while keeping the raw value as the nautobot_name attribute and its primary IP as the correlator.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "0123456789abcdef0123456789abcdef01234567",
@@ -10,7 +10,10 @@
   "routes": [
     {
       "name": "manufacturers",
-      "match": {"method": "GET", "path": "/api/dcim/manufacturers/"},
+      "match": {
+        "method": "GET",
+        "path": "/api/dcim/manufacturers/"
+      },
       "responses": [
         {
           "status": 200,
@@ -20,7 +23,11 @@
             "previous": null,
             "results": [
               "this-row-is-a-string-not-an-object",
-              {"id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979", "object_type": "dcim.manufacturer", "name": "Cisco"}
+              {
+                "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                "object_type": "dcim.manufacturer",
+                "name": "Cisco"
+              }
             ]
           }
         }
@@ -29,12 +36,15 @@
     },
     {
       "name": "devices",
-      "match": {"method": "GET", "path": "/api/dcim/devices/"},
+      "match": {
+        "method": "GET",
+        "path": "/api/dcim/devices/"
+      },
       "responses": [
         {
           "status": 200,
           "json": {
-            "count": 6,
+            "count": 7,
             "next": null,
             "previous": null,
             "results": [
@@ -43,13 +53,17 @@
                 "id": null,
                 "object_type": "dcim.device",
                 "name": "device-with-no-id",
-                "primary_ip4": {"address": "192.0.2.90/24"}
+                "primary_ip4": {
+                  "address": "192.0.2.90/24"
+                }
               },
               {
                 "id": "not-a-uuid-at-all",
                 "object_type": "dcim.device",
                 "name": "device-with-integer-style-id",
-                "primary_ip4": {"address": "192.0.2.91/24"}
+                "primary_ip4": {
+                  "address": "192.0.2.91/24"
+                }
               },
               {
                 "id": "44444444-4444-4444-8444-444444444444",
@@ -58,13 +72,19 @@
                 "serial": "",
                 "device_type": "PowerEdge R750",
                 "status": "Active",
-                "role": ["Server"],
+                "role": [
+                  "Server"
+                ],
                 "platform": 12345,
                 "location": null,
-                "primary_ip4": {"address": "not-an-ip-address"},
+                "primary_ip4": {
+                  "address": "not-an-ip-address"
+                },
                 "primary_ip6": null,
                 "custom_fields": {},
-                "tags": ["production"],
+                "tags": [
+                  "production"
+                ],
                 "last_updated": "2099-01-01T00:00:00.000000Z",
                 "created": "not-a-timestamp"
               },
@@ -73,9 +93,45 @@
                 "object_type": "dcim.device",
                 "name": "device-with-loopback-only",
                 "serial": "",
-                "device_type": {"id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1", "model": "ISR 4331", "manufacturer": {"id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979", "object_type": "dcim.manufacturer"}},
-                "status": {"id": "9f38bab4-4b47-4e77-b50c-fda62817b2db", "name": "Active"},
-                "primary_ip4": {"address": "127.0.0.1/8"},
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "model": "ISR 4331",
+                  "manufacturer": {
+                    "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                    "object_type": "dcim.manufacturer"
+                  }
+                },
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "name": "Active"
+                },
+                "primary_ip4": {
+                  "address": "127.0.0.1/8"
+                },
+                "custom_fields": {},
+                "tags": []
+              },
+              {
+                "id": "77777777-7777-4777-8777-777777777770",
+                "object_type": "dcim.device",
+                "name": "PDU Rack 4 (Row B)",
+                "serial": "",
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "model": "Rack PDU",
+                  "manufacturer": {
+                    "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                    "object_type": "dcim.manufacturer"
+                  }
+                },
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "name": "Active"
+                },
+                "primary_ip4": {
+                  "address": "192.0.2.97/24",
+                  "host": "192.0.2.97"
+                },
                 "custom_fields": {},
                 "tags": []
               },
@@ -84,12 +140,28 @@
                 "object_type": "dcim.device",
                 "name": "device-that-is-fine",
                 "serial": "SN-OK-01",
-                "device_type": {"id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1", "model": "ISR 4331", "manufacturer": {"id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979", "object_type": "dcim.manufacturer"}},
-                "status": {"id": "9f38bab4-4b47-4e77-b50c-fda62817b2db", "name": "Active"},
-                "role": {"id": "40567487-6328-4dac-b7b5-b789d1154bf0", "name": "Router"},
+                "device_type": {
+                  "id": "4bf23e23-4eb1-4fae-961c-edd6f8cbaaf1",
+                  "model": "ISR 4331",
+                  "manufacturer": {
+                    "id": "b329ec0d-5ee7-47d8-b4a7-3951c28e2979",
+                    "object_type": "dcim.manufacturer"
+                  }
+                },
+                "status": {
+                  "id": "9f38bab4-4b47-4e77-b50c-fda62817b2db",
+                  "name": "Active"
+                },
+                "role": {
+                  "id": "40567487-6328-4dac-b7b5-b789d1154bf0",
+                  "name": "Router"
+                },
                 "platform": null,
                 "location": null,
-                "primary_ip4": {"address": "192.0.2.96/24", "host": "192.0.2.96"},
+                "primary_ip4": {
+                  "address": "192.0.2.96/24",
+                  "host": "192.0.2.96"
+                },
                 "primary_ip6": null,
                 "custom_fields": {},
                 "tags": []
@@ -102,7 +174,10 @@
     },
     {
       "name": "device-interfaces",
-      "match": {"method": "GET", "path": "/api/dcim/interfaces/"},
+      "match": {
+        "method": "GET",
+        "path": "/api/dcim/interfaces/"
+      },
       "responses": [
         {
           "status": 200,
@@ -118,13 +193,18 @@
                 "type": "1000base-t",
                 "mac_address": "not:a:mac:address",
                 "enabled": true,
-                "device": {"id": "44444444-4444-4444-8444-444444444444"},
+                "device": {
+                  "id": "44444444-4444-4444-8444-444444444444"
+                },
                 "ip_addresses": "192.0.2.99/24"
               },
               {
                 "id": "88888888-8888-4888-8888-888888888888",
                 "name": "eth1",
-                "type": {"value": "1000base-t", "label": "1000BASE-T (1GE)"},
+                "type": {
+                  "value": "1000base-t",
+                  "label": "1000BASE-T (1GE)"
+                },
                 "mac_address": "00:00:00:00:00:00",
                 "enabled": true,
                 "device": "this-device-is-a-string",
@@ -133,14 +213,24 @@
               {
                 "id": "99999999-9999-4999-8999-999999999999",
                 "name": "eth0",
-                "type": {"value": "1000base-t", "label": "1000BASE-T (1GE)"},
+                "type": {
+                  "value": "1000base-t",
+                  "label": "1000BASE-T (1GE)"
+                },
                 "mac_address": "00:11:22:DD:00:66",
                 "enabled": true,
-                "device": {"id": "66666666-6666-4666-8666-666666666666"},
+                "device": {
+                  "id": "66666666-6666-4666-8666-666666666666"
+                },
                 "ip_addresses": [
-                  {"address": "169.254.10.20/16"},
+                  {
+                    "address": "169.254.10.20/16"
+                  },
                   "this-ip-is-a-string",
-                  {"address": "198.51.100.96/24", "host": "198.51.100.96"}
+                  {
+                    "address": "198.51.100.96/24",
+                    "host": "198.51.100.96"
+                  }
                 ]
               }
             ]
@@ -150,13 +240,17 @@
       "when_exhausted": "error"
     }
   ],
-  "default_response": {"status": 404, "text": "no fixture route"},
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
   "expect": {
-    "asset_count": 3,
+    "asset_count": 4,
     "ids": [
       "nautobot:$HOST:device:44444444-4444-4444-8444-444444444444",
       "nautobot:$HOST:device:55555555-5555-4555-8555-555555555555",
-      "nautobot:$HOST:device:66666666-6666-4666-8666-666666666666"
+      "nautobot:$HOST:device:66666666-6666-4666-8666-666666666666",
+      "nautobot:$HOST:device:77777777-7777-4777-8777-777777777770"
     ],
     "ids_absent": [
       "nautobot:$HOST:device:not-a-uuid-at-all",
@@ -174,13 +268,34 @@
       },
       {
         "id": "nautobot:$HOST:device:55555555-5555-4555-8555-555555555555",
-        "fields": {"hostnames": "device-with-loopback-only"},
-        "fields_absent": ["ipAddresses", "macAddresses"]
+        "fields": {
+          "hostnames": "device-with-loopback-only"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses"
+        ]
+      },
+      {
+        "id": "nautobot:$HOST:device:77777777-7777-4777-8777-777777777770",
+        "fields": {
+          "ipAddresses": "192.0.2.97",
+          "nautobot_name": "PDU Rack 4 (Row B)"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
       },
       {
         "id": "nautobot:$HOST:device:44444444-4444-4444-8444-444444444444",
-        "fields": {"hostnames": "device-with-junk-relations"},
-        "fields_absent": ["ipAddresses", "macAddresses", "firstSeenTS"]
+        "fields": {
+          "hostnames": "device-with-junk-relations"
+        },
+        "fields_absent": [
+          "ipAddresses",
+          "macAddresses",
+          "firstSeenTS"
+        ]
       }
     ],
     "log_contains": [
@@ -190,5 +305,7 @@
     ]
   },
   "check_determinism": true,
-  "invariants": {"skip": []}
+  "invariants": {
+    "skip": []
+  }
 }

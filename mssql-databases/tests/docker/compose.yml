@@ -49,10 +49,10 @@ services:
       ACCEPT_EULA: "1"
       MSSQL_PID: Developer
       # SQL Server's own complexity rules: upper, lower, digit, symbol, 8+.
-      # Deliberately free of ',' and of the URL delimiters @ : / ? #. The first
-      # would be split into a fabricated second parameter by the runZero CLI's
-      # --kwargs flag; the rest would corrupt the sqlserver:// DSN the script
-      # builds by string interpolation, since it does not percent-encode.
+      # Deliberately free of ',' -- the runZero CLI's --kwargs flag would split
+      # it into a fabricated second parameter. The URL delimiters @ : / ? # are
+      # safe (the script percent-encodes DSN components), but the verified
+      # password is kept as-is rather than churned.
       MSSQL_SA_PASSWORD: "runZero-Test-Pw-2026!"
       # Bound the buffer pool. Left alone the engine sizes itself against the
       # whole machine, and this suite shares a host with other stacks.

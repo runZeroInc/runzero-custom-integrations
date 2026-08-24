@@ -104,7 +104,7 @@ load('http', http_get='get', 'url_encode')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('net', 'network_interface', 'routable_ips', 'clean_hostnames', 'normalize_mac')
 load('xml', xml_parse='parse')
-load('time', 'now', 'parse_ts')
+load('time', 'now', 'parse_ts', 'sleep')
 load('re', re_match='match')
 load('coerce', 'as_text')
 
@@ -445,6 +445,38 @@ def safe_label(ctx, page):
     return "{} page {}".format(ctx["path"], page)
 
 
+# Statuses worth a second attempt before a page is declared failed. Raw
+# http.get is required here (the body is XML), so the shared helper's built-in
+# retry is unavailable; this list is its transient subset. 500 is deliberately
+# absent: a live Miradore site answers 500 -- not 400 -- to a query whose
+# syntax it dislikes, and that failure belongs to the select ladder below, not
+# to a retry loop.
+TRANSIENT_STATUSES = [408, 425, 429, 502, 503, 504]
+TRANSIENT_RETRIES = 3
+
+
+def http_get_transient(url, **options):
+    """GET with retries for transient statuses and no-response transport errors.
+
+    A single 502 blip on page 40 of a long walk used to end the run with a
+    truncated import; retrying with backoff rides out the blip. Every other
+    status is returned to the caller untouched on the first attempt.
+    """
+    resp = None
+    for attempt in range(TRANSIENT_RETRIES + 1):
+        if attempt:
+            # 1s, 2s, 4s. Starlark has no ** operator; shift instead.
+            sleep("{}s".format(1 << (attempt - 1)))
+        resp = http_get(url, **options)
+        if resp != None and resp.status_code not in TRANSIENT_STATUSES:
+            return resp
+        if attempt < TRANSIENT_RETRIES:
+            # The URL is never logged: the v1 key travels in its query string.
+            print("miradore: transient failure ({}); retrying".format(
+                "no response" if resp == None else "status {}".format(resp.status_code)))
+    return resp
+
+
 def fetch_page(ctx, page):
     """Fetch one page of devices and return (elements, total, err, retryable).
 
@@ -457,7 +489,7 @@ def fetch_page(ctx, page):
     failures no attribute list can repair, and retrying them would spend a second
     request and log a misleading cause.
     """
-    resp = http_get(ctx["url"] + ctx["path"] + "?" + build_query(ctx, page), **ctx["http_options"])
+    resp = http_get_transient(ctx["url"] + ctx["path"] + "?" + build_query(ctx, page), **ctx["http_options"])
     if resp == None:
         return [], -1, "no response from the Miradore server", False
     if resp.status_code == 401:

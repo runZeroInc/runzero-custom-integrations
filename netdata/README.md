@@ -19,7 +19,8 @@ hostname alone.
 
 - Netdata Agent **v1.40 or later** for `/api/v2/nodes`; **v2.0 or later** for `/api/v3/nodes`.
   The default `api_version` of `auto` tries v3 first and falls back to v2, so both are supported
-  without configuration.
+  without configuration. A 401 does not fall back: it means the agent is bearer-protected and the
+  credentials were refused, so the run fails fast with a message naming `api_token`.
 - The agent's HTTP API reachable from the Explorer. By default an agent listens on `0.0.0.0:19999`
   and serves its API without authentication.
 - Optionally, a **bearer token**, if the agent has bearer protection enabled.
@@ -211,7 +212,10 @@ unchanged, and the assets it reports merge exactly as they do from an ingest tas
   supplies `os` and `osVersion` plus `os_id`, `os_id_like`, `kernel_name`, `kernel_version`,
   `architecture`, `virtualization`, `virt_detection`, `container`, `container_detection`,
   `is_k8s_node`, and the full host-label set. **Maximum nodes to enrich** caps the call count; nodes
-  past the cap are still imported, without OS fields, and the number skipped is logged.
+  past the cap are still imported, without OS fields, and the number skipped is logged. A hostname
+  reported by more than one node gets no child detail at all: `/host/<name>` can only answer for one
+  machine, so fetching it would attribute one machine's OS detail to both GUIDs. The skip is logged
+  per node and both nodes still import.
 - **Host labels** are split by Netdata's own convention: labels beginning with `_` are set by the
   agent and land under `netdata.label_auto.*` (`os_name`, `architecture`, `virtualization`,
   `container`, `install_type`, and on cloud instances `cloud_provider_type`, `cloud_instance_type`,

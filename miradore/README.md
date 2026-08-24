@@ -212,9 +212,13 @@ version. The import still succeeds, with less detail.
 than walking the ladder — no attribute list fixes a rejected key, and retrying
 would blame the wrong thing.
 
-**Requests are not retried.** v1 answers in XML, so the script uses the raw HTTP
-client, which takes no retry budget. A page that fails ends the walk, and the log
-names the page.
+**Only transient failures are retried.** v1 answers in XML, so the script uses the
+raw HTTP client and carries its own small retry loop: a 408/425/429/502/503/504 or
+a dropped connection is retried up to three times with backoff before the page is
+declared failed, so a one-off proxy blip mid-walk no longer truncates the import.
+A 500 is deliberately not retried here -- a live site answers 500 to a query whose
+syntax it dislikes, and that failure belongs to the select ladder above. Any other
+page failure ends the walk, and the log names the page.
 
 **Page size is capped when application inventory is on.** Measured against a live
 site, a device costs about **1.3 KB** of XML without its applications and **45 KB**

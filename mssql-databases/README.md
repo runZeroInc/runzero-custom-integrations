@@ -78,44 +78,44 @@ Internally the script builds a `sqlserver://` URL DSN consumed by the
 `github.com/microsoft/go-mssqldb` driver:
 
 ```
-sqlserver://<username>:<password>@<host>:<port>?database=<database>&encrypt=<true|disable>
+sqlserver://<username>:<password>@<host>:<port>?database=<database>&encrypt=<true|disable>[&trustservercertificate=true]
 ```
+
+The username, password, and database components are **percent-encoded** before they are
+interpolated, so a password containing `@ : / ? # % &` or a space cannot corrupt the URL
+parse into a wrong host or a failed login. (The runZero CLI's `--kwargs` flag has its own
+quoting rules for `=` and `,` — see **Running it from the command line** below — but the
+DSN itself is safe for any password.)
 
 The `encrypt` credential parameter is a boolean and maps to exactly two of the
 driver's values: `true` when set, `disable` when clear. TLS encryption is on by
 default; disable only on isolated test instances.
 
-**`trust_server_certificate` is missing, and it is the reason `encrypt=true` will not connect
-to a stock SQL Server.** Read this before turning encryption on.
+**Read this before turning encryption on against a stock SQL Server.**
 
 In `go-mssqldb`, the DSN option `trustservercertificate` defaults to `false` whenever
-`encrypt` is specified explicitly — which this script always does, because `_dsn()` writes
-`encrypt=true` or `encrypt=disable` on every connection string it builds. With `encrypt` on,
+`encrypt` is specified explicitly — which this script always does. With `encrypt` on,
 the driver therefore **validates the server's certificate**: chain and hostname both.
 
 A stock SQL Server install presents a **self-signed certificate** that nothing trusts. The
 connection fails with a certificate error and does not fall back to an unencrypted session, so
 the symptom is a task that cannot connect at all rather than one that connects insecurely.
+The script prints a hint naming this exact failure mode before it connects.
 
-Every other integration in this library solves this with a TLS option — `tls_ca_cert` or
-`tls_disable_validation` from the shared `OPTIONS_TLS` include. **This one has neither.** It
-declares no `includes` block, because those options configure the shared HTTP client and this
-integration does not speak HTTP; and it exposes no `trust_server_certificate` parameter of its
-own, so nothing reaches `trustservercertificate` in the DSN. There is no way to wave the
-certificate through, from the credential form or from the command line.
-
-That leaves exactly two options:
+That leaves three options, in order of preference:
 
 1. **Install a certificate on the instance that the Explorer host trusts**, issued for the name
    you put in `host`. This is the correct answer and it is what SQL Server's own documentation
    recommends. Note the hostname has to match: connecting by IP to a certificate issued for an
    FQDN fails validation just as surely as an untrusted chain.
-2. **Clear `encrypt`** and accept an unencrypted TDS connection on a trusted network. The
-   credential travels in that connection, so this is a real trade rather than a formality.
-
-Adding a `trust_server_certificate` boolean to `CONFIG`, threaded into `_dsn()`, would give
-operators the third option every comparable integration has. It is a small change and it is
-the single most likely reason a correctly configured task here fails to connect.
+2. **Set `trust_server_certificate`** to keep the session encrypted while skipping certificate
+   validation. This is the TDS equivalent of `tls_disable_validation` on the HTTP integrations:
+   the wire is still encrypted, but the server is no longer authenticated, so an on-path
+   attacker could impersonate it. It is opt-in and defaults to off so that a properly issued
+   certificate is still verified.
+3. **Clear `encrypt`** and accept an unencrypted TDS connection on a trusted network. The
+   credential travels in that connection, so this is a real trade rather than a formality —
+   prefer option 2 over this one.
 
 ## Steps
 
@@ -144,12 +144,13 @@ the single most likely reason a correctly configured task here fails to connect.
    - **Username** (`username`): the SQL login created above.
    - **Password** (`password`): that login's password.
    - **Initial catalog** (`database`): optional; default `master`. Leave it alone unless the login cannot connect to `master`.
-   - **Require TLS encryption** (`encrypt`): optional; default **enabled**. Read the certificate note above before leaving it on — with no `trust_server_certificate` parameter, a stock self-signed instance cannot be connected to with this set.
+   - **Require TLS encryption** (`encrypt`): optional; default **enabled**. Read the certificate note above before leaving it on — a stock self-signed instance needs either a trusted certificate installed or `trust_server_certificate` set.
+   - **Trust the server certificate** (`trust_server_certificate`): optional; default **disabled**. Keeps the session encrypted while skipping certificate validation, for instances presenting a self-signed certificate.
    - **Query timeout (seconds)** (`timeout`): optional; default `30`, range 1–600.
 
    There are no `tls_*` or `http_*` options on this credential. The script declares no
    `includes` block because those configure the shared HTTP client, and this integration speaks
-   TDS. `encrypt` is the only TLS control it has.
+   TDS. `encrypt` and `trust_server_certificate` are its TLS controls.
 3. [Create the Custom Integration task](https://console.runzero.com/ingest/custom/).
    - Select the Credential and Custom Integration created in steps 1 and 2.
    - Update the task schedule to recur at the desired timeframes. Database inventory changes slowly, so daily is usually plenty.
@@ -287,7 +288,6 @@ arbitrarily-merged asset with one database's attributes on it.
 - **Backup state.** `msdb.dbo.backupset` records the last backup per database, joined on database name. "Which databases have never been backed up, or were last backed up months ago" is exactly the sort of question an inventory should answer, and this integration already produces the per-database assets to hang the answer on. Note it requires read access to `msdb`, which the current least-privilege grant does not include.
 - **Availability groups and replicas.** `sys.availability_groups` and `sys.dm_hadr_availability_replica_states` describe which instances participate in an AG and which is primary. On a clustered estate, a database exists on several instances at once, and this integration's per-instance id means it currently appears as several unrelated assets with no indication they are replicas of one database.
 - **Named-instance resolution.** As the requirements note, this integration does not speak the SQL Browser protocol on UDP 1434, so `HOST\INSTANCE` cannot be resolved to a port and a dynamic port has to be pinned by hand. Adding Browser support would remove the most fiddly part of the setup, and would also let one credential discover every instance on a host rather than one.
-- **A `trust_server_certificate` parameter.** Covered in full under **DSN format** above. Not a new capability, but the change most likely to unblock a deployment.
 - **Filtering system databases.** `master`, `model`, `msdb`, and `tempdb` are imported alongside real databases and are identical on every instance in an estate. An `include_system_databases` parameter defaulting to off would cut the asset count meaningfully on a large SQL estate without losing anything anyone wants.
 - **Outbound push-back is technically trivial and should not be built.** A SQL connection can write, so runZero data could in principle be inserted into a table. Nothing about that is a good idea: it would need a credential with write access to a production database, and there is no natural destination for the data. If SQL Server inventory needs to reach another system, it should go through runZero's own export API rather than back down this connection.
 - **There is no event feed, and the alternatives are not integration-shaped.** SQL Server can push through Service Broker, Query Notifications, or Extended Events, but all of them require a long-lived subscriber and a session that outlives a task. A runZero custom integration is a scheduled run with a bounded lifetime, so this is a poll by necessity. Database inventory changes slowly, which is why the setup notes suggest a daily schedule.
