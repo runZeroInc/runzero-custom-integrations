@@ -1,0 +1,150 @@
+{
+  "name": "mobile-null",
+  "integration": "jamf",
+  "description": "Present-but-null fields on detail records must degrade, never abort. Mobile device 301 answers its detail call with \"name\": null (which used to send None into .replace) and \"extensionAttributes\": null (not iterable); it must import on its Wi-Fi MAC and address with no hostname. Mobile device 302 carries an extension attribute list holding a bare string, an attribute with a null name, and a legacy attribute whose value is a scalar string rather than a values list -- the scalar shape used to abort on \",\".join. The computer detail carries \"extensionAttributes\": null and \"userAndLocation\": null, the shape that used to abort on len(None). All three records must import and the run must finish with its summary line.\n\nnamespaced_ids is skipped for the same reason as happy: bare Jamf udid, no tenant scope.",
+  "kwargs": {
+    "url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "fixture-secret"
+  },
+  "routes": [
+    {
+      "name": "oauth-token",
+      "match": {"method": "POST", "path": "/api/oauth/token"},
+      "responses": [
+        {"status": 200, "json": {"access_token": "fixture-token-1", "expires_in": 3600, "token_type": "Bearer"}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-page-0",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory", "query_contains": "page=0"},
+      "responses": [
+        {"status": 200, "json": {"totalCount": 1, "results": [{"id": "401"}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computers-drained",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory"},
+      "responses": [{"status": 200, "json": {"totalCount": 1, "results": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "computer-detail-401-null-ea",
+      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/401"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "CCCC3333-0000-4000-8000-000000000401",
+            "general": {"displayName": "syn-mac-nullea", "lastIpAddress": "10.40.3.41"},
+            "hardware": {"macAddress": "00:50:56:00:40:31", "model": "MacBookPro18,3", "make": "Apple", "serialNumber": "SYNSER0000401"},
+            "operatingSystem": {"name": "macOS", "version": "14.4.1"},
+            "extensionAttributes": null,
+            "userAndLocation": null
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-page-0",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/detail", "query_contains": "page=0"},
+      "responses": [
+        {"status": 200, "json": {"totalCount": 2, "results": [{"mobileDeviceId": "301", "name": "syn ipad 301"}, {"mobileDeviceId": "302", "name": "syn iphone 302"}]}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-drained",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/detail"},
+      "responses": [{"status": 200, "json": {"totalCount": 2, "results": []}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-detail-301-null-name",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/301/detail"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "BBBB2222-0000-4000-8000-000000000301",
+            "name": null,
+            "model": "iPad13,1",
+            "modelIdentifier": "iPad13,1",
+            "wifiMacAddress": "00:50:56:00:40:21",
+            "serialNumber": "SYNSER0000301",
+            "extensionAttributes": null,
+            "general": {"osVersion": "17.4.1", "displayName": null, "ipAddress": "10.40.3.31"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "mobile-detail-302-legacy-ea",
+      "match": {"method": "GET", "path": "/api/v2/mobile-devices/302/detail"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "udid": "BBBB2222-0000-4000-8000-000000000302",
+            "name": "syn iphone 302",
+            "model": "iPhone15,2",
+            "modelIdentifier": "iPhone15,2",
+            "wifiMacAddress": "00:50:56:00:40:22",
+            "serialNumber": "SYNSER0000302",
+            "extensionAttributes": [
+              "a bare string where an attribute object is documented",
+              {"name": null, "values": ["orphaned"]},
+              {"name": "Battery Level", "value": "85"}
+            ],
+            "general": {"osVersion": "17.4.1", "displayName": "syn iphone 302", "ipAddress": "10.40.3.32"}
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "CCCC3333-0000-4000-8000-000000000401",
+      "BBBB2222-0000-4000-8000-000000000301",
+      "BBBB2222-0000-4000-8000-000000000302"
+    ],
+    "request_count": 8,
+    "assets": [
+      {
+        "id": "CCCC3333-0000-4000-8000-000000000401",
+        "fields": {
+          "hostnames": "syn-mac-nullea",
+          "os": "macOS"
+        }
+      },
+      {
+        "id": "BBBB2222-0000-4000-8000-000000000301",
+        "fields": {
+          "ipAddresses": "10.40.3.31",
+          "deviceType": "Tablet"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      },
+      {
+        "id": "BBBB2222-0000-4000-8000-000000000302",
+        "fields": {
+          "hostnames": "syn-iphone-302",
+          "deviceType": "Mobile",
+          "ext_attr_battery_level": "85"
+        }
+      }
+    ],
+    "log_contains": [
+      "jamf: read 1 computer and 2 mobile inventory item(s), reported 3 assets"
+    ]
+  },
+  "invariants": {"skip": ["namespaced_ids"]}
+}

@@ -84,7 +84,9 @@ Lifetime** setting, so there is no single correct number to quote — read
 `expires_in` from the response rather than assuming one. Client-credentials
 tokens have no keep-alive endpoint (unlike the older basic-auth token flow), so
 they must be re-requested; the script re-authenticates every 100 requests and
-again on a 403.
+again on a 401 or 403, retrying the rejected request once with the new token.
+Jamf Pro answers an expired or failed authentication with 401; 403 usually
+means a missing privilege, but a fresh token settles which.
 
 ## Steps
 
@@ -98,14 +100,16 @@ again on a 403.
 ### runZero configuration
 
 1. (OPTIONAL) - Make any necessary changes to the script to align with your environment.
-    - `DAYS_AGO` (default `60`) sets the lookback. The script filters computers
-      on `general.lastContactTime` and mobile devices on
-      `lastInventoryUpdateDate`, so a device that has not checked in within that
-      window is **not imported**. Raise it if you want stale records, lower it if
-      you only care about active devices.
-    - `COMPUTER_ASSETS` and `MOBILE_ASSETS` (both default `True`) turn each
-      device class on or off. Set `MOBILE_ASSETS = False` if you did not grant
-      **Read Mobile Devices**, otherwise every mobile request returns 403.
+    - **Activity window (days)** (`activity_days`, default `60`) sets the
+      lookback. The script filters computers on `general.lastContactTime` and
+      mobile devices on `lastInventoryUpdateDate`, so a device that has not
+      checked in within that window is **not imported**. Raise it for stale
+      records, lower it if you only care about active devices, or set it to `0`
+      to remove the filter entirely.
+    - **Import computers** (`import_computers`) and **Import mobile devices**
+      (`import_mobile`) (both default true) turn each device class on or off.
+      Disable `import_mobile` if you did not grant **Read Mobile Devices**,
+      otherwise every mobile request returns 403.
     - Modify datapoints uploaded to runZero as needed.
 2. [Create the Credential for the Custom Integration](https://console.runzero.com/credentials).
     - Select the type `Custom Integration Script Secrets`.
@@ -142,7 +146,8 @@ runzero script --filename jamf/jamf.star \
 directory that already exists, so add `--overwrite` when re-running into the same path.
 Add `--verbose` for the request-by-request log, or omit `--output` to see only the log
 lines. There is no parameter that caps the run, so the size of a first run is set by
-`DAYS_AGO` in the script — lower it temporarily for a smoke test against a large fleet.
+the `activity_days` parameter — lower it temporarily for a smoke test against a large
+fleet (add `--kwargs activity_days=7` to the command above).
 
 A 403 on the computer endpoints means the role is missing **Read Computers**; a 403 on
 the mobile endpoints alone means it is missing **Read Mobile Devices**. If you granted
@@ -223,7 +228,7 @@ Two data-quality notes about what accompanies the identity:
 - **Installed applications as `Software` records.** The `APPLICATIONS` section is the per-device application inventory, and this integration currently emits **no `Software` records at all**; `applications` and `packageReceipts` are explicitly excluded from the attribute flattening. For a Mac fleet this is the single most useful thing Jamf knows that runZero cannot see from the network.
 - **Security posture as tags rather than flattened text.** The `SECURITY` and `DISK_ENCRYPTION` sections carry FileVault state, System Integrity Protection, Gatekeeper, the firewall, secure-boot level, and XProtect version. Some of that is already reaching custom attributes through the catch-all flattening, as keys like `diskEncryption.bootPartitionEncryptionDetails...`. Modelled as tags it would make "every Mac on this segment without FileVault" a one-line runZero query.
 - **Pending software updates as findings.** The `SOFTWARE_UPDATES` section reports available updates per device. Where an Apple update names CVEs those map onto real `Vulnerability` records — unlike behavioral detections, these would be recognised by runZero's CVE-based reporting.
-- **Make the lookback window a parameter.** `DAYS_AGO` is a constant set to 60, and it is applied as a Jamf filter on `general.lastContactTime` (computers) and `lastInventoryUpdateDate` (mobile). Devices quiet for longer than that are invisible to the import with no indication in the console that a window is being applied. It belongs in `CONFIG` alongside the URL and credentials — and a shorter window is also the obvious cheap incremental sync.
+- **A shorter activity window is the obvious cheap incremental sync.** The lookback is now the `activity_days` CONFIG parameter (default 60, `0` disables it), applied as a Jamf filter on `general.lastContactTime` (computers) and `lastInventoryUpdateDate` (mobile). A scheduled task with a window barely longer than its interval imports only what changed.
 - **Outbound: push runZero context into Jamf as an extension attribute.** Jamf scopes policies and configuration profiles by Smart Group, and Smart Groups can be built on extension attributes. Writing a runZero-derived value onto a computer record — the segment it was found on, whether runZero classifies it as a server, whether it is missing an expected agent — would let Jamf act on runZero's view of the network directly, rather than an administrator re-deriving the same set by hand. This integration already reads extension attributes (both device-level and user-level) and imports them as `ext_attr_*` custom attributes, so the shape is familiar; the write is the new part.
 - **MDM commands are reachable and deliberately out of scope.** The same credential class can issue device lock, wipe, and profile-removal commands. A wipe is unrecoverable, so nothing about an inventory sync justifies going near them; if an outbound integration is ever built, these need per-device confirmation and an audit trail rather than a policy rule.
 - **Enrollment coverage-gap reporting.** Jamf knows every enrolled Apple device; runZero discovers the ones on the network. Apple hardware runZero fingerprints that has no Jamf record is unmanaged, which for a Mac fleet is the whole point of asking. In the other direction, `general.lastContactTime` is already imported and identifies enrolled devices that have stopped checking in — a device that is managed on paper and absent in practice.

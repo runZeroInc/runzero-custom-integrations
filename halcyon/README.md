@@ -125,6 +125,8 @@ minting an API key or personal access token. Username and password are the only 
      for an EU tenant.
    - **Username** (`username`): the Halcyon console username for the ReadOnly account.
    - **Password** (`password`): that account's password.
+   - **Search page size** (`page_size`): optional; assets per search page (default 10).
+     Raise it to reduce request volume on a large tenant.
 2. [Create the Custom Integration](https://console.runzero.com/custom-integrations/new).
    - Add a Name and Icon for the integration, such as `halcyon`.
    - Toggle `Enable custom integration script` to input the finalized script.
@@ -158,9 +160,12 @@ that already exists, so add `--overwrite` when re-running into the same path. Ad
 `--verbose` for the request-by-request log, or omit `--output` to see only the log lines.
 
 Expect a command-line run against a large tenant to take a while. The script pages the
-search endpoint 10 assets at a time and then issues **one additional detail request per
-asset**, so a ten-thousand-asset tenant is roughly a thousand search calls plus ten thousand
-detail calls. There is no cap parameter to bound it.
+search endpoint `page_size` assets at a time (default 10) and then issues **one additional
+detail request per asset**, so a ten-thousand-asset tenant at the default page size is
+roughly a thousand search calls plus ten thousand detail calls. Raise `page_size` to cut
+the search half of that; the detail pass is not capped. Page progress is reported to the
+task log as the walk advances, and the page walk itself is bounded by the `maxPages`
+value in `CONFIG`.
 
 `Halcyon login failed:` in the log is a rejected credential or the wrong regional host.
 `Failed to fetch detailed info for asset <id>:` is a per-asset detail failure — the run
@@ -244,9 +249,9 @@ Prefer `script --kwargs` for ad-hoc runs.
 - Cardinality: one source row per asset. The detail lookup returns additional fields for the same asset rather than new records.
 - Stability: not published. Halcyon's API reference documents the shape of an asset but says nothing about the lifecycle of its `id`, and the narrative documentation that might is behind SSO. What can be established is that the id survives between the search call and the detail call within a run, and that it is the handle the platform uses. **Whether an agent uninstall and reinstall re-uses the existing asset record or creates a new one could not be determined** — assume the latter, as with every other agent-based source in this repository.
 - Reuse behavior: not documented.
-- Presence: expected on every search result. A record without one is skipped — but note that the skip is **silent**: `if not asset_id: continue` prints nothing, unlike the other integrations here, so a tenant returning malformed records would produce a quietly short import.
+- Presence: expected on every search result. A record without one is skipped, and the skip is logged with the record's name (`halcyon: skipping asset with no id: name=...`), so a tenant returning malformed records produces a visibly short import rather than a quiet one.
 - Final runZero ID: the raw Halcyon asset id as a string.
-- Missing-ID behavior: skip, without a log line.
+- Missing-ID behavior: skip, with a log line naming the record.
 - Match behavior: **not set** — the platform default, all match and break dimensions on. Correct under the governing rule: this is a per-agent identifier issued by the platform and used directly, not something derived from an address or a scan.
 - Verdict: **scoped authoritative** for an agent registration within one regional tenant; the stability caveat above is the one unverified property.
 
@@ -260,11 +265,13 @@ easy to establish what else is reachable, so this section deliberately does **no
 route names it has not read — the items below name capabilities to look for and the changes
 that are derivable from this integration's own code.
 
-- **Raise the page size — the cheapest possible improvement.** `pageSize` is hard-coded to
-  **10**. Combined with the per-asset detail call, a ten-thousand-asset tenant costs roughly
-  a thousand search requests plus ten thousand detail requests. Nothing in the API reference
-  requires a page that small, and raising it to a few hundred would cut the search half of
-  that by an order of magnitude at no cost in correctness.
+- **Raise the default page size.** `pageSize` is now the `page_size` parameter, but its
+  default stays at **10** because no larger value has been verified against a live tenant.
+  Combined with the per-asset detail call, a ten-thousand-asset tenant at the default costs
+  roughly a thousand search requests plus ten thousand detail requests. Nothing in the API
+  reference requires a page that small; once a few hundred is verified live, raising the
+  default would cut the search half of that by an order of magnitude at no cost in
+  correctness.
 - **Use the `filters` array that is already being sent empty.** The search body carries
   `"filters": []` on every request. A server-side filter — a last-seen window, an agent
   status — is what would turn this from a full inventory walk into an incremental sync, and

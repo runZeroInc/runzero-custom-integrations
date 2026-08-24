@@ -1,0 +1,33 @@
+{
+  "name": "auth-failure",
+  "integration": "infoblox",
+  "description": "A rejected credential. The network-view bootstrap answers 401, and the run must end cleanly with zero assets, a printed error naming the failed read, and the credential hint -- never an abort or a retry storm. 401 is deliberately outside get_json's transient retry list, so exactly one request is made.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "wrong-password",
+    "wapi_version": "v2.13.1"
+  },
+  "routes": [
+    {
+      "name": "network-views-unauthorized",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/networkview"},
+      "responses": [
+        {"status": 401, "json": {"Error": "AdmConProtoError: Invalid credentials", "code": "Client.Ibap.Proto", "text": "Invalid credentials"}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "infoblox: failed to list network views:",
+      "infoblox: check the username and password and that the NIOS user has API access",
+      "infoblox: no network views retrieved"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}

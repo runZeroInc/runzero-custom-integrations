@@ -98,6 +98,8 @@ load('net', 'ip_address', 'ip_in_network', 'network_interface', 'routable_ip')
 load('http', http_get='get', 'get_json', 'basic', 'url_parse')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('time', 'now', 'parse_time', 'sleep', 'parse_ts')
+load('re', re_search='search')
+load('jsonstream', 'iter_array')
 
 load('coerce', 'as_dict', 'as_text', 'dedupe', 'dicts')
 VENDOR = "illumio-core"
@@ -109,12 +111,15 @@ API_BASE = "/api/v2"
 # asynchronous GET collection as the only supported way past it.
 SYNC_LIMIT = 500
 LABEL_LIMIT = 500
-BATCH_SIZE = 100
 MAX_CHILDREN = 99
 MAX_POLLS = 600
 DEFAULT_RETRY_AFTER = 5
 MAX_RETRY_AFTER = 30
 DIGITS = "0123456789"
+# jsonstream.iter_array raises on a body that is not a JSON array, and a raise
+# aborts the whole script, so every streamed body is sniffed for an opening
+# bracket first.
+ARRAY_RE = r"^\s*\["
 # open_service_ports[].protocol is an IANA protocol number, not a name. Only the
 # port-bearing transports runZero models are mapped; ICMP (1) and IPv6-ICMP (58)
 # carry no port and are counted rather than invented into a Service.
@@ -213,12 +218,24 @@ def _api_url(ctx, href):
     return ctx["base_url"] + API_BASE + text
 
 
+def _index_label(index, label):
+    """Add one label record to the href index."""
+    record = as_dict(label)
+    href = as_text(record.get("href"), join=",").strip()
+    key = as_text(record.get("key"), join=",").strip()
+    value = as_text(record.get("value"), join=",").strip()
+    if href and key:
+        index[href] = "{}:{}".format(key, value) if value else key
+
+
 def build_label_index(ctx):
     """Index the organization's labels by href so a workload that only carries
     label references can still be tagged. A collection GET may return labels
     either expanded (href, key, value) or as bare references depending on the
     PCE release, and requesting an expanded representation is not portable
-    across releases, so the catalog is fetched once instead."""
+    across releases, so the catalog is fetched once instead. A catalog that
+    hits the synchronous 500-object cap is re-fetched as an asynchronous GET
+    collection, the same escape hatch the workload collection uses."""
     index = {}
     url = ctx["org_url"] + "/labels"
     data, err = get_json(url, params={"max_results": str(LABEL_LIMIT)}, **ctx["http_options"])
@@ -227,13 +244,30 @@ def build_label_index(ctx):
         return index
     labels = data if type(data) == "list" else []
     for label in dicts(labels):
-        href = as_text(label.get("href"), join=",").strip()
-        key = as_text(label.get("key"), join=",").strip()
-        value = as_text(label.get("value"), join=",").strip()
-        if href and key:
-            index[href] = "{}:{}".format(key, value) if value else key
-    if len(labels) >= LABEL_LIMIT:
-        _log("the label catalog returned the {} object collection cap; some workload labels may import as references".format(LABEL_LIMIT))
+        _index_label(index, label)
+    if len(labels) < LABEL_LIMIT:
+        return index
+
+    _log("the label catalog returned the {} object collection cap; re-running it as an asynchronous GET collection".format(LABEL_LIMIT))
+    location, retry_after, err = start_async_job(ctx, "/labels", {})
+    href = ""
+    if not err:
+        href, err = poll_async_job(ctx, location, retry_after)
+    if err:
+        _log("the asynchronous label collection failed ({}); some workload labels may import as references".format(err))
+        return index
+    response = http_get(_api_url(ctx, href), **ctx["http_options"])
+    if response == None or response.status_code != 200:
+        _log("failed to download the label collection result; some workload labels may import as references")
+        return index
+    if not re_search(ARRAY_RE, as_text(response.body, join=",")[:64]):
+        _log("the label collection result was not a JSON array; some workload labels may import as references")
+        return index
+    total = 0
+    for label in iter_array(response.body):
+        _index_label(index, label)
+        total += 1
+    _log("asynchronous label collection returned {} labels".format(total))
     return index
 
 
@@ -506,36 +540,30 @@ def build_asset(ctx, record):
     return asset
 
 
-def build_assets(ctx, records):
-    """Convert a batch of Illumio workload records into runZero assets."""
-    assets = []
-    for record in records:
-        if type(record) != "dict":
-            ctx["malformed"] += 1
-            continue
-        href = as_text(record.get("href"), join=",").strip()
-        if not href:
-            _log("skipping workload with no href: hostname=" + as_text(record.get("hostname"), join=","))
-            ctx["skipped"] += 1
-            continue
-        if record.get("deleted") == True:
-            ctx["deleted"] += 1
-            continue
-        assets.append(build_asset(ctx, record))
-    return assets
+def report_one(ctx, record):
+    """Validate and report one workload record, returning the count reported.
+    A malformed, href-less, or deleted record is counted and skipped so one bad
+    row cannot end the run."""
+    if type(record) != "dict":
+        ctx["malformed"] += 1
+        return 0
+    href = as_text(record.get("href"), join=",").strip()
+    if not href:
+        _log("skipping workload with no href: hostname=" + as_text(record.get("hostname"), join=","))
+        ctx["skipped"] += 1
+        return 0
+    if record.get("deleted") == True:
+        ctx["deleted"] += 1
+        return 0
+    return report_asset(build_asset(ctx, record))
 
 
 def report_workloads(ctx, records):
-    """Report a workload collection to runZero in batches so only one batch of
-    ImportAsset objects exists at a time. The PCE has no offset or cursor on a
-    workload collection: a synchronous call returns everything up to the cap in
-    one response and an asynchronous job produces one downloadable file, so the
-    raw records unavoidably arrive together and batching bounds what is built
-    from them."""
+    """Report a workload collection to runZero one record at a time, so only
+    one ImportAsset object exists at a time."""
     reported = 0
-    total = len(records)
-    for start in range(0, total, BATCH_SIZE):
-        reported += report_assets(build_assets(ctx, records[start:start + BATCH_SIZE]))
+    for record in records:
+        reported += report_one(ctx, record)
     return reported
 
 
@@ -550,20 +578,19 @@ def fetch_sync(ctx):
     return (data if type(data) == "list" else []), None
 
 
-def start_async_job(ctx):
-    """Ask the PCE to run the workload collection as an offline job and return
-    the job href it publishes in the Location response header. This is the one
-    request that has to use the raw HTTP builtin, because get_json does not
-    expose response headers and Location is the only handle on the job. Raw
-    requests take no retry budget, so this single call gets one attempt; it is
-    issued only after a synchronous collection has already succeeded, so the PCE
-    is known to be reachable at that point."""
-    params = {}
-    if ctx["managed_only"]:
-        params["managed"] = "true"
-    # max_results is deliberately omitted: it is what caps a collection, and the
-    # whole point of the offline job is to return the estate uncapped.
-    response = http_get(ctx["org_url"] + "/workloads", params=params, **ctx["async_options"])
+def start_async_job(ctx, path, params):
+    """Ask the PCE to run one collection as an offline job and return the job
+    href it publishes in the Location response header. This request has to use
+    the raw HTTP builtin, because get_json does not expose response headers and
+    Location is the only handle on the job. Raw requests take no retry budget,
+    so this single call gets one attempt; it is issued only after a synchronous
+    collection has already succeeded, so the PCE is known to be reachable at
+    that point.
+
+    max_results is deliberately omitted from params: it is what caps a
+    collection, and the whole point of the offline job is to return the set
+    uncapped."""
+    response = http_get(ctx["org_url"] + path, params=params, **ctx["async_options"])
     if response == None:
         return "", 0, "no response to the asynchronous collection request"
     if response.status_code >= 400:
@@ -609,31 +636,45 @@ def poll_async_job(ctx, location, retry_after):
     return "", "the collection job did not finish within {} polls".format(MAX_POLLS)
 
 
-def fetch_async(ctx):
-    """Run the workload collection as an asynchronous GET collection and
-    download the result. This is the documented way to read more than the 500
-    workloads a synchronous collection returns; without it an estate larger than
-    that is silently truncated."""
-    location, retry_after, err = start_async_job(ctx)
-    if err:
-        return [], err
-    _log("asynchronous collection job accepted, polling {} every {}s".format(location, retry_after))
+def stream_async_result(ctx, href, sync_hrefs):
+    """Download the asynchronous collection datafile and stream it record by
+    record via jsonstream, so the estate is never decoded into memory whole --
+    the datafile is precisely the response taken when the estate exceeds 500
+    workloads, and a large PCE can hold tens of thousands. The raw HTTP builtin
+    is used because jsonstream needs the body; it takes no retry budget, so
+    this single request gets one attempt. Each record's href is marked in
+    sync_hrefs as it streams, so the caller can tell which synchronous rows the
+    datafile did not carry.
 
-    href, err = poll_async_job(ctx, location, retry_after)
-    if err:
-        return [], err
+    Returns (reported, streamed, err). Every failure is detected before the
+    first record is reported, so on err the caller can still fall back to the
+    synchronous result without duplicating assets."""
+    response = http_get(_api_url(ctx, href), **ctx["http_options"])
+    if response == None:
+        return 0, 0, "no response downloading the collection result"
+    if response.status_code != 200:
+        return 0, 0, "status {} downloading the collection result".format(response.status_code)
+    if not re_search(ARRAY_RE, as_text(response.body, join=",")[:64]):
+        return 0, 0, "the collection result was not a JSON array"
 
-    data, err = get_json(_api_url(ctx, href), **ctx["http_options"])
-    if err:
-        return [], "failed to download the collection result: " + err
-    return (data if type(data) == "list" else []), None
+    reported = 0
+    streamed = 0
+    for record in iter_array(response.body):
+        streamed += 1
+        if type(record) == "dict":
+            record_href = as_text(record.get("href"), join=",").strip()
+            if record_href and record_href in sync_hrefs:
+                sync_hrefs[record_href] = True
+        reported += report_one(ctx, record)
+    return reported, streamed, None
 
 
 def fetch_and_report_workloads(ctx):
     """Fetch every workload and stream it to runZero. A synchronous collection
     is tried first because it is one request and covers most estates; when it
     comes back at the documented 500 object cap the result may be truncated, so
-    the same collection is re-run as an asynchronous offline job."""
+    the same collection is re-run as an asynchronous offline job and its
+    datafile is streamed."""
     records, err = fetch_sync(ctx)
     if err:
         if err.startswith("status 401") or err.startswith("status 403"):
@@ -646,17 +687,32 @@ def fetch_and_report_workloads(ctx):
         return report_workloads(ctx, records)
 
     _log("the synchronous collection returned the {} object cap, so the estate may be larger; re-running it as an asynchronous GET collection".format(SYNC_LIMIT))
-    full, err = fetch_async(ctx)
-    if err:
-        _log("WARNING: the asynchronous GET collection failed ({}), so only the first {} workloads were imported and an unknown number were skipped. Every workload past the cap is missing from runZero until this is resolved.".format(err, len(records)))
-        return report_workloads(ctx, records)
+    params = {}
+    if ctx["managed_only"]:
+        params["managed"] = "true"
+    location, retry_after, err = start_async_job(ctx, "/workloads", params)
+    href = ""
+    if not err:
+        _log("asynchronous collection job accepted, polling {} every {}s".format(location, retry_after))
+        href, err = poll_async_job(ctx, location, retry_after)
+    if not err:
+        sync_hrefs = {}
+        for record in records:
+            if type(record) == "dict":
+                record_href = as_text(record.get("href"), join=",").strip()
+                if record_href:
+                    sync_hrefs[record_href] = False
+        reported, streamed, err = stream_async_result(ctx, href, sync_hrefs)
+        if not err:
+            _log("asynchronous collection returned {} workloads".format(streamed))
+            missing = [r for r in records if type(r) == "dict" and sync_hrefs.get(as_text(r.get("href"), join=",").strip()) == False]
+            if missing:
+                _log("WARNING: the asynchronous result was missing {} workloads the synchronous call returned; importing those rows from the synchronous snapshot".format(len(missing)))
+                reported += report_workloads(ctx, missing)
+            return reported
 
-    if len(full) < len(records):
-        _log("WARNING: the asynchronous collection returned {} workloads, fewer than the {} the synchronous call returned; importing the synchronous result instead".format(len(full), len(records)))
-        return report_workloads(ctx, records)
-
-    _log("asynchronous collection returned {} workloads".format(len(full)))
-    return report_workloads(ctx, full)
+    _log("WARNING: the asynchronous GET collection failed ({}), so only the first {} workloads were imported and an unknown number were skipped. Every workload past the cap is missing from runZero until this is resolved.".format(err, len(records)))
+    return report_workloads(ctx, records)
 
 
 def main(**kwargs):

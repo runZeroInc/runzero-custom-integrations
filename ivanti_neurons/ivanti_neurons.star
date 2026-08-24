@@ -8,6 +8,14 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Neurons serves the device scroll in pages of 500 and the walk is driven
+    # entirely by @odata.nextLink. 500 pages x 500 rows = 250,000 devices, past
+    # the endpoint count of the largest Neurons tenant. The repeated-link check
+    # in the walk catches a stuck scroll first and says so precisely; this is
+    # the backstop for a landscape that mints a NEW link every time while never
+    # advancing, and reaching it raises so a truncated import is reported as an
+    # error rather than looking complete.
+    "maxPages": 500,
     "params": [
         {
             "key": "url",
@@ -46,16 +54,6 @@ load('net', 'network_interface')
 load('http', 'get_json')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string')
 
-# A hard bound on the OData scroll below. Neurons serves the scroll in pages of
-# 500 and the walk is driven entirely by @odata.nextLink, so a landscape that
-# keeps issuing a next link -- or reissues one already served -- has no other
-# end. 500 pages x 500 rows = 250,000 devices, past the endpoint count of the
-# largest Neurons tenant. The repeated-link check below normally catches a stuck
-# scroll first and says so precisely; this is the backstop for a landscape that
-# mints a NEW link every time while never advancing. Reaching it is logged,
-# because a silently truncated import looks exactly like a complete one.
-MAX_PAGES = 500
-
 # Distributions that ship only as a server platform, matched against OS.Name.
 # Ubuntu, Debian, Fedora, openSUSE and macOS are deliberately absent: each is as
 # often a workstation as a server. So is SUSE Linux Enterprise *Desktop*, which
@@ -93,6 +91,14 @@ def _device_type(os_name):
     return ""
 
 
+def _dict_field(record, key):
+    """Return a nested object field as a dict. A present-but-null or non-object
+    value becomes {}, because .get defaults only apply when the key is ABSENT
+    and calling .get on None aborts the whole run."""
+    value = record.get(key)
+    return value if type(value) == "dict" else {}
+
+
 def build_assets(assets):
     assets_import = []
     # A device with neither id has nothing stable to key on. Counted rather
@@ -100,7 +106,12 @@ def build_assets(assets):
     # export cannot become one line per device.
     skipped = 0
     skipped_name = ""
+    malformed = 0
     for asset in assets:
+        # A non-object element in value[] has no fields to read at all.
+        if type(asset) != "dict":
+            malformed += 1
+            continue
         raw_id = asset.get('DiscoveryId') or asset.get('DeviceID')
         if not raw_id:
             skipped += 1
@@ -108,19 +119,18 @@ def build_assets(assets):
                 skipped_name = str(asset.get('DeviceName', ''))
             continue
         asset_id = str(raw_id)
-        hostname = asset.get('DeviceName', '')
-        os_name = asset.get('OS', {}).get('Name', '')
-        os_version = asset.get('OS', {}).get('Version', '')
+        hostname = asset.get('DeviceName', '') or ''
+        os_info = _dict_field(asset, 'OS')
+        os_name = str(os_info.get('Name') or '')
+        os_version = str(os_info.get('Version') or '')
         os = os_name + ' ' + os_version if os_version else os_name
-        model = asset.get('System', {}).get('Model', '')
+        model = str(_dict_field(asset, 'System').get('Model') or '')
 
         # create the network interfaces
         #
-        # `or {}` rather than a .get default on both hops: the default only
-        # applies when the key is ABSENT, so a device carrying "Network": null
-        # returned None from the first .get, and calling .get on None aborted
-        # the script.
-        tcpip = (asset.get('Network') or {}).get('TCPIP') or {}
+        # _dict_field on both hops: a device carrying "Network": null (or a
+        # non-object TCPIP) must degrade to no addresses, not abort the run.
+        tcpip = _dict_field(_dict_field(asset, 'Network'), 'TCPIP')
         address_list = list(tcpip.values())
 
         # network_interface returns None when nothing usable survives, and
@@ -166,10 +176,16 @@ def build_assets(assets):
     if skipped > 0:
         print("ivanti-neurons: skipped {} assets with no DiscoveryId/DeviceID (first name: {})".format(
             skipped, skipped_name))
+    if malformed > 0:
+        print("ivanti-neurons: skipped {} non-object records in the device list".format(malformed))
     return assets_import
 
-def get_assets(base_url, token, config_kwargs):
-    assets_all = []
+def get_and_report_assets(base_url, token, config_kwargs):
+    """Walk the device scroll and stream each page to runZero as it arrives, so
+    memory stays bounded by one page and an interrupted walk keeps everything
+    already reported. Returns the count reported."""
+    reported = 0
+    collected = 0
     url = base_url + '/api/apigatewaydataservices/v1/devices'
     headers = {'Accept': 'application/json',
                 'Authorization': 'Bearer ' + token}
@@ -179,23 +195,13 @@ def get_assets(base_url, token, config_kwargs):
 
     # Ivanti documents the scroll as "keep calling the next link until you
     # receive an empty response", so the walk is driven by @odata.nextLink
-    # rather than by a row count. The previous condition,
-    # len(assets_all) < total_assets - 1, did neither job: it aborted the whole
-    # script whenever @odata.count was absent, because that made it evaluate
-    # None - 1, and when the count WAS present it stopped one record short of it
-    # and silently dropped the final page.
-    #
-    # MAX_PAGES + 1 iterations, with the last reserved for the ceiling message.
-    # The loop has seven ways out and none of them is the ceiling, so this is the
-    # one place the exhausted case can be reported without a flag that has to be
-    # kept in step with every one of those breaks. The extra iteration issues no
-    # request: the ceiling is still exactly MAX_PAGES pages.
-    for _page in range(0, MAX_PAGES + 1):
-        if _page == MAX_PAGES:
-            print('ivanti-neurons: stopped at the {} page ceiling with {} devices collected; the scroll never ended, so this run is truncated'.format(
-                MAX_PAGES, len(assets_all)))
-            break
-
+    # rather than by a row count. CONFIG maxPages backs it via pager(): the
+    # repeated-link check below catches a stuck scroll first and says so
+    # precisely, and the pager raise is the backstop for a landscape that mints
+    # a NEW link every time while never advancing -- an incomplete import is
+    # reported as an error rather than silently truncated.
+    _pager = pager("devices")
+    while _pager.next():
         data, err = get_json(url, **http_options)
         if err:
             print('ivanti-neurons: failed to retrieve devices from ' + url + ': ' + err)
@@ -205,8 +211,8 @@ def get_assets(base_url, token, config_kwargs):
 
         # Every field of the OData envelope is optional in a degraded or error
         # response, and Starlark has no exception handling -- so an abort here
-        # loses every device already collected, not just this page. data['value']
-        # was direct key access, which is exactly that abort.
+        # would lose the rest of the walk. data['value'] as direct key access
+        # was exactly that abort.
         if type(data) != "dict":
             print('ivanti-neurons: expected an object from ' + url + ', stopping the walk')
             break
@@ -216,7 +222,8 @@ def get_assets(base_url, token, config_kwargs):
             break
         if not assets:
             break  # the empty response Ivanti documents as the end of the walk
-        assets_all.extend(assets)
+        collected += len(assets)
+        reported += report_assets(build_assets(assets))
 
         # Only adopted when it is actually a number; an absent @odata.count
         # leaves the walk to terminate on the next link instead of aborting.
@@ -233,15 +240,15 @@ def get_assets(base_url, token, config_kwargs):
         # and stop, rather than repeating it until the page ceiling.
         if url in seen_links:
             print('ivanti-neurons: the scroll returned a next link it had already served, so it is not advancing; stopping with {} devices collected'.format(
-                len(assets_all)))
+                collected))
             break
         seen_links[url] = True
         # A landscape that keeps handing back a next link cannot spin forever:
         # once the tenant's own reported total has arrived, the walk is done.
-        if total_assets != None and len(assets_all) >= total_assets:
+        if total_assets != None and collected >= total_assets:
             break
 
-    return assets_all
+    return reported
 
 def get_token(base_url, tenant_id, client_id, client_secret, config_kwargs):
     url = base_url + '/api/apigatewaydataservices/v1/token'
@@ -284,10 +291,10 @@ def main(*args, **kwargs):
     if not token:
         print('ivanti-neurons: no access token, nothing to import')
         return None
-    assets = get_assets(base_url, token, kwargs)
-    
-    # Build and stream asset import via report_assets instead of returning a list
-    reported = report_assets(build_assets(assets))
+
+    # Each page is built and streamed inside the walk, so nothing is buffered
+    # across pages.
+    reported = get_and_report_assets(base_url, token, kwargs)
     print('ivanti-neurons: reported {} assets'.format(reported))
 
     return None

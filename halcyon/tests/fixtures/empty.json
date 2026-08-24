@@ -1,7 +1,7 @@
 {
   "name": "empty",
   "integration": "halcyon",
-  "description": "A tenant with no registered endpoints. The search returns an empty items list and the run must stop after one page, report zero assets and log cleanly rather than looping the `range(1000000000000)` walk or failing the task. Also proves no detail call is attempted when there is nothing to enrich.",
+  "description": "A tenant with no registered endpoints. The search returns an empty items list and the run must stop after one page, report zero assets and log cleanly rather than looping the pager-bounded walk or failing the task. Also proves no detail call is attempted when there is nothing to enrich.",
   "kwargs": {
     "url": "$BASE",
     "username": "svc-runzero@example.com",

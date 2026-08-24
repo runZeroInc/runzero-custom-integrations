@@ -202,11 +202,15 @@ directory from a previous run — the scanner refuses an `--output` directory th
 already exists otherwise. Add `--verbose` for the request-by-request log. Omit
 `--output` to see only the log lines.
 
-**Run this one verbose.** There are no tuning parameters — no page size, no
-cap, no filter — so the only way to see the scroll walk described above is the
-request log. With 10 to 20 devices per response and a five-minute scrollID
-window, `--verbose` is how you find out whether the walk is completing or
-quietly stopping partway.
+**Run this one verbose.** There are no credential-form tuning parameters — no
+page size, no filter — so the only way to see the scroll walk described above
+is the request log. With 10 to 20 devices per response and a five-minute
+scrollID window, `--verbose` is how you find out whether the walk is completing
+or quietly stopping partway. The walk itself is bounded by the `maxPages` value
+in `CONFIG` (500 pages) via `pager()`; a scroll that never ends is reported as
+an error naming the label and the page count rather than truncating silently,
+and each page is streamed to runZero as it arrives, so everything imported
+before the stop is kept.
 
 The four parameters divide cleanly by failure mode:
 
@@ -240,8 +244,11 @@ The fixtures under `ivanti_neurons/tests/fixtures/` cover the token exchange,
 the scroll walk, and the degraded envelopes offline — `paged` walks three pages
 and checks the last one is not dropped, `scroll-ends-early` stops on an absent
 next link, `degraded-envelope` survives a page with no `@odata.count` and an
-error document with no `value`, `token-rejected` stops before `/devices`, and
-`missing-network` imports devices that report no adapter:
+error document with no `value`, `token-rejected` stops before `/devices`,
+`missing-network` imports devices that report no adapter, `malformed-os-system`
+imports a device carrying `"OS": null` and `"System": null` and skips a
+non-object row, and `page-ceiling` proves a scroll that never ends errors at
+the `maxPages` bound instead of truncating silently:
 
 ```bash
 python3 tests/run.py ivanti_neurons

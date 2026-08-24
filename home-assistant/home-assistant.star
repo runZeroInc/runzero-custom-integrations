@@ -93,7 +93,6 @@ ATTR_SEPARATOR = "_"
 
 STATES_PATH = "/api/states"
 TEMPLATE_PATH = "/api/template"
-CONFIG_PATH = "/api/config"
 CONFIG_ENTRIES_PATH = "/api/config/config_entries/entry"
 
 MAX_ATTR_VALUES = 32
@@ -616,8 +615,10 @@ def collect_devices(ctx, entity_index, config_entries):
     so a duplicate here would be permanent."""
     reported = 0
     claimed = {}
+    seen_devices = {}
     skipped_service = 0
     skipped_unaddressed = 0
+    skipped_repeated = 0
 
     _pager = pager("home-assistant")
 
@@ -637,6 +638,14 @@ def collect_devices(ctx, entity_index, config_entries):
             device_id = as_text(record.get("id"), join=",").strip()
             if not device_id:
                 continue
+            # The device-id list is re-derived from states and sliced on every
+            # render, so a device registered mid-run shifts the later slices and
+            # one row can appear in two pages. The first copy wins; a second
+            # would emit a duplicate foreign id in one run.
+            if device_id in seen_devices:
+                skipped_repeated += 1
+                continue
+            seen_devices[device_id] = True
             # A "service" entry is the cloud account or hub an integration
             # created, not a physical device on any network.
             if as_text(record.get("entry_type"), join=",").strip().lower() == SERVICE_ENTRY_TYPE:
@@ -670,6 +679,8 @@ def collect_devices(ctx, entity_index, config_entries):
 
     print("home-assistant: imported {} devices from the registry; skipped {} with no MAC or IP and {} service entries".format(
         reported, skipped_unaddressed, skipped_service))
+    if skipped_repeated:
+        print("home-assistant: skipped {} device rows repeated across registry pages (registry changed mid-run)".format(skipped_repeated))
     return reported, claimed, True
 
 

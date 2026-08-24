@@ -1,90 +1,222 @@
 {
-  "name": "auth-refresh",
-  "integration": "jamf",
-  "description": "Jamf Pro expires the bearer token mid-run. The computers-inventory listing answers 403 once, and so does a per-device detail call, and each time the integration must mint a NEW token and replay the request rather than giving up on the page.\n\nNote the trigger is 403, not 401: Jamf Pro answers an expired token with 403 Forbidden and http_request only re-authenticates on `status 403`. A 401 would fall through as a plain error and lose the rest of the run, which is why this scenario scripts 403 specifically.\n\nThe proof is in the Authorization headers: the token endpoint hands out fixture-token-1, then -2, then -3, and requests carrying the later tokens must appear in the recorded sequence. Also proves get_json does NOT silently retry 403 itself, since the replay is what produces the second token.\n\nnamespaced_ids is skipped for the same reason as happy: bare Jamf udid, no tenant scope. Reported as a bug rather than fixed here.",
-  "kwargs": {
-    "url": "$BASE",
-    "client_id": "fixture-client",
-    "client_secret": "fixture-secret"
-  },
-  "routes": [
+ "name": "auth-refresh",
+ "integration": "jamf",
+ "description": "Jamf Pro expires the bearer token mid-run. The computers-inventory listing answers 401 once, and a per-device detail call answers 403, and each time the integration must mint a NEW token and replay the request rather than giving up on the page.\n\nBoth statuses are scripted deliberately: Jamf Pro answers a failed or expired authentication with 401, while 403 is what a token that lost a privilege mid-run looks like -- http_request re-authenticates on either, because a fresh token settles which one it was.\n\nThe proof is in the Authorization headers: the token endpoint hands out fixture-token-1, then -2, then -3, and requests carrying the later tokens must appear in the recorded sequence. Also proves get_json does NOT silently retry 401/403 itself, since the replay is what produces the second token.\n\nnamespaced_ids is skipped for the same reason as happy: bare Jamf udid, no tenant scope. Reported as a bug rather than fixed here.",
+ "kwargs": {
+  "url": "$BASE",
+  "client_id": "fixture-client",
+  "client_secret": "fixture-secret"
+ },
+ "routes": [
+  {
+   "name": "oauth-token",
+   "match": {
+    "method": "POST",
+    "path": "/api/oauth/token"
+   },
+   "responses": [
     {
-      "name": "oauth-token",
-      "match": {"method": "POST", "path": "/api/oauth/token"},
-      "responses": [
-        {"status": 200, "json": {"access_token": "fixture-token-1", "expires_in": 3600, "token_type": "Bearer"}},
-        {"status": 200, "json": {"access_token": "fixture-token-2", "expires_in": 3600, "token_type": "Bearer"}},
-        {"status": 200, "json": {"access_token": "fixture-token-3", "expires_in": 3600, "token_type": "Bearer"}}
-      ],
-      "when_exhausted": "repeat_last"
+     "status": 200,
+     "json": {
+      "access_token": "fixture-token-1",
+      "expires_in": 3600,
+      "token_type": "Bearer"
+     }
     },
     {
-      "name": "computers-page-0-expires-then-ok",
-      "match": {"method": "GET", "path": "/api/v1/computers-inventory", "query_contains": "page=0"},
-      "responses": [
-        {"status": 403, "json": {"httpStatus": 403, "errors": [{"code": "INVALID_TOKEN", "description": "token expired"}]}},
-        {"status": 200, "json": {"totalCount": 2, "results": [{"id": "101"}, {"id": "102"}]}}
-      ],
-      "when_exhausted": "repeat_last"
+     "status": 200,
+     "json": {
+      "access_token": "fixture-token-2",
+      "expires_in": 3600,
+      "token_type": "Bearer"
+     }
     },
     {
-      "name": "computers-drained",
-      "match": {"method": "GET", "path": "/api/v1/computers-inventory"},
-      "responses": [{"status": 200, "json": {"totalCount": 2, "results": []}}],
-      "when_exhausted": "repeat_last"
-    },
-    {
-      "name": "computer-detail-101",
-      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/101"},
-      "responses": [
-        {
-          "status": 200,
-          "json": {
-            "udid": "AAAA1111-0000-4000-8000-000000000101",
-            "general": {"displayName": "syn-mac-101", "lastIpAddress": "10.40.1.101"},
-            "hardware": {"macAddress": "00:50:56:00:40:01", "model": "MacBookPro18,3", "make": "Apple", "serialNumber": "SYNSER0000101"},
-            "operatingSystem": {"name": "macOS", "version": "14.4.1"}
-          }
-        }
-      ],
-      "when_exhausted": "repeat_last"
-    },
-    {
-      "name": "computer-detail-102-expires-then-ok",
-      "match": {"method": "GET", "path": "/api/v1/computers-inventory-detail/102"},
-      "responses": [
-        {"status": 403, "json": {"httpStatus": 403, "errors": [{"code": "INVALID_TOKEN", "description": "token expired"}]}},
-        {
-          "status": 200,
-          "json": {
-            "udid": "AAAA1111-0000-4000-8000-000000000102",
-            "general": {"displayName": "syn-mac-102", "lastIpAddress": "10.40.1.102"},
-            "hardware": {"macAddress": "00:50:56:00:40:02", "model": "MacBookAir10,1", "make": "Apple", "serialNumber": "SYNSER0000102"},
-            "operatingSystem": {"name": "macOS", "version": "13.6.6"}
-          }
-        }
-      ],
-      "when_exhausted": "repeat_last"
-    },
-    {
-      "name": "mobile-drained",
-      "match": {"method": "GET", "path": "/api/v2/mobile-devices/detail"},
-      "responses": [{"status": 200, "json": {"totalCount": 0, "results": []}}],
-      "when_exhausted": "repeat_last"
+     "status": 200,
+     "json": {
+      "access_token": "fixture-token-3",
+      "expires_in": 3600,
+      "token_type": "Bearer"
+     }
     }
-  ],
-  "expect": {
-    "asset_count": 2,
-    "ids": [
-      "AAAA1111-0000-4000-8000-000000000101",
-      "AAAA1111-0000-4000-8000-000000000102"
-    ],
-    "requests_include": [
-      {"method": "GET", "path": "/api/v1/computers-inventory", "header_contains": "fixture-token-1"},
-      {"method": "GET", "path": "/api/v1/computers-inventory", "header_contains": "fixture-token-2"},
-      {"method": "GET", "path": "/api/v1/computers-inventory-detail/102", "header_contains": "fixture-token-3"}
-    ],
-    "log_contains": ["403 Forbidden. Fetching new token and retrying..."]
+   ],
+   "when_exhausted": "repeat_last"
   },
-  "invariants": {"skip": ["namespaced_ids"]}
+  {
+   "name": "computers-page-0-expires-then-ok",
+   "match": {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory",
+    "query_contains": "page=0"
+   },
+   "responses": [
+    {
+     "status": 401,
+     "json": {
+      "httpStatus": 401,
+      "errors": [
+       {
+        "code": "INVALID_TOKEN",
+        "description": "token expired"
+       }
+      ]
+     }
+    },
+    {
+     "status": 200,
+     "json": {
+      "totalCount": 2,
+      "results": [
+       {
+        "id": "101"
+       },
+       {
+        "id": "102"
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  },
+  {
+   "name": "computers-drained",
+   "match": {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "totalCount": 2,
+      "results": []
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  },
+  {
+   "name": "computer-detail-101",
+   "match": {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory-detail/101"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "udid": "AAAA1111-0000-4000-8000-000000000101",
+      "general": {
+       "displayName": "syn-mac-101",
+       "lastIpAddress": "10.40.1.101"
+      },
+      "hardware": {
+       "macAddress": "00:50:56:00:40:01",
+       "model": "MacBookPro18,3",
+       "make": "Apple",
+       "serialNumber": "SYNSER0000101"
+      },
+      "operatingSystem": {
+       "name": "macOS",
+       "version": "14.4.1"
+      }
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  },
+  {
+   "name": "computer-detail-102-expires-then-ok",
+   "match": {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory-detail/102"
+   },
+   "responses": [
+    {
+     "status": 403,
+     "json": {
+      "httpStatus": 403,
+      "errors": [
+       {
+        "code": "INVALID_TOKEN",
+        "description": "token expired"
+       }
+      ]
+     }
+    },
+    {
+     "status": 200,
+     "json": {
+      "udid": "AAAA1111-0000-4000-8000-000000000102",
+      "general": {
+       "displayName": "syn-mac-102",
+       "lastIpAddress": "10.40.1.102"
+      },
+      "hardware": {
+       "macAddress": "00:50:56:00:40:02",
+       "model": "MacBookAir10,1",
+       "make": "Apple",
+       "serialNumber": "SYNSER0000102"
+      },
+      "operatingSystem": {
+       "name": "macOS",
+       "version": "13.6.6"
+      }
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  },
+  {
+   "name": "mobile-drained",
+   "match": {
+    "method": "GET",
+    "path": "/api/v2/mobile-devices/detail"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "totalCount": 0,
+      "results": []
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  }
+ ],
+ "expect": {
+  "asset_count": 2,
+  "ids": [
+   "AAAA1111-0000-4000-8000-000000000101",
+   "AAAA1111-0000-4000-8000-000000000102"
+  ],
+  "requests_include": [
+   {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory",
+    "header_contains": "fixture-token-1"
+   },
+   {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory",
+    "header_contains": "fixture-token-2"
+   },
+   {
+    "method": "GET",
+    "path": "/api/v1/computers-inventory-detail/102",
+    "header_contains": "fixture-token-3"
+   }
+  ],
+  "log_contains": [
+   "Authentication rejected (status 401). Fetching new token and retrying...",
+   "Authentication rejected (status 403). Fetching new token and retrying..."
+  ]
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
 }

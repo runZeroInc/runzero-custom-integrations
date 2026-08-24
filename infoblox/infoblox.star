@@ -102,7 +102,7 @@ load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'basic')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'from_timestamp')
+load('time', 'parse_ts')
 
 DEFAULT_WAPI_VERSION = "v2.13.1"
 DEFAULT_PAGE_SIZE = 1000
@@ -231,12 +231,14 @@ def _get_page(url, http_options, params):
 
 
 def _parse_epoch(value):
-    """Convert a WAPI Timestamp, which is epoch seconds, into a time object."""
-    if type(value) == "float":
-        value = int(value)
-    if type(value) != "int" or value <= 0:
-        return None
-    return from_timestamp(value)
+    """Convert a WAPI Timestamp, which is epoch seconds, into a time object.
+
+    parse_ts treats a non-positive or unparseable value as absent and clamps
+    future values to now. The clamp is what keeps the record alive: an active
+    lease's `ends` is in the future by definition, and the platform silently
+    drops any record whose lastSeenTS is ahead of now. The raw values survive
+    in the infoblox_dhcp_* custom attributes."""
+    return parse_ts(value)
 
 
 def _extattrs(value):

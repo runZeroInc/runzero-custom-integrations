@@ -230,7 +230,10 @@ and leaving those fields unset lets runZero's own fingerprinting decide rather t
 - **Bound users need one request per system.** The graph endpoint returns user ObjectIDs and paths, not
   usernames, and no bulk system-to-users endpoint exists. Rather than resolving each ID with its own
   request, the script walks `GET /api/systemusers` once and builds an ObjectID-to-username map, then joins
-  locally. Cost is therefore one pass over the directory plus one request per system.
+  locally. Cost is therefore one pass over the directory plus one request per system. The per-system walk
+  stops after 50 bound users; when that cap is hit with rows still unread, `jumpcloud_bound_user_count`
+  reports a floor (`50+`) and `jumpcloud_bound_users_truncated` is set, so a host bound to a whole
+  directory is not mistaken for one with exactly 50 users.
 - **Direct versus group-derived bindings are distinguished.** Each returned element carries a `paths` array
   which "enumerates each path from this System to the corresponding User". A path consisting of a single
   connection is a direct system-to-user binding; a longer path arrives through a group. The script splits

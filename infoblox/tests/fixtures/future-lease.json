@@ -1,0 +1,132 @@
+{
+  "name": "future-lease",
+  "integration": "infoblox",
+  "description": "Lease timestamps that land in the future must not kill the record. An active lease's `ends` is in the future by definition, and the platform silently drops any record whose lastSeenTS is ahead of now. Address .21 carries a lease with no cltt at all, so the fallback source for lastSeenTS is the future `ends`; address .22 carries a cltt in the future, the shape a Grid with a fast clock produces. Both must import -- the parsed value is clamped to now via parse_ts -- and the raw epoch values must survive verbatim in the infoblox_dhcp_* custom attributes.\n\ncheck_determinism is disabled for the same reason as happy: ids are namespaced by the Grid host AND ephemeral fixture port.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "wapi_version": "v2.13.1",
+    "network_view": "default",
+    "include_leases": "true"
+  },
+  "routes": [
+    {
+      "name": "leases",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/lease"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "lease/ZG5zLmxlYXNlJDAvMTAuNjAuMC4yMS8w:10.60.0.21/default",
+                "address": "10.60.0.21",
+                "binding_state": "ACTIVE",
+                "hardware": "00:1a:2b:60:00:21",
+                "client_hostname": "future-ends-021",
+                "network": "10.60.0.0/24",
+                "protocol": "IPV4",
+                "starts": 1755000000,
+                "ends": 4102444800
+              },
+              {
+                "_ref": "lease/ZG5zLmxlYXNlJDAvMTAuNjAuMC4yMi8w:10.60.0.22/default",
+                "address": "10.60.0.22",
+                "binding_state": "ACTIVE",
+                "hardware": "00:1a:2b:60:00:22",
+                "client_hostname": "skewed-cltt-022",
+                "network": "10.60.0.0/24",
+                "protocol": "IPV4",
+                "starts": 1755000000,
+                "cltt": 4102444800,
+                "ends": 4102444800
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "networks",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/network"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "network/ZG5zLm5ldHdvcmskMTAuNjAuMC4wLzI0LzA:10.60.0.0/24/default",
+                "network": "10.60.0.0/24",
+                "network_view": "default"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "addresses",
+      "match": {"method": "GET", "path": "/wapi/v2.13.1/ipv4address"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "result": [
+              {
+                "_ref": "ipv4address/Li5pcHY0X2FkZHJlc3MkMTAuNjAuMC4yMS8w:10.60.0.21",
+                "ip_address": "10.60.0.21",
+                "network": "10.60.0.0/24",
+                "network_view": "default",
+                "status": "USED",
+                "usage": ["DHCP"],
+                "names": [],
+                "is_conflict": false
+              },
+              {
+                "_ref": "ipv4address/Li5pcHY0X2FkZHJlc3MkMTAuNjAuMC4yMi8w:10.60.0.22",
+                "ip_address": "10.60.0.22",
+                "network": "10.60.0.0/24",
+                "network_view": "default",
+                "status": "USED",
+                "usage": ["DHCP"],
+                "names": [],
+                "is_conflict": false
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "assets": [
+      {
+        "id": "infoblox:$BASE_HOST:default:10.60.0.21",
+        "fields": {
+          "ipAddresses": "10.60.0.21",
+          "hostnames": "future-ends-021",
+          "infoblox_dhcp_ends": "4102444800"
+        }
+      },
+      {
+        "id": "infoblox:$BASE_HOST:default:10.60.0.22",
+        "fields": {
+          "ipAddresses": "10.60.0.22",
+          "infoblox_dhcp_cltt": "4102444800"
+        }
+      }
+    ],
+    "log_contains": [
+      "infoblox: view default: reported 2 addresses"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

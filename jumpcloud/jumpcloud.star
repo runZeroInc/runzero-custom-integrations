@@ -84,7 +84,7 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface', 'normalize_mac')
 load('http', 'get_json')
-load('time', 'now', 'parse_time', 'parse_ts')
+load('time', 'parse_ts')
 load('re', re_match='match')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 
@@ -350,7 +350,7 @@ def build_software(rows, os_family):
     return software
 
 
-def build_bound_user_attributes(bound, user_index):
+def build_bound_user_attributes(bound, user_index, truncated=False):
     """Summarize the users bound to one system into flat attributes and tags.
 
     Each element of the graph response carries the bound user's ObjectID and the
@@ -358,6 +358,9 @@ def build_bound_user_attributes(bound, user_index):
     binding; a longer path arrives through a group. That distinction is what an
     operator needs when asking not just who can log in to a host but why, and
     which grouping would have to change to revoke it.
+
+    When the graph walk stopped at the listing cap, the count is a floor rather
+    than a total, and the attributes say so.
     """
     usernames = []
     emails = []
@@ -400,7 +403,7 @@ def build_bound_user_attributes(bound, user_index):
             admins.append(username)
 
     attrs = {
-        "bound_user_count": len(user_ids),
+        "bound_user_count": "{}+".format(len(user_ids)) if truncated else len(user_ids),
         "bound_users": usernames[:MAX_BOUND_USERS_LISTED],
         "bound_user_emails": emails[:MAX_BOUND_USERS_LISTED],
         "bound_user_ids": user_ids[:MAX_BOUND_USERS_LISTED],
@@ -408,6 +411,8 @@ def build_bound_user_attributes(bound, user_index):
         "bound_users_via_group": via_group[:MAX_BOUND_USERS_LISTED],
         "bound_users_with_sudo": admins[:MAX_BOUND_USERS_LISTED],
     }
+    if truncated:
+        attrs["bound_users_truncated"] = True
     tags = []
     for username in usernames[:MAX_USER_TAGS]:
         tag = _tag_value("user", username)
@@ -622,7 +627,11 @@ def fetch_user_index(base_url, http_options, page_size):
 
 
 def fetch_bound_users(base_url, http_options, system_id, page_size):
-    """Fetch every user bound to one system, directly or through a group."""
+    """Fetch the users bound to one system, directly or through a group.
+
+    Returns (bound, truncated). truncated is True when the walk stopped at the
+    MAX_BOUND_USERS_LISTED cap with rows still unread, so the caller can mark
+    the count as a floor instead of reporting exactly the cap."""
     bound = []
     url = base_url + SYSTEM_BOUND_USERS_PATH.format(system_id)
     skip = 0
@@ -632,20 +641,20 @@ def fetch_bound_users(base_url, http_options, system_id, page_size):
                              **http_options)
         if err:
             print("jumpcloud: failed to fetch bound users for one system:", err)
-            return bound
+            return bound, False
         # This endpoint answers with a bare JSON array, and a system with no
         # bound users can answer with an empty body that decodes to None.
         items = as_list(data)
         if not items:
             break
         for item in items:
-            bound.append(item)
             if len(bound) >= MAX_BOUND_USERS_LISTED:
-                return bound
+                return bound, True
+            bound.append(item)
         if len(items) < page_size:
             break
         skip += page_size
-    return bound
+    return bound, False
 
 
 def fetch_insights(base_url, http_options, path, system_id, page_size, insights_state):
@@ -711,9 +720,9 @@ def fetch_system_detail(base_url, http_options, system, system_id, page_size,
     detail = {"bound_attrs": {}, "bound_tags": [], "software": [], "macs": {}}
 
     if include_bound_users:
+        bound, truncated = fetch_bound_users(base_url, http_options, system_id, page_size)
         detail["bound_attrs"], detail["bound_tags"] = build_bound_user_attributes(
-            fetch_bound_users(base_url, http_options, system_id, page_size),
-            user_index)
+            bound, user_index, truncated)
 
     if not include_software and not include_mac_addresses:
         return detail

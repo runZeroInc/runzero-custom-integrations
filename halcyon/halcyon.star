@@ -8,6 +8,7 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    "maxPages": 10000,
     "params": [
         {
             "key": "url",
@@ -17,6 +18,16 @@ CONFIG = {
             "default": "https://api.halcyon.ai",
             "placeholder": "https://api.halcyon.ai",
             "description": "Halcyon's API endpoint. Override only for a regional or self-hosted deployment.",
+        },
+        {
+            "key": "page_size",
+            "label": "Search page size",
+            "type": "int",
+            "required": False,
+            "default": 10,
+            "min": 1,
+            "max": 1000,
+            "description": "Assets per search page. Raise it to reduce request volume on a large tenant.",
         },
         {
             "key": "username",
@@ -39,7 +50,9 @@ CONFIG = {
 load('runzero.types', 'ImportAsset', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'post_json', 'bearer')
-load('kwargs', 'get_http_options')
+load('kwargs', 'get_http_options', 'get_int')
+load('coerce', 'as_dict', 'as_list', 'as_int', 'dicts')
+load('runzero.progress', progress_report='report')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or self-hosted deployment can be reached
@@ -92,7 +105,10 @@ def _get_access_token(base_url, username, password, config_kwargs):
     if err:
         print("Halcyon login failed:", err)
         return None
-    return data.get("accessToken") if data else None
+    if type(data) != "dict":
+        print("Halcyon login returned an unexpected response shape; expected a JSON object")
+        return None
+    return data.get("accessToken")
 
 def _build_headers(api_token):
     return {
@@ -140,10 +156,13 @@ def _authorized_get_json(url, auth_state):
 
 def _build_network_interfaces(ip_objects, mac_list):
     # Halcyon IP entries are objects like {"ipAddressType": "IPv4", "value": "1.2.3.4"}.
-    ips = [obj.get("value") for obj in ip_objects if type(obj) == "dict"]
+    # dicts()/as_list() tolerate a null or non-list value from the detail record,
+    # so "ipAddresses": null cannot abort the run.
+    ips = [obj.get("value") for obj in dicts(ip_objects)]
+    macs = as_list(mac_list, wrap=False)
     mac = ""
-    if type(mac_list) == "list" and len(mac_list) > 0 and mac_list[0]:
-        mac = str(mac_list[0])
+    if len(macs) > 0 and macs[0]:
+        mac = str(macs[0])
     nic = network_interface(mac=mac, ips=ips)
     return [nic] if nic else []
 
@@ -177,9 +196,10 @@ def main(*args, **kwargs):
 
     reported = 0
     page = 1
-    page_size = 10
+    page_size = get_int(kwargs, 'page_size', default=10)
 
-    for _ in range(1000000000000):
+    p = pager("asset-search")
+    while p.next():
         search_url = "{}/v2/assets/search".format(base_url)
         payload = {
             "filters": [],
@@ -197,13 +217,24 @@ def main(*args, **kwargs):
         if err:
             print("API Error during asset search:", err)
             break
-        items = data.get("items", []) if data else []
+        if type(data) != "dict":
+            # A gateway or a changed API version can answer 200 with a bare
+            # array or a string; stop cleanly instead of aborting on .get.
+            print("halcyon: asset search returned an unexpected response shape; expected an object with items")
+            break
+        items = data.get("items", [])
+        if type(items) != "list":
+            print("halcyon: asset search items field is not a list; stopping")
+            break
 
         if not items:
             break
 
         page_assets = []
         for item in items:
+            if type(item) != "dict":
+                print("halcyon: skipping non-object search row")
+                continue
             asset_id = item.get("id")
             if not asset_id:
                 print("halcyon: skipping asset with no id: name=" + str(item.get("name", "")))
@@ -217,10 +248,11 @@ def main(*args, **kwargs):
             if detail_err:
                 print("Failed to fetch detailed info for asset {}: {}".format(asset_id, detail_err))
                 detail_data = {}
-            elif detail_data:
+            elif type(detail_data) == "dict":
                 ips = detail_data.get("ipAddresses", [])
                 macs = detail_data.get("macAddresses", [])
             else:
+                # None, or a non-object 200 body; import the asset without addresses.
                 detail_data = {}
 
             net_interfaces = _build_network_interfaces(ips, macs)
@@ -271,9 +303,13 @@ def main(*args, **kwargs):
         reported += report_assets(page_assets)
 
         # Handle pagination using the API's pagination block
-        pagination = data.get("pagination", {})
-        current_page = pagination.get("currentPage", page)
-        total_pages = pagination.get("totalPages", 1)
+        pagination = as_dict(data.get("pagination"))
+        current_page = as_int(pagination.get("currentPage"), page)
+        total_pages = as_int(pagination.get("totalPages"), 1)
+
+        if total_pages > 0:
+            progress_report(min(current_page * 100 // total_pages, 100),
+                            "page {}/{}: {} assets imported".format(current_page, total_pages, reported))
 
         if current_page >= total_pages:
             break
