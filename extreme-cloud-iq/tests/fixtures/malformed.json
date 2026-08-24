@@ -1,0 +1,122 @@
+{
+ "name": "malformed",
+ "integration": "extreme-cloud-iq",
+ "description": "One malformed record must cost itself, never the run. Device 500000000010001 carries a garbage ip_address string -- ip_address() answers None for it, and the old code read .version off that None and aborted the page. Device 500000000010002 carries present-but-null ip_address/ipv6_address/hostname fields and must import on its MAC alone. A bare string sits in the data array where a device object is documented and is skipped with a log line. The healthy device on the same page must import with both address families intact. namespaced_ids is skipped as in happy: the id is the bare XIQ device id.",
+ "kwargs": {
+  "url": "$BASE",
+  "username": "fixture-user",
+  "password": "fixture-password"
+ },
+ "routes": [
+  {
+   "name": "login",
+   "match": {
+    "method": "POST",
+    "path": "/login"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "access_token": "fixture-xiq-token",
+      "token_type": "Bearer",
+      "expires_in": 86400
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  },
+  {
+   "name": "devices",
+   "match": {
+    "method": "GET",
+    "path": "/devices"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "page": 1,
+      "count": 4,
+      "total_count": 4,
+      "total_pages": 1,
+      "data": [
+       {
+        "id": 500000000010001,
+        "hostname": "syn-bad-ip",
+        "device_function": "AP",
+        "ip_address": "not-an-ip-address",
+        "mac_address": "00:11:22:33:aa:01",
+        "device_admin_state": "MANAGED"
+       },
+       "not-an-object",
+       {
+        "id": 500000000010002,
+        "hostname": null,
+        "ip_address": null,
+        "ipv6_address": null,
+        "mac_address": "00:11:22:33:aa:02",
+        "device_admin_state": "MANAGED"
+       },
+       {
+        "id": 500000000010003,
+        "hostname": "syn-clean",
+        "device_function": "SWITCH",
+        "ip_address": "10.61.1.13",
+        "ipv6_address": "2001:db8:61::13",
+        "mac_address": "00:11:22:33:aa:03",
+        "device_admin_state": "MANAGED"
+       }
+      ]
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  }
+ ],
+ "expect": {
+  "asset_count": 3,
+  "ids": [
+   "500000000010001",
+   "500000000010002",
+   "500000000010003"
+  ],
+  "assets": [
+   {
+    "id": "500000000010001",
+    "fields": {
+     "macAddresses": "00:11:22:33:aa:01"
+    },
+    "fields_absent": [
+     "ipAddresses"
+    ]
+   },
+   {
+    "id": "500000000010002",
+    "fields": {
+     "macAddresses": "00:11:22:33:aa:02"
+    },
+    "fields_absent": [
+     "ipAddresses",
+     "hostnames"
+    ]
+   },
+   {
+    "id": "500000000010003",
+    "fields": {
+     "ipAddresses": "10.61.1.13\t2001:db8:61::13",
+     "deviceType": "Switch"
+    }
+   }
+  ],
+  "log_contains": [
+   "Skipping non-object device record.",
+   "Total assets imported: 3"
+  ]
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
+}

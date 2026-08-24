@@ -115,8 +115,10 @@ python3 tests/run.py efficientip-solidserver
   same care as renaming a runZero site.
 - Final runZero ID: `efficientip:<appliance-host>:<space>:<address>` — for
   example `efficientip:solidserver.example.com:Local:10.211.132.72`.
-- Missing-ID behavior: rows with no usable `hostaddr` are skipped; no id is
-  invented.
+- Missing-ID behavior: rows with no usable address are skipped; no id is
+  invented. IPv6 rows fall back to converting the bare 32-hex-digit `ip6_addr`
+  column when `hostaddr` is absent, since installs differ in whether the
+  printable form is exposed; the id uses the canonical colon form either way.
 - Match behavior (set once in `CONFIG`): `no-id-match no-id-break`. The
   composite is deterministic but address-based, so it must not drive or block
   merging; correlation falls back to the MAC, IP, and hostnames on the record.

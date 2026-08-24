@@ -1,0 +1,116 @@
+{
+ "name": "malformed",
+ "integration": "device42",
+ "description": "One malformed record must cost itself, never the run. Device 9601 carries a bare string and a null inside ip_addresses and a string inside mac_addresses -- the unguarded .get on those entries used to abort the task, losing the current page and every page after it. Device 9602 carries present-but-null macAddresses/ip_addresses fields, which the old `.get(key, [])` defaults did not defend (a .get default only applies when the key is ABSENT), so `None + []` aborted the run. The bare string in the Devices array itself has no id to key on and is counted with the id-less devices. All three real devices must import with whatever addressing was usable. namespaced_ids is skipped for the reason recorded in happy. NOTE: the served page size is learned from the first response (so a server-side row cap cannot silently truncate the import), which means a single-page inventory is confirmed with one extra request that must return an empty Devices array.",
+ "kwargs": {
+  "url": "$BASE",
+  "auth_scheme": "basic",
+  "credential": "Zml4dHVyZTpmaXh0dXJl"
+ },
+ "routes": [
+  {
+   "match": {
+    "method": "GET",
+    "path": "/api/1.0/devices/all/"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "Devices": [
+       {
+        "id": 9601,
+        "name": "d42-mixed-entries",
+        "os": "Ubuntu",
+        "ip_addresses": [
+         "10.92.0.5",
+         null,
+         {
+          "ip": "10.92.0.6",
+          "macaddress": "00:11:22:33:66:01"
+         }
+        ],
+        "mac_addresses": [
+         "00:11:22:33:66:02",
+         {
+          "mac": "00:11:22:33:66:03"
+         }
+        ]
+       },
+       "not-an-object",
+       {
+        "id": 9602,
+        "name": "d42-null-fields",
+        "os": "Windows",
+        "macAddresses": null,
+        "ip_addresses": null,
+        "ipAddresses": [
+         {
+          "ip": "10.92.0.7",
+          "macaddress": "00:11:22:33:66:04"
+         }
+        ]
+       },
+       {
+        "id": 9603,
+        "name": "d42-clean",
+        "os": "Linux",
+        "ip_addresses": [
+         {
+          "ip": "10.92.0.8",
+          "macaddress": "00:11:22:33:66:05"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "status": 200,
+     "json": {
+      "Devices": []
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 3,
+  "ids": [
+   "9601",
+   "9602",
+   "9603"
+  ],
+  "assets": [
+   {
+    "id": "9601",
+    "fields": {
+     "ipAddresses": "10.92.0.6",
+     "macAddresses": "00:11:22:33:66:01\t00:11:22:33:66:03"
+    }
+   },
+   {
+    "id": "9602",
+    "fields": {
+     "ipAddresses": "10.92.0.7"
+    }
+   },
+   {
+    "id": "9603",
+    "fields": {
+     "ipAddresses": "10.92.0.8"
+    }
+   }
+  ],
+  "log_contains": [
+   "device42: skipped 1 devices with no stable id"
+  ],
+  "request_count": 2
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
+}

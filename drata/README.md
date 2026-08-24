@@ -171,9 +171,9 @@ Two things about correlation are worth reading carefully, because they differ fr
 - **The hostname is Drata's asset `name`, which is a label rather than a name in the DNS sense.** For hardware synced from a device connector it is usually the real machine name; for a hand-entered asset it can be anything an administrator typed. Custom integration hostnames are enrolled in runZero's trusted-name set, so a label like `Jane's laptop` participates in both matching and breaking. If Drata assets are merging oddly, the `name` values in the register are the first place to look.
 - **The serial number is imported as the `device.serialNumber` custom attribute only.** It is not used as identity and it is not a correlation dimension, so it is available for a search or a manual reconciliation but it does not merge anything by itself.
 
-### Known defect
+### Compliance-check handling
 
-**An unrecognized compliance-check type ends the run.** The `else` branch of the compliance-check loop executes `print('unrecognized compliance check: ' + type)`, concatenating a string with `type` — the Starlark builtin, not the `check_type` variable holding the value. Starlark has no exception handling, so that expression aborts the whole script rather than printing a warning. Six check types are handled by name (`AGENT_INSTALLED`, `PASSWORD_MANAGER`, `HDD_ENCRYPTION`, `ANTIVIRUS`, `AUTO_UPDATES`, `LOCK_SCREEN`); any seventh that Drata introduces, on any asset, will take the whole import down with it.
+Six check types are mapped by name (`AGENT_INSTALLED`, `PASSWORD_MANAGER`, `HDD_ENCRYPTION`, `ANTIVIRUS`, `AUTO_UPDATES`, `LOCK_SCREEN`). Any type Drata introduces beyond those is logged — `drata: unrecognized compliance check: <type>` — and the record still imports with the checks it does recognize. An earlier revision aborted the whole run here: its `else` branch concatenated a string with `type`, the Starlark **builtin** rather than the variable holding the check's type, and Starlark has no exception handling, so the first unrecognized check took the entire import down. The loop also screens its input now — a present-but-null `complianceChecks` value and a non-object entry inside the list are both skipped rather than aborting the run.
 
 ## Future
 

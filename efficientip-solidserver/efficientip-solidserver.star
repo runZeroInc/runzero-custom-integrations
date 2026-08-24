@@ -213,13 +213,36 @@ def parse_epoch(value):
     return from_timestamp(seconds)
 
 
+HEX_DIGITS = "0123456789abcdefABCDEF"
+
+
+def v6_from_hex(text):
+    """Convert SOLIDserver's bare 32-hex-digit IPv6 column form (ip6_addr,
+    dhcplease6_ip6_addr, ...) into colon notation, or return "" when the value
+    is not that shape."""
+    if len(text) != 32:
+        return ""
+    for index in range(32):
+        if text[index] not in HEX_DIGITS:
+            return ""
+    groups = []
+    for index in range(0, 32, 4):
+        groups.append(text[index:index + 4])
+    return ":".join(groups)
+
+
 def canonical_ip(value):
     """Return the canonical text of an address, so join keys agree between the
-    long-form IPv6 DNS emits and the forms the IPAM tables hold."""
+    long-form IPv6 DNS emits, the forms the IPAM tables hold, and the bare hex
+    form some v6 columns use."""
     text = str(value or "").strip()
     if not text:
         return ""
     addr = ip_address(text)
+    if addr == None:
+        hex_form = v6_from_hex(text)
+        if hex_form:
+            addr = ip_address(hex_form)
     if addr == None:
         return ""
     return str(addr)
@@ -460,7 +483,13 @@ def main(**kwargs):
             def report_v6(row):
                 if str(row.get("type", "") or "") == "free":
                     return 0
+                # Installs differ in whether ip6_address6_list rows carry a
+                # ready-made hostaddr; the hex ip6_addr column is the fallback
+                # so those rows enrich the import instead of being silently
+                # skipped.
                 ip = canonical_ip(row.get("hostaddr"))
+                if not ip:
+                    ip = canonical_ip(row.get("ip6_addr"))
                 if not ip:
                     return 0
                 return report_asset(build_asset(row, ip, True, site_name, appliance_host,

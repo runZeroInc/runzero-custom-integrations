@@ -123,7 +123,10 @@ field for the page size; 100 is the vendor maximum.
 If the run fails, the token is the first thing to check, and the failure mode is
 distinctive: because the token travels as a **cookie** rather than an
 `Authorization` header, a missing or expired token typically produces a redirect
-to a login page or an empty alert list rather than a clean `401`.
+to a login page or an empty alert list rather than a clean `401`. The script
+recognizes the login-page case — a `200` whose body is HTML rather than JSON —
+and ends the walk with a log line naming the likely expired cookie instead of
+failing on a decode error.
 
 To check only that the `CONFIG` block and the HTTP/TLS wiring are sound, without
 touching a real tenant:

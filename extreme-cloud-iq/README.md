@@ -130,7 +130,7 @@ containing a comma cannot be passed this way; prefer `script --kwargs` for ad-ho
 
 Two operational notes that follow from how the requests are made rather than from the identity itself:
 
-- **This integration authenticates and fetches over a `requests.Session`, which accepts only `insecure_skip_verify`.** The consequence is that of the shared TLS options on the credential, **only `tls_disable_validation` is honored** — a custom CA certificate, a client certificate, or a pinned thumbprint will not be applied to any request this integration makes. The shared HTTP retry budget does not apply either, so a rate-limited or briefly unavailable API is not retried; the run ends and the next scheduled task tries again.
+- **Requests go through the shared HTTP helpers (`post_json`/`get_json` with `get_http_options`).** The full shared option set on the credential is honored — TLS validation control, a custom CA certificate, client certificates, pinned thumbprints, the user agent, and proxy settings — and transient failures (429 and 5xx) are retried with backoff, honoring `Retry-After`, so a briefly rate-limited API no longer truncates the run. The login response's status is checked before its body is decoded, so an HTML error page from a proxy ends the run with a readable message instead of a decode abort.
 - **Unmanaged devices are imported by default.** `SKIP_UNMANAGED` is `False` at the top of the script, so the `device_admin_state != "MANAGED"` check never fires. Set it to `True` to restrict the import to managed devices only.
 
 ## Future

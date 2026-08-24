@@ -111,7 +111,7 @@ load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
 load('net', 'network_interface')
 load('http', 'get_json', 'post_json', 'basic', 'bearer')
 load('kwargs', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
-load('time', 'from_timestamp')
+load('time', 'parse_ts')
 
 TOKEN_PATH = "/oauth2/token"
 NETWORKS_PATH = "/api/v1/networks"
@@ -207,22 +207,15 @@ def _scrub(attrs):
 def _epoch_ms(value):
     """Convert an ExtraHop epoch-milliseconds timestamp into a time, or None.
 
-    Device timestamps are documented as "milliseconds since the epoch". The
-    field is occasionally delivered as a numeric string, so digit strings are
-    accepted as well. Zero and negative values mean "never set" and yield None
-    rather than a 1970 timestamp.
+    Device timestamps are documented as "milliseconds since the epoch".
+    parse_ts accepts the numeric-string form the field is occasionally
+    delivered in, yields None for the zero and negative values that mean
+    "never set", and clamps future values to now -- the platform drops an
+    entire ImportAsset whose last-seen time is ahead of the importing clock,
+    so a sensor with a fast clock would otherwise silently lose every
+    recently-active device.
     """
-    if value == None:
-        return None
-    if type(value) == "string":
-        if not value.isdigit():
-            return None
-        value = int(value)
-    if type(value) == "float":
-        value = int(value)
-    if type(value) != "int" or value <= 0:
-        return None
-    return from_timestamp(value // 1000)
+    return parse_ts(value, unit="ms")
 
 
 def _node_key(node_id):
@@ -420,7 +413,43 @@ def build_asset(device, base_url, appliance_uuid, discovery_id, software):
     return asset
 
 
-def build_assets(devices, base_url, http_options, appliance_uuids, seen, include_software):
+def _refresh_authorization(ctx):
+    """Re-mint the bearer token after a mid-run 401, RevealX 360 only.
+
+    RevealX 360 access tokens are valid for roughly ten minutes, so a long walk
+    -- especially with the software N+1 -- outlives the one fetched at startup.
+    Enterprise API keys do not expire, so a 401 there is a real credential
+    problem and is not retried. Returns True when a new token was installed.
+    """
+    if ctx["deployment"] != "reveal360":
+        return False
+    print("extrahop: access token rejected mid-run; requesting a new one")
+    authorization = build_authorization(ctx["base_url"], ctx["kwargs"], "reveal360")
+    if not authorization:
+        return False
+    # The headers dict inside http_options is the one every later request
+    # sends, so updating it re-authenticates the rest of the run too.
+    ctx["http_options"]["headers"]["Authorization"] = authorization
+    return True
+
+
+def api_get(ctx, url):
+    """GET returning (data, err), re-authenticating once on a rejected token."""
+    data, err = get_json(url, **ctx["http_options"])
+    if err and err.startswith("status 401") and _refresh_authorization(ctx):
+        data, err = get_json(url, **ctx["http_options"])
+    return data, err
+
+
+def api_post(ctx, url, body):
+    """POST returning (data, err), re-authenticating once on a rejected token."""
+    data, err = post_json(url, json=body, **ctx["http_options"])
+    if err and err.startswith("status 401") and _refresh_authorization(ctx):
+        data, err = post_json(url, json=body, **ctx["http_options"])
+    return data, err
+
+
+def build_assets(devices, ctx, appliance_uuids, seen, include_software):
     """Build one page of ImportAssets, skipping devices already seen this run.
 
     The device search is paged with limit and offset over a live inventory that
@@ -452,13 +481,13 @@ def build_assets(devices, base_url, http_options, appliance_uuids, seen, include
 
         software = []
         if include_software:
-            software = fetch_software(base_url, http_options, device.get("id"))
+            software = fetch_software(ctx, device.get("id"))
 
-        assets.append(build_asset(device, base_url, appliance_uuid, discovery_id, software))
+        assets.append(build_asset(device, ctx["base_url"], appliance_uuid, discovery_id, software))
     return assets
 
 
-def fetch_software(base_url, http_options, device_id):
+def fetch_software(ctx, device_id):
     """Fetch the software observed on one device.
 
     The software sub-resource is keyed by the numeric device id rather than the
@@ -466,8 +495,8 @@ def fetch_software(base_url, http_options, device_id):
     """
     if device_id == None or device_id == "":
         return []
-    url = base_url + DEVICE_SOFTWARE_PATH.format(device_id)
-    data, err = get_json(url, **http_options)
+    url = ctx["base_url"] + DEVICE_SOFTWARE_PATH.format(device_id)
+    data, err = api_get(ctx, url)
     if err:
         print("extrahop: failed to fetch software for device {}: {}".format(device_id, err))
         return []
@@ -523,14 +552,14 @@ def build_authorization(base_url, kwargs, deployment):
     return "ExtraHop apikey=" + api_key
 
 
-def fetch_appliance_uuids(base_url, http_options):
+def fetch_appliance_uuids(ctx):
     """Map each node_id to its appliance UUID, or return None when unavailable.
 
     A console returns one network per connected sensor; a standalone sensor
     returns a single network whose node_id is null, which is keyed here as the
     empty string so that devices reporting a null node_id resolve to it.
     """
-    data, err = get_json(base_url + NETWORKS_PATH, **http_options)
+    data, err = api_get(ctx, ctx["base_url"] + NETWORKS_PATH)
     if err:
         print("extrahop: failed to fetch networks:", err)
         if err.startswith("status 401") or err.startswith("status 403"):
@@ -575,20 +604,20 @@ def build_search_body(page_size, offset, lookback_days, require_ip_address):
     return body
 
 
-def fetch_and_report_devices(base_url, http_options, appliance_uuids, page_size,
+def fetch_and_report_devices(ctx, appliance_uuids, page_size,
                              lookback_days, require_ip_address, include_software):
     """Fetch and stream devices one page at a time so the full set is never
     held in memory at once."""
     reported = 0
     offset = 0
     seen = {}
-    url = base_url + DEVICES_SEARCH_PATH
+    url = ctx["base_url"] + DEVICES_SEARCH_PATH
 
     _pager = pager("extrahop")
 
     while _pager.next():
         body = build_search_body(page_size, offset, lookback_days, require_ip_address)
-        data, err = post_json(url, json=body, **http_options)
+        data, err = api_post(ctx, url, body)
         if err:
             print("extrahop: failed to fetch devices:", err)
             if err.startswith("status 401") or err.startswith("status 403"):
@@ -603,7 +632,7 @@ def fetch_and_report_devices(base_url, http_options, appliance_uuids, page_size,
         if not devices:
             break
 
-        assets = build_assets(devices, base_url, http_options, appliance_uuids,
+        assets = build_assets(devices, ctx, appliance_uuids,
                               seen, include_software)
         if assets:
             reported += report_assets(assets)
@@ -635,15 +664,25 @@ def main(**kwargs):
     http_options["retries"] = HTTP_RETRIES
     http_options["retry_backoff"] = HTTP_RETRY_BACKOFF
 
+    # Shared request state: api_get/api_post read the headers from here, and a
+    # mid-run RevealX 360 token refresh writes the new Authorization back into
+    # them for every later request.
+    ctx = {
+        "base_url": base_url,
+        "kwargs": kwargs,
+        "deployment": deployment,
+        "http_options": http_options,
+    }
+
     # The appliance UUID is the uniqueness scope for a discovery ID, so it is
     # resolved before any asset is built. Falling back to another scope token
     # would re-identify every asset on the next run, so the run stops instead.
-    appliance_uuids = fetch_appliance_uuids(base_url, http_options)
+    appliance_uuids = fetch_appliance_uuids(ctx)
     if appliance_uuids == None:
         print("extrahop: cannot resolve appliance UUIDs, no assets imported")
         return None
 
-    reported = fetch_and_report_devices(base_url, http_options, appliance_uuids,
+    reported = fetch_and_report_devices(ctx, appliance_uuids,
                                         page_size, lookback_days,
                                         require_ip_address, include_software)
     if not reported:

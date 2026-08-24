@@ -8,6 +8,13 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # A hard bound on the offset walk. Its normal exits are an empty page and a
+    # short page, and an appliance that ignores `offset` produces neither -- it
+    # just keeps answering with the same full page. 200 pages x 1000 rows =
+    # 200,000 devices, past the CMDB size of the largest Device42 appliance.
+    # Reaching the ceiling raises, naming this key: a truncated import that
+    # says nothing looks exactly like a complete one.
+    "maxPages": 200,
     "params": [
         {
             "key": "url",
@@ -51,13 +58,6 @@ load('kwargs', 'get_url_base', 'get_http_options')
 # real assets.
 DEVICE42_ENDPOINT = '/api/1.0/devices/all/'
 PAGE_SIZE         = 1000
-
-# A hard bound on the offset walk below. Its exits are an empty page and a short
-# page, and an appliance that ignores `offset` produces neither -- it just keeps
-# answering with the same full page. 200 pages x 1000 rows = 200,000 devices,
-# past the CMDB size of the largest Device42 appliance. Reaching the ceiling is
-# logged: a truncated import that says nothing looks exactly like a complete one.
-MAX_PAGES = 200
 
 # runZero's exact-match device-type vocabulary, from
 # IdentifyTypeFromCustomIntegration in the platform. A value outside this list is
@@ -116,10 +116,20 @@ def device_type(d):
             return mapped
     return None
 
+def _list(value):
+    """Return the value when it is a list, else an empty list. Device42's
+    interface fields are documented as arrays, but a present-but-null value or
+    a stray scalar would abort the concatenation or the loop below."""
+    return value if type(value) == "list" else []
+
 def build_network_interfaces(mac_entries, ip_entries):
     interfaces = []
     seen_macs = {}
     for ip_obj in ip_entries:
+        # A bare string or null element would abort the run at .get, losing the
+        # current page and every page after it; drop the entry instead.
+        if type(ip_obj) != "dict":
+            continue
         ip_str = ip_obj.get('ip')
         if not ip_str:
             continue
@@ -136,6 +146,8 @@ def build_network_interfaces(mac_entries, ip_entries):
             interfaces.append(nic)
 
     for m in mac_entries:
+        if type(m) != "dict":
+            continue
         mac_addr = m.get('mac') or m.get('mac_address')
         if mac_addr not in seen_macs:
             # Likewise None when the record carried neither key, leaving an
@@ -149,6 +161,11 @@ def build_network_interfaces(mac_entries, ip_entries):
 def build_assets(devices, skipped):
     assets = []
     for d in devices:
+        # A non-object row has no id to key on and would abort the run at
+        # .get; count it with the id-less devices.
+        if type(d) != "dict":
+            skipped[0] += 1
+            continue
         raw_id = d.get('id') or d.get('uuid') or d.get('device_id') or d.get('serial_no')
         if not raw_id:
             # Tallied across every page and reported once by main; logging each
@@ -165,8 +182,8 @@ def build_assets(devices, skipped):
             if val and val not in hostnames:
                 hostnames.append(val)
 
-        mac_entries = d.get('macAddresses', []) + d.get('mac_addresses', [])
-        ip_entries  = d.get('ipAddresses', [])  + d.get('ip_addresses', [])
+        mac_entries = _list(d.get('macAddresses')) + _list(d.get('mac_addresses'))
+        ip_entries  = _list(d.get('ipAddresses'))  + _list(d.get('ip_addresses'))
         network_ifaces = build_network_interfaces(mac_entries, ip_entries)
 
         asset_os = d.get('os')
@@ -244,12 +261,18 @@ def main(**kwargs):
     http_options = get_http_options(kwargs, headers=headers)
 
     offset = 0
-    total = 0
-    capped = True
     reported = 0
+    # The size the appliance actually serves, learned from the first page. An
+    # appliance may clamp `limit` below the requested PAGE_SIZE, and comparing
+    # the stop condition against the request rather than the served size would
+    # end the walk after one full page and silently truncate the import.
+    served_page_size = 0
     # [count, first name] -- a list so build_assets can accumulate across pages.
     skipped = [0, ""]
-    for _page in range(0, MAX_PAGES):
+    # CONFIG maxPages bounds the walk; reaching it raises rather than quietly
+    # handing back a truncated inventory.
+    p = pager("devices")
+    while p.next():
         url = '{}{}?format=json&limit={}&offset={}'.format(
             base_url, DEVICE42_ENDPOINT, PAGE_SIZE, offset
         )
@@ -271,22 +294,19 @@ def main(**kwargs):
 
         page = body.get('Devices', [])
         if not page:
-            capped = False
             break
 
         # Build and stream this page's assets, then let it be reclaimed before
         # fetching the next page so memory stays bounded by a single page.
         reported += report_assets(build_assets(page, skipped))
-        total += len(page)
 
-        if len(page) < PAGE_SIZE:
-            capped = False
+        if served_page_size == 0:
+            served_page_size = len(page)
+        if len(page) < served_page_size:
             break
-        offset += PAGE_SIZE
-
-    if capped:
-        print('device42: stopped at the {} page ceiling after {} devices; every page came back full, so this run is truncated'.format(
-            MAX_PAGES, total))
+        # Advance by the rows actually served, not by the requested limit, so a
+        # clamped appliance pages through the whole estate without gaps.
+        offset += len(page)
 
     if skipped[0] > 0:
         print('device42: skipped {} devices with no stable id (first name: {})'.format(

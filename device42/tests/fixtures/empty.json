@@ -1,0 +1,42 @@
+{
+ "name": "empty",
+ "integration": "device42",
+ "description": "An appliance with no devices. The real GET response carries only the Devices array (the code/msg pair belongs to write operations), so this also proves the `code` check tolerates the key's absence. The run must make its one authenticated request, import nothing, and say so.",
+ "kwargs": {
+  "url": "$BASE",
+  "auth_scheme": "basic",
+  "credential": "Zml4dHVyZTpmaXh0dXJl"
+ },
+ "routes": [
+  {
+   "match": {
+    "method": "GET",
+    "path": "/api/1.0/devices/all/"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "Devices": []
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 0,
+  "request_count": 1,
+  "log_contains": [
+   "device42: reported 0 assets"
+  ],
+  "requests_include": [
+   {
+    "header_contains": "Zml4dHVyZTpmaXh0dXJl"
+   }
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

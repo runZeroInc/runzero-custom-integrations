@@ -1,0 +1,173 @@
+{
+  "name": "malformed",
+  "integration": "exe-dev",
+  "description": "One malformed record must cost itself, never the run, and a denied enrichment command must degrade rather than abort. The ls -l payload mixes a healthy VM, a bare string where a VM object is documented, a VM whose vm_name is present but null (a .get default does not defend a null -- 'exedev-' + None used to abort the task), and a VM whose tags field is null (iterating None aborts, and joining a non-string tag aborts; this record also carries a numeric tag that must be dropped). 'domain ls -a' answers 403, which must be logged as the enrichment being unavailable -- the 403 is not a retryable status, so it must be requested exactly once. The two usable VMs must import; the null-name record is tallied under the no-vm_name skip and the string row under the non-object skip.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "exe1.fixture-token"
+  },
+  "routes": [
+    {
+      "name": "ls-l",
+      "match": {
+        "method": "POST",
+        "body_contains": "ls -l"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "vms": [
+              {
+                "vm_name": "syn-ok-01",
+                "status": "running",
+                "region": "us-east",
+                "region_display": "US East",
+                "https_url": "https://syn-ok-01.exe.dev/",
+                "ssh_dest": "syn-ok-01.ssh.exe.dev",
+                "tags": ["ci"]
+              },
+              "not-an-object",
+              {
+                "vm_name": null,
+                "status": "running",
+                "comment": "present-but-null vm_name"
+              },
+              {
+                "vm_name": "syn-null-tags-02",
+                "status": "stopped",
+                "region": "eu-west",
+                "region_display": "EU West",
+                "https_url": "https://syn-null-tags-02.exe.dev/",
+                "ssh_dest": "syn-null-tags-02.ssh.exe.dev",
+                "tags": null
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "domain-ls-denied",
+      "match": {
+        "method": "POST",
+        "body_contains": "domain ls"
+      },
+      "responses": [
+        {
+          "status": 403,
+          "json": {"error": "command not permitted by this token"}
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "share-show-ok",
+      "match": {
+        "method": "POST",
+        "body_contains": "share show syn-ok-01"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {"public": true, "email_enabled": false, "port": 8080}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "share-show-null-tags",
+      "match": {
+        "method": "POST",
+        "body_contains": "share show syn-null-tags-02"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {"public": false, "email_enabled": false, "port": 0}
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "integrations-list",
+      "match": {
+        "method": "POST",
+        "body_contains": "integrations list"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "integrations": [
+              {
+                "name": "syn-repo-sync",
+                "type": "github",
+                "repository": "example/syn-service",
+                "attached": ["vm:syn-ok-01", 42, null]
+              },
+              "not-an-integration"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "exedev-syn-ok-01",
+      "exedev-syn-null-tags-02"
+    ],
+    "assets": [
+      {
+        "id": "exedev-syn-ok-01",
+        "fields": {
+          "deviceType": "Server",
+          "exe_dev_proxy_public": "True",
+          "exe_dev_integrations": "syn-repo-sync"
+        }
+      },
+      {
+        "id": "exedev-syn-null-tags-02",
+        "fields": {
+          "deviceType": "Server",
+          "exe_dev_status": "stopped"
+        }
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "body_contains": "ls -l"
+      },
+      {
+        "method": "POST",
+        "body_contains": "domain ls -a"
+      },
+      {
+        "method": "POST",
+        "body_contains": "share show syn-ok-01"
+      }
+    ],
+    "log_contains": [
+      "exe-dev: skipped 1 non-object VM records",
+      "exe-dev: retrieved 3 VMs",
+      "exe-dev: forbidden (403); the token lacks permission for: domain ls -a",
+      "exe-dev: custom domain enrichment unavailable; the token may lack the 'domain ls' permission",
+      "exe-dev: skipped 1 VMs with no vm_name (first status: running)",
+      "exe-dev: reported 2 assets"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

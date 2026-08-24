@@ -8,6 +8,12 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # A BACKSTOP, not the primary guard: the walk's real runaway protection is
+    # the repeated-page check in the loop, which notices a tenant that ignores
+    # `page` after two requests. 100,000 pages x 100 rows = 10,000,000 devices,
+    # past any real XIQ deployment; reaching it raises rather than quietly
+    # truncating.
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -37,11 +43,10 @@ CONFIG = {
     },
 }
 load('runzero.types', 'ImportAsset', 'NetworkInterface')
-load('requests', 'Session')
-load('json', json_encode='encode', json_decode='decode')
+load('http', 'get_json', 'post_json', 'bearer')
 load('flatten_json', 'flatten')
 load('net', 'ip_address')
-load('kwargs', 'get_bool')
+load('kwargs', 'get_http_options')
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
 # than compiled in, so a regional or self-hosted deployment can be reached
@@ -51,20 +56,6 @@ DEFAULT_EXTREME_CLOUD_IQ_URL = 'https://api.extremecloudiq.com'
 SKIP_UNMANAGED = False
 
 PAGE_SIZE = 100
-
-# A BACKSTOP, not the primary guard. The walk's real runaway protection is the
-# repeated-page check in the loop below, which notices a tenant that ignores
-# `page` after two requests. A page ceiling is a poor first line of defence: an
-# XIQ that keeps re-serving one page would be hammered for the whole ceiling
-# before anything stopped it.
-#
-# The number is derived from a record target rather than hand-picked, so it
-# scales with the page size instead of encoding a guess about tenant size:
-# 100,000 pages x 100 rows = 10,000,000 devices, past any real XIQ deployment.
-# With the repeated-page check in front of it this should never be reached;
-# reaching it anyway is logged, because a truncated import that says nothing
-# looks exactly like a complete one.
-MAX_PAGES = 100000
 
 # device_function is the XiqDeviceFunction enum from Extreme's published
 # OpenAPI specification, and every documented value is listed here except the
@@ -91,6 +82,10 @@ def asset_networks(ips, mac):
     ip6s = []
     for ip in ips[:99]:
         ip_obj = ip_address(ip)
+        # ip_address answers None for a malformed value, and .version on None
+        # aborts the run mid-page; one bad address must only cost itself.
+        if ip_obj == None:
+            continue
         if ip_obj.version == 4:
             ip4s.append(ip_obj)
         elif ip_obj.version == 6:
@@ -138,33 +133,38 @@ def main(*args, **kwargs):
     # script still works if it is invoked without one.
     base_url = (kwargs.get('url') or DEFAULT_EXTREME_CLOUD_IQ_URL).rstrip('/')
 
-    session = Session(insecure_skip_verify=get_bool(kwargs, 'tls_disable_validation', False))
-    session.headers.set('Content-Type', 'application/json')
-    session.headers.set('Accept', 'application/json')
-    if kwargs.get('http_user_agent'):
-        session.headers.set('User-Agent', kwargs.get('http_user_agent'))
+    # get_http_options wires the full shared option set -- TLS material beyond
+    # insecure_skip_verify, the user agent, proxy, timeouts -- and get_json/
+    # post_json retry the transient statuses (429/5xx) with backoff. The old
+    # requests.Session honored only tls_disable_validation and retried nothing,
+    # so a rate-limited page truncated the import.
+    http_options = get_http_options(kwargs, headers={"Accept": "application/json"})
 
-    login_payload = {
-        "username": username,
-        "password": password
-    }
-    login_resp = session.post(base_url + "/login", json=login_payload)
-    print("Login response code:", login_resp.status_code)
-    login_body = json_decode(login_resp.body)
-    print("Login response body:", login_body.keys())
-
-    if not login_resp or login_resp.status_code != 200:
-        return []
+    # post_json checks the status BEFORE decoding and reports a non-JSON 200
+    # body as an error string, so the HTML page a proxy answers with -- or an
+    # empty body -- ends the run with a clean message instead of aborting the
+    # task inside json_decode. Logging in mints a token and changes nothing, so
+    # the default retry policy is safe here.
+    login_body, err = post_json(base_url + "/login",
+                                json={"username": username, "password": password},
+                                **http_options)
+    if err:
+        print("extreme-cloud-iq: login failed:", err)
+        if err.startswith("status 401") or err.startswith("status 403"):
+            print("extreme-cloud-iq: check the username and password")
+        return None
+    if type(login_body) != "dict":
+        print("extreme-cloud-iq: unexpected login response shape, wanted an object")
+        return None
 
     token = login_body.get("access_token")
     if not token:
         print("Access token not found in response.")
-        return []
+        return None
 
-    session.headers.set("Authorization", "Bearer {}".format(token))
+    http_options["headers"]["Authorization"] = bearer(token)
 
     reported = 0
-    page = 1
     limit = PAGE_SIZE
     last_signature = ""
     # XIQ reports the size of the whole inventory alongside every page. It is
@@ -172,37 +172,22 @@ def main(*args, **kwargs):
     # rather than a bare count the reader cannot judge.
     total_count = None
 
-    # MAX_PAGES + 1 iterations, with the last one reserved for the ceiling
-    # message. The loop has six different ways out and none of them is the
-    # ceiling, so this is the one place the exhausted case can be reported
-    # without a flag to keep in step with every one of those breaks. The extra
-    # iteration issues no request: the ceiling is still exactly MAX_PAGES pages.
-    for _page in range(0, MAX_PAGES + 1):
-        if _page == MAX_PAGES:
-            print("extreme-cloud-iq: page limit of {} hit (integration safety limit). {}".format(
-                MAX_PAGES, retrieved_of(reported, total_count)))
-            break
-
-        url = "{}/devices?page={}&limit={}&view=full".format(base_url, page, limit)
+    # CONFIG maxPages backstops the walk via pager(); the repeated-page check
+    # below remains the primary runaway guard.
+    p = pager("devices")
+    while p.next():
+        page = p.page
+        # `views` (uppercase enum values) is XIQ's documented parameter for the
+        # FULL device view. Earlier revisions sent only `view=full`, which XIQ
+        # ignores as an unknown parameter, so the run worked but silently lost
+        # the FULL-view extras. Both spellings are sent so the request works
+        # whichever one the deployment honors.
+        url = "{}/devices?page={}&limit={}&view=full&views=FULL".format(base_url, page, limit)
         print("Fetching page:", page)
-        resp = session.get(url)
-        if not resp:
-            print("No response for page", page)
+        devices_body, err = get_json(url, **http_options)
+        if err:
+            print("extreme-cloud-iq: failed to fetch page {}: {}".format(page, err))
             break
-        print("Page response code:", resp.status_code)
-
-        # Check the status before decoding, not after. json_decode has no
-        # recoverable failure mode — it aborts the script — so handing it the
-        # HTML error page that accompanies a 401 or a 502 would end the run
-        # rather than break out of this loop.
-        if resp.status_code != 200:
-            break
-
-        body = resp.body.strip() if resp.body else ""
-        if not body.startswith("{") and not body.startswith("["):
-            print("Non-JSON response body on page", page)
-            break
-        devices_body = json_decode(body)
 
         # The documented response is an object with a "data" array; reading .get
         # off a list would abort the script.
@@ -214,7 +199,12 @@ def main(*args, **kwargs):
         if type(reported_total) == "int" and reported_total >= 0:
             total_count = reported_total
 
-        devices = devices_body.get("data", [])
+        # A present-but-null data field defeats the .get default, and anything
+        # but a list would abort the signature check below.
+        devices = devices_body.get("data") or []
+        if type(devices) != "list":
+            print("Unexpected data field shape on page", page, "- wanted a list")
+            break
         if not devices:
             print("No devices on page", page)
             break
@@ -235,6 +225,11 @@ def main(*args, **kwargs):
 
         page_assets = []
         for device in devices:
+            # A non-object element in the data array has no fields to read and
+            # would abort the run at .get; skip it with a note instead.
+            if type(device) != "dict":
+                print("Skipping non-object device record.")
+                continue
 
             device_id = device.get("id") or device.get("serial_number")
             if not device_id:
@@ -255,7 +250,9 @@ def main(*args, **kwargs):
 
             asset_params = {
                 "id": str(device_id),
-                "hostnames": [device.get("hostname", "")],
+                # A present-but-null hostname defeats the .get default and a
+                # None in the hostnames list aborts the whole run.
+                "hostnames": [device.get("hostname") or ""],
                 "networkInterfaces": [asset_networks(ips, mac)],
                 "customAttributes": {},
             }
@@ -281,7 +278,6 @@ def main(*args, **kwargs):
 
         if len(devices) < limit:
             break
-        page += 1
 
     print("Total assets imported:", reported)
     return None

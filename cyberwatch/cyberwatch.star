@@ -304,8 +304,14 @@ def build_software(ctx, server_id, address, detail):
         package_type = as_text(package.get("type"), join=",").strip()
         version = as_text(package.get("version"), join=",").strip()
 
+        # The version is part of the id so two installed versions of one
+        # package on the same asset stay two Software records instead of
+        # collapsing onto a single id.
+        software_id = "{}:{}:{}:package:{}:{}".format(VENDOR, ctx["scope"], server_id, package_type, product)
+        if version:
+            software_id += ":" + version
         params = {
-            "id": "{}:{}:{}:package:{}:{}".format(VENDOR, ctx["scope"], server_id, package_type, product),
+            "id": software_id,
             "product": product,
             "serviceAddress": address or "127.0.0.1",
         }

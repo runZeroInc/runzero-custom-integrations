@@ -1,0 +1,61 @@
+{
+ "name": "empty",
+ "integration": "extreme-cloud-iq",
+ "description": "A tenant with no devices. The login must succeed, the single devices request must come back empty, and the run must report zero assets rather than failing.",
+ "kwargs": {
+  "url": "$BASE",
+  "username": "fixture-user",
+  "password": "fixture-password"
+ },
+ "routes": [
+  {
+   "name": "login",
+   "match": {
+    "method": "POST",
+    "path": "/login"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "access_token": "fixture-xiq-token",
+      "token_type": "Bearer",
+      "expires_in": 86400
+     }
+    }
+   ],
+   "when_exhausted": "repeat_last"
+  },
+  {
+   "name": "devices",
+   "match": {
+    "method": "GET",
+    "path": "/devices"
+   },
+   "responses": [
+    {
+     "status": 200,
+     "json": {
+      "page": 1,
+      "count": 0,
+      "total_count": 0,
+      "total_pages": 0,
+      "data": []
+     }
+    }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 0,
+  "request_count": 2,
+  "log_contains": [
+   "No devices on page 1",
+   "Total assets imported: 0"
+  ]
+ },
+ "invariants": {
+  "skip": []
+ }
+}

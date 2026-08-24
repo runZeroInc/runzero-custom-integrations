@@ -92,8 +92,9 @@ be a Device42 **non-staff** user, and the token inherits that user's permissions
    for paging - that is, the offset is only applied when the total number of objects
    returned exceeds the limit that is returned." With the setting off, `limit` and `offset`
    are ignored, one request returns the entire inventory, and the script's paging loop is
-   working against an API that is not honouring it. The script requests 1000 per page, so
-   set the API GET Limit to at least that.
+   working against an API that is not honouring it. The script requests 1000 per page and
+   learns the size the appliance actually serves from the first response, so a lower API
+   GET Limit still pages the whole inventory correctly — it just costs more requests.
 
 5. Note the base URL. Device42 is a self-hosted virtual appliance, so this is
    `https://<your-appliance-host>` with **no path suffix** — the script appends

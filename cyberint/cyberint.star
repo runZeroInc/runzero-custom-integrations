@@ -8,6 +8,9 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Backstop for the alert page walk; the normal exits are an empty page and
+    # the running count reaching the reported total.
+    "maxPages": 100000,
     "params": [
         {
             "key": "url",
@@ -28,12 +31,9 @@ CONFIG = {
         "http_": OPTIONS_HTTP,
     },
 }
-load('requests', 'Session', 'Cookie')
-load('json', json_encode='encode', json_decode='decode')
 load('runzero.types', 'ImportAsset', 'Vulnerability')
-load('kwargs', 'get_url_base', 'get_bool')
-
-INSECURE_ALLOWED = False
+load('http', 'post_json')
+load('kwargs', 'get_url_base', 'get_http_options')
 
 # Cyberint pages POST /alert/api/v1/alerts with a 1-based `page` and a `size`,
 # both top-level fields of the request body, and answers with `total` (the
@@ -56,7 +56,6 @@ INSECURE_ALLOWED = False
 # and never used it. No such field exists in this response -- the only count is
 # `total` -- so it would have been 0 on every run even if something had read it.
 PAGE_SIZE = 100
-MAX_PAGES = 100000
 
 def main(*args, **kwargs):
     """
@@ -71,16 +70,19 @@ def main(*args, **kwargs):
     # Cyberint API endpoint (tenant-specific, includes asset-configuration)
     url = base_url + "/alert/api/v1/alerts"
 
-    # Setup session with cookie authentication
-    insecure_allowed = get_bool(kwargs, 'tls_disable_validation', INSECURE_ALLOWED)
-    session = Session(insecure_skip_verify=insecure_allowed)
-    session.headers.set('Accept', 'application/json')
-    if kwargs.get('http_user_agent'):
-        session.headers.set('User-Agent', kwargs.get('http_user_agent'))
-    session.cookies.set(url, {"access_token": access_token})
-    
+    # The token travels as a cookie rather than an Authorization header, which
+    # is the vendor's documented approach. get_http_options wires the shared
+    # TLS and HTTP options a raw Session ignored, and post_json retries the
+    # transient statuses (429/5xx) with backoff -- the alert search is a
+    # read-only POST, so a retried request cannot double-apply anything.
+    http_options = get_http_options(kwargs, headers={
+        "Accept": "application/json",
+        "Cookie": "access_token=" + str(access_token or ""),
+    })
+    if "timeout" not in http_options:
+        http_options["timeout"] = 300
+
     related_assets = {}
-    assets = []
 
     # The request used to be a single POST with an empty {} body, so whatever
     # one unpaged response happened to carry was the entire import and every
@@ -91,18 +93,21 @@ def main(*args, **kwargs):
     # An alert with no id cannot be keyed on. Counted across every page and
     # reported once, so a bad export costs a line rather than one per alert.
     skipped = 0
-    for page in range(1, MAX_PAGES + 1):
-        response = session.post(url, json={"page": page, "size": PAGE_SIZE}, timeout=300)
-        if not response or response.status_code != 200:
-            status = response.status_code if response else "no response"
-            print("cyberint: failed to fetch alerts page {}: {}".format(page, status))
+    p = pager("alerts")
+    while p.next():
+        page = p.page
+        data, err = post_json(url, json={"page": page, "size": PAGE_SIZE}, **http_options)
+        if err:
+            # The documented failure mode of an expired or invalid cookie is a
+            # 200 login page rather than a 401. The HTML body fails JSON
+            # decoding inside post_json and arrives here as an error string, so
+            # it is named for what it is instead of aborting the task with a
+            # decode error. Domains already collected still get reported below.
+            if err.startswith("status 200") and "invalid JSON" in err:
+                print("cyberint: page {} returned a non-JSON body; the access token cookie is likely expired or invalid (the portal answers a bad cookie with its login page)".format(page))
+            else:
+                print("cyberint: failed to fetch alerts page {}: {}".format(page, err))
             break
-        # json_decode aborts the whole script on malformed input and Starlark has
-        # no exceptions, so an empty body is screened rather than decoded.
-        if not response.body:
-            print("cyberint: empty body on alerts page {}".format(page))
-            break
-        data = json_decode(response.body)
         if type(data) != "dict":
             print("cyberint: unexpected response shape on page {}, wanted an object".format(page))
             break
@@ -116,6 +121,11 @@ def main(*args, **kwargs):
         seen += len(alerts)
 
         for item in alerts:
+            # A non-object element in the alerts array cannot be keyed on and
+            # would abort the run at .get; count it with the id-less alerts.
+            if type(item) != "dict":
+                skipped += 1
+                continue
             alert_id = item.get("id")
             if not alert_id:
                 skipped += 1
@@ -139,6 +149,9 @@ def main(*args, **kwargs):
             # every alert in the response.
             related_assets_alert = item.get("related_assets") or []
             for a in related_assets_alert:
+                # A bare string in related_assets would abort the run at .get.
+                if type(a) != "dict":
+                    continue
                 asset_type = a.get("type")
                 if asset_type == "domain":
                     domain = a.get("name")
@@ -162,15 +175,18 @@ def main(*args, **kwargs):
     if skipped > 0:
         print("cyberint: skipped {} alerts with no id".format(skipped))
 
+    # The import pivots alerts onto the domains they name, and a later page can
+    # add findings to a domain seen earlier, so the domain index has to survive
+    # the whole walk. Each asset is still streamed as it is built rather than
+    # buffered into a second list, and a walk that ended early reports every
+    # domain collected so far instead of losing them.
+    reported = 0
     for domain, vulns in related_assets.items():
-        assets.append(ImportAsset(
+        reported += report_asset(ImportAsset(
             id=domain.replace(".", "-"),
             hostnames=[domain],
             vulnerabilities=vulns,
-    ))
-
-    # Stream assets to runZero via report_assets instead of returning a list.
-    reported = report_assets(assets)
+        ))
     print("cyberint: reported {} assets".format(reported))
 
     return None

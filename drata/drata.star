@@ -8,6 +8,12 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # A BACKSTOP, not the primary guard: the walk's real runaway protection is
+    # the repeated-page check in the loop, which notices a Drata that ignores
+    # `page` after two requests. 200,000 pages x 50 rows = 10,000,000 assets,
+    # past any real Drata deployment; reaching it raises rather than quietly
+    # truncating.
+    "maxPages": 200000,
     "params": [
         {
             "key": "url",
@@ -42,20 +48,6 @@ load('flatten_json', 'flatten')
 DEFAULT_DRATA_URL = 'https://public-api.drata.com'
 
 PAGE_SIZE = 50
-
-# A BACKSTOP, not the primary guard. The walk's real runaway protection is the
-# repeated-page check in the loop below, which notices a Drata that ignores
-# `page` after two requests. A page ceiling is a poor first line of defence: it
-# lets a stuck tenant be hammered for the whole ceiling before anything stops
-# it.
-#
-# The number is derived from a record target rather than hand-picked, so it
-# scales with the page size instead of encoding a guess about tenant size:
-# 200,000 pages x 50 rows = 10,000,000 assets, past any real Drata deployment.
-# With the repeated-page check in front of it this should never be reached;
-# reaching it anyway is logged, because a truncated import that says nothing
-# looks exactly like a complete one.
-MAX_PAGES = 200000
 
 
 def retrieved_of(retrieved, total):
@@ -92,6 +84,11 @@ def page_signature(rows):
 def build_assets(assets_json):
     assets_import = []
     for item in assets_json:
+        # A non-object element in the data array has no id to key on and would
+        # abort the run at .get, losing this page and every page after it.
+        if type(item) != 'dict':
+            print("drata: skipping non-object asset row")
+            continue
         id = item.get('id')
         if not id:
             print("drata: skipping asset with no id: name=" + str(item.get('name', '')))
@@ -181,8 +178,11 @@ def build_assets(assets_json):
         owner_roles = ''
         owner_terms_agreed = ''
         owner_updated_at = ''
-        device = []
+        # The device block must be an object: present-but-null defeats the .get
+        # default, and .get on a scalar aborts the run.
         device = item.get('device', {})
+        if type(device) != 'dict':
+            device = {}
         if device:
             os_version = device.get('osVersion', '')
             serial_number = device.get('serialNumber', '')
@@ -201,10 +201,17 @@ def build_assets(assets_json):
             is_device_compliant = device.get('isDeviceCompliant', '')
 
             # parse Drata compliance checks; will likely need updated based on your configuration
-            compliance_checks = []
-            compliance_checks = device.get('complianceChecks', {})
+            # A present-but-null complianceChecks value defeats a .get default,
+            # and iterating anything but a list of objects aborts the run at
+            # check.get -- so the shape is screened before the loop.
+            compliance_checks = device.get('complianceChecks')
+            if type(compliance_checks) != 'list':
+                compliance_checks = []
             if compliance_checks:
                 for check in compliance_checks:
+                    if type(check) != 'dict':
+                        print('drata: skipping malformed compliance check entry')
+                        continue
                     check_type = check.get('type', '')
                     if check_type == 'AGENT_INSTALLED':
                         deviceComplianceCheckAgentInstalledCreatedAt = check.get('createdAt', '')
@@ -263,8 +270,9 @@ def build_assets(assets_json):
                         # device still unprocessed.
                         print('drata: unrecognized compliance check: ' + str(check_type))
 
-        owner = []
         owner = item.get('owner', {})
+        if type(owner) != 'dict':
+            owner = {}
         if owner:
             owner_id = owner.get('id', '')
             owner_email = owner.get('email', '')
@@ -383,7 +391,6 @@ def main(**kwargs):
     # Get assets
     filter = 'assetClassType=HARDWARE&employmentStatus=CURRENT_EMPLOYEE'
 
-    page = 1
     page_size = PAGE_SIZE
     reported = 0
     last_signature = ""
@@ -391,13 +398,12 @@ def main(**kwargs):
     # captured so a truncated run can say what fraction of the estate it got,
     # rather than a bare count the reader cannot judge.
     total_count = None
-    # The walk used to be driven by a hasNextPage flag tested at the top of the
-    # loop, which cost an extra iteration to notice the end. The two end
-    # conditions break directly instead, so the page budget below is spent only
-    # on pages actually requested.
-    capped = True
 
-    for _page in range(0, MAX_PAGES):
+    # CONFIG maxPages backstops the walk via pager(); the repeated-page check
+    # below remains the primary runaway guard.
+    p = pager("assets")
+    while p.next():
+        page = p.page
         url = '{}/{}?{}&page={}&limit={}'.format(base_url, 'public/assets', filter, page, page_size)
         data, err = get_json(url, **http_options)
         if err:
@@ -414,9 +420,11 @@ def main(**kwargs):
         if type(reported_total) == 'int' and reported_total >= 0:
             total_count = reported_total
 
-        results_json = data.get('data', [])
+        results_json = data.get('data') or []
+        if type(results_json) != 'list':
+            print('drata: unexpected data field shape, wanted a list')
+            break
         if not results_json:
-            capped = False
             break
 
         # THE PRIMARY RUNAWAY GUARD. A page identical to the one before it means
@@ -428,7 +436,6 @@ def main(**kwargs):
         # requests where the page ceiling would take 200,000.
         signature = page_signature(results_json)
         if signature == last_signature:
-            capped = False
             print('drata: paging stopped after {} pages: the API returned the same page twice. {}'.format(
                 page, retrieved_of(reported, total_count)))
             break
@@ -442,13 +449,7 @@ def main(**kwargs):
         # never held in memory.
         reported += report_assets(build_assets(results_json))
         if len(results_json) < page_size:
-            capped = False
             break
-        page += 1
-
-    if capped:
-        print('drata: page limit of {} hit (integration safety limit). {}'.format(
-            MAX_PAGES, retrieved_of(reported, total_count)))
 
     if not reported:
         print('no assets')

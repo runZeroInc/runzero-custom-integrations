@@ -1,64 +1,89 @@
 {
-  "name": "null-related-assets",
-  "integration": "cyberint",
-  "description": "REGRESSION LOCK on two null-valued fields Cyberint really emits. An alert with no related assets carries \"related_assets\": null, and `for a in item.get(\"related_assets\")` iterated None, aborting the script with 'NoneType value is not iterable'. An alert with an explicitly null severity hit the same class of defect one line earlier: item.get(\"severity\", \"low\") returns None because the key is PRESENT -- a .get default only applies when the key is missing -- and .lower() on None aborted too. Either one lost every alert in the response, including the healthy ones.\n\nBoth are now tolerated: the null severity falls back to low, and the alert naming no domain simply contributes nothing. The two alerts that do name store.example.com must land on one asset.\n\nSkips namespaced_ids: cyberint ids are the domain with dots replaced by dashes and carry no tenant scope, a separate defect reported with the happy scenario.",
-  "kwargs": {
-    "url": "$BASE",
-    "access_token": "fixture-cyberint-cookie"
-  },
-  "routes": [
+ "name": "null-related-assets",
+ "integration": "cyberint",
+ "description": "REGRESSION LOCK on two null-valued fields Cyberint really emits. An alert with no related assets carries \"related_assets\": null, and `for a in item.get(\"related_assets\")` iterated None, aborting the script with 'NoneType value is not iterable'. An alert with an explicitly null severity hit the same class of defect one line earlier: item.get(\"severity\", \"low\") returns None because the key is PRESENT -- a .get default only applies when the key is missing -- and .lower() on None aborted too. Either one lost every alert in the response, including the healthy ones.\n\nBoth are now tolerated: the null severity falls back to low, and the alert naming no domain simply contributes nothing. The two alerts that do name store.example.com must land on one asset.\n\nSkips namespaced_ids: cyberint ids are the domain with dots replaced by dashes and carry no tenant scope, a separate defect reported with the happy scenario. Extended with two non-object elements Cyberint could emit tomorrow: a bare string inside related_assets (used to abort at a.get) and a bare string in the alerts array itself (no id to key on, tallied with the id-less alerts and logged once).",
+ "kwargs": {
+  "url": "$BASE",
+  "access_token": "fixture-cyberint-cookie"
+ },
+ "routes": [
+  {
+   "name": "alerts",
+   "match": {
+    "method": "POST",
+    "path": "/alert/api/v1/alerts"
+   },
+   "responses": [
     {
-      "name": "alerts",
-      "match": {"method": "POST", "path": "/alert/api/v1/alerts"},
-      "responses": [
-        {
-          "status": 200,
-          "json": {
-            "total": 3,
-            "alerts": [
-              {
-                "id": "alert-9001",
-                "severity": "high",
-                "title": "Credential pair offered for sale",
-                "description": "A credential pair for the tenant appeared on a paste site.",
-                "recommendation": "Force a password reset.",
-                "related_assets": null
-              },
-              {
-                "id": "alert-9002",
-                "severity": null,
-                "title": "Unclassified finding",
-                "description": "Cyberint has not assigned a severity to this alert yet.",
-                "recommendation": "Triage the alert.",
-                "related_assets": [
-                  {"type": "domain", "name": "store.example.com"}
-                ]
-              },
-              {
-                "id": "alert-9003",
-                "severity": "medium",
-                "title": "Expiring TLS certificate",
-                "description": "The certificate expires within 14 days.",
-                "recommendation": "Renew the certificate.",
-                "related_assets": [
-                  {"type": "domain", "name": "store.example.com"}
-                ]
-              }
-            ]
-          }
-        }
-      ],
-      "when_exhausted": "error"
+     "status": 200,
+     "json": {
+      "total": 4,
+      "alerts": [
+       {
+        "id": "alert-9001",
+        "severity": "high",
+        "title": "Credential pair offered for sale",
+        "description": "A credential pair for the tenant appeared on a paste site.",
+        "recommendation": "Force a password reset.",
+        "related_assets": null
+       },
+       {
+        "id": "alert-9002",
+        "severity": null,
+        "title": "Unclassified finding",
+        "description": "Cyberint has not assigned a severity to this alert yet.",
+        "recommendation": "Triage the alert.",
+        "related_assets": [
+         {
+          "type": "domain",
+          "name": "store.example.com"
+         }
+        ]
+       },
+       {
+        "id": "alert-9003",
+        "severity": "medium",
+        "title": "Expiring TLS certificate",
+        "description": "The certificate expires within 14 days.",
+        "recommendation": "Renew the certificate.",
+        "related_assets": [
+         "junk-related-asset-string",
+         {
+          "type": "domain",
+          "name": "store.example.com"
+         }
+        ]
+       },
+       "junk-alert-string"
+      ]
+     }
     }
+   ],
+   "when_exhausted": "error"
+  }
+ ],
+ "expect": {
+  "asset_count": 1,
+  "ids": [
+   "store-example-com"
   ],
-  "expect": {
-    "asset_count": 1,
-    "ids": ["store-example-com"],
-    "assets": [
-      {"id": "store-example-com", "fields": {"hostnames": "store.example.com"}}
-    ],
-    "min_vulnerabilities_total": 2,
-    "request_count": 1
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "assets": [
+   {
+    "id": "store-example-com",
+    "fields": {
+     "hostnames": "store.example.com"
+    }
+   }
+  ],
+  "min_vulnerabilities_total": 2,
+  "request_count": 1,
+  "log_contains": [
+   "cyberint: skipped 1 alerts with no id"
+  ]
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
 }

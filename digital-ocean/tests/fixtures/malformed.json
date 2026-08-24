@@ -1,41 +1,119 @@
 {
-  "name": "malformed",
-  "description": "A page mixing a droplet with a null id, a droplet whose networks and image blocks are null, and v4 entries with no ip_address. Each must be skipped or degraded without aborting the run. namespaced_ids is skipped: the id is the bare droplet number with no account scope (reported defect).",
-  "kwargs": {"url": "$BASE", "api_token": "fixture-token"},
-  "routes": [
+ "name": "malformed",
+ "description": "A page mixing a droplet with a null id, a bare string where a droplet object is documented, a droplet whose networks and image blocks are null, v4 entries with no ip_address, and a tags array holding a number, a null, and an object alongside a real string tag. Each must be skipped or degraded without aborting the run: the string row is skipped with a log line, the numeric tag is stringified, the null and object tags are dropped, and the real tag survives. namespaced_ids is skipped: the id is the bare droplet number with no account scope (reported defect).",
+ "kwargs": {
+  "url": "$BASE",
+  "api_token": "fixture-token"
+ },
+ "routes": [
+  {
+   "name": "droplets",
+   "match": {
+    "method": "GET",
+    "path": "/v2/droplets"
+   },
+   "responses": [
     {
-      "name": "droplets",
-      "match": {"method": "GET", "path": "/v2/droplets"},
-      "responses": [
-        {"status": 200, "json": {
-          "droplets": [
-            {"id": null, "name": "fixture-null-id",
-             "networks": {"v4": [{"ip_address": "192.0.2.30", "type": "public"}]}},
-            {"id": 3300002, "name": "fixture-null-blocks", "networks": null, "image": null,
-             "tags": null},
-            {"id": 3300003, "name": "fixture-blank-ips",
-             "networks": {"v4": [{"type": "public"}, {"ip_address": "", "type": "private"},
-                                 {"ip_address": "192.0.2.33", "type": "public"}],
-                          "v6": null},
-             "image": {"distribution": "Fedora"}, "tags": ["team:platform"]}
-          ],
-          "links": {},
-          "meta": {"total": 3}
-        }}
-      ]
+     "status": 200,
+     "json": {
+      "droplets": [
+       {
+        "id": null,
+        "name": "fixture-null-id",
+        "networks": {
+         "v4": [
+          {
+           "ip_address": "192.0.2.30",
+           "type": "public"
+          }
+         ]
+        }
+       },
+       "not-an-object",
+       {
+        "id": 3300002,
+        "name": "fixture-null-blocks",
+        "networks": null,
+        "image": null,
+        "tags": null
+       },
+       {
+        "id": 3300003,
+        "name": "fixture-blank-ips",
+        "networks": {
+         "v4": [
+          {
+           "type": "public"
+          },
+          {
+           "ip_address": "",
+           "type": "private"
+          },
+          {
+           "ip_address": "192.0.2.33",
+           "type": "public"
+          }
+         ],
+         "v6": null
+        },
+        "image": {
+         "distribution": "Fedora"
+        },
+        "tags": [
+         42,
+         null,
+         {
+          "weird": "object"
+         },
+         "team:platform"
+        ]
+       }
+      ],
+      "links": {},
+      "meta": {
+       "total": 4
+      }
+     }
     }
+   ]
+  }
+ ],
+ "expect": {
+  "asset_count": 2,
+  "ids": [
+   "3300002",
+   "3300003"
   ],
-  "expect": {
-    "asset_count": 2,
-    "ids": ["3300002", "3300003"],
-    "assets": [
-      {"id": "3300002", "fields": {"hostnames": "fixture-null-blocks"},
-       "fields_absent": ["ipAddresses", "macAddresses"]},
-      {"id": "3300003", "fields": {"hostnames": "fixture-blank-ips", "ipAddresses": "192.0.2.33",
-                                   "os": "Fedora"}}
-    ],
-    "log_contains": ["digital-ocean: skipping droplet with no id: name=fixture-null-id"],
-    "request_count": 1
-  },
-  "invariants": {"skip": ["namespaced_ids"]}
+  "assets": [
+   {
+    "id": "3300002",
+    "fields": {
+     "hostnames": "fixture-null-blocks"
+    },
+    "fields_absent": [
+     "ipAddresses",
+     "macAddresses"
+    ]
+   },
+   {
+    "id": "3300003",
+    "fields": {
+     "hostnames": "fixture-blank-ips",
+     "ipAddresses": "192.0.2.33",
+     "os": "Fedora",
+     "tags": "42\tteam=platform"
+    }
+   }
+  ],
+  "log_contains": [
+   "digital-ocean: skipping droplet with no id: name=fixture-null-id",
+   "digital-ocean: skipping non-object droplet entry"
+  ],
+  "request_count": 1
+ },
+ "invariants": {
+  "skip": [
+   "namespaced_ids"
+  ]
+ }
 }

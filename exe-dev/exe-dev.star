@@ -31,8 +31,7 @@ CONFIG = {
 }
 
 load("runzero.types", "ImportAsset")
-load("json", json_decode="decode")
-load("http", "bearer", http_post="post")
+load("http", "bearer", "post_json")
 load("kwargs", "get_string", "get_http_options")
 
 # Used when the url parameter is unset. The endpoint stays configurable rather
@@ -68,27 +67,26 @@ def parse_hostname_from_url(url_str):
 
 
 def run_exe_command(api_url, http_options, command):
-    resp = http_post(api_url, body=bytes(command), **http_options)
-
-    if resp == None:
-        _log("no response from the API for command: " + command)
+    # post_json checks the status, decodes the body, and retries the transient
+    # statuses (429/5xx) with backoff, honoring Retry-After -- so one blip on
+    # the first command no longer imports nothing. Every command this
+    # integration issues is a read-only listing, so a retried POST cannot apply
+    # twice. A 200 whose body is not JSON arrives as an error string here
+    # rather than aborting the task inside json_decode.
+    data, err = post_json(api_url, body=bytes(command), **http_options)
+    if err:
+        if err.startswith("status 401"):
+            _log("unauthorized (401); check the API token")
+        elif err.startswith("status 403"):
+            _log("forbidden (403); the token lacks permission for: " + command)
+        elif err.startswith("status 429"):
+            _log("rate limited (429) after retries for: " + command)
+        elif err.startswith("status 200"):
+            _log("non-JSON response body for: " + command)
+        else:
+            _log("request failed for '{}': {}".format(command, err))
         return None
-    if resp.status_code == 401:
-        _log("unauthorized (401); check the API token")
-        return None
-    if resp.status_code == 403:
-        _log("forbidden (403); the token lacks permission for: " + command)
-        return None
-    if resp.status_code == 429:
-        _log("rate limited (429)")
-        return None
-    if resp.status_code != 200:
-        _log("unexpected status " + str(resp.status_code) + " for: " + command)
-        return None
-    if resp.body == None:
-        return None
-
-    return json_decode(resp.body)
+    return data
 
 
 def fetch_custom_domains_map(api_url, http_options):
@@ -98,12 +96,15 @@ def fetch_custom_domains_map(api_url, http_options):
     """
     domain_map = {}
     data = run_exe_command(api_url, http_options, "domain ls -a")
-    if data == None:
+    if data == None or type(data) != "dict":
         _log("custom domain enrichment unavailable; the token may lack the 'domain ls' permission")
         return domain_map
-    for d in data.get("domains", []):
-        vm_name = d.get("vm_name", "")
-        domain_name = d.get("domain", "")
+    # "domains": null and non-object elements must cost the entry, not the run.
+    for d in data.get("domains") or []:
+        if type(d) != "dict":
+            continue
+        vm_name = d.get("vm_name") or ""
+        domain_name = d.get("domain") or ""
         if vm_name == "" or domain_name == "":
             continue
         host = parse_hostname_from_url(domain_name)
@@ -128,6 +129,8 @@ def fetch_share_map(api_url, http_options, vm_names):
         if data == None:
             _log("share enrichment unavailable; the token may lack the 'share show' permission")
             return share_map
+        if type(data) != "dict":
+            continue
         share_map[vm_name] = {
             "public": str(data.get("public", False)),
             "email_enabled": str(data.get("email_enabled", False)),
@@ -152,13 +155,19 @@ def fetch_integrations_map(api_url, http_options, vm_names, vm_tags_by_name):
         result[name] = []
 
     data = run_exe_command(api_url, http_options, "integrations list")
-    if data == None:
+    if data == None or type(data) != "dict":
         _log("integration enrichment unavailable; the token may lack the 'integrations list' permission")
         return result
 
     total = 0
-    for integration in data.get("integrations", []):
-        for spec in integration.get("attached", []):
+    # "integrations": null, non-object entries, and non-string attachment
+    # specs must each cost themselves, never the run.
+    for integration in data.get("integrations") or []:
+        if type(integration) != "dict":
+            continue
+        for spec in integration.get("attached") or []:
+            if type(spec) != "string":
+                continue
             if spec == "auto:all":
                 for name in vm_names:
                     result[name].append(integration)
@@ -233,9 +242,18 @@ def _summarise_integrations(integrations):
     }
 
 
+def vm_name_of(vm):
+    """Return the record's vm_name as a string, treating a present-but-null
+    value (which defeats a .get default) the same as an absent one."""
+    name = vm.get("vm_name")
+    if name == None:
+        return ""
+    return str(name)
+
+
 def build_asset(vm, custom_domains_map, share_map, integrations_map):
     """Build a single ImportAsset from a VM record plus enrichment maps."""
-    vm_name = vm.get("vm_name", "")
+    vm_name = vm_name_of(vm)
     if vm_name == "":
         # vm_name is the whole identity here -- it is what the id is built from
         # and what every enrichment map is keyed on -- so a record without one
@@ -250,7 +268,13 @@ def build_asset(vm, custom_domains_map, share_map, integrations_map):
     region         = vm.get("region", "")
     region_display = vm.get("region_display", "")
     comment        = vm.get("comment", "")
-    vm_tags        = vm.get("tags", [])
+    # "tags": null defeats the .get default, iterating None aborts the run, and
+    # a non-string element would abort the joins below, so the list is screened
+    # down to its usable members.
+    vm_tags        = vm.get("tags")
+    if type(vm_tags) != "list":
+        vm_tags = []
+    vm_tags = [t for t in vm_tags if type(t) == "string" and t != ""]
     # ls -l may expose shelley status directly; fall back to False
     shelley_direct = vm.get("shelley", False)
 
@@ -343,23 +367,43 @@ def main(**kwargs):
     if vms_data == None:
         _log("no VM data retrieved")
         return None
+    if type(vms_data) != "dict":
+        _log("unexpected response shape for 'ls -l', wanted an object")
+        return None
 
-    vms = vms_data.get("vms", [])
+    # "vms": null defeats a .get default and len(None) aborts the run; a
+    # non-object element in the list has no fields to read at all.
+    raw_vms = vms_data.get("vms")
+    if type(raw_vms) != "list":
+        raw_vms = []
+    vms = []
+    malformed = 0
+    for vm in raw_vms:
+        if type(vm) == "dict":
+            vms.append(vm)
+        else:
+            malformed += 1
+    if malformed > 0:
+        _log("skipped " + str(malformed) + " non-object VM records")
     _log("retrieved " + str(len(vms)) + " VMs")
 
     # Build lookup structures needed for integration resolution
-    vm_names = [vm.get("vm_name", "") for vm in vms if vm.get("vm_name", "") != ""]
+    vm_names = [vm_name_of(vm) for vm in vms if vm_name_of(vm) != ""]
     vm_tags_by_name = {}
     for vm in vms:
-        name = vm.get("vm_name", "")
+        name = vm_name_of(vm)
         if name != "":
-            vm_tags_by_name[name] = vm.get("tags", [])
+            tags = vm.get("tags")
+            vm_tags_by_name[name] = tags if type(tags) == "list" else []
 
     custom_domains_map = fetch_custom_domains_map(base_url, http_options)
     share_map          = fetch_share_map(base_url, http_options, vm_names)
     integrations_map   = fetch_integrations_map(base_url, http_options, vm_names, vm_tags_by_name)
 
-    assets = []
+    # Stream each asset as it is built rather than buffering the estate; a
+    # failure late in the loop then costs one record instead of everything
+    # already parsed.
+    reported = 0
     skipped = 0
     skipped_status = ""
     for vm in vms:
@@ -371,14 +415,11 @@ def main(**kwargs):
             if skipped == 1:
                 skipped_status = str(vm.get("status", ""))
             continue
-        assets.append(asset)
+        reported += report_asset(asset)
 
     if skipped > 0:
         _log("skipped {} VMs with no vm_name (first status: {})".format(
             skipped, skipped_status))
 
-    if assets:
-        report_assets(assets)
-
-    _log("reported " + str(len(assets)) + " assets")
+    _log("reported " + str(reported) + " assets")
     return None

@@ -214,9 +214,11 @@ dummy server, so it proves the script initializes, declares its parameters
 correctly, and issues a request. It does not prove the token is valid, does not
 reveal which `cmds` it carries, and never parses a real VM.
 
-There are no fixtures in `exe-dev/tests/fixtures/`, so there is no offline
-parsing test to run for this integration — the command-line run against a real
-token is the test.
+Offline parsing tests live in `exe-dev/tests/fixtures/` and run with
+`python3 tests/run.py exe-dev` from the repository root; they stand up a fixture
+server, replay the command responses, and assert on the assets that come out.
+The command-line run against a real token remains the only test of the token
+itself and of the vendor's live contract.
 
 The same script also runs under the `scan` command, which is what the platform
 itself invokes for a scheduled task:

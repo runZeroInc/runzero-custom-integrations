@@ -8,6 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # Upper bound on the droplet page walk, so a server that keeps handing back
+    # a next link can never spin forever. 1,000 pages x 200 droplets covers any
+    # real account.
+    "maxPages": 1000,
     "params": [
         {
             "key": "url",
@@ -41,10 +45,6 @@ load('kwargs', 'get_http_options')
 # so the parameter carries only the scheme and host.
 DEFAULT_DIGITAL_OCEAN_URL = 'https://api.digitalocean.com'
 
-# Upper bound on the droplet page walk, so a server that keeps handing back a
-# next link can never spin forever.
-MAX_PAGES = 1000
-
 # Every record this integration imports comes from /v2/droplets, and a Droplet
 # is DigitalOcean's cloud compute instance -- there is no other kind of record
 # in the collection, so the role is carried by the resource itself rather than
@@ -68,9 +68,17 @@ def collect_ips(networks):
     return ips
 
 def format_tags(tags):
-    """Convert DigitalOcean `key:value` tags to runZero `key=value` tags."""
+    """Convert DigitalOcean `key:value` tags to runZero `key=value` tags.
+
+    DO tags are strings today, but `':' in t` on anything else aborts the whole
+    run, so stray scalars are stringified and container values are dropped."""
     out = []
     for t in tags or []:
+        if t == None or type(t) in ("dict", "list"):
+            continue
+        t = str(t)
+        if not t:
+            continue
         if ':' in t:
             k, v = t.split(':', 1)
             out.append(k + '=' + v)
@@ -81,6 +89,11 @@ def format_tags(tags):
 def build_assets(assets_json):
     assets = []
     for item in assets_json:
+        # A non-object element in the droplets array would abort the run at
+        # .get, losing every droplet after it; skip it with a note instead.
+        if type(item) != "dict":
+            print("digital-ocean: skipping non-object droplet entry")
+            continue
         item_id = item.get('id')
         if not item_id:
             print("digital-ocean: skipping droplet with no id: name=" + str(item.get('name', '')))
@@ -135,11 +148,12 @@ def main(**kwargs):
     # of round trips down.
     url = base_url + '/v2/droplets?per_page=200'
     reported = 0
-    pages = 0
 
-    # The cursor comes from the server, so cap the walk rather than trusting it
-    # to terminate.
-    for _ in range(MAX_PAGES):
+    # The cursor comes from the server, so bound the walk with pager() rather
+    # than trusting it to terminate; reaching CONFIG maxPages raises instead of
+    # silently truncating.
+    p = pager("droplets")
+    while p.next():
         if not url:
             break
 
@@ -153,15 +167,12 @@ def main(**kwargs):
             print('digital-ocean: unexpected response shape, wanted an object')
             break
 
-        # Stream each page via report_assets instead of accumulating the estate.
-        reported += report_assets(build_assets(body.get('droplets', [])))
-        pages += 1
+        # Stream each page via report_assets instead of accumulating the
+        # estate. A present-but-null droplets field must not abort the walk.
+        reported += report_assets(build_assets(body.get('droplets') or []))
 
         links = body.get('links') or {}
         url = (links.get('pages') or {}).get('next', '')
-
-    if url:
-        print('digital-ocean: stopped after ' + str(pages) + ' pages; more remain')
 
     if not reported:
         print('no assets')
