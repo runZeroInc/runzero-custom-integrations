@@ -1,0 +1,76 @@
+{
+  "name": "discovery-auth-refresh",
+  "integration": "forescout-counteract",
+  "description": "The paginated path re-authenticates through a different function than the legacy path (api_post rather than api_get), so it needs its own coverage or that branch is never executed by any test; auth-refresh is the legacy equivalent. The Web API mints a JWT valid for about five minutes while a paginated walk of a large estate runs for much longer, so a token rejected mid-walk is the normal case rather than an error: page 1 answers 401 once, and the walk must log back in and retry that page rather than losing it. Both endpoints must be imported and the second token must appear on the wire. A 401 is deliberately NOT treated as a reason to fall back to the legacy path -- the legacy path uses the same credential and would fail the same way.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password",
+    "include_details": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXJzdCJ9.Zmlyc3Qtc2lnbmF0dXJl"},
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzZWNvbmQifQ.c2Vjb25kLXNpZ25hdHVyZQ"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-page-0",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "next_link": "https://enterprise-manager.example.com/api/hosts/discovery?pageSize=1000&page=1&nodeId=0"
+            },
+            "hosts": [
+              {"id": 167838209, "ip": "10.1.2.1", "mac": "0022e51f9018", "fields": {}}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "discovery-page-1",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=1"},
+      "responses": [
+        {"status": 401, "json": {"error": "token expired"}},
+        {
+          "status": 200,
+          "json": {
+            "metadata": {},
+            "hosts": [
+              {"id": 167838210, "ip": "10.1.2.2", "mac": "0022e51f9019", "fields": {}}
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:167838209",
+      "forescout-counteract:$HOST:167838210"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/login"},
+      {"header_contains": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzZWNvbmQifQ.c2Vjb25kLXNpZ25hdHVyZQ"}
+    ],
+    "requests_absent": [
+      {"path": "/api/hosts"}
+    ],
+    "log_contains": [
+      "forescout-counteract: re-authenticating after a rejected token while fetching the paginated endpoint list",
+      "forescout-counteract: imported 2 assets from the paginated endpoint over 2 request(s)"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

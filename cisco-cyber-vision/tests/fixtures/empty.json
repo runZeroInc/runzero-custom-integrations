@@ -1,0 +1,28 @@
+{
+  "name": "empty",
+  "integration": "cisco-cyber-vision",
+  "description": "A Center that has not learned anything yet, or a preset filtered down to nothing. Zero rows must report zero assets and finish cleanly. It also pins the fallback rule: an empty answer is a successful answer, so the preset route must NOT be tried. Falling back on emptiness would double the requests on every quiet Center and hide a genuinely empty inventory behind a second empty one.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/3.0/devices"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/api/3.0/presets"},
+      {"path_contains": "/vulnerabilities"}
+    ],
+    "log_contains": ["cisco-cyber-vision: reported 0 devices"]
+  },
+  "check_determinism": true
+}

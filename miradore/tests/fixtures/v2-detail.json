@@ -1,0 +1,211 @@
+{
+  "name": "v2-detail",
+  "integration": "miradore",
+  "description": "The API v2 half of the integration. v1 enumerates; v2 adds the three things v1 has no field for at all -- the suspended-device list, per-device custom attribute values, and the last reported location. Proves v2 is addressed at the server root rather than under the site path segment, that it authenticates with X-API-Key and names the site in X-Instance-Name (so unlike a v1 URL these requests carry no secret in the query string), that the suspended list is read as bare ids and marks the right device, that a custom attribute is keyed on its stable Identifier and falls back to its Name, that the newest location entry wins rather than the first, and that the Security and Enrollment wildcards flatten under whatever names the site returns. Also proves an application vendor is derived from a reverse DNS bundle identifier -- the only source there is, because InvApplication has no vendor property at all (confirmed against a live site on 2026-08-26, which rejects InvApplication.Vendor with a 400) -- and that a reported size of zero is dropped rather than imported as an empty install.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"2\"><Device><ID>11</ID><Platform>macOS</Platform><LocalIPAddress>10.30.0.11</LocalIPAddress><MACAddress>00:11:22:BB:00:11</MACAddress><Status>Active</Status><LastReported>20.08.2026 07:45:00</LastReported><InvDevice><DeviceName>mac-eng-11</DeviceName><Manufacturer>Apple</Manufacturer><Model>Mac14,10</Model><MarketingName>MacBook Pro</MarketingName><SerialNumber>SN-MIR-0011</SerialNumber></InvDevice><InvOS><Platform>macOS</Platform><Version>15.1</Version></InvOS><Security><EncryptionStatus>Encrypted</EncryptionStatus><PasscodePresent>true</PasscodePresent><JailBroken>false</JailBroken></Security><Enrollment><Type>DEP</Type><EnrolledTime>04.02.2025 09:00:00</EnrolledTime></Enrollment><InvApplications><InvApplication><Name>Safari</Name><Version>18.1</Version><Identifier>com.apple.Safari</Identifier><Size>264241152</Size></InvApplication><InvApplication><Name>Slack</Name><Version>4.41.0</Version><Identifier>com.tinyspeck.slackmacgap</Identifier><Size>0</Size></InvApplication></InvApplications></Device><Device><ID>12</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.12</LocalIPAddress><MACAddress>00:11:22:BB:00:12</MACAddress><Status>Active</Status><InvDevice><DeviceName>ipad-lobby-12</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPad13,4</Model><MarketingName>iPad Pro</MarketingName></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "suspended",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/SuspendedDevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            12
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "custom-attributes-11",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/11/CustomAttribute"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "identifier": "assetTag",
+              "name": "Asset Tag",
+              "value": "RZ-0011"
+            },
+            {
+              "identifier": "",
+              "name": "Cost Centre",
+              "value": "CC-42"
+            },
+            {
+              "identifier": "unset",
+              "name": "Unset",
+              "value": null
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "custom-attributes-12",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/12/CustomAttribute"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "location-11",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/11/Location"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "timestamp": "2026-08-01T10:00:00Z",
+              "latitude": "60.1699",
+              "longitude": "24.9384",
+              "accuracy": 40
+            },
+            {
+              "timestamp": "2026-08-20T11:30:00Z",
+              "latitude": "60.1830",
+              "longitude": "24.9510",
+              "accuracy": 8
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "location-12",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/12/Location"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "miradore:acme:11",
+      "miradore:acme:12"
+    ],
+    "min_software_total": 2,
+    "log_contains": [
+      "using /acme/API/Device",
+      "v2 reports 1 suspended device(s)",
+      "reported 2 of 2 devices matched by the query"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path_contains": "/api/v2/Device/SuspendedDevices",
+        "header": {
+          "X-API-Key": "1_fixturekey",
+          "X-Instance-Name": "acme"
+        }
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v2/Device/11/CustomAttribute"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v2/Device/11/Location",
+        "query_contains": "startDate"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/acme/api/v2"
+      },
+      {
+        "path_contains": "/api/v2/Devices"
+      }
+    ],
+    "assets": [
+      {
+        "id": "miradore:acme:11",
+        "fields": {
+          "os": "macOS",
+          "osVersion": "15.1",
+          "deviceType": "Laptop",
+          "ipAddresses": "10.30.0.11",
+          "miradore_attr_asset_tag": "RZ-0011",
+          "miradore_attr_cost_centre": "CC-42",
+          "miradore_geo_latitude": "60.1830",
+          "miradore_geo_longitude": "24.9510",
+          "miradore_geo_accuracy": "8",
+          "miradore_geo_timestamp": "2026-08-20T11:30:00Z",
+          "miradore_security_encryption_status": "Encrypted",
+          "miradore_security_passcode_present": "true",
+          "miradore_security_jail_broken": "false",
+          "miradore_enrollment_type": "DEP",
+          "miradore_enrollment_enrolled_time": "04.02.2025 09:00:00"
+        },
+        "fields_absent": [
+          "miradore_attr_unset",
+          "miradore_suspended"
+        ]
+      },
+      {
+        "id": "miradore:acme:12",
+        "fields": {
+          "miradore_suspended": "true"
+        },
+        "fields_absent": [
+          "miradore_geo_latitude",
+          "miradore_security_encryption_status"
+        ]
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

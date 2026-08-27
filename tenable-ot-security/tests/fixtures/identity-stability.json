@@ -1,0 +1,136 @@
+{
+  "name": "identity-stability",
+  "integration": "tenable-ot-security",
+  "description": "The regression lock for the foreign id. Asset 0001 is the same physical controller as in the happy scenario after a readdress and a rename -- new IP, new MAC, new name, same Asset.id -- and its runZero id must still be exactly tenable-ot-security:<console host>:<uuid>, with no address or name folded in. Asset 0002 carries the SAME name and an adjacent address under a different uuid, so a name- or address-derived key would collapse the two into one asset; they must stay distinct. Asset 0003 has no name at all and only an address, proving the id does not depend on a name being present.\n\nThe namespace is asserted with $HOST rather than $BASE_HOST because the console host, not host:port, is the scope: one appliance reached on two ports is one appliance, and check_determinism re-runs this scenario on a new ephemeral port, so a port-bearing id would change between polls and duplicate the whole estate. Both the port-bearing spelling and the un-namespaced raw uuid are asserted absent.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "true",
+    "import_software": "false"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "getAssets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+                    "name": "line-3-controller",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "firstSeen": "2024-02-01T00:00:00Z",
+                    "lastSeen": "2026-08-22T10:00:00Z",
+                    "lastUpdate": "2026-08-22T10:00:05Z",
+                    "macs": {"nodes": ["00:1d:9c:ff:11:01"]},
+                    "ips": {"nodes": ["10.199.7.10"]},
+                    "directMacs": {"nodes": ["00:1d:9c:ff:11:01"]},
+                    "directIps": {"nodes": ["10.199.7.10"]},
+                    "segments": {"nodes": [{"id": "seg-199", "name": "Controller / 10.199.7.X", "type": "Filter"}]},
+                    "risk": {"totalRisk": "72.8374829734034"},
+                    "vendor": "Rockwell Automation",
+                    "model": "1756-L81E/B",
+                    "plugins": {"nodes": [
+                      {"id": "500123", "name": "CVE-2023-3595", "severity": "Critical", "vprScore": 9.6}
+                    ]}
+                  },
+                  {
+                    "id": "f0f0f0f0-2222-4222-8222-222222222222",
+                    "name": "line-3-controller",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "criticality": "MediumCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-22T10:01:00Z",
+                    "macs": {"nodes": ["00:1d:9c:ff:11:02"]},
+                    "ips": {"nodes": ["10.199.7.11"]},
+                    "directMacs": {"nodes": ["00:1d:9c:ff:11:02"]},
+                    "directIps": {"nodes": ["10.199.7.11"]},
+                    "segments": {"nodes": []},
+                    "risk": {"totalRisk": "31.0"}
+                  },
+                  {
+                    "id": "f0f0f0f0-3333-4333-8333-333333333333",
+                    "name": "",
+                    "type": "OtDevice",
+                    "superType": "OtDevice",
+                    "category": "NetworkAssetsCategory",
+                    "purdueLevel": "Level2",
+                    "criticality": "LowCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-22T10:02:00Z",
+                    "macs": {"nodes": []},
+                    "ips": {"nodes": ["10.199.7.12"]},
+                    "directMacs": {"nodes": []},
+                    "directIps": {"nodes": ["10.199.7.12"]},
+                    "segments": {"nodes": []},
+                    "risk": {"totalRisk": "5.0"}
+                  }
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tenable-ot-security:$HOST:00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+      "tenable-ot-security:$HOST:f0f0f0f0-2222-4222-8222-222222222222",
+      "tenable-ot-security:$HOST:f0f0f0f0-3333-4333-8333-333333333333"
+    ],
+    "ids_absent": [
+      "tenable-ot-security:$BASE_HOST:00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+      "tenable-ot-security:$HOST:10.199.7.10",
+      "tenable-ot-security:$HOST:line-3-controller",
+      "tenable-ot-security:$HOST:00:1d:9c:ff:11:01",
+      "00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8"
+    ],
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+        "fields": {
+          "hostnames": "line-3-controller",
+          "ipAddresses": "10.199.7.10",
+          "macAddresses": "00:1d:9c:ff:11:01",
+          "tenable_ot_security_asset_id": "00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8"
+        }
+      },
+      {
+        "id": "tenable-ot-security:$HOST:f0f0f0f0-2222-4222-8222-222222222222",
+        "fields": {
+          "hostnames": "line-3-controller",
+          "ipAddresses": "10.199.7.11"
+        }
+      },
+      {
+        "id": "tenable-ot-security:$HOST:f0f0f0f0-3333-4333-8333-333333333333",
+        "fields": {"ipAddresses": "10.199.7.12"},
+        "fields_absent": ["hostnames"]
+      }
+    ],
+    "log_contains": [
+      "no-name-break",
+      "tenable-ot-security: reported 3 assets"
+    ]
+  },
+  "check_determinism": true
+}

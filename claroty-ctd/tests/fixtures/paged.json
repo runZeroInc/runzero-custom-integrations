@@ -1,0 +1,202 @@
+{
+  "name": "paged",
+  "integration": "claroty-ctd",
+  "description": "A two-page walk of both endpoints, driven by the response's own count rather than by page size. Every page here is SHORT - two rows against a per_page of 500 - which is the case that matters: no server-side per_page ceiling is documented for this API, so an appliance that clamps the requested page size would make every page look short. Stopping on a short page alone would then truncate the whole import to page one with no error, which is why the count still governs a short page and the short-page rule is only the fallback for a response carrying no usable count. Proves the second request carries page=2 and that the walk stops once the running count reaches the total instead of asking for a third page. The counts agree here; filtered-count is the scenario where they diverge and count_filtered is shown to be the one that binds. has_correlator is skipped: 33-1 is the address-less backplane card described in the happy scenario.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [{"status": 200, "json": {"token": "paged-token", "password_expired": false, "username": "admin"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vulnerabilities-page-2",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities", "query_contains": "page=2"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 3,
+          "count_in_page": 1,
+          "count_total": 3,
+          "objects": [
+            {
+              "resource_id": "612-1",
+              "asset_id": "202-1",
+              "asset_name": "hmi-02",
+              "cve_id": "CVE-2021-22779",
+              "cvss_v3_score": {"value": 9.8, "label": "Critical"},
+              "epss_score": {"value": 0.412},
+              "actively_exploited": true,
+              "vulnerability_type": "Known Vulnerability",
+              "detection_date": "2024-03-03T00:00:00+00:00",
+              "relevance__": "Confirmed"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vulnerabilities-page-1",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 3,
+          "count_in_page": 2,
+          "count_total": 3,
+          "objects": [
+            {
+              "resource_id": "610-1",
+              "asset_id": "201-1",
+              "asset_name": "plc-01",
+              "cve_id": "CVE-2020-6088",
+              "cvss_v3_score": {"value": 7.5, "label": "High"},
+              "epss_score": {"value": 0.0311},
+              "actively_exploited": false,
+              "vulnerability_type": "Known Vulnerability",
+              "detection_date": "2024-03-01T00:00:00+00:00",
+              "relevance__": "Confirmed"
+            },
+            {
+              "resource_id": "611-1",
+              "asset_id": "201-1",
+              "asset_name": "plc-01",
+              "cve_id": "CVE-2019-10953",
+              "cvss_v3_score": {"value": 5.3, "label": "Medium"},
+              "epss_score": {"value": 0.0021},
+              "actively_exploited": false,
+              "vulnerability_type": "Known Vulnerability",
+              "detection_date": "2024-03-02T00:00:00+00:00",
+              "relevance__": "Confirmed"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets-page-2",
+      "match": {"method": "GET", "path": "/ranger/assets", "query_contains": "page=2"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 3,
+          "count_in_page": 1,
+          "count_total": 3,
+          "objects": [
+            {
+              "id": 33,
+              "resource_id": "33-1",
+              "site_id": 1,
+              "site_name": "site-2",
+              "name": "10.1.30.1:Card 2 \\ Addr 255",
+              "address": ["10.1.30.1:Card 2 \\ Addr 255"],
+              "asset_type__": "ePLC",
+              "class_type": "OT",
+              "vendor": "Rockwell Automation",
+              "model": "1756-CNB/D 7.015",
+              "firmware": "V7.015",
+              "serial_number": "001605B3",
+              "ghost": false,
+              "special_hint": 0
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets-page-1",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 3,
+          "count_in_page": 2,
+          "count_total": 3,
+          "objects": [
+            {
+              "id": 201,
+              "resource_id": "201-1",
+              "site_id": 1,
+              "site_name": "site-2",
+              "name": "plc-01",
+              "hostname": "plc-01",
+              "ipv4": ["10.20.1.11"],
+              "mac": ["00:1D:9C:BD:A9:4F"],
+              "vendor": "Rockwell Automation",
+              "model": "1756-L61/B",
+              "firmware": "V20.019",
+              "asset_type__": "ePLC",
+              "class_type": "OT",
+              "criticality__": "eHigh",
+              "purdue_level": 1,
+              "ghost": false,
+              "special_hint": 0
+            },
+            {
+              "id": 202,
+              "resource_id": "202-1",
+              "site_id": 1,
+              "site_name": "site-2",
+              "name": "hmi-02",
+              "hostname": "hmi-02",
+              "ipv4": ["10.20.1.12"],
+              "mac": ["00:1D:9C:C0:04:9D"],
+              "vendor": "Siemens",
+              "os": "Windows 10",
+              "asset_type__": "eHMI",
+              "class_type": "OT",
+              "purdue_level": 2,
+              "ghost": false,
+              "special_hint": 0
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "claroty-ctd:$HOST:201-1",
+      "claroty-ctd:$HOST:202-1",
+      "claroty-ctd:$HOST:33-1"
+    ],
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:201-1",
+        "fields": {"claroty_ctd_vulnerability_count": "2"}
+      },
+      {
+        "id": "claroty-ctd:$HOST:202-1",
+        "fields": {"claroty_ctd_vulnerability_count": "1"}
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/ranger/asset-vulnerabilities", "query_contains": "page=1"},
+      {"method": "GET", "path": "/ranger/asset-vulnerabilities", "query_contains": "page=2"},
+      {"method": "GET", "path": "/ranger/assets", "query_contains": "page=1"},
+      {"method": "GET", "path": "/ranger/assets", "query_contains": "page=2"}
+    ],
+    "requests_absent": [
+      {"path": "/ranger/assets", "query_contains": "page=3"},
+      {"path": "/ranger/asset-vulnerabilities", "query_contains": "page=3"}
+    ],
+    "log_contains": [
+      "indexed 3 vulnerabilities across 2 assets",
+      "reported 3 assets"
+    ]
+  },
+  "invariants": {
+    "skip": ["has_correlator"]
+  },
+  "check_determinism": true
+}

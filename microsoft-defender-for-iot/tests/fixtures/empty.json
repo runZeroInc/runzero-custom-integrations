@@ -1,0 +1,32 @@
+{
+  "name": "empty",
+  "integration": "microsoft-defender-for-iot",
+  "description": "A sensor that has not classified any device yet answers the inventory with an empty array. Zero assets must be reported with the 'no assets retrieved' notice rather than the task failing -- on an OT sensor the difference between a quiet segment and a broken credential is that log line. The vulnerability report is switched off here, which also proves the toggle: exactly one request is made and /api/v1/reports/vulnerabilities/devices is never called.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/devices/"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {"path_contains": "/api/v1/reports/vulnerabilities/devices"}
+    ],
+    "log_contains": [
+      "microsoft-defender-for-iot: reported 0 assets from sensor",
+      "microsoft-defender-for-iot: no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

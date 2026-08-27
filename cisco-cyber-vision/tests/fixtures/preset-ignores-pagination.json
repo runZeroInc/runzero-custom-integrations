@@ -1,0 +1,87 @@
+{
+  "name": "preset-ignores-pagination",
+  "integration": "cisco-cyber-vision",
+  "description": "REGRESSION LOCK on the runaway preset walk. A Center that does not honour page and size answers every request with the identical full inventory. The termination test is len(rows) < page_size, which never fires on a full page, so before the repeat-page guard the walk re-requested and re-reported the same inventory until maxPages (10000) raised -- ten thousand full-inventory requests against a production Center, ending in a failed task. Here the networknode-list route repeats one 3-row page forever with page_size=3. The run must stop after noticing the repeat, report the 3 devices exactly once, and say why.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "inventory_source": "preset",
+    "preset_label": "All data",
+    "collect_vulnerabilities": "false",
+    "page_size": "3"
+  },
+  "routes": [
+    {
+      "name": "presets",
+      "match": {
+        "method": "GET",
+        "path": "/api/3.0/presets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 3,
+              "label": "All data"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "networknode-list",
+      "match": {
+        "method": "GET",
+        "path": "/api/3.0/presets/3/visualisations/networknode-list"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "aaaa0001-0000-4000-8000-000000000001",
+              "label": "Cell9-PLC-01",
+              "ip": "10.29.0.11",
+              "mac": "00:80:f4:29:00:01",
+              "isDevice": true,
+              "normalizedProperties": {
+                "vendor": "Fixture Automation"
+              }
+            },
+            {
+              "id": "aaaa0002-0000-4000-8000-000000000002",
+              "label": "Cell9-PLC-02",
+              "ip": "10.29.0.12",
+              "mac": "00:80:f4:29:00:02",
+              "isDevice": true,
+              "normalizedProperties": {
+                "vendor": "Fixture Automation"
+              }
+            },
+            {
+              "id": "aaaa0003-0000-4000-8000-000000000003",
+              "label": "Cell9-PLC-03",
+              "ip": "10.29.0.13",
+              "mac": "00:80:f4:29:00:03",
+              "isDevice": true,
+              "normalizedProperties": {
+                "vendor": "Fixture Automation"
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "request_count": 3,
+    "log_contains": [
+      "is not honouring page and size"
+    ]
+  },
+  "check_determinism": true
+}

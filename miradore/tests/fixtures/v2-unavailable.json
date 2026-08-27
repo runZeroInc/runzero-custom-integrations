@@ -1,0 +1,76 @@
+{
+  "name": "v2-unavailable",
+  "integration": "miradore",
+  "description": "A site whose key is not entitled to API v2, which is the ordinary case for an older Miradore subscription: every v2 route answers 401. The v1 import must be unaffected -- v2 is enrichment, not a dependency -- and each v2 endpoint must announce itself once for the run rather than once per device, which on a real estate would be thousands of identical lines. Two devices are enough to prove the second one adds no new line.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"2\"><Device><ID>11</ID><Platform>macOS</Platform><LocalIPAddress>10.30.0.11</LocalIPAddress><MACAddress>00:11:22:BB:00:11</MACAddress><Status>Active</Status><LastReported>20.08.2026 07:45:00</LastReported><InvDevice><DeviceName>mac-eng-11</DeviceName><Manufacturer>Apple</Manufacturer><Model>Mac14,10</Model><MarketingName>MacBook Pro</MarketingName><SerialNumber>SN-MIR-0011</SerialNumber></InvDevice><InvOS><Platform>macOS</Platform><Version>15.1</Version></InvOS><Security><EncryptionStatus>Encrypted</EncryptionStatus><PasscodePresent>true</PasscodePresent><JailBroken>false</JailBroken></Security><Enrollment><Type>DEP</Type><EnrolledTime>04.02.2025 09:00:00</EnrolledTime></Enrollment><InvApplications><InvApplication><Name>Safari</Name><Version>18.1</Version><Identifier>com.apple.Safari</Identifier><Size>264241152</Size></InvApplication><InvApplication><Name>Slack</Name><Version>4.41.0</Version><Vendor>Slack Technologies</Vendor><Identifier>com.tinyspeck.slackmacgap</Identifier><Size>0</Size></InvApplication></InvApplications></Device><Device><ID>12</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.12</LocalIPAddress><MACAddress>00:11:22:BB:00:12</MACAddress><Status>Active</Status><InvDevice><DeviceName>ipad-lobby-12</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPad13,4</Model><MarketingName>iPad Pro</MarketingName></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "v2-denied",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/api/v2/"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "text": "Status Code: 401; Unauthorized"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "miradore:acme:11",
+      "miradore:acme:12"
+    ],
+    "log_contains": [
+      "v2 suspended device list unavailable",
+      "v2 device custom attributes unavailable",
+      "v2 device locations unavailable",
+      "reported 2 of 2 devices matched by the query"
+    ],
+    "assets": [
+      {
+        "id": "miradore:acme:11",
+        "fields": {
+          "os": "macOS",
+          "ipAddresses": "10.30.0.11",
+          "miradore_security_encryption_status": "Encrypted"
+        },
+        "fields_absent": [
+          "miradore_attr_asset_tag",
+          "miradore_geo_latitude",
+          "miradore_suspended"
+        ]
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "name": "identity-stability",
+  "integration": "claroty-xdome",
+  "description": "The regression lock on the foreign id. This is the same device as the SCADA server in the happy scenario -- same uid -- after everything mutable about it has moved: both NICs readdressed, one MAC replaced, a hostname learned where there was none, device_name changed, the site renamed, the risk level raised, and a second Claroty asset_id issued. The emitted id must be byte-for-byte the id happy asserts, because none of those values may reach it.\n\nThat matters more here than for most sources. xDome retains a device's historical addressing on the same row rather than creating a new one, which is precisely why the vendor's uid is trusted for identity and why the ids asserted here and in happy have to be identical. check_determinism additionally re-runs the scenario on a fresh ephemeral port: the id carries no host component, so the port cannot leak into it. The second ip_list entry carries the documented ' / (Last Known IP)' annotation and is no longer imported as an address -- it is historical, not current -- so only the first MAC/IP pair appears in macPairs while both MACs survive as interfaces.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "import_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "uid": "002b2962-6964-4b0d-9faa-3a46e9057241",
+                "asset_id": "ZZQQWWE",
+                "device_name": "plant-scada-primary",
+                "device_category": "OT",
+                "device_subcategory": "Operation",
+                "device_type": "SCADA Server",
+                "windows_last_seen_hostname": "scada-sv9-99",
+                "mac_list": [
+                  "a8:99:69:54:0f:f3",
+                  "b0:11:22:33:44:55"
+                ],
+                "ip_list": [
+                  "10.44.7.5",
+                  "10.44.7.6 / (Last Known IP)"
+                ],
+                "ip_assignment_list": [
+                  "DHCP",
+                  "DHCP"
+                ],
+                "number_of_nics": 2,
+                "manufacturer": "ABB",
+                "model": "ABB Ability System 800xA DCS",
+                "site_name": "SV_9",
+                "purdue_level": "Level 3",
+                "risk_score": "Critical",
+                "retired": false,
+                "first_seen_list": [
+                  "2024-12-30T07:00:35.923519+00:00"
+                ],
+                "last_seen_list": [
+                  "2026-01-14T11:02:00+00:00"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "claroty-xdome:002b2962-6964-4b0d-9faa-3a46e9057241"
+    ],
+    "assets": [
+      {
+        "id": "claroty-xdome:002b2962-6964-4b0d-9faa-3a46e9057241",
+        "fields": {
+          "hostnames": "scada-sv9-99",
+          "macPairs": "a8:99:69:54:0f:f3=10.44.7.5",
+          "tags": "purdue:Level 3\trisk:Critical\tsite:SV_9",
+          "macAddresses": "a8:99:69:54:0f:f3\tb0:11:22:33:44:55"
+        }
+      }
+    ],
+    "request_count": 1,
+    "requests_absent": [
+      {
+        "method": "POST",
+        "path": "/api/v1/device_vulnerability_relations/"
+      }
+    ],
+    "log_contains": [
+      "reported 1 devices"
+    ]
+  },
+  "check_determinism": true
+}

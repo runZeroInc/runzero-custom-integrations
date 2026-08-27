@@ -1,0 +1,99 @@
+{
+  "name": "auth-fallback",
+  "integration": "forescout-rem",
+  "description": "The 401 fallback. The two published descriptions of this API's Authorization header disagree: the one public client that runs against a live tenant sends 'Bearer <key>', while Forescout's own prose for the sibling SCIM API says to paste the key with no prefix, and Forescout documents no header for this API at all. So the script tries Bearer first and re-issues the request once with the bare key on a 401.\n\nThe two routes are the assertion. The first matches only requests whose Authorization header contains 'Bearer' and always answers 401; the second matches the same path with no header condition. A request still carrying the Bearer prefix therefore CANNOT reach the second route -- it would take another 401, the search would fail, and no asset would be exported. So asset_count 1 with request_count 2 proves the retry carried the bare key with no prefix, which a substring header matcher could not: 'fixture-rem-key' is a substring of 'Bearer fixture-rem-key'.\n\nrequest_count is also what proves the 401 was not simply retried by the HTTP helper: get_json retries 408, 425, 429 and 5xx, and a 401 is none of those.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-rem-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "bearer-rejected",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "header": {
+          "Authorization": "Bearer"
+        }
+      },
+      "responses": [
+        {
+          "status": 401,
+          "json": {
+            "message": "invalid authorization header"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "bare-key-accepted",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-auth-1",
+                "hostname": "fallback-pump-01",
+                "ip_addresses": [
+                  "10.70.0.10"
+                ],
+                "mac_addresses": [
+                  "00:70:00:00:00:01"
+                ],
+                "rem_category": "Medical Device",
+                "rem_function": "Infusion Pump",
+                "rem_vendor": "Fixture Medical",
+                "risk_score": 4.2,
+                "risk_severity": "Medium",
+                "last_seen": "2026-08-20T09:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "forescout-rem:$HOST:rem-auth-1"
+    ],
+    "assets": [
+      {
+        "id": "forescout-rem:$HOST:rem-auth-1",
+        "fields": {
+          "hostnames": "fallback-pump-01",
+          "ipAddresses": "10.70.0.10",
+          "macAddresses": "00:70:00:00:00:01",
+          "deviceType": "Infusion Pump"
+        }
+      }
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "header": {
+          "Authorization": "Bearer fixture-rem-key"
+        }
+      }
+    ],
+    "log_contains": [
+      "forescout-rem: bearer authorization rejected, retrying with the bare API key header",
+      "the whole window fit in one response",
+      "forescout-rem: reported 1 assets from 1 search windows"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,101 @@
+{
+  "name": "malformed",
+  "integration": "claroty-xdome",
+  "description": "Rows that must be skipped without ending the walk, and values that must not abort the script.\n\nBoth arrays carry a bare string where the schema documents an object; calling .get on a string aborts a Starlark run outright, so the type is checked before the record is read. Two device rows carry no usable uid -- one null, one empty -- and are dropped rather than given a synthesized id, because a random fallback creates a brand new asset on every poll. The skips are tallied and reported as one line rather than one line per record, which is what a large estate needs.\n\nThe surviving device is deliberately awkward: mac_list arrives as a bare string instead of an array, ip_list holds a null beside a real address and a link-local one that identifies nothing, first_seen_list holds an unparseable timestamp, and last_seen_list holds a timestamp in 2099. That last one is the dangerous value: an un-clamped future timestamp makes the platform drop the whole asset, which is why the script never parses a timestamp by hand. A relation row with a null device_uid and a cve_ids list holding a null and a non-CVE string must contribute nothing and fail nothing.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-relations",
+      "match": {"method": "POST", "path": "/api/v1/device_vulnerability_relations/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices_vulnerabilities": [
+              "this-row-should-be-an-object",
+              {
+                "device_uid": null,
+                "vulnerability_id": "ORPHAN00",
+                "vulnerability_cve_ids": ["CVE-2021-44228"]
+              },
+              {
+                "device_uid": "30000000-0000-4000-8000-000000000001",
+                "vulnerability_id": "MALF0001",
+                "vulnerability_name": "Advisory with a partly unusable CVE list",
+                "vulnerability_cve_ids": [null, "not-a-cve", "cve-2019-0708"],
+                "vulnerability_relevance": "Confirmed",
+                "vulnerability_published_date": "not a timestamp"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "POST", "path": "/api/v1/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              "this-row-should-be-an-object",
+              {
+                "uid": null,
+                "asset_id": "NOUID001",
+                "device_name": "10.70.0.9",
+                "ip_list": ["10.70.0.9"],
+                "mac_list": ["00:2a:2a:00:00:09"]
+              },
+              {
+                "uid": "",
+                "asset_id": "NOUID002",
+                "ip_list": ["10.70.0.10"]
+              },
+              {
+                "uid": "30000000-0000-4000-8000-000000000001",
+                "asset_id": "MALFSURV",
+                "device_name": "10.70.0.11",
+                "device_type": "Building Automation Controller",
+                "local_name": "bms-ctrl-11",
+                "other_hostnames": ["localhost", "unknown"],
+                "mac_list": "00:2a:2a:00:00:0b",
+                "ip_list": ["10.70.0.11", null, "169.254.44.9"],
+                "first_seen_list": ["not a timestamp"],
+                "last_seen_list": ["2099-01-01T00:00:00+00:00"],
+                "retired": false
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["claroty-xdome:30000000-0000-4000-8000-000000000001"],
+    "assets": [
+      {
+        "id": "claroty-xdome:30000000-0000-4000-8000-000000000001",
+        "fields": {
+          "hostnames": "bms-ctrl-11",
+          "ipAddresses": "10.70.0.11",
+          "macPairs": "00:2a:2a:00:00:0b=10.70.0.11"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 1,
+    "request_count": 2,
+    "log_contains": [
+      "indexed 1 vulnerability relations across 1 devices",
+      "skipped 3 device records with no uid"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,109 @@
+{
+  "name": "paged",
+  "integration": "armis",
+  "description": "A two-page device walk with page_size=2. Armis answers data.next with an ABSOLUTE row offset rather than an opaque cursor, so page 1 returning next=2 must produce a second request carrying from=2 -- that assertion is the whole point of this scenario, because feeding the row count back instead of the server's value silently skips or repeats rows on a live inventory. Page 2 returns a null next and ends the walk. Vulnerabilities are off, so only the token exchange and the two search pages are issued.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key",
+    "page_size": "2",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "paged-token", "expiration_utc": "2026-08-26T18:04:56.123456+00:00"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/", "query_contains": "orderBy=lastSeen"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 2,
+              "next": 2,
+              "prev": null,
+              "results": [
+                {
+                  "category": "Computers",
+                  "firstSeen": "2024-01-02T00:00:00.000000+00:00",
+                  "id": 101,
+                  "ipAddress": "10.90.0.1",
+                  "lastSeen": "2026-08-01T00:00:00.000000+00:00",
+                  "macAddress": "44:11:22:00:00:01",
+                  "name": "page1-host-a",
+                  "operatingSystem": "Windows",
+                  "site": {"location": "Austin", "name": "Austin Plant"},
+                  "type": "Servers"
+                },
+                {
+                  "category": "Computers",
+                  "firstSeen": "2024-01-03T00:00:00.000000+00:00",
+                  "id": 102,
+                  "ipAddress": "10.90.0.2",
+                  "lastSeen": "2026-08-02T00:00:00.000000+00:00",
+                  "macAddress": "44:11:22:00:00:02",
+                  "name": "page1-host-b",
+                  "operatingSystem": "Linux",
+                  "site": {"location": "Austin", "name": "Austin Plant"},
+                  "type": "Servers"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 1,
+              "next": null,
+              "prev": 0,
+              "results": [
+                {
+                  "category": "Network Equipment",
+                  "firstSeen": "2024-02-01T00:00:00.000000+00:00",
+                  "id": 103,
+                  "ipAddress": "10.90.0.3",
+                  "lastSeen": "2026-08-03T00:00:00.000000+00:00",
+                  "macAddress": "44:11:22:00:00:03",
+                  "name": "page2-switch-a",
+                  "operatingSystem": "Cisco IOS",
+                  "site": {"location": "Austin", "name": "Austin Plant"},
+                  "type": "Switches"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "armis:$HOST:101",
+      "armis:$HOST:102",
+      "armis:$HOST:103"
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "from=0"},
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "from=2"},
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "length=2"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1/vulnerability-match/"},
+      {"path": "/api/v1/search/", "query_contains": "orderBy=lastDetected"},
+      {"path": "/api/v1/search/", "query_contains": "from=4"}
+    ]
+  },
+  "check_determinism": true
+}

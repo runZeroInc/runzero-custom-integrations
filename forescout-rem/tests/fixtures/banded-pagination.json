@@ -1,0 +1,230 @@
+{
+  "name": "banded-pagination",
+  "integration": "forescout-rem",
+  "description": "The whole coverage strategy in four requests, because this API has no page cursor at all: it caps every response and honours no limit, offset or page parameter, so the only way to reach the rest of an estate is to narrow the search window and ask again.\n\nThe `banded` route matches on risk_score_min and is listed first, so the `unbanded` route can only ever serve a request that carries no risk bound. The two zero-score assets live exclusively behind that route, so asserting them in the output is proof that the one unbounded, risk_score-ASCENDING call happened -- and that call is not optional: sending either risk bound makes the API drop assets scored exactly 0, and no later banded query can recover them. requests_absent locks the other half of the same rule, that no risk-ordered query ever carried a bound (the query string is rendered with its keys sorted, so a bounded risk_score query would read order_by=risk_score&risk_score_max=...).\n\nThe first banded call covers the full 0.0-10.0 scale and comes back truncated -- total_hits 6 against 2 entities -- which forces the split into 5.1-10.0 and 0.0-5.0. Both halves are complete, so the walk stops at four requests. Asset A is returned by the parent band and again by the upper half, and asset B by the parent band and again by the lower half; asset_count 6 with two duplicates logged is what proves each is emitted exactly once. The request count also includes the zero-score sweep, which narrows the bound-free probe on time when it is itself truncated -- the difference between a complete import and one that silently omits every unscored asset while reporting success.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "banded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 6,
+            "entities": [
+              {
+                "id": "rem-a",
+                "hostname": "pump-a",
+                "ip_addresses": [
+                  "10.40.0.10"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:0a"
+                ],
+                "rem_category": "Medical Device",
+                "rem_function": "Infusion Pump",
+                "rem_vendor": "Acme Medical",
+                "risk_score": 9.1,
+                "risk_severity": "Critical",
+                "last_seen": "2026-05-06T08:55:23.777Z"
+              },
+              {
+                "id": "rem-b",
+                "hostname": "hmi-b",
+                "ip_addresses": [
+                  "10.40.0.11"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:0b"
+                ],
+                "rem_category": "OT",
+                "rem_function": "HMI",
+                "risk_score": 2.5,
+                "risk_severity": "Low",
+                "last_seen": "2026-05-06T08:55:23.500Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 2,
+            "entities": [
+              {
+                "id": "rem-c",
+                "hostname": "plc-c",
+                "ip_addresses": [
+                  "10.40.0.12"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:0c"
+                ],
+                "rem_category": "OT",
+                "rem_function": "PLC",
+                "risk_score": 8.0,
+                "risk_severity": "High",
+                "last_seen": "2026-05-06T08:55:22.100Z"
+              },
+              {
+                "id": "rem-a",
+                "hostname": "pump-a",
+                "ip_addresses": [
+                  "10.40.0.10"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:0a"
+                ],
+                "rem_category": "Medical Device",
+                "rem_function": "Infusion Pump",
+                "rem_vendor": "Acme Medical",
+                "risk_score": 9.1,
+                "risk_severity": "Critical",
+                "last_seen": "2026-05-06T08:55:23.777Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 2,
+            "entities": [
+              {
+                "id": "rem-b",
+                "hostname": "hmi-b",
+                "ip_addresses": [
+                  "10.40.0.11"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:0b"
+                ],
+                "rem_category": "OT",
+                "rem_function": "HMI",
+                "risk_score": 2.5,
+                "risk_severity": "Low",
+                "last_seen": "2026-05-06T08:55:23.500Z"
+              },
+              {
+                "id": "rem-d",
+                "hostname": "camera-d",
+                "ip_addresses": [
+                  "10.40.0.13"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:0d"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "IP Camera",
+                "risk_score": 1.2,
+                "risk_severity": "Low",
+                "last_seen": "2026-05-06T08:55:21.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "unbanded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 6,
+            "entities": [
+              {
+                "id": "rem-zero-1",
+                "hostname": "badge-reader-1",
+                "ip_addresses": [
+                  "10.40.0.1"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:01"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Badge Reader",
+                "risk_score": 0,
+                "risk_severity": "None",
+                "last_seen": "2026-05-06T08:55:10.000Z"
+              },
+              {
+                "id": "rem-zero-2",
+                "hostname": "badge-reader-2",
+                "ip_addresses": [
+                  "10.40.0.2"
+                ],
+                "mac_addresses": [
+                  "00:aa:00:00:00:02"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Badge Reader",
+                "risk_score": 0,
+                "risk_severity": "None",
+                "last_seen": "2026-05-06T08:55:11.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 6,
+    "ids": [
+      "forescout-rem:$HOST:rem-zero-1",
+      "forescout-rem:$HOST:rem-zero-2",
+      "forescout-rem:$HOST:rem-a",
+      "forescout-rem:$HOST:rem-b",
+      "forescout-rem:$HOST:rem-c",
+      "forescout-rem:$HOST:rem-d"
+    ],
+    "request_count": 8,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "order_by=risk_score&sort_order=ASCENDING"
+      },
+      {
+        "query_contains": "risk_score_max=10.0&risk_score_min=0.0"
+      },
+      {
+        "query_contains": "risk_score_max=10.0&risk_score_min=5.1"
+      },
+      {
+        "query_contains": "risk_score_max=5.0&risk_score_min=0.0"
+      },
+      {
+        "query_contains": "order_by=last_seen"
+      }
+    ],
+    "requests_absent": [
+      {
+        "query_contains": "order_by=risk_score&risk_score"
+      }
+    ],
+    "log_contains": [
+      "banding the risk scale to cover it",
+      "2 entities were returned by more than one window and imported once",
+      "reported 6 assets from 4 search windows"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,30 @@
+{
+  "name": "empty",
+  "integration": "forescout-rem",
+  "description": "A tenant whose search window holds nothing. total_hits 0 against an empty entities array is a complete response, not a truncated one, so the run must stop after the single unbounded sweep rather than banding a scale that has nothing on it.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "search",
+      "match": {"method": "GET", "path": "/api/data-exchange/v3/rem-asset-search"},
+      "responses": [
+        {"status": 200, "json": {"total_hits": 0, "entities": []}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "the whole window fit in one response",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

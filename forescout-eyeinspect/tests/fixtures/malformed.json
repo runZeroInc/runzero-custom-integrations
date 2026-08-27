@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "forescout-eyeinspect",
-  "description": "Junk rows and off-contract field types mixed into good ones. eyeInspect does not publish the element shape of open_ports or mac_addresses, so this pins what the coercions actually do: a bare string row is dropped, a null id and a blank id are each skipped with a log line, open_ports typed as a single object still yields a service, open_ports typed as a comma-separated string yields one service per parseable token and silently drops the unparseable one, mac_addresses typed as an object yields no MAC rather than a garbage one, and an unparseable timestamp is preserved as a custom attribute instead of aborting parse_time.\n\nThe alerts fetch is also exercised in its failure mode: host 8007 advertises alerts, the alerts call 500s through its retries, and the host must still be imported with no findings rather than being lost.\n\nDeliberately NOT in this fixture: a host whose first_seen or last_seen is in the future. That case aborts the entire run at report_assets and loses every asset on the page; it is reported as a bug rather than encoded as expected behaviour here. Host 8008's traffic-inferred main_name is the placeholder 'unknown'; it must import on its address with no hostname, because every unresolved host shares that name.",
+  "description": "Junk rows and off-contract field types mixed into good ones. eyeInspect does not publish the element shape of open_ports or mac_addresses, so this pins what the coercions actually do: a bare string row is dropped, a null id and a blank id are each skipped with a log line, open_ports typed as a single object still yields a service, open_ports typed as a comma-separated string yields one service per parseable token and silently drops the unparseable one, mac_addresses typed as an object yields no MAC rather than a garbage one, and an unparseable timestamp is preserved as a custom attribute instead of aborting parse_time.\n\nThe alerts fetch is exercised in its failure mode: every host gets an alerts call, the route 500s through its retries for all of them, and all six hosts must still import with no findings rather than being lost. The call is unconditional because alert_count is not a Host record field -- it appears only in the sort_field enum -- so a short-circuit keyed on it could never fire on real data.\n\nDeliberately NOT in this fixture: a host whose first_seen or last_seen is in the future. That case aborts the entire run at report_assets and loses every asset on the page; it is reported as a bug rather than encoded as expected behaviour here. Host 8008's traffic-inferred main_name is the placeholder 'unknown'; it must import on its address with no hostname, because every unresolved host shares that name.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-operator",
@@ -136,10 +136,9 @@
         "method": "GET",
         "path": "/api/v1/alerts",
         "query_contains": "host_id=8007"
-      }
-    ],
-    "requests_absent": [
+      },
       {
+        "method": "GET",
         "path": "/api/v1/alerts",
         "query_contains": "host_id=8004"
       }
@@ -149,6 +148,7 @@
       "skipping host with no id: ip=10.82.0.1",
       "skipping host with no id: ip=10.82.0.2",
       "failed to fetch alerts for host 8007",
+      "failed to fetch alerts for host 8004",
       "reported 6 assets"
     ],
     "assets": [

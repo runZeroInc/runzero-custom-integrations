@@ -1,0 +1,204 @@
+{
+  "name": "legacy-fallback",
+  "integration": "forescout-counteract",
+  "description": "A Web API plugin predating the paginated endpoint answers POST /api/hosts/discovery with a 404, and that must degrade rather than end the run: the walk falls back to GET /api/hosts plus one property document per host. The log has to name which path was taken, or an operator cannot tell a slow legacy import from a fast paginated one.\n\nEverything else here exercises the legacy path end to end -- the field index driving the fields= query, classification, services, software, and CVE findings, the two skip paths (a row with no hostId, and a host whose only address is loopback with no MAC or name), the all-zero index MAC that must not reach an interface, and epoch seconds on host 1001 against epoch milliseconds on host 1002 both resolving to the same instant, which is what pins the millisecond detection. The asserted ids are identical to the ones the paginated path produces, which is the point: a deployment that falls back must not re-key a single asset.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password",
+    "include_details": "true"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.c2lnbmF0dXJlLWZpeHR1cmU"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-not-implemented",
+      "match": {"method": "POST", "path": "/api/hosts/discovery"},
+      "responses": [
+        {"status": 404, "text": "Not Found"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hostFields": [
+              {"name": "hostname", "label": "Hostname"},
+              {"name": "nbtdomain", "label": "NetBIOS Domain"},
+              {"name": "os_classification", "label": "Operating System"},
+              {"name": "prim_classification", "label": "Function"},
+              {"name": "vendor_classification", "label": "Vendor and Model"},
+              {"name": "mac_vendor_string", "label": "NIC Vendor"},
+              {"name": "cl_type", "label": "Classified By"},
+              {"name": "online", "label": "Online"},
+              {"name": "onsite", "label": "Onsite"},
+              {"name": "macs", "label": "MAC Addresses"},
+              {"name": "openports", "label": "Open Ports"},
+              {"name": "installed_applications", "label": "Windows Applications Installed"},
+              {"name": "va_cve_list", "label": "Vulnerabilities"},
+              {"name": "ipv4_report_time", "label": "IPv4 Report Time"},
+              {"name": "not_a_property name", "label": "Rejected by the field-name screen"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-1001",
+      "match": {"method": "GET", "path": "/api/hosts/1001"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 1001,
+              "ip": "10.20.30.40",
+              "fields": {
+                "hostname": {"value": "acct-ws-01"},
+                "nbtdomain": {"value": "CORP"},
+                "os_classification": {"value": "Computer/Windows Machine/Windows 10"},
+                "prim_classification": {"value": "Computer/Desktop"},
+                "vendor_classification": {"value": "Dell Inc./OptiPlex 7090"},
+                "mac_vendor_string": {"value": "Dell Inc."},
+                "cl_type": {"value": "Classification Engine"},
+                "online": {"value": "true"},
+                "onsite": {"value": "true"},
+                "macs": [{"value": "001122334455"}, {"value": "00:11:22:33:44:66"}],
+                "openports": [
+                  {"value": "445/tcp"},
+                  {"value": "3389"},
+                  {"value": "161/udp"},
+                  {"value": "0/tcp"}
+                ],
+                "installed_applications": [
+                  {"value": "7-Zip 23.01"},
+                  {"value": {"name": "Notepad Plus", "version": "8.6.2", "vendor": "Fixture Software"}},
+                  {"value": "7-Zip 23.01"}
+                ],
+                "va_cve_list": [
+                  {"value": "cve-2024-12345 and CVE-2023-45678"},
+                  {"value": "CVE-2024-12345"}
+                ],
+                "ipv4_report_time": {"value": "1754000000"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-1002",
+      "match": {"method": "GET", "path": "/api/hosts/1002"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 1002,
+              "fields": {
+                "hostname": {"value": "plc-line-3"},
+                "prim_classification": {"value": "Operational Technology/PLC"},
+                "vendor_classification": {"value": "Fixture Automation"},
+                "online": {"value": "false"},
+                "ipv4_report_time": {"value": "1754000000000"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-1003",
+      "match": {"method": "GET", "path": "/api/hosts/1003"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"host": {"id": 1003, "fields": {"ipv4_report_time": {"value": "not-a-timestamp"}}}}
+        }
+      ]
+    },
+    {
+      "name": "host-index",
+      "match": {"method": "GET", "path": "/api/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {"hostId": 1001, "ip": "10.20.30.40", "mac": "001122334455"},
+              {"hostId": 1002, "ip": "10.20.30.41", "mac": "000000000000"},
+              {"hostId": 1003, "ip": "127.0.0.1", "mac": "000000000000"},
+              {"ip": "10.20.30.44", "mac": "00:11:22:33:44:99"}
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:1001",
+      "forescout-counteract:$HOST:1002"
+    ],
+    "min_requests": 6,
+    "requests_include": [
+      {"method": "POST", "path": "/api/login", "body_contains": "username=webapi-fixture"},
+      {"method": "GET", "path": "/api/hostfields"},
+      {"method": "POST", "path": "/api/hosts/discovery"},
+      {"method": "GET", "path": "/api/hosts"},
+      {"method": "GET", "path": "/api/hosts/1001", "query_contains": "fields=hostname"}
+    ],
+    "log_contains": [
+      "forescout-counteract: the paginated endpoint is unavailable (status 404",
+      "falling back to the host index and per-host properties",
+      "forescout-counteract: skipping host with no object id: ip=10.20.30.44",
+      "forescout-counteract: skipping host 1003 with no address, MAC, or name to correlate on",
+      "the host index returned 4 hosts",
+      "forescout-counteract: reported 2 assets"
+    ],
+    "min_services_total": 3,
+    "min_software_total": 2,
+    "min_vulnerabilities_total": 2,
+    "assets": [
+      {
+        "id": "forescout-counteract:$HOST:1001",
+        "fields": {
+          "hostnames": "acct-ws-01",
+          "ipAddresses": "10.20.30.40",
+          "macAddresses": "00:11:22:33:44:55\t00:11:22:33:44:66",
+          "os": "Windows 10",
+          "deviceType": "Desktop",
+          "domain": "CORP",
+          "manufacturer": "Dell Inc.",
+          "model": "OptiPlex 7090",
+          "forescout_counteract_detail_enriched": "true",
+          "forescout_counteract_source_endpoint": "index",
+          "lastSeenTS": "1754000000"
+        }
+      },
+      {
+        "id": "forescout-counteract:$HOST:1002",
+        "fields": {
+          "deviceType": "Industrial Control System",
+          "ipAddresses": "10.20.30.41",
+          "lastSeenTS": "1754000000"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

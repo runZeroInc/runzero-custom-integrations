@@ -1,0 +1,103 @@
+{
+  "name": "since-time",
+  "integration": "forescout-counteract",
+  "description": "sinceTime is the incremental-sync control the paginated endpoint publishes: \"respond only with endpoints that have been updated after the provided UNIX timestamp\", defaulting to 0. It is exposed as a window in days rather than an epoch, because an epoch is not a thing an operator types, and 0 leaves the parameter off the request entirely -- happy asserts that absence. Here since_days is 7 and every paginated request must carry sinceTime. The value itself is now() minus seven days and so cannot be asserted literally, which is what the log line covering the window is for.\n\nBoth pages must carry it, not just the first: the follow-up page is rebuilt from the next_link's page and nodeId against the configured base URL rather than dialled as given, so a walk that dropped the operator's own parameters on page 2 would silently import the whole estate anyway. The 429 on the first page is the documented rate limit -- \"the transaction is limited to 20 requests per minute\" -- and it must be absorbed by the built-in retry rather than by any backoff of this integration's own.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password",
+    "since_days": "7",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzaW5jZSJ9.c2luY2Utc2lnbmF0dXJl"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {"status": 200, "json": {"hostFields": [{"name": "hostname_calculated"}, {"name": "online"}]}}
+      ]
+    },
+    {
+      "name": "discovery-page-0",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=0"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "too many requests"}},
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "next_link": "https://enterprise-manager.example.com/api/hosts/discovery?pageSize=50&sinceTime=1715282542&page=1&nodeId=5934747350691673071"
+            },
+            "hosts": [
+              {
+                "id": 167838209,
+                "ip": "10.1.2.1",
+                "mac": "0022e51f9018",
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724839643, "value": "recent-01"},
+                  "online": {"timestamp": 1724839643, "value": "true"}
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "discovery-page-1",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {"next_link": ""},
+            "hosts": [
+              {
+                "id": 167838210,
+                "ip": "10.1.2.2",
+                "mac": "0022e51f9019",
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724839644, "value": "recent-02"},
+                  "online": {"timestamp": 1724839644, "value": "true"}
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:167838209",
+      "forescout-counteract:$HOST:167838210"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "sinceTime="},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=0"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=1"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "pageSize=50"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "nodeId=5934747350691673071"}
+    ],
+    "requests_absent": [
+      {"path": "/api/hosts"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "sinceTime=0"}
+    ],
+    "log_contains": [
+      "forescout-counteract: incremental sync, asking for endpoints updated in the last 7 day(s)",
+      "forescout-counteract: imported 2 assets from the paginated endpoint over 2 request(s)"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

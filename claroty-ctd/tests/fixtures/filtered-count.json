@@ -1,0 +1,166 @@
+{
+  "name": "filtered-count",
+  "integration": "claroty-ctd",
+  "description": "A filtered walk whose two counts disagree: count_total is 500 and count_filtered is 2, which is what a real appliance returns when the request carries ghost__exact=false or relevance__exact=1 and the table behind it is far larger than the matching set. count_filtered is the bound that matches the walk this script actually makes, so the run stops after one page of each endpoint; bounding on count_total instead would over-run and spend one more request per endpoint before the empty array stopped it. Both page-2 routes are declared and answer with an empty page, so a regression to count_total would still terminate cleanly rather than hang - the requests_absent assertions are what catch it.\n\nThe same response is the natural home for the other half of this scenario. A projected or filtered response is exactly where CTD's paired enum label goes missing: asset 44-1 carries asset_type 12 with no asset_type__ at all, and must still be typed Switch from the local table, while 45-1 carries both spellings of the same value. Asserting the same deviceType on both is what proves the integer fallback agrees with the appliance's own label rather than merely being non-empty.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [{"status": 200, "json": {"token": "filtered-token", "password_expired": false, "username": "admin"}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "vulnerabilities-page-2",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities", "query_contains": "page=2"},
+      "responses": [
+        {"status": 200, "json": {"count_filtered": 1, "count_in_page": 0, "count_total": 500, "objects": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulnerabilities-page-1",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 1,
+          "count_in_page": 1,
+          "count_total": 500,
+          "objects": [
+            {
+              "resource_id": "900-1",
+              "asset_id": "44-1",
+              "asset_name": "idf3-access-sw",
+              "cve_id": "CVE-2023-20198",
+              "cvss_v3_score": {"value": 10.0, "label": "Critical"},
+              "epss_score": {"value": 0.9412},
+              "actively_exploited": true,
+              "vulnerability_type": "Known Vulnerability",
+              "detection_date": "2024-11-04T00:00:00+00:00",
+              "relevance__": "Confirmed"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "assets-page-2",
+      "match": {"method": "GET", "path": "/ranger/assets", "query_contains": "page=2"},
+      "responses": [
+        {"status": 200, "json": {"count_filtered": 2, "count_in_page": 0, "count_total": 500, "objects": []}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-page-1",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 2,
+          "count_in_page": 2,
+          "count_total": 500,
+          "objects": [
+            {
+              "id": 44,
+              "resource_id": "44-1",
+              "site_id": 1,
+              "site_name": "site-3",
+              "name": "idf3-access-sw",
+              "hostname": "idf3-access-sw",
+              "ipv4": ["10.30.1.4"],
+              "mac": ["00:1D:9C:AA:10:04"],
+              "vendor": "Cisco",
+              "model": "IE-4000-8GT8GP4G-E",
+              "firmware": "15.2(7)E4",
+              "asset_type": 12,
+              "class_type": "IT",
+              "criticality": 1,
+              "risk_level": 2,
+              "purdue_level": 2,
+              "ghost": false,
+              "special_hint": 0,
+              "first_seen": "2024-01-08T11:02:00+00:00",
+              "last_seen": "2024-11-04T18:41:00+00:00"
+            },
+            {
+              "id": 45,
+              "resource_id": "45-1",
+              "site_id": 1,
+              "site_name": "site-3",
+              "name": "idf4-access-sw",
+              "hostname": "idf4-access-sw",
+              "ipv4": ["10.30.1.5"],
+              "mac": ["00:1D:9C:AA:10:05"],
+              "vendor": "Cisco",
+              "model": "IE-4000-8GT8GP4G-E",
+              "firmware": "15.2(7)E4",
+              "asset_type": 12,
+              "asset_type__": "eSwitch",
+              "class_type": "IT",
+              "criticality": 1,
+              "risk_level": 2,
+              "purdue_level": 2,
+              "ghost": false,
+              "special_hint": 0,
+              "first_seen": "2024-01-08T11:04:00+00:00",
+              "last_seen": "2024-11-04T18:42:00+00:00"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "claroty-ctd:$HOST:44-1",
+      "claroty-ctd:$HOST:45-1"
+    ],
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:44-1",
+        "fields": {
+          "deviceType": "Switch",
+          "claroty_ctd_asset_type": "12",
+          "claroty_ctd_asset_type_label": "Switch",
+          "claroty_ctd_criticality_label": "Medium",
+          "claroty_ctd_risk_level_label": "High",
+          "claroty_ctd_vulnerability_count": "1"
+        }
+      },
+      {
+        "id": "claroty-ctd:$HOST:45-1",
+        "fields": {
+          "deviceType": "Switch",
+          "claroty_ctd_asset_type": "12",
+          "claroty_ctd_asset_type_label": "Switch"
+        }
+      }
+    ],
+    "request_count": 3,
+    "min_vulnerabilities_total": 1,
+    "requests_include": [
+      {"method": "POST", "path": "/auth/authenticate"},
+      {"method": "GET", "path": "/ranger/asset-vulnerabilities", "query_contains": "page=1"},
+      {"method": "GET", "path": "/ranger/assets", "query_contains": "page=1"}
+    ],
+    "requests_absent": [
+      {"path": "/ranger/assets", "query_contains": "page=2"},
+      {"path": "/ranger/asset-vulnerabilities", "query_contains": "page=2"}
+    ],
+    "log_contains": [
+      "indexed 1 vulnerabilities across 1 assets",
+      "reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

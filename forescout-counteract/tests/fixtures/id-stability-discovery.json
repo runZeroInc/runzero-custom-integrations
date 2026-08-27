@@ -1,0 +1,91 @@
+{
+  "name": "id-stability-discovery",
+  "integration": "forescout-counteract",
+  "description": "Half of a pair: this scenario and id-stability-legacy serve the SAME endpoint -- 10.42.1.156, MAC 0050568b007f, hostname em-stable-01 -- through the two different Web API endpoints, and both assert the identical foreign id forescout-counteract:$HOST:170525084. If what the id means ever changes, exactly one of the pair fails and the other passes, which is the failure an existing deployment would experience as every asset re-keying.\n\nThe reason the two agree is that the CounterACT host key is the endpoint's IPv4 address packed into a 32-bit integer: the guide's own index example pairs hostId 170525084 with ip 10.42.1.156, and 10*2^24 + 42*2^16 + 1*2^8 + 156 is 170525084 exactly. The paginated endpoint's sample types the same key with an {EM.IP} placeholder in a block that also prints two \"id\" keys in one object, so the sample cannot be read literally -- which is why the id is canonicalised rather than trusted. Here it arrives in the address form and must still key on the integer; the second endpoint, arriving with the id already an integer, must pass through untouched. Note this is also why matchBehavior is no-id-match no-id-break: an address-derived key is recycled to whatever device takes the address over, so it is a record key and never a merge key.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdGFibGUifQ.c3RhYmxlLXNpZ25hdHVyZQ"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {"status": 200, "json": {"hostFields": [{"name": "hostname_calculated"}, {"name": "online"}]}}
+      ]
+    },
+    {
+      "name": "discovery",
+      "match": {"method": "POST", "path": "/api/hosts/discovery"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {},
+            "hosts": [
+              {
+                "id": "10.42.1.156",
+                "ip": "10.42.1.156",
+                "mac": "0050568b007f",
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724839643, "value": "em-stable-01"},
+                  "online": {"timestamp": 1724839643, "value": "true"}
+                }
+              },
+              {
+                "id": 170524982,
+                "ip": "10.42.1.54",
+                "mac": null,
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724839643, "value": "em-stable-02"},
+                  "online": {"timestamp": 1724839643, "value": "true"}
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:170525084",
+      "forescout-counteract:$HOST:170524982"
+    ],
+    "ids_absent": [
+      "forescout-counteract:$HOST:10.42.1.156"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/hosts/discovery"}
+    ],
+    "requests_absent": [
+      {"path": "/api/hosts"}
+    ],
+    "assets": [
+      {
+        "id": "forescout-counteract:$HOST:170525084",
+        "fields": {
+          "hostnames": "em-stable-01",
+          "ipAddresses": "10.42.1.156",
+          "macAddresses": "00:50:56:8b:00:7f",
+          "forescout_counteract_host_id": "170525084",
+          "forescout_counteract_source_endpoint": "discovery",
+          "lastSeenTS": "1724839643"
+        }
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-23T10:35:24.731709Z",
-  "totalIntegrations": 111,
+  "lastUpdated": "2026-08-27T03:31:34.248495Z",
+  "totalIntegrations": 118,
   "integrationDetails": [
     {
       "name": "Absolute Secure Endpoint",
@@ -22,6 +22,13 @@
       "maturity": "beta",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/akamai-guardicore-centra/centra-v4-api.star"
+    },
+    {
+      "name": "Armis Centrix",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/armis/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/armis/armis.star"
     },
     {
       "name": "Asimily",
@@ -80,6 +87,13 @@
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/checkmk-raw/checkmk-raw.star"
     },
     {
+      "name": "Cisco Cyber Vision",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-cyber-vision/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-cyber-vision/cisco-cyber-vision.star"
+    },
+    {
       "name": "Cisco ISE",
       "type": "inbound",
       "maturity": "beta",
@@ -92,6 +106,20 @@
       "maturity": "alpha",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-secure-endpoint/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/cisco-secure-endpoint/cisco-secure-endpoint.star"
+    },
+    {
+      "name": "Claroty CTD",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/claroty-ctd/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/claroty-ctd/claroty-ctd.star"
+    },
+    {
+      "name": "Claroty xDome",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/claroty-xdome/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/claroty-xdome/claroty-xdome.star"
     },
     {
       "name": "Cortex XDR",
@@ -204,6 +232,13 @@
       "maturity": "alpha",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/forescout-eyeinspect/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/forescout-eyeinspect/forescout-eyeinspect.star"
+    },
+    {
+      "name": "Forescout Risk and Exposure Management",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/forescout-rem/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/forescout-rem/forescout-rem.star"
     },
     {
       "name": "Frontline VM",
@@ -379,6 +414,13 @@
       "maturity": "beta",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/maze-security/maze-security.star"
+    },
+    {
+      "name": "Microsoft Defender for IoT",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/microsoft-defender-for-iot/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/microsoft-defender-for-iot/microsoft-defender-for-iot.star"
     },
     {
       "name": "Microsoft SQL Server databases",
@@ -673,6 +715,13 @@
       "maturity": "beta",
       "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/README.md",
       "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tailscale/tailscale.star"
+    },
+    {
+      "name": "Tenable OT Security",
+      "type": "inbound",
+      "maturity": "alpha",
+      "readme": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tenable-ot-security/README.md",
+      "integration": "https://github.com/runZeroInc/runzero-custom-integrations/blob/main/tenable-ot-security/tenable-ot-security.star"
     },
     {
       "name": "TP-Link Omada",

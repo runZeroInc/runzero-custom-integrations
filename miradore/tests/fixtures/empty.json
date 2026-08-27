@@ -1,0 +1,63 @@
+{
+  "name": "empty",
+  "integration": "miradore",
+  "description": "A site with no devices matching the query. The path probe succeeds, the first page is an empty <Items> element, and the run ends cleanly with nothing reported -- no error, and no per-device v2 request to make.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"0\"></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "suspended",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/SuspendedDevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "log_contains": [
+      "reported 0 of 0 devices matched by the query"
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/CustomAttribute"
+      },
+      {
+        "path_contains": "/Location"
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": [
+      "namespaced_ids"
+    ]
+  }
+}

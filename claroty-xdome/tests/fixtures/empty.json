@@ -1,0 +1,33 @@
+{
+  "name": "empty",
+  "integration": "claroty-xdome",
+  "description": "A tenant whose token is scoped to sites holding nothing, or whose retired filter excluded everything. The response schema declares `devices` required and typed as an array, but a real exhausted page comes back as `{\"devices\": null}` -- the Elastic integration's mock server reproduces exactly that, and its CEL guards for it. A script that only checks for an empty list would call .get on None and abort the run, so null is treated as end-of-data on both envelopes. Zero assets and one clear log line is the correct outcome: the difference between a small tenant and a broken credential is what the log says, not a failed task.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-relations",
+      "match": {"method": "POST", "path": "/api/v1/device_vulnerability_relations/"},
+      "responses": [{"status": 200, "json": {"devices_vulnerabilities": null}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "POST", "path": "/api/v1/devices/"},
+      "responses": [{"status": 200, "json": {"devices": null}}],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "log_contains": [
+      "indexed 0 vulnerability relations across 0 devices",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

@@ -123,9 +123,25 @@ def run_once(scenario, script, scanner, basedir="."):
         shutil.rmtree(workdir, ignore_errors=True)
 
 
+# Every key check_expectations understands. An unknown key is a hard error: a
+# silently ignored expectation is one the harness never evaluates, so the
+# scenario reports PASS while asserting nothing.
+EXPECT_KEYS = frozenset([
+    "assets", "asset_count", "min_assets", "ids", "ids_absent",
+    "request_count", "min_requests", "requests_include", "requests_absent",
+    "log_contains", "min_services_total", "min_software_total",
+    "min_vulnerabilities_total",
+])
+
+
 def check_expectations(scenario, assets, requests, log, base, gmp=None):
     """Compare the run against the scenario's `expect` block."""
     expect = json.loads(substitute(json.dumps(scenario.get("expect", {})), base, gmp))
+    unknown = sorted(set(expect) - EXPECT_KEYS)
+    if unknown:
+        raise ValueError(
+            "unsupported expect key(s) %s; supported: %s"
+            % (", ".join(unknown), ", ".join(sorted(EXPECT_KEYS))))
     failures = []
 
     # Assert individual asset fields. Identity and merge behaviour live here:

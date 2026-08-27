@@ -1,0 +1,81 @@
+{
+  "name": "auth-refresh",
+  "integration": "claroty-ctd",
+  "description": "A 401 mid-run. Claroty publishes no token lifetime at all, only that tokens expire and that 401 is the signal, so a full-inventory walk of a large EMC can outlive its first token. Here the login mints token-one, the vulnerability pass succeeds under it, and the first asset request answers 401 - the fixture's stand-in for the session ageing out. Proves the integration authenticates again (the second login issues token-two), rebuilds the HTTP options rather than mutating the snapshotted header map, retries the failed request exactly once under the new token, and completes with the full inventory instead of a silently partial import.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [
+        {"status": 200, "json": {"token": "token-one", "password_expired": false, "username": "admin"}},
+        {"status": 200, "json": {"token": "token-two", "password_expired": false, "username": "admin"}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-vulnerabilities",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities"},
+      "responses": [
+        {"status": 200, "json": {"count_filtered": 0, "count_in_page": 0, "count_total": 0, "objects": []}}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 401, "json": {"error": "token expired"}},
+        {"status": 200, "json": {
+          "count_filtered": 1,
+          "count_in_page": 1,
+          "count_total": 1,
+          "objects": [
+            {
+              "id": 310,
+              "resource_id": "310-1",
+              "site_id": 1,
+              "site_name": "site-refresh",
+              "name": "engineering-ws-01",
+              "hostname": "engineering-ws-01",
+              "ipv4": ["10.30.7.21"],
+              "mac": ["00:50:56:8D:9B:1C"],
+              "vendor": "VMware",
+              "os": "Windows 10",
+              "asset_type__": "eEngineeringStation",
+              "class_type": "OT",
+              "criticality__": "eHigh",
+              "purdue_level": 3,
+              "ghost": false,
+              "special_hint": 0,
+              "last_seen": "2026-08-20T11:04:05+00:00"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["claroty-ctd:$HOST:310-1"],
+    "requests_include": [
+      {"method": "POST", "path": "/auth/authenticate", "body_contains": "fixture-user"},
+      {"method": "GET", "path": "/ranger/asset-vulnerabilities", "header_contains": "token-one"},
+      {"method": "GET", "path": "/ranger/assets", "header_contains": "token-one"},
+      {"method": "GET", "path": "/ranger/assets", "header_contains": "token-two"}
+    ],
+    "log_contains": [
+      "session token rejected mid-run, authenticating again",
+      "reported 1 assets"
+    ]
+  },
+  "check_determinism": true
+}

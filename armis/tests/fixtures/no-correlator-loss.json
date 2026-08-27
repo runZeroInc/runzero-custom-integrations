@@ -1,0 +1,142 @@
+{
+  "name": "no-correlator-loss",
+  "integration": "armis",
+  "description": "THE COST OF no-id-match, MADE VISIBLE. The identity decision here is conservative rather than proven: id reuse rests on a single unverified community field report, and the merge-event stream proves only that merges happen. Taking the id out of the matching path is the safe answer while that is open, but it is not free, and this scenario is the bill. Rows 8101, 8102 and 8103 carry an id, a site, a riskLevel and a type and nothing else -- the shape of an Armis row marked visibility 'Limited', which Armis learned about from a connected tool rather than from traffic. With default matching they would import on their foreign id; with the id barred from matching they have nothing to correlate on, would land as a fresh orphan on every poll, and are therefore skipped. asset_count 2 out of 5 is the loss, and the skip tally is asserted so it can never become silent. RE-POINT THIS SCENARIO if the reuse question is ever settled against reuse: asset_count would become 5 and this file is the record of what changed.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret",
+    "include_vulnerabilities": "false",
+    "page_size": "1000"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/access_token/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "access_token": "fixture-token",
+              "expiration_utc": "2030-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/search/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 5,
+              "total": 5,
+              "next": null,
+              "results": [
+                {
+                  "id": 8001,
+                  "name": "ward-monitor-01",
+                  "ipAddress": "10.8.0.11",
+                  "macAddress": "00:88:00:00:00:11",
+                  "type": "Patient Monitor",
+                  "category": "Medical",
+                  "riskLevel": 7,
+                  "visibility": "Full",
+                  "site": {
+                    "name": "Riverside",
+                    "location": "Building 2"
+                  },
+                  "lastSeen": "2026-08-20T09:00:00Z"
+                },
+                {
+                  "id": 8002,
+                  "name": "ward-pump-02",
+                  "ipAddress": "10.8.0.12",
+                  "macAddress": "00:88:00:00:00:12",
+                  "type": "Infusion Pump",
+                  "category": "Medical",
+                  "riskLevel": 5,
+                  "visibility": "Full",
+                  "site": {
+                    "name": "Riverside",
+                    "location": "Building 2"
+                  },
+                  "lastSeen": "2026-08-20T09:05:00Z"
+                },
+                {
+                  "id": 8101,
+                  "name": "",
+                  "ipAddress": null,
+                  "macAddress": null,
+                  "type": "Ultrasound",
+                  "category": "Medical",
+                  "riskLevel": 8,
+                  "visibility": "Limited",
+                  "site": {
+                    "name": "Riverside",
+                    "location": "Building 2"
+                  },
+                  "lastSeen": "2026-08-19T11:00:00Z"
+                },
+                {
+                  "id": 8102,
+                  "name": null,
+                  "ipAddress": "",
+                  "macAddress": "",
+                  "type": "Ventilator",
+                  "category": "Medical",
+                  "riskLevel": 9,
+                  "visibility": "Limited",
+                  "site": {
+                    "name": "Riverside",
+                    "location": "Building 4"
+                  },
+                  "lastSeen": "2026-08-19T12:00:00Z"
+                },
+                {
+                  "id": 8103,
+                  "type": "Imaging",
+                  "category": "Medical",
+                  "riskLevel": 6,
+                  "visibility": "Limited",
+                  "site": {
+                    "name": "Lakeside",
+                    "location": "Annex"
+                  },
+                  "lastSeen": "2026-08-19T13:00:00Z"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "armis:$HOST:8001",
+      "armis:$HOST:8002"
+    ],
+    "ids_absent": [
+      "armis:$HOST:8101",
+      "armis:$HOST:8102",
+      "armis:$HOST:8103"
+    ],
+    "log_contains": [
+      "armis: skipped 3 devices with no MAC, IP, or hostname to correlate on"
+    ]
+  },
+  "check_determinism": true
+}

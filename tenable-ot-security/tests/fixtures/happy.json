@@ -1,0 +1,364 @@
+{
+  "name": "happy",
+  "integration": "tenable-ot-security",
+  "description": "One GraphQL page containing the two asset nodes recorded in Elastic's own tenable_ot_security test fixtures (an OtDevice with one MAC and one IP, and a Plc with three inherited IPs plus one direct MAC), a Windows engineering station carrying osDetails.hotFixes and plugin findings, and one hidden asset. The two Elastic nodes are reproduced verbatim, which is why their segment nodes carry `key` and `system`: that capture came off a real console rather than from Elastic's own narrower selection. Proves the X-APIKeys header carries a raw `key=` value with no bearer scheme, that hidden assets are dropped, that the synthetic console name \"OT Device #966\" is refused as a hostname while \"DeviceNet_L81\" is accepted, that risk.totalRisk survives arriving as a string, and that the Go zero time on runStatusTime and on one hotfix never becomes a timestamp. The PLC asserts only its directIps address. Its ips list additionally carries 10.100.101.151 and .155, which the vendor schema calls 'All associated IPs' -- addresses inherited from sibling backplane modules and fronting gateways. Putting those on the interface makes every module in a rack advertise the same addresses, so ip-match pulls unrelated modules onto one another. Elastic's shipping pipeline promotes only direct_ips for the same reason. The full associated list stays as an attribute. UPDATED: none of these four nodes carries a directNetworkInterfaces connection, so this scenario is now also the lock on the flat-list FALLBACK -- the path taken for the minimal document and for a console that has not built the interface connection. The interface-connection path itself is covered by dns-hostnames. Two other behaviours changed under this scenario without changing its assertions: hostnames now come from clean_hostnames over dnsNames with the console name behind them (there are no dnsNames here, so the outcome is identical), and lastSeenTS no longer falls back to lastHit or lastUpdate, which is why the PLC -- which carries no lastSeen at all -- now has no last-seen date rather than one invented from its update time. See never-seen for that.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "true",
+    "import_software": "true"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "getAssets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "c2fb6b1e-f015-49b4-a247-6576fc648a6e",
+                    "name": "OT Device #966",
+                    "firstSeen": "2024-06-25T17:38:44.422095Z",
+                    "lastSeen": "2025-02-25T04:54:57.955813Z",
+                    "lastHit": "2025-02-25T01:14:13.485511Z",
+                    "lastSnapshot": null,
+                    "macs": {
+                      "nodes": [
+                        "f8:75:a4:f5:c6:37"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "81.2.69.192"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": [
+                        {
+                          "id": "531c4526-7ee7-4b95-abc0-f36867efcd38",
+                          "name": "OtDevice / 172.26.23.X",
+                          "type": "Filter",
+                          "key": "AG1-633",
+                          "system": true
+                        }
+                      ]
+                    },
+                    "type": "OtDevice",
+                    "superType": "OtDevice",
+                    "category": "NetworkAssetsCategory",
+                    "purdueLevel": "Level2",
+                    "runStatus": "Unknown",
+                    "runStatusTime": "0001-01-01T00:00:00Z",
+                    "risk": {
+                      "totalRisk": "35.40130597317059"
+                    },
+                    "criticality": "MediumCriticality",
+                    "hidden": false,
+                    "lastUpdate": "2024-06-25T17:38:47.67543Z",
+                    "directIps": {
+                      "nodes": [
+                        "81.2.69.192"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "id": "00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+                    "name": "DeviceNet_L81",
+                    "macs": {
+                      "nodes": []
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.100.101.151",
+                        "10.100.101.155",
+                        "10.100.101.150"
+                      ]
+                    },
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "risk": {
+                      "totalRisk": "72.8374829734034"
+                    },
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "directIps": {
+                      "nodes": [
+                        "10.100.101.150"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": [
+                        "00:1d:9c:d4:c3:95"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": [
+                        {
+                          "id": "0c1a6f43-2f77-4a6d-9c2e-1f3a0b2c4d5e",
+                          "name": "Controller / 10.100.101.X",
+                          "type": "Filter"
+                        }
+                      ]
+                    },
+                    "vendor": "Rockwell Automation",
+                    "model": "1756-L81E/B",
+                    "serial": "40A1C2D3",
+                    "family": "ControlLogix",
+                    "location": "Plant 1 / Line 3",
+                    "slot": "0",
+                    "firmwareVersion": "32.011",
+                    "os": null,
+                    "description": "ControlLogix 5580 controller",
+                    "backplane": {
+                      "id": "b7c5b0f1-4d3a-4c1f-9a2b-7e6d5c4b3a21",
+                      "name": "1756-A10",
+                      "size": 10
+                    },
+                    "customField1": "CMDB-88214",
+                    "osDetails": null,
+                    "plugins": {
+                      "nodes": [
+                        {
+                          "id": "500123",
+                          "name": "CVE-2023-3595",
+                          "source": "Tenable",
+                          "family": "SCADA",
+                          "severity": "Critical",
+                          "vprScore": 9.6,
+                          "comment": "Rockwell ControlLogix out-of-bounds write in the CIP message handler.",
+                          "totalAffectedAssets": 4
+                        },
+                        {
+                          "id": "500124",
+                          "name": "Unencrypted Telnet Server",
+                          "source": "Tenable",
+                          "family": "Misc.",
+                          "severity": "Medium",
+                          "vprScore": 5.1,
+                          "totalAffectedAssets": 12
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "9f3d54a2-2c0b-4e78-8c1c-3b6b8f5f1a20",
+                    "name": "ENG-STATION-04",
+                    "firstSeen": "2025-01-08T12:00:00Z",
+                    "lastSeen": "2026-08-20T04:00:00Z",
+                    "lastHit": "2026-08-20T03:55:00Z",
+                    "lastUpdate": "2026-08-20T04:00:02Z",
+                    "macs": {
+                      "nodes": [
+                        "00:0c:29:5b:aa:71"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.100.90.20"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": [
+                        "00:0c:29:5b:aa:71"
+                      ]
+                    },
+                    "directIps": {
+                      "nodes": [
+                        "10.100.90.20"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": [
+                        {
+                          "id": "3a2b1c0d-9e8f-4a7b-8c6d-5e4f3a2b1c0d",
+                          "name": "Server / 10.100.90.X",
+                          "type": "Filter"
+                        }
+                      ]
+                    },
+                    "type": "EngineeringStation",
+                    "superType": "Server",
+                    "category": "NetworkAssetsCategory",
+                    "purdueLevel": "Level3",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "runStatus": "Unknown",
+                    "runStatusTime": "0001-01-01T00:00:00Z",
+                    "risk": {
+                      "totalRisk": "61.5"
+                    },
+                    "vendor": "VMware, Inc.",
+                    "model": "VMware Virtual Platform",
+                    "serial": "VMware-56-4d-1f-22",
+                    "family": "Windows",
+                    "location": "Plant 2 / Control Room",
+                    "os": "Windows Server 2019",
+                    "description": "Studio 5000 engineering station",
+                    "customField1": "CMDB-44710",
+                    "customField7": "owner: controls-engineering",
+                    "osDetails": {
+                      "name": "Windows Server 2019",
+                      "architecture": "x64",
+                      "version": "10.0.17763",
+                      "hotFixes": {
+                        "nodes": [
+                          {
+                            "name": "KB5000802",
+                            "installDate": "2025-03-11T00:00:00Z",
+                            "description": "Security Update for Windows Server 2019"
+                          },
+                          {
+                            "name": "KB5001567",
+                            "installDate": "0001-01-01T00:00:00Z",
+                            "description": "Cumulative Update"
+                          }
+                        ]
+                      }
+                    },
+                    "plugins": {
+                      "nodes": [
+                        {
+                          "id": "700455",
+                          "name": "Microsoft Windows SMBv1 Enabled",
+                          "source": "Tenable",
+                          "family": "Windows",
+                          "severity": "High",
+                          "vprScore": 7.2,
+                          "totalAffectedAssets": 3
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "5e1b9c77-9a4e-4c33-9c11-2d7f0a3e8b44",
+                    "name": "HIDDEN-TEST-RIG",
+                    "hidden": true,
+                    "type": "OtDevice",
+                    "macs": {
+                      "nodes": [
+                        "00:11:22:33:44:99"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.100.90.99"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": []
+                    },
+                    "directIps": {
+                      "nodes": []
+                    },
+                    "segments": {
+                      "nodes": []
+                    }
+                  }
+                ],
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tenable-ot-security:$HOST:c2fb6b1e-f015-49b4-a247-6576fc648a6e",
+      "tenable-ot-security:$HOST:00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+      "tenable-ot-security:$HOST:9f3d54a2-2c0b-4e78-8c1c-3b6b8f5f1a20"
+    ],
+    "ids_absent": [
+      "tenable-ot-security:$HOST:5e1b9c77-9a4e-4c33-9c11-2d7f0a3e8b44"
+    ],
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "hasNextPage"
+      },
+      {
+        "header_contains": "key=fixture-api-key"
+      },
+      {
+        "body_contains": "DescNullLast"
+      },
+      {
+        "body_contains": "Equal"
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "min_software_total": 2,
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:c2fb6b1e-f015-49b4-a247-6576fc648a6e",
+        "fields": {
+          "deviceType": "OtDevice",
+          "ipAddresses": "81.2.69.192",
+          "macAddresses": "f8:75:a4:f5:c6:37",
+          "tenable_ot_security_name": "OT Device #966",
+          "tenable_ot_security_total_risk": "35.40130597317059",
+          "tags": "criticality:Medium\tpurdue:Level2\tsegment:OtDevice / 172.26.23.X\ttype:OtDevice"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      },
+      {
+        "id": "tenable-ot-security:$HOST:00b1e0a5-31ce-4b30-9af7-a6e1aa4616b8",
+        "fields": {
+          "deviceType": "Plc",
+          "hostnames": "DeviceNet_L81",
+          "manufacturer": "Rockwell Automation",
+          "model": "1756-L81E/B",
+          "ipAddresses": "10.100.101.150",
+          "macAddresses": "00:1d:9c:d4:c3:95",
+          "tenable_ot_security_direct_ips": "10.100.101.150",
+          "tenable_ot_security_firmware_version": "32.011",
+          "tenable_ot_security_backplane_name": "1756-A10",
+          "tenable_ot_security_custom_field_1": "CMDB-88214",
+          "tenable_ot_security_plugin_count": "2"
+        }
+      },
+      {
+        "id": "tenable-ot-security:$HOST:9f3d54a2-2c0b-4e78-8c1c-3b6b8f5f1a20",
+        "fields": {
+          "os": "Windows Server 2019",
+          "osVersion": "10.0.17763",
+          "hostnames": "ENG-STATION-04",
+          "tenable_ot_security_hotfix_count": "2",
+          "tenable_ot_security_os_architecture": "x64"
+        }
+      }
+    ],
+    "log_contains": [
+      "no-name-break",
+      "tenable-ot-security: excluded 1 hidden assets",
+      "tenable-ot-security: reported 3 assets"
+    ]
+  },
+  "check_determinism": true
+}

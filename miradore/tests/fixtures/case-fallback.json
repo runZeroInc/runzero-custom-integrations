@@ -5,7 +5,8 @@
   "kwargs": {
     "url": "$BASE",
     "api_key": "1_fixturekey",
-    "site_name": "Acme"
+    "site_name": "Acme",
+    "include_v2_details": "false"
   },
   "routes": [
     {

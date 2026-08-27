@@ -1,0 +1,133 @@
+{
+  "name": "identity-stability",
+  "integration": "claroty-ctd",
+  "description": "The regression lock on the foreign id. Asset 601-1 is seen after a readdress and a rename - a new IPv4 with the previous one moved into old_ips, a new hostname, a new display name, a new site name, a moved virtual zone, and a bumped last_updated. resource_id is a database primary key with nothing address-derived or name-derived feeding into it, so every one of those mutable values must be absent from the emitted id; each alternative a careless id builder would have produced is asserted absent. The namespace is the appliance HOSTNAME with the port stripped, so claroty-ctd:$BASE_HOST:601-1 is asserted absent too - an id carrying host:port would re-key the whole estate the day the appliance moved behind a proxy, and would fail the determinism re-run, which binds a new ephemeral port.\n\nThe other two rows are the multi-site collision case an EMC makes real. 602-1 carries the SAME hostname as 601-1 and the SAME address 601-1 used to hold, and must stay a separate asset: a shared inferred name is not evidence of a shared device. 601-7 is numeric asset id 601 at site 7, which is a genuinely different machine from 601 at site 1 - the exact collision that makes the bare id unusable and is why resource_id embeds the site.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "false",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [{"status": 200, "json": {"token": "stability-token", "password_expired": false}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 3,
+          "count_in_page": 3,
+          "count_total": 3,
+          "objects": [
+            {
+              "id": 601,
+              "resource_id": "601-1",
+              "site_id": 1,
+              "site_name": "site-new",
+              "name": "hmi-new",
+              "hostname": "hmi-new",
+              "display_name": "HMI (relabelled)",
+              "ipv4": ["10.60.9.99"],
+              "old_ips": ["10.60.1.10"],
+              "mac": ["00:50:56:8D:3E:8C"],
+              "vendor": "Siemens",
+              "model": "SIMATIC HMI",
+              "asset_type__": "eHMI",
+              "class_type": "OT",
+              "virtual_zone_name": "HMI: Other",
+              "purdue_level": 2,
+              "ghost": false,
+              "special_hint": 0,
+              "first_seen": "2023-01-01T00:00:00+00:00",
+              "last_seen": "2024-06-01T00:00:00+00:00",
+              "last_updated": "2024-06-02T00:00:00+00:00"
+            },
+            {
+              "id": 602,
+              "resource_id": "602-1",
+              "site_id": 1,
+              "site_name": "site-new",
+              "name": "hmi-new",
+              "hostname": "hmi-new",
+              "ipv4": ["10.60.1.10"],
+              "mac": ["00:1D:9C:C0:04:9D"],
+              "vendor": "Siemens",
+              "asset_type__": "eHMI",
+              "class_type": "OT",
+              "purdue_level": 2,
+              "ghost": false,
+              "special_hint": 0,
+              "last_seen": "2024-06-01T00:00:00+00:00"
+            },
+            {
+              "id": 601,
+              "resource_id": "601-7",
+              "site_id": 7,
+              "site_name": "site-seven",
+              "name": "plc-seven",
+              "hostname": "plc-seven",
+              "ipv4": ["10.60.9.99"],
+              "mac": ["00:1D:9C:BD:A9:4F"],
+              "vendor": "Rockwell Automation",
+              "asset_type__": "ePLC",
+              "class_type": "OT",
+              "purdue_level": 1,
+              "ghost": false,
+              "special_hint": 0,
+              "last_seen": "2024-06-01T00:00:00+00:00"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "claroty-ctd:$HOST:601-1",
+      "claroty-ctd:$HOST:602-1",
+      "claroty-ctd:$HOST:601-7"
+    ],
+    "ids_absent": [
+      "claroty-ctd:$BASE_HOST:601-1",
+      "claroty-ctd:$HOST:601",
+      "claroty-ctd:$HOST:601-1:10.60.9.99",
+      "claroty-ctd:$HOST:site-new:601",
+      "claroty-ctd:$HOST:hmi-new",
+      "601-1"
+    ],
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:601-1",
+        "fields": {
+          "claroty_ctd_resource_id": "601-1",
+          "claroty_ctd_appliance": "$HOST",
+          "claroty_ctd_old_ips": "10.60.1.10",
+          "claroty_ctd_site_name": "site-new",
+          "hostnames": "hmi-new",
+          "ipAddresses": "10.60.9.99"
+        }
+      },
+      {
+        "id": "claroty-ctd:$HOST:601-7",
+        "fields": {
+          "claroty_ctd_asset_id": "601",
+          "claroty_ctd_site_id": "7"
+        }
+      }
+    ],
+    "requests_absent": [
+      {"path_contains": "/ranger/asset-vulnerabilities"}
+    ],
+    "log_contains": ["reported 3 assets"]
+  },
+  "check_determinism": true
+}

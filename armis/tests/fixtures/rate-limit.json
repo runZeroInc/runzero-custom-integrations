@@ -1,0 +1,63 @@
+{
+  "name": "rate-limit",
+  "integration": "armis",
+  "description": "Armis caps a sender at 200 requests per 5 minutes across all endpoints and answers 429 with Retry-After. The device search answers 429 once and then succeeds, and the run must still emit every asset. Nothing in the script handles this: get_json already retries 429 and 5xx with exponential backoff and honors Retry-After, and hand-rolling a second backoff on top of it is how an integration turns one throttle into a retry storm. This scenario is the proof that the built-in budget is what absorbs it.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1000",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "ratelimit-token", "expiration_utc": "2026-08-26T18:04:56.123456+00:00"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/", "query_contains": "orderBy=lastSeen"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"message": "Rate limit exceeded"}},
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 1,
+              "next": null,
+              "prev": null,
+              "results": [
+                {
+                  "category": "Computers",
+                  "firstSeen": "2024-07-01T00:00:00.000000+00:00",
+                  "id": 7001,
+                  "ipAddress": "10.92.0.1",
+                  "lastSeen": "2026-08-12T00:00:00.000000+00:00",
+                  "macAddress": "44:44:22:00:00:01",
+                  "name": "throttled-host",
+                  "operatingSystem": "Linux",
+                  "site": {"location": "Reno", "name": "Reno Plant"},
+                  "type": "Servers"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["armis:$HOST:7001"],
+    "min_requests": 3,
+    "requests_absent": [
+      {"path": "/api/v1/search/", "query_contains": "from=1000"}
+    ]
+  },
+  "check_determinism": true
+}

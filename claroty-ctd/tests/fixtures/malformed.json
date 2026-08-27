@@ -1,0 +1,186 @@
+{
+  "name": "malformed",
+  "integration": "claroty-ctd",
+  "description": "Junk in both payloads must be skipped without losing the run. On the asset side: a row whose resource_id is null (skipped and logged, because id alone is site-scoped and there is no safe fallback), a row that is a bare string rather than an object, a row whose ipv4 and mac arrive as scalars rather than the documented lists, and a row whose network and subnet objects arrive as strings. On the vulnerability side: cvss_v3_score and epss_score are documented as OBJECTS, so a build that sends a bare number for either must still parse; a lower-case cve_id must be upper-cased; a cve_id that misses the CVE-YYYY-NNNN shape must be carried as a plain name rather than assigned to the cve field, because the platform validates that field and rejects the WHOLE record on a miss; and a row with neither a resource_id nor a cve_id is dropped. no_placeholder_hostnames is skipped only in the sense that the scenario deliberately feeds 'unknown' and a bare IP as names and asserts they never reach the asset - the invariant itself still runs.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [{"status": 200, "json": {"token": "malformed-token", "password_expired": false}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-vulnerabilities",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 5,
+          "count_in_page": 5,
+          "count_total": 5,
+          "objects": [
+            {
+              "resource_id": "801-1",
+              "asset_id": "501-1",
+              "cve_id": "cve-2020-6088",
+              "cvss_v3_score": "8.6",
+              "epss_score": "0.51",
+              "actively_exploited": "true",
+              "vulnerability_type": "Known Vulnerability",
+              "detection_date": "not-a-timestamp",
+              "relevance__": "Confirmed"
+            },
+            {
+              "resource_id": "802-1",
+              "asset_id": "501-1",
+              "cve_id": "CVE-20-1",
+              "cvss_v3_score": {"value": "4.3", "label": "Medium"},
+              "epss_score": {},
+              "vulnerability_type": "Suspected Vulnerability",
+              "relevance__": "Confirmed"
+            },
+            {
+              "resource_id": "803-1",
+              "asset_id": "",
+              "cve_id": "CVE-2019-10953"
+            },
+            {
+              "resource_id": "",
+              "asset_id": "501-1",
+              "cve_id": ""
+            },
+            "this row is a string, not an object"
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 200, "json": {
+          "count_filtered": 5,
+          "count_in_page": 5,
+          "count_total": 5,
+          "objects": [
+            {
+              "id": 501,
+              "resource_id": "501-1",
+              "site_id": 1,
+              "site_name": "site-malformed",
+              "name": "unknown",
+              "display_name": "10.50.0.11",
+              "hostname": "unknown",
+              "ipv4": "10.50.0.11",
+              "mac": "00:1D:9C:BD:A9:4F",
+              "vlan": "12",
+              "network": "Default",
+              "subnet": "10.0.0.0/8",
+              "project_parsed": "none",
+              "plc_slots": "none",
+              "custom_informations": {"key": "Mode (Card 0)", "val": "Program Mode"},
+              "custom_attributes": [{"value": "Line 9", "category": "Production Line"}],
+              "children": "33-1",
+              "vendor": "Rockwell Automation",
+              "firmware": "V20.019",
+              "asset_type__": "ePLC",
+              "class_type": 0,
+              "criticality": 2,
+              "risk_level": 9,
+              "purdue_level": 1,
+              "insight_names": "Full Match CVEs",
+              "protocol": "ENIP",
+              "ghost": "false",
+              "special_hint": "0",
+              "first_seen": "2099-01-01T00:00:00+00:00",
+              "last_seen": "2024-07-04T09:07:30+00:00"
+            },
+            {
+              "id": 502,
+              "resource_id": null,
+              "site_id": 1,
+              "name": "no-resource-id-host",
+              "ipv4": ["10.50.0.12"],
+              "ghost": false,
+              "special_hint": 0
+            },
+            {
+              "id": 503,
+              "resource_id": "   ",
+              "site_id": 1,
+              "name": "blank-resource-id-host",
+              "ipv4": ["10.50.0.13"],
+              "ghost": false,
+              "special_hint": 0
+            },
+            "this row is a string, not an object",
+            {
+              "id": 505,
+              "resource_id": "505-1",
+              "site_id": 1,
+              "site_name": "site-malformed",
+              "name": "filtered-address-host",
+              "ipv4": ["127.0.0.1", "169.254.10.5", "10.50.0.15"],
+              "mac": ["not-a-mac", "00:50:56:8D:3E:8C"],
+              "asset_type__": "eEndpoint",
+              "class_type": "IT",
+              "ghost": false,
+              "special_hint": 0
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "claroty-ctd:$HOST:501-1",
+      "claroty-ctd:$HOST:505-1"
+    ],
+    "ids_absent": [
+      "claroty-ctd:$HOST:502-1",
+      "claroty-ctd:$HOST:503-1",
+      "claroty-ctd:$HOST:"
+    ],
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:501-1",
+        "fields": {
+          "claroty_ctd_class_type": "OT",
+          "claroty_ctd_criticality_label": "High",
+          "claroty_ctd_ipv4": "10.50.0.11",
+          "claroty_ctd_vulnerability_count": "2",
+          "ipAddresses": "10.50.0.11"
+        },
+        "fields_absent": ["hostnames", "claroty_ctd_risk_level_label", "claroty_ctd_children_resource_ids"]
+      },
+      {
+        "id": "claroty-ctd:$HOST:505-1",
+        "fields": {
+          "hostnames": "filtered-address-host",
+          "ipAddresses": "10.50.0.15",
+          "macAddresses": "00:50:56:8d:3e:8c"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 2,
+    "log_contains": [
+      "skipping asset with no resource_id: id=502",
+      "skipping asset with no resource_id: id=503",
+      "skipped 2 rows with no resource_id, or flagged ghost or non-unicast",
+      "indexed 2 vulnerabilities across 1 assets",
+      "reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,45 @@
+{
+  "name": "field-error",
+  "integration": "claroty-xdome",
+  "description": "The failure mode this API makes easiest to hit. `fields` is a required request member validated against an enum, so one name a tenant's API version does not know rejects the WHOLE request with a FastAPI 422 -- zero assets imported, not one missing column. The recovered vendor spec's enum is known to lag the live API, so this is not hypothetical.\n\nThe run has to end with a message an operator can act on: it must name the endpoint, name the parameter that fixes it, and stop. 422 is not in the default retry set, so exactly one request is made rather than four. The response body is deliberately not echoed -- a FastAPI validation dump can carry the whole submitted request back, and a log line is not the place for it.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "import_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "POST", "path": "/api/v1/devices/"},
+      "responses": [
+        {
+          "status": 422,
+          "json": {
+            "detail": [
+              {
+                "loc": ["body", "fields", 37],
+                "msg": "value is not a valid enumeration member; permitted: 'uid', 'asset_id', ...",
+                "type": "type_error.enum"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "devices rejected the request with HTTP 422",
+      "set the device_fields parameter to a narrower list",
+      "no assets retrieved"
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/api/v1/device_vulnerability_relations/"}
+    ]
+  },
+  "check_determinism": true
+}

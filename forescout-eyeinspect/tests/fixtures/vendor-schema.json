@@ -1,0 +1,183 @@
+{
+  "name": "vendor-schema",
+  "integration": "forescout-eyeinspect",
+  "description": "REGRESSION LOCK on the real Host record property names, taken from the eyeInspect API Guide's Record Type Definitions rather than from the sort_field enum. The two vocabularies are NOT the same list: sorting on 'name' returns 'main_name', and the same holds for role and vendor_model. Reading role, vendor_model and complex_cves instead -- none of which are response keys -- leaves deviceType unset, names every firmware Software row 'Firmware', and empties host CVE findings even with full=true. The open_ports transport key is l4_protocol, not l4_proto, so getting that wrong imports every UDP service as tcp. CVEs arrive as a HostCVEInfo array: the suppressed entry is an operator dismissal and must not become a finding, and the ICS-CERT-only entry has an empty cve_id. Exactly one CVE finding must survive.\n\nIt also covers the Full-only properties. 'software' is a SoftwareInfo[] of {install_date, version, name, vendor} -- a direct match for runZero's Software, whose product field is 'product' and whose id is mandatory -- and 'patches' is a PatchesInfo[] of {hot_fix_id, installed_by, install_date, service_pack}. Three application rows, one patch row and the synthetic firmware row must all appear, with vendor and version carried through. OpenPortsInfo's third member 'app' ('The service/application running on the port. Example: HTTP') must reach the Service as its protocol name.\n\nThe value domains are the guide's: criticality is an integer in [0-5] (not the word 'high'), purdue_level is the string enum LEVEL0..LEVEL5/LEVEL35/UNDEFINED (not '1'), and security_risk and operational_risk are floats. host_mac_address is a HostMacAddress[] of objects, not a string[], and the guide spells the sensor id list 'sensors_ids'. alert_count is NOT a Host record field and is absent from the record: it exists only in the sort_field enum.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-pass",
+    "include_alerts": "false",
+    "include_cve_details": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "results": [
+              {
+                "id": 8101,
+                "ip": "10.81.0.11",
+                "mac_addresses": [
+                  "00:1b:1b:81:00:01"
+                ],
+                "host_mac_address": [
+                  {
+                    "mac_address": "00:1b:1b:81:00:02",
+                    "last_seen": "2026-08-01T09:00:00.000+01:00"
+                  }
+                ],
+                "sensors_ids": [
+                  7,
+                  9
+                ],
+                "main_name": "syn-plc-vendor-schema",
+                "main_role": "PLC",
+                "main_vendor_model": "Siemens SIMATIC S7-1500",
+                "all_roles": [
+                  "PLC",
+                  "Engineering Station"
+                ],
+                "all_vendors_models": [
+                  "Siemens SIMATIC S7-1500"
+                ],
+                "firmware_version": "2.9.2",
+                "os_version": "VxWorks 6.9",
+                "criticality": 4,
+                "purdue_level": "LEVEL1",
+                "security_risk": 7.4,
+                "operational_risk": 3.2,
+                "first_seen": "2026-01-05T08:15:00Z",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "software_source": "ACTIVE_WMI",
+                "software": [
+                  {
+                    "install_date": "2024-03-11",
+                    "version": "16.0.1",
+                    "name": "TIA Portal",
+                    "vendor": "Siemens"
+                  },
+                  {
+                    "install_date": "2023-11-02",
+                    "version": "3.4.7",
+                    "name": "OPC UA Server",
+                    "vendor": "Softing"
+                  },
+                  {
+                    "install_date": "",
+                    "version": "",
+                    "name": "Step 7 Runtime",
+                    "vendor": ""
+                  },
+                  {
+                    "install_date": "2024-03-11",
+                    "version": "16.0.1",
+                    "name": "TIA Portal",
+                    "vendor": "Siemens"
+                  },
+                  {
+                    "install_date": "2022-01-01",
+                    "version": "1.0",
+                    "name": "",
+                    "vendor": "Nameless Ltd"
+                  }
+                ],
+                "patches": [
+                  {
+                    "hot_fix_id": "KB4477137",
+                    "installed_by": "NT AUTHORITY\\SYSTEM",
+                    "install_date": "2019-01-08",
+                    "service_pack": "SP1"
+                  },
+                  {
+                    "hot_fix_id": "",
+                    "installed_by": "NT AUTHORITY\\SYSTEM",
+                    "install_date": "2019-02-12",
+                    "service_pack": "SP1"
+                  }
+                ],
+                "open_ports": [
+                  {
+                    "port": "502",
+                    "l4_protocol": "TCP",
+                    "app": "MODBUS"
+                  },
+                  {
+                    "port": "161",
+                    "l4_protocol": "UDP",
+                    "app": "SNMP"
+                  }
+                ],
+                "cves": [
+                  {
+                    "id": "CVE-2022-38465",
+                    "cve_id": "CVE-2022-38465",
+                    "icsa_id": "ICSA-22-307-02",
+                    "vendor_specific_id": "",
+                    "suppressed": false,
+                    "matching_confidence": "productVersion"
+                  },
+                  {
+                    "id": "ICSA-14-133-02",
+                    "cve_id": "",
+                    "icsa_id": "ICSA-14-133-02",
+                    "vendor_specific_id": "",
+                    "suppressed": false,
+                    "matching_confidence": "product"
+                  },
+                  {
+                    "id": "CVE-2020-15782",
+                    "cve_id": "CVE-2020-15782",
+                    "icsa_id": "",
+                    "vendor_specific_id": "",
+                    "suppressed": true,
+                    "matching_confidence": "product"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "assets": [
+      {
+        "id": "forescout-eyeinspect:$HOST:8101",
+        "fields": {
+          "deviceType": "PLC",
+          "forescout_eyeinspect_purdue_level": "LEVEL1",
+          "forescout_eyeinspect_criticality": "4",
+          "forescout_eyeinspect_security_risk": "7.4",
+          "forescout_eyeinspect_operational_risk": "3.2",
+          "forescout_eyeinspect_software_source": "ACTIVE_WMI",
+          "forescout_eyeinspect_sensor_ids": "7,9",
+          "forescout_eyeinspect_mac_addresses": "00:1b:1b:81:00:01,00:1b:1b:81:00:02",
+          "tags": "criticality:4\tforescout-eyeinspect\tot\tpurdue-level:LEVEL1\trole:PLC",
+          "macAddresses": "00:1b:1b:81:00:01\t00:1b:1b:81:00:02"
+        }
+      }
+    ],
+    "min_services_total": 2,
+    "min_software_total": 5,
+    "min_vulnerabilities_total": 1
+  },
+  "check_determinism": true
+}

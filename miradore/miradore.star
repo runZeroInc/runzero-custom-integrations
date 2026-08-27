@@ -8,11 +8,10 @@ CONFIG = {
     "version": "1",
     "maturity": "alpha",
     "minVersion": "5.1.260818.0",
-    # Device.ID is the Miradore site's own database key for the enrollment, so it
-    # is stable across runs and one-per-device. What churns on an MDM fleet is
-    # everything else: phones roam between networks, pick up new DHCP leases, and
-    # are renamed by their owners. Keep id-based merging authoritative and stop
-    # drift in the other three dimensions from blocking a legitimate merge.
+    # Device.ID is the site's database key for the enrollment: stable across runs
+    # and one per device, so id matching stays authoritative. Everything else
+    # churns on an MDM fleet -- phones roam, take new leases, get renamed -- and
+    # these flags stop that drift blocking a merge. See README "Asset identity".
     "matchBehavior": "no-mac-break no-ip-break no-name-break",
     "ownershipAttributes": ["miradore_user_email"],
     # The repo-wide record target is ten million per run; at the default 500 rows
@@ -30,15 +29,15 @@ CONFIG = {
         },
         {
             "key": "api_key",
-            "label": "API v1 authentication key",
-            "description": "Authentication key generated in the Miradore console under System > Infrastructure diagram. The key identifies the site on its own, so the site name is not needed.",
+            "label": "API authentication key",
+            "description": "Authentication key generated in the Miradore console under System > Infrastructure diagram. The same key authenticates both API versions. Its leading number does not select the site -- name the site separately below.",
             "type": "secret",
             "required": True,
         },
         {
             "key": "site_name",
             "label": "Miradore site name",
-            "description": "The site name shown in the Miradore console. The API does not need it -- the authentication key already selects the site -- but it scopes imported asset IDs, because Miradore numbers devices per site and every site has a device 1.",
+            "description": "The site name shown in the Miradore console. Both APIs need it -- v1 in the request path, v2 in the X-Instance-Name header -- and it also scopes imported asset IDs, because Miradore numbers devices per site and every site has a device 1.",
             "type": "string",
             "required": True,
         },
@@ -65,6 +64,30 @@ CONFIG = {
             "type": "bool",
             "default": False,
         },
+        {
+            "key": "include_v2_details",
+            "label": "Add API v2 detail",
+            "description": "Adds the per-device custom attribute values and the suspended-device list from Miradore API v2, which API v1 does not expose. Costs one extra request per device.",
+            "type": "bool",
+            "default": True,
+        },
+        {
+            "key": "include_v2_location",
+            "label": "Add the last reported location",
+            "description": "Adds each device's most recent reported coordinates from API v2. This is employee-device geolocation, so it is separately switchable; it costs a second extra request per device.",
+            "type": "bool",
+            "default": True,
+            "dependsOn": "include_v2_details",
+        },
+        {
+            "key": "v2_detail_limit",
+            "label": "Maximum devices to detail",
+            "description": "Upper bound on how many devices the per-device v2 requests are made for. The v1 walk still imports the whole estate; devices past this bound are imported without their v2 detail rather than letting a large fleet spend the run on per-device requests.",
+            "type": "int",
+            "default": 5000,
+            "min": 0,
+            "max": 100000,
+        },
     ],
     "includes": {
         "tls_": OPTIONS_TLS,
@@ -72,41 +95,27 @@ CONFIG = {
     },
 }
 
-# Miradore exposes two APIs, and only one of them can enumerate devices.
+# Miradore has two APIs and only v1 can enumerate devices, so this reads both:
+# v1 lists the estate, v2 adds the per-device custom attributes and locations v1
+# does not carry. v2 is a management API, its Device schema is request-only, and
+# the two routes that look like enumeration (/Devices, /Device/SuspendedDevices)
+# answer 401 to every credential. See the README for the probe results.
 #
-# API v2 (https://www.miradore.com/knowledge/integrations/miradore-api-v2/) is a
-# device *management* API. Its OpenAPI document
-# (https://online.miradore.com/swagger/v2/swagger.json) declares no collection
-# GET for devices at all: the only device reads are /api/v2/Device/{id}/Location,
-# /api/v2/Device/{id}/CustomAttribute, and /api/v2/Device/SuspendedDevices, and
-# the Device schema appears solely as the request body of POST /api/v2/Device and
-# PATCH /api/v2/Device/{id} -- never as a response. That schema also carries no
-# operating system, serial number, MAC, IP, or software field. Nothing in the
-# whole v2 document accepts a paging parameter. Miradore's own v2 documentation
-# says so outright: "The device ID can be retrieved using Miradore API v1, as an
-# attribute of the Device item."
-#
-# So this integration reads API v1, which is the reporting interface and the only
-# way to list devices. Its specification is the "Miradore API Specification"
-# PDF linked from
-# https://www.miradore.com/knowledge/integrations/programmers-guide-to-api-v1/
-# (version 1.14 was used here). Every attribute in the select lists below comes
-# from that document's Appendix 2.
-#
-# Two consequences of v1 that shape the code:
-#   - v1 answers in XML, not JSON, so this uses raw http.get plus xml.parse.
-#     Raw http.get takes no retry budget, so a failed page is not retried.
-#   - v1 authenticates with the key in the URL query string. The request URL is
-#     therefore a secret and is never logged; see safe_label().
+# Two properties of v1 shape the code: it answers XML, so this uses raw http.get
+# plus xml.parse, which carries no retry budget (see http_get_transient); and it
+# authenticates with the key in the query string, so a v1 URL is a secret and is
+# never logged (see safe_label). v2 takes the same key in an X-API-Key header, so
+# its URLs are logged. v1's contract is the "Miradore API Specification" PDF
+# v1.14; every attribute in the select lists below is from its Appendix 2.
 
 load('runzero.types', 'ImportAsset', 'Software', 'to_custom_attributes')
-load('http', http_get='get', 'url_encode')
+load('http', http_get='get', 'get_json', 'url_encode')
 load('kwargs', 'require', 'get_url_base', 'get_http_options', 'get_string', 'get_int', 'get_bool')
 load('net', 'network_interface', 'routable_ips', 'clean_hostnames', 'normalize_mac')
 load('xml', xml_parse='parse')
 load('time', 'now', 'parse_ts', 'sleep')
 load('re', re_match='match')
-load('coerce', 'as_text')
+load('coerce', 'as_text', 'as_dict', 'as_list', 'as_int')
 
 VENDOR = "miradore"
 
@@ -114,14 +123,15 @@ VENDOR = "miradore"
 # reachable as a child item of Device, so one paged walk covers the whole import.
 ITEM_PATH = "/API/Device"
 
-# Attributes are requested explicitly because v1 returns only a small predefined
-# default set otherwise, and the specification's own advice is to "always define
-# explicitly the attributes required by the caller end".
-#
-# The list is split so that one unrecognized attribute cannot cost the entire
-# import. If a site's schema rejects the full list, fetch_page falls back to
-# SELECT_CORE -- which holds only identity, addressing, and OS -- for the rest of
-# the run. Every attribute below is from Appendix 2 of the v1 specification.
+# v2 lives at the server root, not under the site path segment: the site is named
+# in the X-Instance-Name header instead. Verified against the live service.
+V2_SUSPENDED_PATH = "/api/v2/Device/SuspendedDevices"
+V2_DEVICE_PREFIX = "/api/v2/Device/"
+
+# Attributes are requested explicitly because v1 otherwise returns only a small
+# default set. The list is split into groups so that one unrecognized attribute
+# cannot cost the whole import: v1 fails a query whole, so the ladder in main()
+# drops one group at a time until the site accepts the query.
 SELECT_CORE = [
     "ID",
     "Platform",
@@ -180,25 +190,41 @@ SELECT_EXTRA = [
     "InvStorage.Type",
 ]
 
+# The two child items carrying management posture: encryption, passcode and
+# jailbreak state, and enrollment. Requested as `Item.*` wildcards and flattened
+# under whatever names the site returns, so the script is not pinned to one
+# site's schema. Both are accepted by Miradore Online; they still get their own
+# rung of the ladder in main() so a site that rejects them loses only posture.
+SELECT_POSTURE = [
+    "Security.*",
+    "Enrollment.*",
+]
+
+# InvApplication has exactly six properties: Name, Version, Identifier, Size,
+# OSCategory and InventoryTime. There is NO Vendor property, despite Appendix 2
+# implying one. Do not add it, or anything else unverified, to this list: asking
+# for InvApplication.Vendor 400s the whole query, the ladder steps past both
+# software rungs, and the run imports zero software estate-wide while still
+# reporting assets and looking healthy. software_vendor() derives the vendor from
+# the bundle identifier instead. OSCategory and InventoryTime are omitted because
+# a device reports hundreds of applications; see SOFTWARE_PAGE_LIMIT.
 SELECT_SOFTWARE = [
     "InvApplication.Name",
     "InvApplication.Version",
     "InvApplication.Identifier",
+    "InvApplication.Size",
 ]
 
-# v1 renders DateTime as "dd.MM.yyyy HH:mm:ss" by default. The API can be asked
-# for another rendering with the dateformat option, and an earlier version of
-# this script did that to get an unambiguous one -- but a live Miradore Online
-# site answers 500 to a query carrying it, because the format string's spaces and
-# colons sit inside an options value that is itself comma- and equals-delimited.
-# So the query stays plain and the default rendering is parsed here instead.
-#
-# Both orderings are accepted: day-first is what the documentation specifies, and
-# year-first is recognized as well so a site configured for it is not silently
-# left without timestamps. Nothing else is guessed at -- a value matching neither
-# shape yields no timestamp rather than a transposed day and month.
+# v1 renders DateTime as "dd.MM.yyyy HH:mm:ss" by default, and year-first when a
+# dateformat option is in play. Reading both means the query never has to ask for
+# one. A value matching neither yields no timestamp rather than risking a
+# transposed day and month.
 TS_PATTERN_DAY_FIRST = "^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2}$"
 TS_PATTERN_YEAR_FIRST = "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$"
+
+# Device.ID as the v1 specification documents it: an integer. Checked before the
+# value is spliced into a v2 request path.
+ID_PATTERN = "^[0-9]+$"
 
 # Miradore's Platform enumeration, mapped to the OS name runZero fingerprints
 # against. "Other" and "Unknown" are deliberately absent: they carry no
@@ -212,13 +238,10 @@ PLATFORM_OS = {
 }
 
 # Matched in order against the model name with spaces removed, so "MacBook Pro"
-# is claimed as a laptop before "Mac Pro" can see it.
-#
-# "tab" is last because it is the loosest match and only needs to catch what the
-# platform cannot: Android covers phones and tablets alike, so a Galaxy Tab or a
-# Lenovo Tab would otherwise be typed as a phone by PLATFORM_DEVICE_TYPES below.
-# None of the entries above it contain the substring, so the order is what keeps
-# it from stealing an iPad or a ThinkPad.
+# is claimed as a laptop before "Mac Pro" sees it. Order is load-bearing: "tab"
+# must stay last because it is the loosest match, there to catch Android tablets
+# that PLATFORM_DEVICE_TYPES would otherwise type as phones. Moved up, it would
+# steal an iPad or a ThinkPad.
 MODEL_DEVICE_TYPES = [
     ("ipad", "Tablet"),
     ("iphone", "Mobile"),
@@ -232,12 +255,10 @@ MODEL_DEVICE_TYPES = [
     ("tab", "Tablet"),
 ]
 
-# Only for platforms where the form factor follows from the platform alone.
-# WindowsDesktop and macOS are absent because each covers both laptops and
-# desktops. macOS is settled from the model list above, which names every current
-# Mac chassis. Windows hardware is not: naming every OEM laptop line would be a
-# guess, and runZero fingerprints a Windows machine's chassis better than a model
-# string match would, so those are deliberately left unset rather than assumed.
+# Only platforms where the form factor follows from the platform alone. macOS
+# and WindowsDesktop are absent because each covers laptops and desktops both:
+# macOS is settled by the model list above, while Windows is left unset for
+# runZero to fingerprint rather than guessed at from OEM laptop names.
 PLATFORM_DEVICE_TYPES = {
     "ios": "Mobile",
     "android": "Mobile",
@@ -250,30 +271,28 @@ PLATFORM_DEVICE_TYPES = {
 # but does not manage.
 ACTIVE_STATUSES = ["active", "new"]
 
-# Requesting InvApplication multiplies the response about 34x. Measured against
-# a live site: a device costs ~1.3 KB without its applications and ~45 KB with
-# them. What has to fit in the Explorer's memory budget is not the raw response
-# but the parsed XML document, which expands roughly 70x over it -- so a single
-# page holding 186 devices with applications (8.4 MB of XML) took ~578 MB and was
-# killed against a 512 MB limit, reporting nothing.
-#
-# Twenty-five devices a page is about 1.1 MB of XML at the ~45 KB per device an
-# application inventory costs. What makes this safe at any estate size is that
-# the bound is per page, not per estate: a fleet ten times larger takes ten times
-# the requests at the same peak memory.
-#
-# The cap applies only when applications are actually requested; without them a
-# page of 500 is still well under 700 KB, so the operator's page size stands.
+# Applications are ~97% of the response: measured live, a device costs 1.5 KB
+# without them and 40.1 KB with. The Explorer's memory ceiling applies to the
+# parsed XML, which expands ~70x over the wire, so one 186-device page with
+# applications (8.4 MB of XML) needed 578 MB against a 512 MB limit and was
+# killed mid-walk, reporting nothing. The bound is therefore per PAGE, not per
+# estate: at 25 rows a fleet ten times larger costs ten times the requests at the
+# same peak. The cap applies only when applications are requested; without them a
+# page of 500 stays well under 1 MB and the operator's page size stands.
 SOFTWARE_PAGE_LIMIT = 25
 
-# Software rows per device. A managed Mac reports several hundred applications --
-# on a real estate the average was ~350 and a cap of 99 silently discarded two
-# thirds of the inventory. Raising it costs almost nothing in memory: the whole
-# page is already parsed either way, and assets are streamed out one at a time
-# with report_asset rather than accumulated, so this bounds one asset, not the run.
+# Software rows per device. Managed Macs average ~350 applications, so a cap of
+# 99 would discard two thirds of the inventory. Raising it is nearly free: the
+# page is parsed either way and assets stream out one at a time, so this bounds
+# one asset, not the run.
 MAX_CHILDREN = 999
 MAX_INTERFACES = 32
 MAX_VALUE_LEN = 1024   # custom attribute values are truncated at this length
+
+# Ceiling on keys from any open-ended source: the Security and Enrollment
+# wildcards, v2 custom attribute values, and a v2 location record. All are named
+# by the site rather than a specification, so none has a length this script knows.
+MAX_FLAT_ATTRIBUTES = 32
 
 
 def el_text(element, path):
@@ -286,13 +305,12 @@ def el_text(element, path):
     return as_text(node.text).strip()
 
 
-# A List-typed attribute is requested by its singular item name in `select`
-# ("Tag.Name", "InvApplication.Name") but comes back wrapped in a plural
-# container: <Tags><Tag>...</Tag></Tags>. The specification's Appendix 2 names
-# only the singular, and its response examples show no List attribute at all, so
-# the wrapper is visible only against a live site. Reading the singular as a
-# direct child of <Device> finds nothing and costs software, tags, and storage
-# silently -- verified against a real Miradore Online site, 2026-08-18.
+# List-typed attributes are requested by singular name in `select` ("Tag.Name",
+# "InvApplication.Name") but come back wrapped in a plural container:
+# <Tags><Tag>...</Tag></Tags>. The specification documents only the singular, so
+# this is visible only against a live site. Reading the singular as a direct
+# child of <Device> matches nothing and silently loses all software, tags and
+# storage.
 TAGS_PATH = "Tags/Tag"
 APPLICATIONS_PATH = "InvApplications/InvApplication"
 STORAGE_PATH = "InvStorages/InvStorage"
@@ -322,23 +340,18 @@ def first_text(element, paths):
 def parse_reported_ts(value, ceiling):
     """Parse a Miradore timestamp, or return None.
 
-    Three guards, each protecting against a failure that costs whole assets
-    rather than one field:
-      - the ordering is established from the shape before parsing, so a day
-        and a month are never transposed;
-      - the value is pinned to UTC, because v1 stamps have no zone and an
-        unzoned stamp is not parseable;
-      - the result is clamped to the current time. runZero rejects any
-        ImportAsset carrying a future timestamp, and rejects the whole record
-        rather than the field, so a site whose clock or zone runs ahead of the
-        Explorer's would otherwise import nothing at all.
-    The unparsed string is kept as a custom attribute either way.
+    The ordering is settled from the shape before parsing so day and month are
+    never transposed, and the value is pinned to UTC because v1 stamps carry no
+    zone. The clamp to `ceiling` matters most: runZero rejects an ImportAsset
+    with a future timestamp by discarding the whole record, not the field, so a
+    site whose clock runs ahead of the Explorer would import nothing at all.
+    The raw string is kept as a custom attribute either way.
     """
     if not value:
         return None
     if re_match(TS_PATTERN_DAY_FIRST, value) != None:
-        # dd.MM.yyyy HH:mm:ss -> yyyy-MM-ddTHH:mm:ssZ. The pattern above has
-        # already fixed every offset, so these slices cannot land mid-field.
+        # dd.MM.yyyy HH:mm:ss -> yyyy-MM-ddTHH:mm:ssZ. The pattern fixed every
+        # offset, so these slices cannot land mid-field.
         iso = "{}-{}-{}T{}Z".format(value[6:10], value[3:5], value[0:2], value[11:19])
     elif re_match(TS_PATTERN_YEAR_FIRST, value) != None:
         iso = value.replace(" ", "T") + "Z"
@@ -358,17 +371,14 @@ def parse_reported_ts(value, ceiling):
 def build_query(ctx, page):
     """Build the v1 query string for one page.
 
-    This is deliberately the plainest query the specification documents -- auth,
-    select, and the rows/page options, exactly the shape of its own paging
-    example. Two things an earlier version added are gone because a live site
-    answered 500 to both: the dateformat option (see TS_PATTERN_DAY_FIRST above) and
-    orderby. Ordering would have made the paged walk stricter, but a walk that
-    500s is not stricter than one that works, and the no-progress guard in main
-    still catches a source that never advances.
+    Deliberately the plainest query the specification documents: auth, select and
+    the rows/page options. dateformat and orderby are accepted by a live site but
+    neither is sent, since timestamps are read in either rendering and the
+    no-progress guard in main covers a source that never advances.
 
-    Each key is encoded separately so the order stays fixed and the auth key --
-    which may contain characters that are significant in a query string -- is
-    escaped.
+    Each key is encoded separately. That escaping is required, not cosmetic: real
+    Miradore keys contain braces and commas, which are significant in a query
+    string, and an unencoded key is rejected before it reaches the API.
     """
     parts = [url_encode({"auth": ctx["api_key"]})]
     # An empty select is the last rung of the ladder: the API then returns its
@@ -382,20 +392,18 @@ def build_query(ctx, page):
 def candidate_paths(base_url, site_name):
     """Request paths to try, most likely first.
 
-    Miradore Online serves each site under its own path segment -- a site's
-    console is at https://online.miradore.com/<site>/ -- and that is the shape
-    the v2 documentation uses for its own URLs. The site-less form is kept as a
-    fallback for a deployment that serves the API at the root, and the site
-    segment is skipped when the configured base URL already ends with it, so a
-    base URL that already names the site is not doubled.
+    Miradore Online serves each site under its own /<site>/ path segment; the
+    site-less form is kept as a fallback for a deployment serving the API at the
+    root. The segment is skipped when the base URL already ends with it, so a
+    base URL naming the site is not doubled.
     """
     paths = []
     for name in [site_name, site_name.lower()]:
         # The segment is case-sensitive: a live site answers 200 to /acme/ and
-        # 500 to /Acme/, /ACME/ and every other casing, exactly as it does for a
-        # site that does not exist. Since a console site name is not always
-        # written the way the URL wants it, the lower-case form is tried as well
-        # rather than making the operator discover the difference from a 500.
+        # 500 to every other casing, the same answer it gives for a site that
+        # does not exist. A console site name is not always written the way the
+        # URL wants it, so the lower-case form is tried rather than leaving the
+        # operator to work that out from a 500.
         candidate = "/" + name + ITEM_PATH
         if name and not base_url.endswith("/" + name) and candidate not in paths:
             paths.append(candidate)
@@ -403,19 +411,27 @@ def candidate_paths(base_url, site_name):
     return paths
 
 
+def site_from_path(path, fallback):
+    """The site segment out of a chosen request path.
+
+    choose_path settles the casing the server accepts; this recovers it for the
+    v2 instance header. The site-less path has no segment, so `fallback` stands.
+    """
+    trimmed = path.strip("/")
+    if trimmed.endswith(ITEM_PATH.strip("/")):
+        trimmed = trimmed[:len(trimmed) - len(ITEM_PATH.strip("/"))].strip("/")
+    return trimmed if trimmed else fallback
+
+
 def choose_path(ctx):
     """Pick the request path, returning an error string when none answered.
 
-    Each candidate is tried with the cheapest query the API accepts -- no select,
-    one row -- so this costs one extra request and cannot fail for any reason
-    except the endpoint itself.
-
-    It has to be done at runtime because nothing else settles it. The v1
-    specification's base URL (https://<site>.online.miradore.com/API/) no longer
-    resolves; no such DNS record exists. Both surviving forms answer 401 to an
-    invalid key, so a probe without a real credential cannot tell them apart, and
-    a site that wants the segment answers 500 -- not 404 -- to the form without
-    it. Only a real request distinguishes them.
+    Each candidate is tried with the cheapest query the API accepts, no select
+    and one row, so this cannot fail for any reason except the endpoint itself.
+    It has to happen at runtime: a site wanting the segment answers 500 rather
+    than 404 to the form without it, so only a real request tells the forms
+    apart. (The specification's third form, https://<site>.online.miradore.com/,
+    no longer resolves and is not tried.)
     """
     last = "no request path was tried"
     for path in candidate_paths(ctx["url"], ctx["site_name"]):
@@ -430,8 +446,8 @@ def choose_path(ctx):
             print("miradore: using {}".format(path))
             return None
         if "401" in err:
-            # The endpoint is right and the credential is not. No other path
-            # does better, and saying so beats blaming the last one tried.
+            # The endpoint is right and the credential is not, so no other path
+            # does better. Report this rather than blaming the last one tried.
             ctx["path"] = path
             return err
         print("miradore: {} did not answer ({})".format(path, err))
@@ -445,12 +461,10 @@ def safe_label(ctx, page):
     return "{} page {}".format(ctx["path"], page)
 
 
-# Statuses worth a second attempt before a page is declared failed. Raw
-# http.get is required here (the body is XML), so the shared helper's built-in
-# retry is unavailable; this list is its transient subset. 500 is deliberately
-# absent: a live Miradore site answers 500 -- not 400 -- to a query whose
-# syntax it dislikes, and that failure belongs to the select ladder below, not
-# to a retry loop.
+# Statuses worth a second attempt before a page is declared failed. The body is
+# XML, so raw http.get is required and the shared helper's retry is unavailable;
+# this is its transient subset. 500 is deliberately absent: a live site answers
+# 500 for a site name it cannot resolve, which no retry repairs.
 TRANSIENT_STATUSES = [408, 425, 429, 502, 503, 504]
 TRANSIENT_RETRIES = 3
 
@@ -458,9 +472,9 @@ TRANSIENT_RETRIES = 3
 def http_get_transient(url, **options):
     """GET with retries for transient statuses and no-response transport errors.
 
-    A single 502 blip on page 40 of a long walk used to end the run with a
-    truncated import; retrying with backoff rides out the blip. Every other
-    status is returned to the caller untouched on the first attempt.
+    Backoff rides out a single proxy blip mid-walk, which would otherwise
+    truncate the import. Every other status is returned to the caller untouched
+    on the first attempt.
     """
     resp = None
     for attempt in range(TRANSIENT_RETRIES + 1):
@@ -484,10 +498,9 @@ def fetch_page(ctx, page):
     when the server did not report one.
 
     `retryable` says whether a narrower select could plausibly fix the failure.
-    Only a request the server actively rejected qualifies -- a 400, or a v1
-    <Error> envelope. A refused key, an unreachable server, and a 5xx are all
-    failures no attribute list can repair, and retrying them would spend a second
-    request and log a misleading cause.
+    Only a request the server actively rejected qualifies: a 400, or a v1 <Error>
+    envelope. A refused key or an unreachable server is not something an
+    attribute list repairs, and retrying would log a misleading cause.
     """
     resp = http_get_transient(ctx["url"] + ctx["path"] + "?" + build_query(ctx, page), **ctx["http_options"])
     if resp == None:
@@ -496,13 +509,11 @@ def fetch_page(ctx, page):
         return [], -1, "status 401: the authentication key was rejected", False
     if resp.status_code != 200:
         # v1 reports failures in the body as well as the status line, and the
-        # description is the only thing that distinguishes a bad attribute name
-        # from a bad site.
+        # description is the only thing separating a bad attribute name from a
+        # bad site: a 400 body names it, as in "Entity 'InvApplication' does not
+        # have property 'Vendor'". 500 stays retryable too, since one narrower
+        # attempt is all it costs.
         detail = error_detail(resp.body)
-        # 400 is the documented "bad request". 500 is included because a live
-        # Miradore Online site answers 500 -- not 400 -- to a query whose syntax
-        # it dislikes, so treating it as fatal would strand an import that a
-        # narrower attribute list would have completed.
         retryable = resp.status_code == 400 or resp.status_code == 500
         if detail:
             return [], -1, "status {}: {}".format(resp.status_code, detail), retryable
@@ -542,12 +553,227 @@ def error_detail(body):
     return as_text(node.text).strip()
 
 
+LOWER = "abcdefghijklmnopqrstuvwxyz"
+UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+DIGITS = "0123456789"
+
+
+def attr_key(name):
+    """A custom-attribute-safe key from a vendor-supplied name.
+
+    Callers pass names the site chose, not ones from a specification, so this has
+    to survive spaces, punctuation and any casing. It also has to be stable: the
+    same source name must always yield the same key, or an attribute renames
+    itself between runs.
+    """
+    out = ""
+    for i in range(len(name)):
+        ch = name[i]
+        if ch in UPPER:
+            # camelCase and PascalCase both become snake_case, but only at a
+            # genuine word boundary, so "IMEI" stays "imei" and does not become
+            # "i_m_e_i".
+            if out and (name[i - 1] in LOWER or name[i - 1] in DIGITS):
+                out += "_"
+            out += ch.lower()
+        elif ch in LOWER or ch in DIGITS:
+            out += ch
+        elif out and not out.endswith("_"):
+            out += "_"
+    return out.strip("_")
+
+
+def flatten_children(device, tag, prefix, attrs):
+    """Copy the leaf children of one v1 child item into attrs.
+
+    Security and Enrollment are wildcards, so their field names are whatever the
+    site returns. One level deep is the whole shape of both, and stopping there
+    also bounds the walk against an arbitrarily deep document.
+    """
+    node = device.find(tag)
+    if node == None:
+        return
+    added = 0
+    for child in node.children:
+        if added >= MAX_FLAT_ATTRIBUTES:
+            break
+        value = as_text(child.text).strip()
+        key = attr_key(as_text(child.tag))
+        if not value or not key:
+            continue
+        attrs[prefix + key] = value[:MAX_VALUE_LEN]
+        added += 1
+
+
+def v2_url(base_url, site_name):
+    """The base URL for v2 requests.
+
+    v2 is served from the server root and names the site in a header, so a base
+    URL carrying the site path segment must have it stripped; otherwise the
+    request goes to /<site>/api/v2/... and 404s.
+    """
+    trimmed = base_url.rstrip("/")
+    for name in [site_name, site_name.lower()]:
+        if name and trimmed.lower().endswith("/" + name.lower()):
+            return trimmed[:len(trimmed) - len(name) - 1].rstrip("/")
+    return trimmed
+
+
+def v2_get(ctx, path, what):
+    """GET one v2 JSON endpoint, returning the decoded body or None.
+
+    Every v2 read is enrichment: the device is built from v1 and imported whether
+    or not this succeeds, so a failure is logged once per run rather than once
+    per device. Retries are cut to one because these are two requests per device,
+    and a site answering 5xx would otherwise spend the run in backoff.
+    """
+    data, err = get_json(ctx["v2_url"] + path, retries=1, **ctx["v2_options"])
+    if err != None:
+        if what not in ctx["v2_failures"]:
+            ctx["v2_failures"][what] = True
+            print("miradore: v2 {} unavailable ({}); continuing without it".format(what, err))
+        return None
+    return data
+
+
+def v2_suspended_ids(ctx):
+    """Device ids Miradore currently has suspended, as a set.
+
+    One request for the estate, and the only device state v1 does not report at
+    all: a suspended device still comes back from v1 as "Active". The OpenAPI
+    document declares a 200 with no schema, so both plausible shapes are
+    accepted, a bare list of ids and a list of objects carrying one. On Miradore
+    Online the route 401s to every credential, so this usually returns an empty
+    set and logs once; it is kept because the failure is free and a deployment
+    that does serve it gets the attribute.
+    """
+    suspended = {}
+    data = v2_get(ctx, V2_SUSPENDED_PATH, "suspended device list")
+    if data == None:
+        return suspended
+    for entry in as_list(data):
+        value = ""
+        row = as_dict(entry)
+        if row:
+            for key in ["id", "deviceId", "deviceID", "Id", "ID", "DeviceId"]:
+                value = as_text(row.get(key, "")).strip()
+                if value:
+                    break
+        else:
+            value = as_text(entry).strip()
+        if value:
+            suspended[value] = True
+    if suspended:
+        print("miradore: v2 reports {} suspended device(s)".format(len(suspended)))
+    return suspended
+
+
+def v2_custom_attributes(ctx, device_id, attrs):
+    """Fold a device's v2 custom attribute values into attrs.
+
+    These are the operator's own fields (asset tag, cost centre, owner) and v1
+    does not carry them at all, which is the largest thing v2 adds. Identifier is
+    preferred over Name because a site can rename an attribute without changing
+    its identifier, and a key that moves when a label is edited makes the
+    imported attribute look like a new one.
+    """
+    data = v2_get(ctx, V2_DEVICE_PREFIX + device_id + "/CustomAttribute", "device custom attributes")
+    if data == None:
+        return
+    added = 0
+    for entry in as_list(data):
+        if added >= MAX_FLAT_ATTRIBUTES:
+            break
+        row = as_dict(entry)
+        if not row:
+            continue
+        key = attr_key(as_text(row.get("identifier", "")) or as_text(row.get("name", "")))
+        value = as_text(row.get("value", "")).strip()
+        if not key or not value:
+            continue
+        attrs["miradore_attr_" + key] = value[:MAX_VALUE_LEN]
+        added += 1
+
+
+def v2_location(ctx, device_id, attrs):
+    """Fold a device's most recently reported location into attrs.
+
+    The endpoint returns history over a range and only the newest entry is
+    wanted, so the window is deliberately wide and both bounds are whole dates
+    off the current year, leaving no timezone difference able to clip it.
+
+    Named `miradore_geo_*` rather than `miradore_location_*` because v1 already
+    has a Location item, the site's organizational unit, unrelated to coordinates.
+    """
+    query = url_encode({
+        "startDate": "{}-01-01T00:00:00Z".format(ctx["now"].year - 1),
+        "endDate": "{}-12-31T23:59:59Z".format(ctx["now"].year),
+    })
+    data = v2_get(ctx, V2_DEVICE_PREFIX + device_id + "/Location?" + query, "device locations")
+    if data == None:
+        return
+
+    latest = None
+    latest_stamp = ""
+    for entry in as_list(data):
+        row = as_dict(entry)
+        if not row:
+            continue
+        # Entries are not documented as ordered. These timestamps are ISO
+        # strings, which sort chronologically as text, so the newest is the
+        # largest; an entry with no timestamp wins only if nothing else did.
+        stamp = as_text(row.get("timestamp", "")) or as_text(row.get("time", ""))
+        if latest == None or stamp > latest_stamp:
+            latest = row
+            latest_stamp = stamp
+    if latest == None:
+        return
+
+    added = 0
+    for key, raw in latest.items():
+        if added >= MAX_FLAT_ATTRIBUTES:
+            break
+        name = attr_key(as_text(key))
+        value = as_text(raw).strip()
+        if not name or not value:
+            continue
+        attrs["miradore_geo_" + name] = value[:MAX_VALUE_LEN]
+        added += 1
+
+
+def v2_enrich(ctx, device_id, attrs):
+    """Add every v2 detail this run is configured for to one device.
+
+    The bound counts devices detailed, not elapsed time, because these are
+    per-device requests: a fifty-thousand-device estate would otherwise spend the
+    whole task window here. Past the bound the v1 import continues untouched.
+    """
+    if not ctx["include_v2_details"]:
+        return
+    # The id is spliced into a request path, so it is checked rather than
+    # escaped: Device.ID is documented as an integer, and anything else is a
+    # response this script cannot safely build a URL from. The device is still
+    # imported from v1 either way.
+    if re_match(ID_PATTERN, device_id) == None:
+        return
+    if ctx["detailed"] >= ctx["v2_detail_limit"]:
+        if not ctx["detail_limit_logged"]:
+            ctx["detail_limit_logged"] = True
+            print("miradore: reached the v2 detail limit of {} devices; the rest are imported without v2 detail".format(
+                ctx["v2_detail_limit"]))
+        return
+    ctx["detailed"] += 1
+    v2_custom_attributes(ctx, device_id, attrs)
+    if ctx["include_v2_location"]:
+        v2_location(ctx, device_id, attrs)
+
+
 def local_ip(device):
     """The device's local address.
 
-    Appendix 2 of the specification spells this attribute "LocalIpAddress" and
-    `select` accepts that spelling, but the element that comes back is
-    "LocalIPAddress". Both are read so the value is not lost to a capital letter.
+    Appendix 2 spells the attribute "LocalIpAddress" and `select` accepts that,
+    but the element that comes back is "LocalIPAddress". Both are read so the
+    value is not lost to a capital letter.
     """
     return first_text(device, ["LocalIPAddress", "LocalIpAddress"])
 
@@ -573,17 +799,17 @@ def device_macs(device):
 def device_networks(device):
     """One interface per reported MAC.
 
-    Miradore reports addresses and MACs at the device level with no pairing
-    between them, so the addresses go on the first interface and the remaining
-    MACs are carried as address-less interfaces -- which is what lets a phone
-    still match on its Wi-Fi MAC after its lease has changed.
+    Addresses and MACs are reported at the device level with no pairing, so the
+    addresses go on the first interface and the remaining MACs become
+    address-less ones, letting a phone still match on its Wi-Fi MAC after a lease
+    change.
 
-    routable_ips drops loopback, link-local, and unspecified addresses. That
-    filter matters more than it looks: an agent that reports 127.0.0.1 as a
-    device's only address would otherwise give every such device the same
-    address and merge them onto one asset.
+    Only LocalIPAddress becomes an asset address. Do not add IPAddress: it is the
+    egress address the service saw, identical for every device behind one NAT,
+    and importing it would hand a whole office one address to correlate on. The
+    routable_ips filter guards the same failure for 127.0.0.1.
     """
-    ips = routable_ips([el_text(device, "IPAddress"), local_ip(device)])
+    ips = routable_ips([local_ip(device)])
     macs = device_macs(device)
 
     interfaces = []
@@ -600,6 +826,24 @@ def device_networks(device):
     return interfaces
 
 
+def software_vendor(entry, identifier):
+    """The application's vendor, derived from its identifier.
+
+    InvApplication has no vendor property, so the bundle identifier is the only
+    source: a reverse DNS name like com.apple.Safari names apple in its second
+    label. Nothing is inferred from a name that is not reverse DNS, since a bare
+    "Safari" would make "Safari" the vendor; those go to runZero's own software
+    normalization. The element is still read first for a schema that has one.
+    """
+    vendor = el_text(entry, "Vendor")
+    if vendor:
+        return vendor
+    parts = identifier.split(".")
+    if len(parts) >= 3 and parts[0].lower() in ["com", "org", "net", "io", "co", "edu", "gov"]:
+        return parts[1]
+    return ""
+
+
 def device_software(device):
     """Installed applications, when they were requested and the device has any."""
     software = []
@@ -607,16 +851,24 @@ def device_software(device):
         product = el_text(entry, "Name")
         if not product:
             continue
-        # Software requires an id -- omitting it fails the whole record with
-        # "missing argument for id", which on a live site is most rows: many
-        # InvApplication entries carry no Identifier at all. The bundle or
-        # package identifier is the stable key where it exists; the display name
-        # is the fallback, which is at least stable for the same product.
-        identifier = el_text(entry, "Identifier") or product
-        params = {"id": identifier[:255], "product": product[:255]}
+        # Software requires an id, and many InvApplication entries carry no
+        # Identifier at all, so the display name is the fallback. Without it
+        # those rows fail with "missing argument for id", which on a live site
+        # is most of them.
+        identifier = el_text(entry, "Identifier")
+        params = {"id": (identifier or product)[:255], "product": product[:255]}
         version = el_text(entry, "Version")
         if version:
             params["version"] = version[:255]
+        vendor = software_vendor(entry, identifier)
+        if vendor:
+            params["vendor"] = vendor[:255]
+        # as_int yields 0 for anything unparseable, so a string cannot reach
+        # installedSize. Zero is dropped with it: it means the site reported no
+        # size, not that the application occupies none.
+        size = as_int(el_text(entry, "Size"))
+        if size > 0:
+            params["installedSize"] = size
         software.append(Software(**params))
         if len(software) >= MAX_CHILDREN:
             break
@@ -669,8 +921,8 @@ def build_asset(ctx, device):
 
     attrs = {
         "miradore_device_id": device_id,
-        # Kept raw: hostnames below drops anything that is not DNS-valid, and on
-        # an MDM fleet that is most of them ("John's iPhone").
+        # Kept raw: hostnames below drops anything not DNS-valid, and on an MDM
+        # fleet that is most of them ("John's iPhone").
         "miradore_device_name": display_name,
         "miradore_status": status,
         "miradore_online_status": el_text(device, "OnlineStatus"),
@@ -690,12 +942,15 @@ def build_asset(ctx, device):
         "miradore_organization": el_text(device, "Organization/Name"),
         "miradore_organization_full": el_text(device, "Organization/FullName"),
         "miradore_category": el_text(device, "Category/Name"),
+        # The firmware or baseband revision, distinct from the OS version above.
+        "miradore_software_version": el_text(device, "InvDevice/SoftwareVersion"),
         "miradore_client_version": el_text(device, "Client/Version"),
         "miradore_management_type": el_text(device, "Client/ManagementType"),
         "miradore_bios_version": first_text(device, ["BIOS/Version", "BIOS/SMBIOSBIOSVersion"]),
-        # The addresses exactly as reported, including any this script filtered
-        # out of the interfaces above.
-        "miradore_ip_address": el_text(device, "IPAddress"),
+        # The addresses as reported, including any filtered out of the interfaces
+        # above. IPAddress is the egress address the Miradore service saw, not an
+        # address of the device, so it is named for what it is.
+        "miradore_public_ip": el_text(device, "IPAddress"),
         "miradore_local_ip_address": local_ip(device),
         "miradore_mac_address": el_text(device, "MACAddress"),
         "miradore_wifi_mac": el_text(device, "InvDevice/WiFiMAC"),
@@ -709,14 +964,29 @@ def build_asset(ctx, device):
         "miradore_warranty_end_date": el_text(device, "WarrantyEndDate"),
     }
 
+    if device_id in ctx["suspended"]:
+        # Suspended is a v2 concept; v1 still reports such a device as Active, so
+        # without this the asset looks managed when Miradore has stopped managing
+        # it.
+        attrs["miradore_suspended"] = "true"
+
+    # Whatever the wildcards returned, under the names the site used. Nothing
+    # here assumes a field is present.
+    flatten_children(device, "Security", "miradore_security_", attrs)
+    flatten_children(device, "Enrollment", "miradore_enrollment_", attrs)
+
+    # Last, so a device already skipped above (no ID, or filtered by status)
+    # never costs a request.
+    v2_enrich(ctx, device_id, attrs)
+
     tags = el_texts(device, TAGS_PATH, "Name")
     if tags:
         attrs["miradore_tags"] = ",".join(tags)[:MAX_VALUE_LEN]
 
     volumes = []
     for volume in device.find_all(STORAGE_PATH)[:MAX_CHILDREN]:
-        # Real rows carry Type/TotalSpace/FreeSpace and no Volume at all, so the
-        # label falls back to the storage type rather than leaving a bare colon.
+        # Real rows carry Type/TotalSpace/FreeSpace and no Volume, so the label
+        # falls back to the storage type rather than leaving a bare colon.
         label = el_text(volume, "Volume") or el_text(volume, "Type")
         total = el_text(volume, "TotalSpace")
         free = el_text(volume, "FreeSpace")
@@ -727,10 +997,9 @@ def build_asset(ctx, device):
 
     params = {
         # <slug>:<scope>:<vendor id>. Miradore numbers devices per site starting
-        # at 1, so the bare number is not unique across two Miradore sites and
-        # would merge unrelated devices onto one asset. The slug is not
-        # redundant with the source: the id text is what keeps this integration
-        # from colliding with another that also namespaces by site.
+        # at 1, so a bare number is not unique across sites and would merge
+        # unrelated devices onto one asset. The slug keeps this from colliding
+        # with another integration that also namespaces by site.
         "id": "{}:{}:{}".format(VENDOR, ctx["scope"], device_id),
         "networkInterfaces": device_networks(device),
         "customAttributes": to_custom_attributes(
@@ -756,8 +1025,8 @@ def build_asset(ctx, device):
     first_ts = parse_reported_ts(el_text(device, "Created"), ctx["now"])
     if first_ts != None:
         params["firstSeenTS"] = first_ts
-    # LastReported is when the device last checked in with Miradore, which is a
-    # real observation. Modified only tracks when the database row changed.
+    # LastReported is when the device last checked in, a real observation.
+    # Modified only tracks when the database row changed.
     last_ts = parse_reported_ts(el_text(device, "LastReported"), ctx["now"])
     if last_ts != None:
         params["lastSeenTS"] = last_ts
@@ -775,44 +1044,55 @@ def main(*args, **kwargs):
     base_url = get_url_base(kwargs)
     api_key = get_string(kwargs, "api_key")
     site_name = get_string(kwargs, "site_name").strip().strip("/")
-    # The id scope is case-folded so that "Acme" and "acme" cannot produce two
-    # sets of ids for one site. The request path keeps the operator's spelling
-    # and falls back to the folded form, since only the URL is case-sensitive.
+    # Case-folded so "Acme" and "acme" cannot produce two sets of ids for one
+    # site. The request path keeps the operator's spelling, since only the URL
+    # is case-sensitive.
     scope = site_name.lower()
-    # CONFIG defaults are applied by the console but not on the plain
-    # --kwargs path, so each default is repeated here.
+    # CONFIG defaults are applied by the console but not on the plain --kwargs
+    # path, so each default is repeated here.
     page_size = get_int(kwargs, "page_size", default=100)
     if page_size < 1:
         page_size = 100
     include_software = get_bool(kwargs, "include_software", default=True)
     include_deleted = get_bool(kwargs, "include_deleted", default=False)
+    include_v2_details = get_bool(kwargs, "include_v2_details", default=True)
+    include_v2_location = get_bool(kwargs, "include_v2_location", default=True)
+    v2_detail_limit = get_int(kwargs, "v2_detail_limit", default=5000)
+    if v2_detail_limit < 0:
+        v2_detail_limit = 0
     if include_software and page_size > SOFTWARE_PAGE_LIMIT:
-        # Say it rather than silently ignoring the configured value: a run that
-        # quietly pages differently than asked is hard to reason about, and the
-        # reason is worth knowing when tuning.
+        # Said aloud rather than silently ignoring the configured value: a run
+        # that quietly pages differently than asked is hard to reason about.
         print("miradore: lowering the page size from {} to {} because application inventory is enabled; turn it off to page in larger chunks".format(
             page_size, SOFTWARE_PAGE_LIMIT))
         page_size = SOFTWARE_PAGE_LIMIT
 
-    # The attribute ladder, widest first. Each rung is tried on page 1 only; the
-    # rung that works is used for the whole walk. The last rung sends no select
-    # at all, which makes the API return its own default attribute set -- less
-    # detail, but a query no site can reject on its attribute list.
-    full = SELECT_CORE + SELECT_EXTRA
+    # The attribute ladder, widest first. Each rung is tried on page 1 only and
+    # the one that works is used for the whole walk. Rungs step down a single
+    # group at a time because v1 fails a query whole and never says which
+    # attribute it objected to, so dropping one group per attempt is the only way
+    # to keep what the site does support. The wildcards go first as the likeliest
+    # refusal, applications next. The last rung sends no select at all, which no
+    # site can reject on its attribute list. Each rung carries whether it still
+    # asks for applications, so a fallback keeping them still parses them.
+    base = SELECT_CORE + SELECT_EXTRA
+    stages = []
     if include_software:
-        full = full + SELECT_SOFTWARE
-    stages = [("full attribute set", full),
-              ("core attribute set", SELECT_CORE),
-              ("the API's default attribute set", [])]
+        stages.append(("the full attribute set", base + SELECT_POSTURE + SELECT_SOFTWARE, True))
+        stages.append(("the inventory and application attributes", base + SELECT_SOFTWARE, True))
+    else:
+        stages.append(("the full attribute set", base + SELECT_POSTURE, False))
+    stages.append(("the inventory attributes alone", base, False))
+    stages.append(("the core attribute set", SELECT_CORE, False))
+    stages.append(("the API's default attribute set", [], False))
 
     ctx = {
         "url": base_url,
         # Replaced by choose_path below, which settles the site segment against
         # the live site rather than assuming it.
         "path": ITEM_PATH,
-        # Two different things: the name as the operator typed it builds the
-        # request path (the URL is case-sensitive), and the case-folded form
-        # scopes asset ids (so one site typed two ways is still one set of ids).
+        # The typed name builds the request path (the URL is case-sensitive);
+        # the folded form scopes asset ids.
         "site_name": site_name,
         "scope": scope,
         "api_key": api_key,
@@ -820,21 +1100,51 @@ def main(*args, **kwargs):
         "page_size": page_size,
         "include_software": include_software,
         "include_deleted": include_deleted,
+        "include_v2_details": include_v2_details,
+        "include_v2_location": include_v2_location,
+        "v2_detail_limit": v2_detail_limit,
+        # Devices detailed so far, and whether the limit has been announced:
+        # once per run, not once per device past it.
+        "detailed": 0,
+        "detail_limit_logged": False,
+        # v2 endpoints that already failed, so an unavailable one is reported
+        # once rather than for every device in the estate.
+        "v2_failures": {},
+        "suspended": {},
         "now": now(),
         "http_options": get_http_options(kwargs, headers={"Accept": "application/xml"}),
+        # v2 is served from the server root and takes the key in a header, so it
+        # needs its own base URL and header set. get_http_options snapshots the
+        # headers it is given, so these are built separately rather than by
+        # copying the v1 options.
+        "v2_url": v2_url(base_url, site_name),
+        # Filled in below, once choose_path has settled which spelling of the
+        # site name the server accepts.
+        "v2_options": None,
     }
 
     path_err = choose_path(ctx)
     if path_err != None:
         print("miradore: could not read the device list: {}".format(path_err))
         if "401" not in path_err:
-            # The API answers 500 both for a site that does not exist and for a
-            # site name in the wrong case, so this is the first thing to check
-            # and the error itself never says so.
+            # The API answers 500 both for a site that does not exist and for one
+            # in the wrong case, and the error never says which.
             print("miradore: check the site name. It is the segment in your console URL " +
                   "(https://<server>/<site name>/) and it is case-sensitive; the API answers " +
                   "500 rather than 404 when it does not match.")
         return None
+
+    # X-Instance-Name is case-sensitive and answers a wrong casing with 403 where
+    # v1's path answers 500: two different errors for one mistake. v1 has just
+    # proved which spelling the server accepts, so reuse it rather than asking
+    # the operator for the site name twice.
+    ctx["v2_options"] = get_http_options(kwargs, headers={
+        "Accept": "application/json",
+        "X-API-Key": api_key,
+        "X-Instance-Name": site_from_path(ctx["path"], site_name),
+    })
+    if include_v2_details:
+        ctx["suspended"] = v2_suspended_ids(ctx)
 
     reported = 0
     skipped = 0
@@ -845,9 +1155,9 @@ def main(*args, **kwargs):
     p = pager("devices")
     while p.next():
         devices, total, err, retryable = fetch_page(ctx, p.page)
-        # A site that rejects the query fails it whole, which would otherwise
-        # cost the entire import for one unsupported attribute. Walk down the
-        # ladder on page 1 until a query is accepted.
+        # A rejected query fails whole, which would cost the entire import for
+        # one unsupported attribute. Walk down the ladder on page 1 until a
+        # query is accepted.
         for _ in range(len(stages)):
             if err == None or not retryable or p.page != 1 or stage + 1 >= len(stages):
                 break
@@ -855,21 +1165,23 @@ def main(*args, **kwargs):
             print("miradore: {} failed ({}); retrying with {}".format(
                 safe_label(ctx, p.page), err, stages[stage][0]))
             ctx["select"] = stages[stage][1]
-            # Software only arrives when InvApplication was asked for, and no
-            # rung below the first asks for it.
-            ctx["include_software"] = False
+            # Rungs differ on whether they still ask for InvApplication.
+            ctx["include_software"] = stages[stage][2]
             devices, total, err, retryable = fetch_page(ctx, p.page)
         if err != None:
             print("miradore: {} failed: {}".format(safe_label(ctx, p.page), err))
             break
-        if not devices:
-            break
+        # Recorded before the empty check, so a site matching nothing still ends
+        # the run saying "0 of 0" rather than leaving it ambiguous whether the
+        # query was answered at all.
         if total >= 0:
             seen_total = total
+        if not devices:
+            break
 
-        # A server that ignores the page option -- or a proxy replaying one
-        # response -- would otherwise be paged forever. Comparing the ids on
-        # consecutive pages catches that on the first repeat.
+        # A server ignoring the page option, or a proxy replaying one response,
+        # would otherwise be paged forever. Comparing the ids on consecutive
+        # pages catches that on the first repeat.
         signature = ",".join([el_text(device, "ID") for device in devices])
         if signature == previous:
             print("miradore: {} repeated the previous page; stopping".format(safe_label(ctx, p.page)))

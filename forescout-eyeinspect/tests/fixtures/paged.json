@@ -1,13 +1,13 @@
 {
   "name": "paged",
   "integration": "forescout-eyeinspect",
-  "description": "The hosts listing pages with offset/limit at a limit this integration hardcodes to 100, so the only way to reach page two is to hand back exactly 100 rows. Page one is exactly full and page two is short. This proves three things a wiring check cannot: the second request carries offset=100 rather than repeating offset=0, every row on BOTH pages is parsed into an asset (202 in total), and the walk stops on the short page instead of asking for offset=200. The third route answers 500 so a walk that runs on would fail loudly rather than quietly looping.\n\nEvery host advertises alert_count 0, which suppresses the per-host alerts call, so the request sequence here is purely the paging walk.",
+  "description": "The hosts listing pages by check-point, not by position. Page one is exactly full at the requested limit of 100 and page two is short, which is the only way to reach a second page.\n\nPage two must be requested with id_min=10100 rather than offset=100. The API Guide documents id_min as \"Retrieve hosts from a minimum ID value onward. Useful for check-pointing data\", which walks the table by primary key instead of by position -- an offset walk silently skips a row every time the Command Center inserts a host behind the cursor, and a Command Center is writing that table continuously. offset is what page ONE sends, because there is no check-point yet, and it stays the fallback for a page that carries no numeric id to advance from.\n\nid_min reads as inclusive, so the check-point passed is the last id seen (10100) rather than one past it -- correct whether the Command Center treats it as >= or >. Page two therefore re-delivers host 10100 as its first row, and the walk must drop that duplicate locally: 102 assets, not 103. That is what proves the boundary handling, and it is why page two carries three rows.\n\nThe third route answers 500 so a walk that runs on would fail loudly rather than quietly looping. include_alerts is off so the per-host alerts call does not drown the paging assertions.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-operator",
     "password": "fixture-password",
     "last_seen_days": "0",
-    "include_alerts": "true",
+    "include_alerts": "false",
     "include_cve_details": "false"
   },
   "routes": [
@@ -33,7 +33,6 @@
                 "main_name": "syn-bulk-001",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -47,7 +46,6 @@
                 "main_name": "syn-bulk-002",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -61,7 +59,6 @@
                 "main_name": "syn-bulk-003",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -75,7 +72,6 @@
                 "main_name": "syn-bulk-004",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -89,7 +85,6 @@
                 "main_name": "syn-bulk-005",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -103,7 +98,6 @@
                 "main_name": "syn-bulk-006",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -117,7 +111,6 @@
                 "main_name": "syn-bulk-007",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -131,7 +124,6 @@
                 "main_name": "syn-bulk-008",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -145,7 +137,6 @@
                 "main_name": "syn-bulk-009",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -159,7 +150,6 @@
                 "main_name": "syn-bulk-010",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -173,7 +163,6 @@
                 "main_name": "syn-bulk-011",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -187,7 +176,6 @@
                 "main_name": "syn-bulk-012",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -201,7 +189,6 @@
                 "main_name": "syn-bulk-013",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -215,7 +202,6 @@
                 "main_name": "syn-bulk-014",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -229,7 +215,6 @@
                 "main_name": "syn-bulk-015",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -243,7 +228,6 @@
                 "main_name": "syn-bulk-016",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -257,7 +241,6 @@
                 "main_name": "syn-bulk-017",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -271,7 +254,6 @@
                 "main_name": "syn-bulk-018",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -285,7 +267,6 @@
                 "main_name": "syn-bulk-019",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -299,7 +280,6 @@
                 "main_name": "syn-bulk-020",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -313,7 +293,6 @@
                 "main_name": "syn-bulk-021",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -327,7 +306,6 @@
                 "main_name": "syn-bulk-022",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -341,7 +319,6 @@
                 "main_name": "syn-bulk-023",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -355,7 +332,6 @@
                 "main_name": "syn-bulk-024",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -369,7 +345,6 @@
                 "main_name": "syn-bulk-025",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -383,7 +358,6 @@
                 "main_name": "syn-bulk-026",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -397,7 +371,6 @@
                 "main_name": "syn-bulk-027",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -411,7 +384,6 @@
                 "main_name": "syn-bulk-028",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -425,7 +397,6 @@
                 "main_name": "syn-bulk-029",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -439,7 +410,6 @@
                 "main_name": "syn-bulk-030",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -453,7 +423,6 @@
                 "main_name": "syn-bulk-031",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -467,7 +436,6 @@
                 "main_name": "syn-bulk-032",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -481,7 +449,6 @@
                 "main_name": "syn-bulk-033",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -495,7 +462,6 @@
                 "main_name": "syn-bulk-034",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -509,7 +475,6 @@
                 "main_name": "syn-bulk-035",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -523,7 +488,6 @@
                 "main_name": "syn-bulk-036",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -537,7 +501,6 @@
                 "main_name": "syn-bulk-037",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -551,7 +514,6 @@
                 "main_name": "syn-bulk-038",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -565,7 +527,6 @@
                 "main_name": "syn-bulk-039",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -579,7 +540,6 @@
                 "main_name": "syn-bulk-040",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -593,7 +553,6 @@
                 "main_name": "syn-bulk-041",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -607,7 +566,6 @@
                 "main_name": "syn-bulk-042",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -621,7 +579,6 @@
                 "main_name": "syn-bulk-043",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -635,7 +592,6 @@
                 "main_name": "syn-bulk-044",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -649,7 +605,6 @@
                 "main_name": "syn-bulk-045",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -663,7 +618,6 @@
                 "main_name": "syn-bulk-046",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -677,7 +631,6 @@
                 "main_name": "syn-bulk-047",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -691,7 +644,6 @@
                 "main_name": "syn-bulk-048",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -705,7 +657,6 @@
                 "main_name": "syn-bulk-049",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -719,7 +670,6 @@
                 "main_name": "syn-bulk-050",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -733,7 +683,6 @@
                 "main_name": "syn-bulk-051",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -747,7 +696,6 @@
                 "main_name": "syn-bulk-052",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -761,7 +709,6 @@
                 "main_name": "syn-bulk-053",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -775,7 +722,6 @@
                 "main_name": "syn-bulk-054",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -789,7 +735,6 @@
                 "main_name": "syn-bulk-055",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -803,7 +748,6 @@
                 "main_name": "syn-bulk-056",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -817,7 +761,6 @@
                 "main_name": "syn-bulk-057",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -831,7 +774,6 @@
                 "main_name": "syn-bulk-058",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -845,7 +787,6 @@
                 "main_name": "syn-bulk-059",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -859,7 +800,6 @@
                 "main_name": "syn-bulk-060",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -873,7 +813,6 @@
                 "main_name": "syn-bulk-061",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -887,7 +826,6 @@
                 "main_name": "syn-bulk-062",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -901,7 +839,6 @@
                 "main_name": "syn-bulk-063",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -915,7 +852,6 @@
                 "main_name": "syn-bulk-064",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -929,7 +865,6 @@
                 "main_name": "syn-bulk-065",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -943,7 +878,6 @@
                 "main_name": "syn-bulk-066",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -957,7 +891,6 @@
                 "main_name": "syn-bulk-067",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -971,7 +904,6 @@
                 "main_name": "syn-bulk-068",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -985,7 +917,6 @@
                 "main_name": "syn-bulk-069",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -999,7 +930,6 @@
                 "main_name": "syn-bulk-070",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1013,7 +943,6 @@
                 "main_name": "syn-bulk-071",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1027,7 +956,6 @@
                 "main_name": "syn-bulk-072",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1041,7 +969,6 @@
                 "main_name": "syn-bulk-073",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1055,7 +982,6 @@
                 "main_name": "syn-bulk-074",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1069,7 +995,6 @@
                 "main_name": "syn-bulk-075",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1083,7 +1008,6 @@
                 "main_name": "syn-bulk-076",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1097,7 +1021,6 @@
                 "main_name": "syn-bulk-077",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1111,7 +1034,6 @@
                 "main_name": "syn-bulk-078",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1125,7 +1047,6 @@
                 "main_name": "syn-bulk-079",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1139,7 +1060,6 @@
                 "main_name": "syn-bulk-080",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1153,7 +1073,6 @@
                 "main_name": "syn-bulk-081",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1167,7 +1086,6 @@
                 "main_name": "syn-bulk-082",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1181,7 +1099,6 @@
                 "main_name": "syn-bulk-083",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1195,7 +1112,6 @@
                 "main_name": "syn-bulk-084",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1209,7 +1125,6 @@
                 "main_name": "syn-bulk-085",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1223,7 +1138,6 @@
                 "main_name": "syn-bulk-086",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1237,7 +1151,6 @@
                 "main_name": "syn-bulk-087",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1251,7 +1164,6 @@
                 "main_name": "syn-bulk-088",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1265,7 +1177,6 @@
                 "main_name": "syn-bulk-089",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1279,7 +1190,6 @@
                 "main_name": "syn-bulk-090",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1293,7 +1203,6 @@
                 "main_name": "syn-bulk-091",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1307,7 +1216,6 @@
                 "main_name": "syn-bulk-092",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1321,7 +1229,6 @@
                 "main_name": "syn-bulk-093",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1335,7 +1242,6 @@
                 "main_name": "syn-bulk-094",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1349,7 +1255,6 @@
                 "main_name": "syn-bulk-095",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1363,7 +1268,6 @@
                 "main_name": "syn-bulk-096",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1377,7 +1281,6 @@
                 "main_name": "syn-bulk-097",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1391,7 +1294,6 @@
                 "main_name": "syn-bulk-098",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1405,7 +1307,6 @@
                 "main_name": "syn-bulk-099",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1419,7 +1320,6 @@
                 "main_name": "syn-bulk-100",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1431,11 +1331,11 @@
       "when_exhausted": "error"
     },
     {
-      "name": "hosts-offset-100",
+      "name": "hosts-id-min-10100",
       "match": {
         "method": "GET",
         "path": "/api/v1/hosts",
-        "query_contains": "offset=100"
+        "query_contains": "id_min=10100"
       },
       "responses": [
         {
@@ -1443,6 +1343,19 @@
           "json": {
             "total_count": 102,
             "results": [
+              {
+                "id": 10100,
+                "ip": "10.81.0.101",
+                "mac_addresses": [
+                  "00:1b:1b:00:00:64"
+                ],
+                "main_name": "syn-bulk-100",
+                "role": "RTU",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "open_ports": [
+                  502
+                ]
+              },
               {
                 "id": 10101,
                 "ip": "10.81.0.102",
@@ -1452,7 +1365,6 @@
                 "main_name": "syn-bulk-101",
                 "role": "PLC",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1466,7 +1378,6 @@
                 "main_name": "syn-bulk-102",
                 "role": "RTU",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 0,
                 "open_ports": [
                   502
                 ]
@@ -1510,10 +1421,14 @@
       {
         "method": "GET",
         "path": "/api/v1/hosts",
-        "query_contains": "limit=100&offset=100"
+        "query_contains": "id_min=10100"
       }
     ],
     "requests_absent": [
+      {
+        "path": "/api/v1/hosts",
+        "query_contains": "offset=100"
+      },
       {
         "path": "/api/v1/hosts",
         "query_contains": "offset=200"
@@ -1528,5 +1443,6 @@
   },
   "invariants": {
     "skip": []
-  }
+  },
+  "check_determinism": true
 }

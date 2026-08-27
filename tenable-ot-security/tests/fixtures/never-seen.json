@@ -1,0 +1,122 @@
+{
+  "name": "never-seen",
+  "integration": "tenable-ot-security",
+  "description": "An asset the console says it has never seen. lastSeen is null, and the schema is explicit about what the other two fields mean: lastHit is 'Latest date of last plugin hit or plugin status change' and lastUpdate is 'Asset's details last update time'. Neither is a sighting -- a plugin set re-evaluated overnight, or a criticality an operator edited, touches the record without anyone observing the device on the wire. lastSeen is nullable while lastUpdate is Time! and therefore ALWAYS present, so a lastSeen -> lastHit -> lastUpdate fallback chain fires on precisely the assets the console is telling us were never seen, and stamps every one of them as freshly seen. That is worse than an unknown last-seen date: it makes a decommissioned or never-observed asset look live in runZero forever. So lastSeenTS must be ABSENT here while lastHit and lastUpdate survive verbatim as attributes for anyone who wants them. 0001 also carries the Go zero time on runStatusTime and a null firstSeen, so firstSeenTS must be absent too, and the raw 0001-01-01T00:00:00Z must reach the attribute unconverted rather than becoming a year-1 sighting. 0002 is the control: it carries a real lastSeen and must get a lastSeenTS, which is what proves 0001's absence is the fallback being gone rather than the timestamp path being broken. The two assets also carry the sentinel members of the classification enums against their real ones: PurdueLevel.UnknownLevel and Criticality.NoneCriticality say only that nobody has set the field, so 0001 must tag on its type alone while 0002 tags on all four.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "false",
+    "import_software": "false",
+    "import_services": "false"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "getAssets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "c0c0c0c0-0001-4001-8001-000000000001",
+                    "name": "RTU-NEVER-SEEN-01",
+                    "type": "Rtu",
+                    "superType": "Controller",
+                    "purdueLevel": "UnknownLevel",
+                    "criticality": "NoneCriticality",
+                    "hidden": false,
+                    "firstSeen": null,
+                    "lastSeen": null,
+                    "lastHit": "2026-08-19T02:11:00Z",
+                    "lastUpdate": "2026-08-25T21:40:13Z",
+                    "runStatus": "Unknown",
+                    "runStatusTime": "0001-01-01T00:00:00Z",
+                    "macs": {"nodes": ["00:1d:9c:ee:00:01"]},
+                    "ips": {"nodes": ["10.130.2.11"]},
+                    "directMacs": {"nodes": ["00:1d:9c:ee:00:01"]},
+                    "directIps": {"nodes": ["10.130.2.11"]},
+                    "directNetworkInterfaces": {"nodes": []},
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {"nodes": []}
+                  },
+                  {
+                    "id": "c0c0c0c0-0002-4002-8002-000000000002",
+                    "name": "RTU-SEEN-02",
+                    "type": "Rtu",
+                    "superType": "Controller",
+                    "purdueLevel": "Level1",
+                    "criticality": "MediumCriticality",
+                    "hidden": false,
+                    "firstSeen": "2025-04-02T08:00:00Z",
+                    "lastSeen": "2026-08-24T18:30:00Z",
+                    "lastHit": "2026-08-24T18:29:00Z",
+                    "lastUpdate": "2026-08-25T21:40:13Z",
+                    "runStatus": "Running",
+                    "runStatusTime": "2026-08-24T18:30:00Z",
+                    "macs": {"nodes": ["00:1d:9c:ee:00:02"]},
+                    "ips": {"nodes": ["10.130.2.12"]},
+                    "directMacs": {"nodes": ["00:1d:9c:ee:00:02"]},
+                    "directIps": {"nodes": ["10.130.2.12"]},
+                    "directNetworkInterfaces": {"nodes": []},
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {"nodes": []}
+                  }
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 1,
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:c0c0c0c0-0001-4001-8001-000000000001",
+        "fields": {
+          "hostnames": "RTU-NEVER-SEEN-01",
+          "ipAddresses": "10.130.2.11",
+          "tenable_ot_security_last_hit": "2026-08-19T02:11:00Z",
+          "tenable_ot_security_last_update": "2026-08-25T21:40:13Z",
+          "tenable_ot_security_run_status_time": "0001-01-01T00:00:00Z",
+          "tags": "type:Rtu"
+        },
+        "fields_absent": [
+          "lastSeenTS",
+          "firstSeenTS",
+          "tenable_ot_security_last_seen"
+        ]
+      },
+      {
+        "id": "tenable-ot-security:$HOST:c0c0c0c0-0002-4002-8002-000000000002",
+        "fields": {
+          "hostnames": "RTU-SEEN-02",
+          "lastSeenTS": "1787596200",
+          "firstSeenTS": "1743580800",
+          "tenable_ot_security_last_seen": "2026-08-24T18:30:00Z",
+          "tags": "criticality:Medium\tpurdue:Level1\trun-status:Running\ttype:Rtu"
+        }
+      }
+    ],
+    "log_contains": [
+      "tenable-ot-security: reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,142 @@
+{
+  "name": "discovery-malformed",
+  "integration": "forescout-counteract",
+  "description": "The paginated path's equivalent of malformed. Every documented shape is violated somewhere on page 0 -- a host record that is a bare string, a null id, an id that is neither an integer nor an address, a fields value that is a string instead of an object, a value wrapper that is a bare scalar rather than {timestamp, value}, a wrapper whose timestamp is 0 (the in-group property on a live document stamps every value 0, meaning never, and it must not become a 1970 lastSeenTS), a null mac, and a CVE list holding a string, a null, and an object with no recognisable identifier. None of that may end the run and none of it may produce an asset with nothing to correlate on.\n\nThe walk also has to terminate on a next_link it cannot use. metadata here carries one with neither page nor nodeId, which is not a documented shape and cannot be followed; stopping and saying so is the only safe reading, because guessing the next page would either repeat page 0 forever or skip endpoints silently. host 167838209 survives all of it and must still import with its wrapper-derived lastSeenTS and its one valid CVE.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYWQifQ.YmFkLXNpZ25hdHVyZQ"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hostFields": [
+              "a bare string where an object is documented",
+              {"label": "an entry with no name"},
+              {"name": "hostname_calculated"},
+              {"name": "online"},
+              {"name": "macs"},
+              {"name": "otsm_details_cves"},
+              {"name": "in-group"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "discovery",
+      "match": {"method": "POST", "path": "/api/hosts/discovery"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "next_link": "https://enterprise-manager.example.com/api/hosts/discovery?pageSize=1000"
+            },
+            "hosts": [
+              "a bare string where an object is documented",
+              {
+                "id": null,
+                "ip": "10.70.0.9",
+                "mac": "00:11:22:cc:00:09"
+              },
+              {
+                "id": "not an id or an address",
+                "ip": "10.70.0.10",
+                "mac": "00:11:22:cc:00:10"
+              },
+              {
+                "id": 167838209,
+                "ip": "10.1.2.1",
+                "mac": null,
+                "fields": {
+                  "hostname_calculated": "a bare scalar instead of a value wrapper",
+                  "online": {"timestamp": 1724839643, "value": "true"},
+                  "macs": [{"timestamp": 1724839650, "value": "0022e51f9018"}, {"value": null}, null],
+                  "in-group": [
+                    {"timestamp": 0, "value": "Purdue0Host"},
+                    {"timestamp": 0, "value": "IoT Devices"}
+                  ],
+                  "otsm_details_cves": [
+                    "a bare string holding CVE-2019-0708 for the regex to find",
+                    null,
+                    {"timestamp": 1724826201, "value": {"title": "no identifier anywhere", "cvss_score": "9.8"}},
+                    {"timestamp": 1724826201, "value": {"cve_id": "CVE-2014-2350", "cvss_score": "not a number"}}
+                  ]
+                }
+              },
+              {
+                "id": 167838210,
+                "ip": "10.1.2.2",
+                "mac": null,
+                "fields": "a string where the property document is documented"
+              },
+              {
+                "id": 2130706433,
+                "ip": "127.0.0.1",
+                "mac": "000000000000",
+                "fields": {}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:167838209",
+      "forescout-counteract:$HOST:167838210"
+    ],
+    "ids_absent": [
+      "forescout-counteract:$HOST:None",
+      "forescout-counteract:$HOST:",
+      "forescout-counteract:$HOST:2130706433"
+    ],
+    "log_contains": [
+      "forescout-counteract: skipping host with no object id: ip=10.70.0.9",
+      "forescout-counteract: skipping host with no object id: ip=10.70.0.10",
+      "forescout-counteract: the paginated walk returned a next_link naming no page or node; stopping",
+      "forescout-counteract: skipping host 2130706433 with no address, MAC, or name to correlate on",
+      "forescout-counteract: skipped 3 endpoint(s) carrying no usable object id",
+      "forescout-counteract: imported 2 assets from the paginated endpoint over 1 request(s)"
+    ],
+    "min_vulnerabilities_total": 2,
+    "assets": [
+      {
+        "id": "forescout-counteract:$HOST:167838209",
+        "fields": {
+          "ipAddresses": "10.1.2.1",
+          "macAddresses": "00:22:e5:1f:90:18",
+          "lastSeenTS": "1724839643",
+          "forescout_counteract_last_seen_source": "online"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "forescout-counteract:$HOST:167838210",
+        "fields": {
+          "ipAddresses": "10.1.2.2"
+        },
+        "fields_absent": ["hostnames", "lastSeenTS", "macAddresses"]
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

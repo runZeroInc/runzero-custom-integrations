@@ -1,0 +1,74 @@
+{
+  "name": "rate-limit",
+  "integration": "tenable-ot-security",
+  "description": "Tenable publishes no rate limit for the OT Security GraphQL endpoint, but the console self-protects -- the schema exposes slowCount and countTimeout on assets for exactly that reason -- so a 429 has to be survivable. post_json retries transient statuses three times by default with backoff and honors Retry-After, and the script deliberately does not hand-roll any of that. One 429 followed by a 503 followed by success must still emit the asset rather than ending the import.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "true",
+    "import_software": "true"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "getAssets"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"errors": [{"message": "too many requests"}]}},
+        {"status": 503, "json": {"errors": [{"message": "service unavailable"}]}},
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "7d6c5b4a-3210-4fed-9cba-0123456789ab",
+                    "name": "throttled-rtu-01",
+                    "type": "Rtu",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "criticality": "MediumCriticality",
+                    "hidden": false,
+                    "firstSeen": "2025-06-01T00:00:00Z",
+                    "lastSeen": "2026-08-19T12:00:00Z",
+                    "macs": {"nodes": ["00:1d:9c:bb:00:01"]},
+                    "ips": {"nodes": ["10.130.4.1"]},
+                    "directMacs": {"nodes": ["00:1d:9c:bb:00:01"]},
+                    "directIps": {"nodes": ["10.130.4.1"]},
+                    "segments": {"nodes": []},
+                    "risk": {"totalRisk": "22.0"},
+                    "vendor": "Schneider Electric",
+                    "model": "SCADAPack 470i"
+                  }
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["tenable-ot-security:$HOST:7d6c5b4a-3210-4fed-9cba-0123456789ab"],
+    "request_count": 3,
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:7d6c5b4a-3210-4fed-9cba-0123456789ab",
+        "fields": {
+          "manufacturer": "Schneider Electric",
+          "model": "SCADAPack 470i",
+          "hostnames": "throttled-rtu-01"
+        }
+      }
+    ],
+    "log_contains": ["tenable-ot-security: reported 1 assets"]
+  },
+  "check_determinism": true
+}

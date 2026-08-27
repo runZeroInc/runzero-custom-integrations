@@ -1,0 +1,331 @@
+{
+  "name": "happy",
+  "integration": "armis",
+  "description": "The token exchange, one page of in:vulnerabilities, one page of vulnerability-match, and one page of in:devices, built from the device payloads Armis integration vendors publish. Covers the Armis 1.8 shape (ipv6 as an array), the 2021 shape (ipv6 as a scalar, and a link-local one that must be dropped), a device with no macAddress at all, and a device with no MAC, no IP, and no hostname, which has nothing for runZero to correlate on and must therefore be skipped rather than imported as a permanent orphan. One vulnerability match lands on a device in the inventory page and one on a device that is not, proving the unjoinable finding is counted rather than silently dropped.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1000",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "fixture-access-token", "expiration_utc": "2026-08-26T18:04:56.123456+00:00"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulnerabilities",
+      "match": {"method": "GET", "path": "/api/v1/search/", "query_contains": "orderBy=lastDetected"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 1,
+              "next": null,
+              "prev": null,
+              "results": [
+                {
+                  "affectedDevicesCount": 7,
+                  "attackComplexity": "Medium",
+                  "attackVector": "Remote",
+                  "avmRating": "CRITICAL",
+                  "botnets": ["Mirai", "Mozi", "Enemybot"],
+                  "commonName": "Log4Shell follow-on",
+                  "cveUid": "CVE-2021-45046",
+                  "cvssScore": 9.8,
+                  "description": "An advanced exploit of the vulnerability.",
+                  "epssPercentile": 98.5,
+                  "epssScore": 0.92,
+                  "firstDetected": "2025-03-25T14:30:00.123456+00:00",
+                  "hasRansomware": true,
+                  "hasRemediationInfo": "Yes",
+                  "id": "CVE-2021-45046",
+                  "isWeaponized": true,
+                  "lastDetected": "2025-03-29T20:15:45.678901+00:00",
+                  "score": 9.8,
+                  "severity": "Critical",
+                  "status": "Active",
+                  "threatActors": ["APT28"],
+                  "threatTags": ["Ransomware"],
+                  "type": "Vulnerability"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "vulnerability-match",
+      "match": {"method": "GET", "path": "/api/v1/vulnerability-match/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "paging": {"next": null},
+              "sample": [
+                {
+                  "advisoryId": "ADV-2025-0013",
+                  "avmRating": "CRITICAL",
+                  "confidenceLevel": "High",
+                  "confidenceLevelDescription": "Based on active exploitation and vendor confirmation",
+                  "cveUid": "CVE-2021-45046",
+                  "deviceId": 469,
+                  "firstDetected": "2025-03-25T10:59:59.486176+00:00",
+                  "hasRemediationInfo": "No",
+                  "lastDetected": "2025-03-28T19:59:59.486176+00:00",
+                  "matchCriteriaString": "Windows Server 2016 Standard",
+                  "recommendedSteps": "Update to the latest available OS version as per vendor recommendations.",
+                  "remediationTypes": "Patch Available",
+                  "status": "Open",
+                  "statusChangeReason": "New detection of vulnerability on device",
+                  "statusSource": "Discovered by Armis"
+                },
+                {
+                  "cveUid": "CVE-2021-45046",
+                  "deviceId": 640,
+                  "firstDetected": "2025-03-25T10:59:59.486176+00:00",
+                  "lastDetected": null,
+                  "status": "Open",
+                  "statusSource": "Discovered by Armis"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/", "query_contains": "orderBy=lastSeen"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 4,
+              "next": null,
+              "prev": null,
+              "results": [
+                {
+                  "accessSwitch": "test Enterprise",
+                  "boundaries": "Corporate, Guest",
+                  "businessImpact": "Unassigned",
+                  "category": "Computers",
+                  "customProperties": {},
+                  "dataSources": [
+                    {
+                      "firstSeen": "2024-09-13T18:16:00.620093+00:00",
+                      "instances": [
+                        {
+                          "firstSeen": "2024-09-13T18:16:00.620093+00:00",
+                          "lastSeen": "2024-12-07T13:53:32.184177+00:00",
+                          "name": "Qualys"
+                        }
+                      ],
+                      "lastSeen": "2024-12-07T13:53:32.184177+00:00",
+                      "name": "Qualys",
+                      "types": ["Vulnerability Management"]
+                    },
+                    {
+                      "firstSeen": "2024-09-13T18:16:00.620093+00:00",
+                      "lastSeen": "2024-12-07T13:53:32.184177+00:00",
+                      "name": "Traffic Inspection",
+                      "types": ["Network Analysis"]
+                    }
+                  ],
+                  "displayTitle": "geneva-file-01",
+                  "firstSeen": "2024-09-11T01:13:13.620093+00:00",
+                  "id": 469,
+                  "ipAddress": "175.16.199.10",
+                  "ipv6": ["2001:db8:1::10"],
+                  "lastSeen": "2025-03-29T02:02:09.124100+00:00",
+                  "macAddress": "44:A7:4B:5D:B0:76",
+                  "manufacturer": "Dell",
+                  "model": "PowerEdge R740",
+                  "name": "geneva-file-01",
+                  "names": "geneva-file-01",
+                  "operatingSystem": "Windows",
+                  "operatingSystemVersion": "Server 2016 Standard",
+                  "protections": [
+                    {
+                      "creationTime": "Tue, 18 Feb 2025 00:29:19 GMT",
+                      "deviceId": 469,
+                      "lastSeenTime": "Tue, 18 Feb 2025 00:29:19 GMT",
+                      "protectionName": "CrowdStrike Falcon"
+                    }
+                  ],
+                  "purdueLevel": 4,
+                  "riskLevel": 80,
+                  "sensor": {"name": "geneva-sensor-01", "type": "Armis Controller"},
+                  "site": {"location": "Geneva", "name": "Geneva Enterprise"},
+                  "tags": ["Misconfigurations"],
+                  "type": "Servers",
+                  "typeEnum": "SERVER",
+                  "userIds": [5],
+                  "visibility": "Full"
+                },
+                {
+                  "accessSwitch": null,
+                  "boundaries": "Corporate",
+                  "category": "Computers",
+                  "customProperties": {},
+                  "dataSources": [
+                    {
+                      "firstSeen": "2022-08-11T07:54:32.167939+00:00",
+                      "lastSeen": "2022-11-28T14:56:36.198248+00:00",
+                      "name": "Active Directory",
+                      "types": ["Asset & System Management", "Identity Provider"]
+                    },
+                    {
+                      "firstSeen": "2021-08-15T07:37:58.891683+00:00",
+                      "lastSeen": "2022-11-28T21:02:20.208248+00:00",
+                      "name": "CrowdStrike",
+                      "types": ["Agent Based", "Endpoint Protection"]
+                    }
+                  ],
+                  "firstSeen": "2022-11-21T16:59:58.360310+00:00",
+                  "id": 2172,
+                  "ipAddress": "10.77.27.183",
+                  "ipv6": "fe80::647b:ba0f:9628:6014",
+                  "lastSeen": "2022-11-29T18:42:50.190248+00:00",
+                  "macAddress": "50:76:AF:D3:3F:AB",
+                  "manufacturer": "Lenovo",
+                  "model": "ThinkPad X1 Yoga 3rd Gen",
+                  "name": "000000731194pc.corporate.acme.com",
+                  "operatingSystem": "Windows",
+                  "operatingSystemVersion": "10",
+                  "purdueLevel": 4,
+                  "riskLevel": 5,
+                  "sensor": {"name": "PALO_ALTO-IDF04-SW01:Gig1/0/44 Enterprise", "type": "Access Switch"},
+                  "site": {"location": "Palo Alto", "name": "Palo Alto Enterprise"},
+                  "tags": ["Corporate", "ServiceNow", "SCCM"],
+                  "type": "Laptops",
+                  "user": "acme\\jsmith",
+                  "userIds": [12],
+                  "visibility": "Full"
+                },
+                {
+                  "accessSwitch": "win-sw-hoc-01:po9",
+                  "boundaries": "Corporate",
+                  "category": "Network Equipment",
+                  "customProperties": {},
+                  "firstSeen": "2021-06-02T12:00:00.000000+00:00",
+                  "id": 74745,
+                  "ipAddress": "10.77.30.44",
+                  "ipv6": null,
+                  "lastSeen": "2022-11-29T09:12:00.000000+00:00",
+                  "manufacturer": "Cisco",
+                  "name": "win-ap-hoc-04",
+                  "operatingSystem": "Cisco IOS",
+                  "riskLevel": 10,
+                  "site": {"location": "Winslow", "name": "Winslow Campbellfield"},
+                  "tags": ["MERAKI_NETWORK=Winslow Campbellfield"],
+                  "type": "Access Points",
+                  "typeEnum": "ACCESS_POINT",
+                  "user": "",
+                  "visibility": "Full"
+                },
+                {
+                  "category": "Medical",
+                  "customProperties": {},
+                  "firstSeen": "2025-01-08T00:00:00.000000+00:00",
+                  "id": 88001,
+                  "ipAddress": "",
+                  "ipv6": null,
+                  "lastSeen": "2026-08-01T00:00:00.000000+00:00",
+                  "macAddress": "",
+                  "name": "",
+                  "purdueLevel": 2,
+                  "riskLevel": 40,
+                  "site": {"location": "Geneva", "name": "Geneva Enterprise"},
+                  "type": "Infusion Pumps",
+                  "visibility": "Limited"
+                }
+              ],
+              "total": 4
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "armis:$HOST:469",
+        "fields": {
+          "hostnames": "geneva-file-01",
+          "ipAddresses": "175.16.199.10\t2001:db8:1::10",
+          "macAddresses": "44:a7:4b:5d:b0:76",
+          "os": "Windows",
+          "osVersion": "Server 2016 Standard",
+          "manufacturer": "Dell",
+          "model": "PowerEdge R740",
+          "deviceType": "Servers",
+          "tags": "Misconfigurations\tsite:Geneva Enterprise",
+          "armis_category": "Computers",
+          "armis_purdue_level": "4",
+          "armis_risk_level": "80",
+          "armis_data_sources": "Qualys,Traffic Inspection",
+          "armis_protections": "CrowdStrike Falcon",
+          "armis_sensor_type": "Armis Controller",
+          "armis_site_name": "Geneva Enterprise",
+          "armis_vulnerability_count": "1"
+        }
+      },
+      {
+        "id": "armis:$HOST:2172",
+        "fields": {
+          "hostnames": "000000731194pc.corporate.acme.com",
+          "ipAddresses": "10.77.27.183",
+          "macAddresses": "50:76:af:d3:3f:ab",
+          "deviceType": "Laptops",
+          "armis_ipv6": "fe80::647b:ba0f:9628:6014",
+          "ownedBy": "acme\\jsmith"
+        }
+      },
+      {
+        "id": "armis:$HOST:74745",
+        "fields": {
+          "hostnames": "win-ap-hoc-04",
+          "ipAddresses": "10.77.30.44",
+          "deviceType": "Access Points",
+          "tags": "MERAKI_NETWORK=Winslow Campbellfield\tsite:Winslow Campbellfield"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "ids_absent": [
+      "armis:$HOST:88001",
+      "armis:$HOST:640"
+    ],
+    "min_vulnerabilities_total": 1,
+    "request_count": 4,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1/access_token/", "body_contains": "secret_key"},
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "aql=in%3Avulnerabilities"},
+      {"method": "GET", "path": "/api/v1/vulnerability-match/", "query_contains": "vulnerability_ids=CVE-2021-45046"},
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "aql=in%3Adevices"},
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "includeTotal=false"},
+      {"header_contains": "fixture-access-token"}
+    ],
+    "log_contains": [
+      "armis: indexed 2 vulnerabilities across 2 devices",
+      "armis: skipped 1 devices with no MAC, IP, or hostname to correlate on",
+      "armis: dropped findings for 1 devices absent from the inventory query"
+    ]
+  },
+  "check_determinism": true
+}
