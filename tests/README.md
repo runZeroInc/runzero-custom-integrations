@@ -1,17 +1,7 @@
 # Integration fixture tests
 
-`rumble-scanner script --validate` proves an integration wires up: its CONFIG
-parses, its parameters resolve, it makes at least one HTTP request, and it does
-not abort. It cannot prove the integration is *correct*, because its dummy
-server answers from three built-in heuristics and every collection it returns is
-empty — no row is ever parsed, no second page is ever fetched, no token ever
-expires.
-
-These tests close that gap. Each scenario stands up a fixture server with
-scripted responses, runs the **real scanner** against it, and checks the assets
-that come out. Because the scanner is real, anything the runtime rejects — a
-future timestamp, a malformed CVE, an unexpected keyword argument — fails here
-exactly as it would in production.
+`runzero-cli script --validate` performs basic validation, but does not do full end-to-end testing, these tests close that gap. Each scenario stands up a fixture server with
+scripted responses and runs the real runZero CLI.
 
 ## Running
 
@@ -21,12 +11,7 @@ python3 tests/run.py bmc-discovery       # one integration
 python3 tests/run.py bmc-discovery/paged # one scenario
 ```
 
-Point `RUNZERO_SCANNER` at a scanner binary. `/usr/local/bin/runzero` is a
-zero-byte stub and does not work; build the dev scanner instead:
-
-```bash
-cd /Users/dev/go/platform/product/rumble-scanner && go build -tags recogNocloud,development -o /tmp/rumble-scanner .
-```
+Point `RUNZERO_SCANNER` at a runZero CLI binary.
 
 ## Tuning the fixture servers
 
@@ -45,13 +30,6 @@ was enough live threads to take the machine down.
 
 These are ceilings, not allocations: the pool grows lazily to whatever is
 genuinely concurrent, which for these scenarios is a handful.
-
-Every HTTP response closes its connection, and that is load-bearing. With
-keep-alive a worker stays checked out for the life of the connection rather
-than the life of the request, so a bounded pool fills with idle connections,
-later connections are accepted but never serviced, and the scanner waits on a
-reply that cannot come — the run deadlocks instead of failing. **If a scenario
-hangs, suspect that before raising `MAX_WORKERS`.**
 
 ## Layout
 
