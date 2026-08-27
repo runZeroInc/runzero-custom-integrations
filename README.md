@@ -6,15 +6,11 @@ runZero is a total attack surface and exposure management platform that combines
 
 If you are not a runZero user today, [sign up](https://www.runzero.com/try) for a trial that can be converted to our free Community Edition.
 
-This repository includes **custom integrations** that run in the context of a runZero Explorer. These integrations are written in Starlark, a language similar to Python.
+This repository includes **custom integrations** that can launch from the runZero Console, the runZero Explorer, and the runZero CLI. These integrations are written in Starlark, a language similar to Python.
 
-To create a custom integration within runZero, you will need a user account with `superuser` privileges.
+To create a custom integration within runZero, you will need a user account with administrative privileges in at least one organization.
 
 You can find detailed documentation about Starlark-based integrations on the [runZero help portal](https://help.runzero.com/docs/custom-integration-scripts/).
-
-# Getting Help
-
-If you need help setting up a custom integration, you can create an [issue](https://github.com/runZeroInc/runzero-custom-integrations/issues/new) on this GitHub repo, and our team will work with you. If you have a Customer Success Engineer, you can also work with them directly. 
 
 # Existing Integrations 
 
@@ -206,19 +202,7 @@ CONFIG = {
     "params": [...],
 }
 ```
-
-It is **not** a field on `ImportAsset` — the merge path needs the behavior
-before it has an asset, so the value is read from `CONFIG` and applies to
-every record the script emits. Passing `matchBehavior=` to `ImportAsset`
-fails validation. An absent or empty value means the default.
-
-That default matches and breaks on all four dimensions (id, MAC, IP, name)
-which is correct when the integration owns a strong id. When the id
-is weak or absent, use one of the knobs below to tell the cruncher
-which dimensions are unreliable for **matching** (finding the right
-existing asset to merge into) and which are unreliable for
-**breaking** (refusing a merge that would otherwise happen because
-one dimension conflicts).
+The `matchBehavior` applies to every record the script emits. An absent or empty value means the default - matching and breaking matches on all four dimensions (id, MAC, IP, name). Matching and breaking on `id` depends on this value being stable and unique across executions. If the `id` changes frequently or collides with unrelated assets, use `"no-id-match no-id-break"` to ignore this field for the purpose of asset tracking.
 
 Flags:
 
@@ -269,7 +253,7 @@ A short rule of thumb: if the upstream id is **not both stable and
 unique**, you must relax id matching. If MAC / IP / hostname are
 known to be unreliable for this data source, relax the corresponding
 `-break` flags so a conflict on those fields doesn't fragment one
-real asset into many.
+real asset into many. Even though MACs can look like a great choice, many systems track differnt MACs for the same asset depending on whether its wired, wireless, on a docking station, or connected through a VPN. 
 
 ## Contributing
 
