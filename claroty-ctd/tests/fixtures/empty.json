@@ -1,0 +1,50 @@
+{
+  "name": "empty",
+  "integration": "claroty-ctd",
+  "description": "A CTD appliance whose inventory is empty, which is what a freshly deployed sensor or a site filtered down to nothing looks like. Both walks must terminate on the first response and the run must finish reporting zero assets rather than failing, so an empty site is distinguishable from a broken credential. This scenario also exercises the lookback cursor: last_updated_days is set, so the asset request has to carry last_updated__gt.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "7"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [{"status": 200, "json": {"token": "empty-token", "password_expired": false}}],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-vulnerabilities",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities"},
+      "responses": [
+        {"status": 200, "json": {"count_filtered": 0, "count_in_page": 0, "count_total": 0, "objects": []}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 200, "json": {"count_filtered": 0, "count_in_page": 0, "count_total": 0, "objects": []}}
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/ranger/assets", "query_contains": "last_updated__gt"}
+    ],
+    "log_contains": [
+      "indexed 0 vulnerabilities across 0 assets",
+      "reported 0 assets",
+      "no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,4 @@
+{
+  "env_prefix": "GREENBONE_GMP",
+  "//": "GREENBONE would be a prefix of GREENBONE_SCAN, which makes every GREENBONE_SCAN_* variable ambiguous between the two integrations. The live harness refuses the whole run rather than guessing, so this integration takes a distinct prefix naming the protocol it speaks."
+}

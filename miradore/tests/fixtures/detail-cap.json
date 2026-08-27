@@ -1,0 +1,104 @@
+{
+  "name": "detail-cap",
+  "integration": "miradore",
+  "description": "v2 detail costs two requests per device, so a large fleet would spend the whole task window on it. v2_detail_limit bounds how many devices are detailed; the v1 walk still imports every one of them. With the limit set to one, device 11 gets its v2 detail and device 12 is imported without any -- and the limit is announced once.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme",
+    "page_size": "50",
+    "v2_detail_limit": "1",
+    "include_v2_location": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"2\"><Device><ID>11</ID><Platform>macOS</Platform><LocalIPAddress>10.30.0.11</LocalIPAddress><MACAddress>00:11:22:BB:00:11</MACAddress><Status>Active</Status><LastReported>20.08.2026 07:45:00</LastReported><InvDevice><DeviceName>mac-eng-11</DeviceName><Manufacturer>Apple</Manufacturer><Model>Mac14,10</Model><MarketingName>MacBook Pro</MarketingName><SerialNumber>SN-MIR-0011</SerialNumber></InvDevice><InvOS><Platform>macOS</Platform><Version>15.1</Version></InvOS><Security><EncryptionStatus>Encrypted</EncryptionStatus><PasscodePresent>true</PasscodePresent><JailBroken>false</JailBroken></Security><Enrollment><Type>DEP</Type><EnrolledTime>04.02.2025 09:00:00</EnrolledTime></Enrollment><InvApplications><InvApplication><Name>Safari</Name><Version>18.1</Version><Identifier>com.apple.Safari</Identifier><Size>264241152</Size></InvApplication><InvApplication><Name>Slack</Name><Version>4.41.0</Version><Vendor>Slack Technologies</Vendor><Identifier>com.tinyspeck.slackmacgap</Identifier><Size>0</Size></InvApplication></InvApplications></Device><Device><ID>12</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.12</LocalIPAddress><MACAddress>00:11:22:BB:00:12</MACAddress><Status>Active</Status><InvDevice><DeviceName>ipad-lobby-12</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPad13,4</Model><MarketingName>iPad Pro</MarketingName></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "suspended",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/SuspendedDevices"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "custom-attributes",
+      "match": {
+        "method": "GET",
+        "path_prefix": "/api/v2/Device/",
+        "path_regex": "/CustomAttribute$"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "identifier": "assetTag",
+              "name": "Asset Tag",
+              "value": "RZ-0011"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "log_contains": [
+      "reached the v2 detail limit of 1 devices"
+    ],
+    "requests_include": [
+      {
+        "path_contains": "/api/v2/Device/11/CustomAttribute"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/api/v2/Device/12/CustomAttribute"
+      },
+      {
+        "path_contains": "/Location"
+      }
+    ],
+    "assets": [
+      {
+        "id": "miradore:acme:11",
+        "fields": {
+          "miradore_attr_asset_tag": "RZ-0011"
+        }
+      },
+      {
+        "id": "miradore:acme:12",
+        "fields_absent": [
+          "miradore_attr_asset_tag"
+        ]
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

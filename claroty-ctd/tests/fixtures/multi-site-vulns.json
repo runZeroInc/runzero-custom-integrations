@@ -1,0 +1,211 @@
+{
+  "name": "multi-site-vulns",
+  "integration": "claroty-ctd",
+  "description": "REGRESSION LOCK on cross-site CVE mis-attribution. An EMC aggregates several CTDs and the bare numeric asset id is site-scoped -- that is the whole reason resource_id embeds site_id -- so asset 30 exists at BOTH site 1 and site 2. The vulnerability endpoint's asset_id column carries the numeric id in some deployments and the resource id in others. Trying both spellings at lookup credited BOTH assets with the same finding: site 2's PLC was given a vulnerability belonging only to site 1. Rows are now canonicalised to the resource-id form at index time using the row's own site_id, and a row carrying no site at all is claimed by the first matching asset and then removed, so the join can be lossy but never wrong. Row A names 30-2 explicitly, row B names 30 with site_id 1, row C names 31 with no site at all. Each asset must end with exactly one finding.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {
+        "method": "POST",
+        "path": "/auth/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "token": "fixture-token",
+            "password_expired": false
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "vulns",
+      "match": {
+        "method": "GET",
+        "path": "/ranger/asset-vulnerabilities"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count_total": 3,
+            "count_filtered": 3,
+            "count_in_page": 3,
+            "objects": [
+              {
+                "resource_id": "901-2",
+                "asset_id": "30-2",
+                "cve_id": "CVE-2020-6088",
+                "cvss_v3_score": {
+                  "value": 9.8,
+                  "label": "Critical"
+                },
+                "detection_date": "2024-07-16T09:59:10+00:00",
+                "relevance__": "Confirmed",
+                "status__": "Open",
+                "description": "Fixture finding."
+              },
+              {
+                "resource_id": "902-1",
+                "asset_id": "30",
+                "cve_id": "CVE-2021-22779",
+                "cvss_v3_score": {
+                  "value": 9.8,
+                  "label": "Critical"
+                },
+                "detection_date": "2024-07-16T09:59:10+00:00",
+                "relevance__": "Confirmed",
+                "status__": "Open",
+                "description": "Fixture finding.",
+                "site_id": 1
+              },
+              {
+                "resource_id": "903-1",
+                "asset_id": "31",
+                "cve_id": "CVE-2022-38465",
+                "cvss_v3_score": {
+                  "value": 9.8,
+                  "label": "Critical"
+                },
+                "detection_date": "2024-07-16T09:59:10+00:00",
+                "relevance__": "Confirmed",
+                "status__": "Open",
+                "description": "Fixture finding."
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count_total": 3,
+            "count_filtered": 3,
+            "count_in_page": 0,
+            "objects": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/ranger/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count_total": 3,
+            "count_filtered": 3,
+            "count_in_page": 3,
+            "objects": [
+              {
+                "id": 30,
+                "resource_id": "30-1",
+                "site_id": 1,
+                "site_name": "site-1",
+                "name": "plc-site1",
+                "display_name": "plc-site1",
+                "ipv4": [
+                  "10.1.0.30"
+                ],
+                "mac": [
+                  "00:50:56:8d:01:30"
+                ],
+                "vendor": "Fixture Controls",
+                "class_type": "OT",
+                "purdue_level": 2,
+                "first_seen": "2024-01-02T00:00:00+00:00",
+                "last_seen": "2024-07-04T13:01:30+00:00"
+              },
+              {
+                "id": 30,
+                "resource_id": "30-2",
+                "site_id": 2,
+                "site_name": "site-2",
+                "name": "plc-site2",
+                "display_name": "plc-site2",
+                "ipv4": [
+                  "10.2.0.30"
+                ],
+                "mac": [
+                  "00:50:56:8d:02:30"
+                ],
+                "vendor": "Fixture Controls",
+                "class_type": "OT",
+                "purdue_level": 2,
+                "first_seen": "2024-01-02T00:00:00+00:00",
+                "last_seen": "2024-07-04T13:01:30+00:00"
+              },
+              {
+                "id": 31,
+                "resource_id": "31-1",
+                "site_id": 1,
+                "site_name": "site-1",
+                "name": "plc-site1-b",
+                "display_name": "plc-site1-b",
+                "ipv4": [
+                  "10.1.0.31"
+                ],
+                "mac": [
+                  "00:50:56:8d:01:31"
+                ],
+                "vendor": "Fixture Controls",
+                "class_type": "OT",
+                "purdue_level": 2,
+                "first_seen": "2024-01-02T00:00:00+00:00",
+                "last_seen": "2024-07-04T13:01:30+00:00"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count_total": 3,
+            "count_filtered": 3,
+            "count_in_page": 0,
+            "objects": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:30-1",
+        "fields": {
+          "claroty_ctd_vulnerability_count": "1"
+        }
+      },
+      {
+        "id": "claroty-ctd:$HOST:30-2",
+        "fields": {
+          "claroty_ctd_vulnerability_count": "1"
+        }
+      },
+      {
+        "id": "claroty-ctd:$HOST:31-1",
+        "fields": {
+          "claroty_ctd_vulnerability_count": "1"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 3
+  },
+  "check_determinism": true
+}

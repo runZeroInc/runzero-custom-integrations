@@ -1,0 +1,533 @@
+{
+  "name": "happy",
+  "integration": "claroty-ctd",
+  "description": "One page of the real CTD asset shapes: a multi-IP OT host (68-1), an IT endpoint with a real hostname and an OS (15-1), a MAC-only L2 device whose name is its own MAC (79-1), and a Rockwell backplane card (33-1) that carries neither an IPv4 nor a MAC, only a bus address. 68-1 also carries 33-1 as a full nested children[] object, which is the double-count trap: 33-1 is ALSO its own top-level row, so the run must emit four assets rather than five and must record the child only as a relationship attribute. A ghost row and a multicast pseudo-asset are dropped. The declared matchBehavior is asserted from the run log rather than from _match.behavior, which the export only carries when id matching is disabled. has_correlator is skipped because 33-1 is genuinely address-less on a real appliance - a backplane card is addressed by slot - and dropping it would lose the OT hardware detail this source exists to provide; it still reconciles poll to poll on its foreign id. plc_slots carries the REAL recorded nesting -- each entry's only key is PLCSlotInformation, whose value holds a PLCInformation object -- rather than the flat card record an earlier revision invented and then asserted. Slots 0 and 5 also pin that the attribute is keyed on the card's own slot number: keyed on the array index, slot 5 would be reported as plc_slot_1.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {
+        "method": "POST",
+        "path": "/auth/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "first_name": "admin",
+            "id": 1,
+            "last_name": "admin",
+            "mail": "admin",
+            "password_expired": false,
+            "token": "ctd-token-one",
+            "username": "admin"
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "asset-vulnerabilities",
+      "match": {
+        "method": "GET",
+        "path": "/ranger/asset-vulnerabilities"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count_filtered": 3,
+            "count_in_page": 3,
+            "count_total": 3,
+            "objects": [
+              {
+                "resource_id": "501-1",
+                "asset_id": "68-1",
+                "asset_name": "10.1.34.32",
+                "ipv4": [
+                  "10.1.34.9",
+                  "10.1.35.9"
+                ],
+                "cve_id": "CVE-2020-6088",
+                "cvss_v3_score": {
+                  "value": 9.8,
+                  "label": "Critical"
+                },
+                "epss_score": {
+                  "value": 0.87421
+                },
+                "actively_exploited": true,
+                "advisory_names": [
+                  "ICSA-20-133-02"
+                ],
+                "vulnerability_type": "Known Vulnerability",
+                "detection_date": "2024-07-16T09:59:10+00:00",
+                "description": "An exploitable denial of service vulnerability exists in the Ethernet/IP request path.",
+                "relevance__": "Confirmed",
+                "status__": "Open"
+              },
+              {
+                "resource_id": "502-1",
+                "asset_id": "15-1",
+                "asset_name": "GTWB",
+                "ipv4": [
+                  "1.1.1.1"
+                ],
+                "cve_id": "CVE-2018-7522",
+                "cvss_v3_score": {
+                  "value": 7.5,
+                  "label": "High"
+                },
+                "epss_score": {
+                  "value": 0.0121
+                },
+                "actively_exploited": false,
+                "vulnerability_type": "Windows CVE",
+                "detection_date": "2024-06-01T00:00:00+00:00",
+                "description": "A denial of service vulnerability in the SMBv1 server.",
+                "relevance__": "Confirmed",
+                "status__": "Open"
+              },
+              {
+                "resource_id": "503-1",
+                "asset_id": "33",
+                "asset_name": "10.1.30.1:Card 2 \\ Addr 255",
+                "cve_id": "CVE-2017-14462",
+                "cvss_v3_score": {
+                  "value": 5.3,
+                  "label": "Medium"
+                },
+                "epss_score": {
+                  "value": 0.0034
+                },
+                "actively_exploited": false,
+                "vulnerability_type": "Known Vulnerability",
+                "detection_date": "2024-05-02T00:00:00+00:00",
+                "description": "An exploitable information disclosure vulnerability exists in the CIP implementation.",
+                "relevance__": "Confirmed",
+                "status__": "Open"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/ranger/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count_filtered": 6,
+            "count_in_page": 6,
+            "count_total": 6,
+            "objects": [
+              {
+                "id": 68,
+                "resource_id": "68-1",
+                "site_id": 1,
+                "site_name": "site-10-0-6-185",
+                "name": "10.1.34.32",
+                "display_name": "10.1.34.32",
+                "ipv4": [
+                  "10.1.34.9",
+                  "10.1.35.9"
+                ],
+                "mac": [
+                  "00:50:56:8D:3E:8C"
+                ],
+                "vlan": [
+                  "0"
+                ],
+                "vendor": "VMware",
+                "asset_type": 17,
+                "asset_type__": "eOT",
+                "class_type": "OT",
+                "criticality": 1,
+                "criticality__": "eMedium",
+                "risk_level": 0,
+                "purdue_level": 2,
+                "virtual_zone_id": 25,
+                "virtual_zone_name": "OT: Other",
+                "protocol": [
+                  "CIP",
+                  "ENIP",
+                  "PCCC",
+                  "TCP"
+                ],
+                "insight_names": [
+                  "End Of Life Assets",
+                  "Full Match CVEs",
+                  "Multiple Interfaces"
+                ],
+                "network": {
+                  "id": 1,
+                  "name": "Default",
+                  "resource_id": "1-1",
+                  "site_id": 1
+                },
+                "network_id": 1,
+                "subnet": {
+                  "name": "10.0.0.0/8"
+                },
+                "subnet_id": 1,
+                "subnet_type": 0,
+                "first_seen": "2023-04-17T07:30:22+00:00",
+                "last_seen": "2024-07-04T13:01:30+00:00",
+                "last_entity_seen": "2024-07-04T13:01:30+00:00",
+                "last_updated": "2024-07-16T09:59:10+00:00",
+                "timestamp": "2023-04-17T07:30:22+00:00",
+                "approved": true,
+                "valid": true,
+                "ghost": false,
+                "parsed": false,
+                "special_hint": 0,
+                "special_hint__": "eUnicast",
+                "num_alerts": 0,
+                "patch_count": 0,
+                "installed_programs_count": 0,
+                "usb_devices_count": 0,
+                "installed_antivirus": null,
+                "domain_workgroup": null,
+                "default_gateway": null,
+                "os_architecture": null,
+                "os_build": null,
+                "os_revision": null,
+                "os_service_pack": null,
+                "state": null,
+                "edge_id": null,
+                "edge_last_run": null,
+                "project_parsed": null,
+                "custom_informations": [
+                  {
+                    "category": 2,
+                    "display_key": "Mode (Card 0)",
+                    "key": "Mode (Card 0)",
+                    "priority": 0,
+                    "type": 105,
+                    "val": "Remote Run Mode"
+                  }
+                ],
+                "custom_attributes": [
+                  {
+                    "asset_id": 1,
+                    "id": 1,
+                    "resource_id": "1-1",
+                    "site_id": 1,
+                    "value": "Cell 4",
+                    "category": {
+                      "description": "Line assignment",
+                      "id": 1,
+                      "name": "Production Line",
+                      "resource_id": "1-1",
+                      "site_id": 1
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "id": 33,
+                    "resource_id": "33-1",
+                    "site_id": 1,
+                    "site_name": "site-10-0-6-185",
+                    "name": "10.1.30.1:Card 2 \\ Addr 255",
+                    "address": [
+                      "10.1.30.1:Card 2 \\ Addr 255"
+                    ],
+                    "asset_type": 0,
+                    "asset_type__": "ePLC",
+                    "class_type": "OT",
+                    "vendor": "Rockwell Automation",
+                    "model": "1756-CNB/D 7.015",
+                    "firmware": "V7.015",
+                    "serial_number": "001605B3"
+                  }
+                ]
+              },
+              {
+                "id": 15,
+                "resource_id": "15-1",
+                "site_id": 1,
+                "site_name": "site-1",
+                "name": "GTWB",
+                "hostname": "GTWB",
+                "os": "Windows XP",
+                "os_build": "2600",
+                "os_service_pack": "SP3",
+                "domain_workgroup": "PLANT",
+                "asset_type": 2,
+                "asset_type__": "eEndpoint",
+                "class_type": "IT",
+                "criticality": 0,
+                "criticality__": "eLow",
+                "insight_names": [
+                  "Unsecured Protocols",
+                  "Windows CVEs"
+                ],
+                "ipv4": [
+                  "1.1.1.1"
+                ],
+                "last_seen": "2020-02-16T10:46:00+00:00",
+                "first_seen": "2019-11-02T08:00:00+00:00",
+                "mac": [
+                  "00:0B:AB:1A:DD:DD"
+                ],
+                "project_parsed": null,
+                "risk_level": 0,
+                "vendor": "Advantech Technology",
+                "virtual_zone_name": "Endpoint: Other",
+                "ghost": false,
+                "special_hint": 0
+              },
+              {
+                "id": 79,
+                "resource_id": "79-1",
+                "site_id": 1,
+                "site_name": "site-10-0-6-185",
+                "name": "E3:41:BD:6E:00:15",
+                "mac": [
+                  "E3:41:BD:6E:00:15"
+                ],
+                "vendor": "Siemens",
+                "asset_type": 3,
+                "asset_type__": "eNetworking",
+                "class_type": "OT",
+                "criticality": 1,
+                "criticality__": "eMedium",
+                "risk_level": 1,
+                "purdue_level": 1.5,
+                "virtual_zone_name": "Networking: Other",
+                "protocol": [
+                  "PROFINET"
+                ],
+                "first_seen": "2023-08-01T00:00:00+00:00",
+                "last_seen": "2024-07-04T09:07:30+00:00",
+                "ghost": false,
+                "special_hint": 0
+              },
+              {
+                "id": 33,
+                "resource_id": "33-1",
+                "site_id": 1,
+                "site_name": "site-10-0-6-185",
+                "name": "10.1.30.1:Card 2 \\ Addr 255",
+                "address": [
+                  "10.1.30.1:Card 2 \\ Addr 255"
+                ],
+                "asset_type": 0,
+                "asset_type__": "ePLC",
+                "class_type": "OT",
+                "criticality": 2,
+                "criticality__": "eHigh",
+                "risk_level": 2,
+                "purdue_level": 1,
+                "vendor": "Rockwell Automation",
+                "model": "1756-CNB/D 7.015",
+                "firmware": "V7.015",
+                "serial_number": "001605B3",
+                "virtual_zone_id": 3,
+                "virtual_zone_name": "PLC: Rockwell",
+                "first_seen": "2023-04-17T07:30:31+00:00",
+                "last_seen": "2024-07-04T09:07:30+00:00",
+                "last_updated": "2024-07-16T09:59:10+00:00",
+                "ghost": false,
+                "special_hint": 0,
+                "plc_slots": [
+                  {
+                    "PLCSlotInformation": {
+                      "slot": 0,
+                      "description": "",
+                      "information_type": 11,
+                      "priority": 0,
+                      "value": {
+                        "PLCInformation": {
+                          "name": "Chemical_plant",
+                          "product": "1756-L71/B LOGIX5571",
+                          "vendor": "Rockwell Automation",
+                          "firmware_version": "V20.015",
+                          "serial_number": "00BB8685",
+                          "order_number": "",
+                          "address": ""
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "PLCSlotInformation": {
+                      "slot": 5,
+                      "description": "",
+                      "information_type": 11,
+                      "priority": 0,
+                      "value": {
+                        "PLCInformation": {
+                          "name": "Chemical_plant",
+                          "product": "1756-CNB/D",
+                          "vendor": "Rockwell Automation",
+                          "firmware_version": "7.015",
+                          "serial_number": "00A1B2C3",
+                          "order_number": "",
+                          "address": ""
+                        }
+                      }
+                    }
+                  }
+                ],
+                "project_parsed": {
+                  "builder_hostname": "Manager",
+                  "creation_ver": "9.1",
+                  "description": "Project: CLAROTY, On version: 9.1",
+                  "information_type": 29,
+                  "modification_time": 1513766331,
+                  "name": "CLAROTY",
+                  "project_ver": "some v2"
+                },
+                "custom_informations": [
+                  {
+                    "category": 2,
+                    "display_key": "Mode (Card 0)",
+                    "key": "Mode (Card 0)",
+                    "priority": 0,
+                    "type": 105,
+                    "val": "Remote Run Mode"
+                  }
+                ]
+              },
+              {
+                "id": 91,
+                "resource_id": "91-1",
+                "site_id": 1,
+                "name": "10.0.5.3 (ghost)",
+                "ipv4": [
+                  "10.0.5.3"
+                ],
+                "ghost": true,
+                "special_hint": 0,
+                "asset_type__": "eEndpoint"
+              },
+              {
+                "id": 92,
+                "resource_id": "92-1",
+                "site_id": 1,
+                "name": "224.0.0.251",
+                "ipv4": [
+                  "224.0.0.251"
+                ],
+                "ghost": false,
+                "special_hint": 2,
+                "special_hint__": "eMulticast",
+                "asset_type__": "eBroadcast"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "claroty-ctd:$HOST:68-1",
+      "claroty-ctd:$HOST:15-1",
+      "claroty-ctd:$HOST:79-1",
+      "claroty-ctd:$HOST:33-1"
+    ],
+    "ids_absent": [
+      "claroty-ctd:$HOST:91-1",
+      "claroty-ctd:$HOST:92-1"
+    ],
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:68-1",
+        "fields": {
+          "claroty_ctd_children_resource_ids": "33-1",
+          "claroty_ctd_children_count": "1",
+          "claroty_ctd_purdue_level": "2",
+          "claroty_ctd_class_type": "OT",
+          "claroty_ctd_virtual_zone_name": "OT: Other",
+          "claroty_ctd_site_name": "site-10-0-6-185",
+          "claroty_ctd_subnet": "10.0.0.0/8",
+          "claroty_ctd_attr_production_line": "Cell 4",
+          "claroty_ctd_info_mode_card_0": "Remote Run Mode",
+          "claroty_ctd_vulnerability_count": "1"
+        }
+      },
+      {
+        "id": "claroty-ctd:$HOST:33-1",
+        "fields": {
+          "claroty_ctd_criticality_label": "High",
+          "claroty_ctd_risk_level_label": "High",
+          "claroty_ctd_address": "10.1.30.1:Card 2 \\ Addr 255",
+          "claroty_ctd_project_name": "CLAROTY",
+          "claroty_ctd_vulnerability_count": "1",
+          "claroty_ctd_plc_slot_0_product": "1756-L71/B LOGIX5571",
+          "claroty_ctd_plc_slot_0_serial_number": "00BB8685",
+          "claroty_ctd_plc_slot_5_product": "1756-CNB/D"
+        }
+      },
+      {
+        "id": "claroty-ctd:$HOST:79-1",
+        "fields": {
+          "claroty_ctd_purdue_level": "1.5"
+        }
+      }
+    ],
+    "min_software_total": 4,
+    "min_vulnerabilities_total": 3,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/auth/authenticate"
+      },
+      {
+        "method": "GET",
+        "path": "/ranger/asset-vulnerabilities",
+        "query_contains": "relevance__exact=1",
+        "header_contains": "ctd-token-one"
+      },
+      {
+        "method": "GET",
+        "path": "/ranger/assets",
+        "query_contains": "ghost__exact=false",
+        "header_contains": "ctd-token-one"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/ranger/assets",
+        "query_contains": "fields="
+      },
+      {
+        "path": "/ranger/assets",
+        "query_contains": "last_updated__gt"
+      }
+    ],
+    "log_contains": [
+      "no-name-break",
+      "indexed 3 vulnerabilities across 3 assets",
+      "skipped 2 rows with no resource_id, or flagged ghost or non-unicast",
+      "reported 4 assets"
+    ]
+  },
+  "invariants": {
+    "skip": [
+      "has_correlator"
+    ]
+  },
+  "check_determinism": true
+}

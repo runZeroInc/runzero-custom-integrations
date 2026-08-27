@@ -1,0 +1,137 @@
+{
+  "name": "happy",
+  "integration": "forescout-rem",
+  "description": "One search window that fits inside a single response, so no risk banding is needed and the run costs exactly one request. The entity shape is the field set recovered from the shipped Netskope Cloud Exchange client (id, hostname, ip_addresses, mac_addresses, rem_category, rem_function, rem_vendor, rem_os, rem_model, rem_firmware, risk_score, risk_severity, risk_device_criticality, last_seen, last_seen_online) with the timestamp format the client hard-codes. Covers a medical device with firmware, an OT device with no hostname, and a network device whose address list carries an APIPA value that must be filtered out.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "search",
+      "match": {"method": "GET", "path": "/api/data-exchange/v3/rem-asset-search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 3,
+            "entities": [
+              {
+                "id": "a7f3c2e1-9b4d-4c8a-8e2f-1d5b6c7a8e90",
+                "hostname": "infusion-pump-14",
+                "ip_addresses": ["10.30.4.21"],
+                "mac_addresses": ["00:11:22:33:44:55"],
+                "rem_category": "Medical Device",
+                "rem_function": "Infusion Pump",
+                "rem_vendor": "Acme Medical",
+                "rem_os": "AcmeOS",
+                "rem_model": "PumpMaster 3000",
+                "rem_firmware": "4.2.1",
+                "risk_score": 7.4,
+                "risk_severity": "High",
+                "risk_device_criticality": "Critical",
+                "last_seen": "2026-05-06T08:55:23.777Z",
+                "last_seen_online": "2026-05-06T08:55:23.777Z"
+              },
+              {
+                "id": "c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+                "ip_addresses": ["10.30.9.7"],
+                "mac_addresses": ["00:1b:1b:aa:bb:cc"],
+                "rem_category": "OT",
+                "rem_function": "PLC",
+                "rem_vendor": "Gamma Controls",
+                "rem_os": "Gamma Embedded",
+                "rem_model": "S-900",
+                "rem_firmware": "2.1.0",
+                "risk_score": 0,
+                "risk_severity": "None",
+                "risk_device_criticality": "Medium",
+                "last_seen": "2026-05-06T08:55:20.114Z",
+                "last_seen_online": "2026-05-06T08:55:20.114Z"
+              },
+              {
+                "id": "9f8e7d6c-5b4a-4392-8171-605f4e3d2c1b",
+                "hostname": "core-switch-01",
+                "ip_addresses": ["10.30.0.1", "169.254.3.9"],
+                "mac_addresses": [],
+                "rem_category": "Network Device",
+                "rem_function": "Switch",
+                "rem_vendor": "Beta Networks",
+                "rem_os": "BetaOS",
+                "rem_model": "BN-4800",
+                "risk_score": 3.2,
+                "risk_severity": "Medium",
+                "risk_device_criticality": "High",
+                "last_seen": "2026-05-06T08:55:19.001Z",
+                "last_seen_online": "2026-05-06T08:55:19.001Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "forescout-rem:$HOST:a7f3c2e1-9b4d-4c8a-8e2f-1d5b6c7a8e90",
+      "forescout-rem:$HOST:c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+      "forescout-rem:$HOST:9f8e7d6c-5b4a-4392-8171-605f4e3d2c1b"
+    ],
+    "assets": [
+      {
+        "id": "forescout-rem:$HOST:a7f3c2e1-9b4d-4c8a-8e2f-1d5b6c7a8e90",
+        "fields": {
+          "hostnames": "infusion-pump-14",
+          "ipAddresses": "10.30.4.21",
+          "macAddresses": "00:11:22:33:44:55",
+          "os": "AcmeOS",
+          "manufacturer": "Acme Medical",
+          "model": "PumpMaster 3000",
+          "deviceType": "Infusion Pump",
+          "forescout_rem_category": "Medical Device",
+          "forescout_rem_risk_severity": "High",
+          "forescout_rem_device_criticality": "Critical",
+          "forescout_rem_firmware": "4.2.1",
+          "forescout_rem_risk_score": "7.4",
+          "tags": "category:Medical Device\tcriticality:Critical\trisk:High"
+        }
+      },
+      {
+        "id": "forescout-rem:$HOST:c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+        "fields": {
+          "ipAddresses": "10.30.9.7",
+          "macAddresses": "00:1b:1b:aa:bb:cc",
+          "deviceType": "PLC",
+          "forescout_rem_category": "OT"
+        },
+        "fields_absent": ["hostnames"]
+      },
+      {
+        "id": "forescout-rem:$HOST:9f8e7d6c-5b4a-4392-8171-605f4e3d2c1b",
+        "fields": {
+          "hostnames": "core-switch-01",
+          "ipAddresses": "10.30.0.1",
+          "deviceType": "Switch"
+        },
+        "fields_absent": ["macAddresses"]
+      }
+    ],
+    "min_software_total": 2,
+    "request_count": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/data-exchange/v3/rem-asset-search", "query_contains": "order_by=risk_score"},
+      {"query_contains": "sort_order=ASCENDING"},
+      {"query_contains": "from_date_time_iso_utc="},
+      {"header_contains": "Bearer fixture-key"}
+    ],
+    "log_contains": [
+      "the whole window fit in one response",
+      "reported 3 assets from 1 search windows"
+    ]
+  },
+  "check_determinism": true
+}

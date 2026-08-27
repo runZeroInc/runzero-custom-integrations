@@ -1,0 +1,171 @@
+{
+  "name": "preset-fallback",
+  "integration": "cisco-cyber-vision",
+  "description": "The Center refuses /api/3.0/devices, so the walk falls back to the route Cisco's own export script uses: list the presets, find the one labelled 'All data', and read its network node list.\n\nThat route is where the device/component mix is documented to occur, so the fallback path gets the same double-count assertion the primary path gets: one device and its two components arrive together and exactly one asset comes out. The preset id is returned as a number rather than a string, which is how Cisco's script reads it.\n\nThe fallback is deliberately conditional on an error and on nothing having been imported yet. A failure part-way through a walk must not restart the whole inventory on the other route and report every device twice. The preset route is asserted to page with page and size, the parameters DevNet documents for this URI, and offset/limit are asserted ABSENT -- an earlier revision sent those and this fixture locked the defect in. A Center ignores unknown parameters, so the wrong pair means either the whole inventory on every request until maxPages raises, or silent truncation to the Center's own default page.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "inventory_source": "auto",
+    "preset_label": "All data",
+    "collect_vulnerabilities": "false",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "devices-refused",
+      "match": {
+        "method": "GET",
+        "path": "/api/3.0/devices"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "json": {
+            "error": "not found"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "presets",
+      "match": {
+        "method": "GET",
+        "path": "/api/3.0/presets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 1,
+              "label": "Essential data"
+            },
+            {
+              "id": 3,
+              "label": "All data"
+            },
+            {
+              "id": 7,
+              "label": "Control Systems"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "networknode-list",
+      "match": {
+        "method": "GET",
+        "path": "/api/3.0/presets/3/visualisations/networknode-list"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "ffff0001-0000-4000-8000-000000000001",
+              "label": "Cell6-RTU-01",
+              "originalLabel": "Schneider SCADAPack",
+              "ip": "10.25.0.11",
+              "mac": "00:80:f4:66:00:11",
+              "isDevice": true,
+              "riskScore": 55,
+              "vulnerabilitiesCount": 0,
+              "tags": [
+                {
+                  "label": "OT"
+                }
+              ],
+              "normalizedProperties": [
+                {
+                  "key": "vendor-name",
+                  "value": "Schneider Electric"
+                },
+                {
+                  "key": "model-name",
+                  "value": "SCADAPack 474"
+                },
+                {
+                  "key": "fw-version",
+                  "value": "8.16.1"
+                }
+              ]
+            },
+            {
+              "id": "ffff0002-0000-4000-8000-000000000002",
+              "label": "Cell6-RTU-01 - Ethernet",
+              "ip": "10.25.0.11",
+              "mac": "00:80:f4:66:00:11",
+              "isDevice": false,
+              "vulnerabilitiesCount": 0
+            },
+            {
+              "id": "ffff0003-0000-4000-8000-000000000003",
+              "label": "Cell6-RTU-01 - Serial",
+              "isDevice": false,
+              "vulnerabilitiesCount": 0
+            }
+          ]
+        },
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "cisco-cyber-vision:$HOST:ffff0001-0000-4000-8000-000000000001"
+    ],
+    "ids_absent": [
+      "cisco-cyber-vision:$HOST:ffff0002-0000-4000-8000-000000000002",
+      "cisco-cyber-vision:$HOST:ffff0003-0000-4000-8000-000000000003"
+    ],
+    "assets": [
+      {
+        "id": "cisco-cyber-vision:$HOST:ffff0001-0000-4000-8000-000000000001",
+        "fields": {
+          "hostnames": "Cell6-RTU-01",
+          "ipAddresses": "10.25.0.11",
+          "manufacturer": "Schneider Electric",
+          "model": "SCADAPack 474"
+        }
+      }
+    ],
+    "request_count": 3,
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/3.0/devices"
+      },
+      {
+        "method": "GET",
+        "path": "/api/3.0/presets"
+      },
+      {
+        "query_contains": "size=500"
+      }
+    ],
+    "min_software_total": 1,
+    "log_contains": [
+      "cisco-cyber-vision: /api/3.0/devices was refused",
+      "falling back to the preset network node list",
+      "cisco-cyber-vision: skipped 2 component rows that belong to an imported device",
+      "cisco-cyber-vision: reported 1 devices"
+    ],
+    "requests_absent": [
+      {
+        "query_contains": "offset="
+      },
+      {
+        "query_contains": "limit="
+      }
+    ]
+  },
+  "check_determinism": true
+}

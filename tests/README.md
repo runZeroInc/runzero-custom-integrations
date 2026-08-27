@@ -359,6 +359,40 @@ It is `LIVE_TIMEOUT` rather than `TIMEOUT` because four integrations declare a
 `timeout` parameter of their own meaning something else entirely — how long to
 wait on the vendor. The parameter that reaches the endpoint keeps the plain name.
 
+## CONFIG parsing is checked on every run
+
+The live harness reads each integration's credential form straight out of the
+embedded `CONFIG` literal, so a `CONFIG` it cannot parse means it believes the
+integration declares no parameters at all. That surfaces as every variable being
+rejected:
+
+```
+FAIL  miradore
+        MIRADORE_API_KEY is not a parameter of miradore.
+        miradore accepts: MIRADORE_EXPECT, MIRADORE_EXPECT_FILE, MIRADORE_LIVE_TIMEOUT
+```
+
+which reads as a credential problem and is not one. The cause was an apostrophe
+in a `CONFIG` comment: the brace scanner tracked quotes but not comments, so
+`the site's own key` opened a string that never closed, brace depth never
+returned to zero, and `load_config` handed back an empty dict. Twenty-six
+integrations were affected at once, and `.env.example` was generated wrong for
+all of them.
+
+Two things prevent a repeat. The scanner skips `#` to end-of-line when it is not
+inside a string. And `load_config` now separates the two facts it used to
+conflate: a script with no `CONFIG` still returns `{}`, while a `CONFIG` that is
+present but unparseable raises. Because discovery calls it for every
+integration, **`python3 tests/run_live.py --list` parses all of them and fails
+loudly on any one that breaks** — that listing is the audit, and it costs
+nothing to run.
+
+Regenerate `.env.example` after any `CONFIG` change:
+
+```bash
+python3 tests/run_live.py --env-template > .env.example
+```
+
 ## What runs, and what is merely skipped
 
 - **No `<PREFIX>_` variable set** → skipped silently and counted. Two configured

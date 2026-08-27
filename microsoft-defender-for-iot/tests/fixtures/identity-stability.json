@@ -1,0 +1,90 @@
+{
+  "name": "identity-stability",
+  "integration": "microsoft-defender-for-iot",
+  "description": "Regression pair for the happy scenario. Sensor device ids 42 and 43 come back with every mutable field changed -- renamed in the sensor UI, readdressed, re-MACed, reclassified, newly authorized -- and the emitted foreign ids must be byte-identical to the ones happy.json asserts. That proves the id is built from the sensor device id and the sensor HOSTNAME alone. The hostname is deliberately taken without its port: the fixture server binds a fresh ephemeral port on every run, and a port in the namespace would re-key the whole site whenever the sensor moved. The scenario is not a claim that a renamed record is the same device -- the sensor id is a per-sensor sequential counter of unverified recyclability, which is exactly why CONFIG bars it from matching -- only that the id construction has not quietly absorbed an address or a name.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 42,
+              "name": "hmi-line3-renamed.plant.example.com",
+              "ipAddresses": ["10.88.0.142"],
+              "macAddresses": ["00:1b:1b:ff:ff:42"],
+              "vendor": "Siemens AG",
+              "operatingSystem": "Windows 11",
+              "type": "Engineering Station",
+              "engineeringStation": true,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": true,
+              "protocols": [{"id": 11, "name": "OPC UA", "ipAddresses": ["10.88.0.142"]}],
+              "firmware": [
+                {"moduleAddress": "rack0-slot2", "serial": "SN-99999", "model": "SIMATIC IPC627E", "firmwareVersion": "16.0.0.0"}
+              ]
+            },
+            {
+              "id": 43,
+              "name": "now-a-named-plc.plant.example.com",
+              "ipAddresses": ["10.88.0.143"],
+              "macAddresses": ["00:1b:1b:ff:ff:43"],
+              "vendor": "Rockwell Automation",
+              "operatingSystem": "Linux",
+              "type": "Historian",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": [],
+              "firmware": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "microsoft-defender-for-iot:$HOST:42",
+      "microsoft-defender-for-iot:$HOST:43"
+    ],
+    "assets": [
+      {
+        "id": "microsoft-defender-for-iot:$HOST:42",
+        "fields": {
+          "hostnames": "hmi-line3-renamed.plant.example.com",
+          "ipAddresses": "10.88.0.142",
+          "macAddresses": "00:1b:1b:ff:ff:42",
+          "deviceType": "Engineering Station",
+          "os": "Windows 11",
+          "model": "SIMATIC IPC627E"
+        }
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:43",
+        "fields": {
+          "hostnames": "now-a-named-plc.plant.example.com",
+          "ipAddresses": "10.88.0.143",
+          "macAddresses": "00:1b:1b:ff:ff:43",
+          "deviceType": "Server"
+        }
+      }
+    ],
+    "request_count": 1,
+    "log_contains": ["microsoft-defender-for-iot: reported 2 assets from sensor"]
+  },
+  "check_determinism": true
+}

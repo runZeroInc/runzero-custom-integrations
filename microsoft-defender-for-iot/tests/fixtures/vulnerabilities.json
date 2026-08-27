@@ -1,0 +1,230 @@
+{
+  "name": "vulnerabilities",
+  "integration": "microsoft-defender-for-iot",
+  "description": "The IP-or-name join between the inventory and /api/v1/reports/vulnerabilities/devices. The first report entry is Microsoft's own published sample response for that endpoint, verbatim apart from a trimmed CVE description, and joins device 10 on its address. The second joins device 22 on its NAME only, because the address the report carries for it is not one the inventory returned -- that is the fallback the report forces, since it publishes no device id at all. The third entry joins nothing and is reported on its own so its findings are not silently dropped. The scenario also proves a lower-case CVE is upper-cased before it reaches Vulnerability.cve, that a non-CVE advisory id is kept as a finding name rather than failing the record, that openedPorts become services bound to the device address, that the report never overwrites a manufacturer the inventory already supplied, and that the report's operatingSystem block is not trusted as an OS name -- Microsoft's own sample puts a vendor string in it.\n\nTHE PLAIN-TEXT PASSWORD MUST NEVER BE IMPORTED. plainTextPasswords[] carries live credentials recovered from monitored traffic. Everything about the finding except the credential is asserted PRESENT and exact -- the count, the protocol, and Microsoft's own strength rating -- and every attribute name the value could plausibly be filed under is asserted absent. The exact-value assertions are half the guard: a regression that folded the password in beside the protocol would change plaintext_password_protocols and fail. The harness cannot grep every attribute of an asset, so this is a named-key check rather than an exhaustive one.\n\nweakAuthentication uses the documented shape, a JSON array of strings naming the applications using weak authentication, and its names are now imported the way antiViruses already was rather than only counted. deviceType asserts as Industrial Control rather than the sensor's IED: the vocabulary is folded onto runZero's types where the mapping is unambiguous, and the raw spelling survives in the type: tag and the device_type attribute.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-report",
+      "match": {"method": "GET", "path": "/api/v1/reports/vulnerabilities/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "name": "IED #10",
+              "ipAddresses": ["10.2.1.10"],
+              "securityScore": 100,
+              "vendor": "ABB Switzerland Ltd, Power Systems",
+              "firmwareVersion": null,
+              "model": null,
+              "isWirelessAccessPoint": false,
+              "operatingSystem": {
+                "name": "ABB Switzerland Ltd, Power Systems",
+                "type": "abb",
+                "version": null,
+                "latestVersion": null
+              },
+              "vulnerabilities": {
+                "antiViruses": ["McAfee"],
+                "plainTextPasswords": [{"password": "REDACTED", "protocol": "HTTP", "strength": "Very Weak"}],
+                "remoteAccess": [{"port": 5900, "transport": "TCP", "clientSoftware": "VNC", "client": "10.2.1.20"}],
+                "isBackupServer": true,
+                "openedPorts": [
+                  {"port": 445, "transport": "TCP", "protocol": "SMP Over IP", "isConflictingWithFirewall": false},
+                  {"port": 80, "transport": "TCP", "protocol": "HTTP", "isConflictingWithFirewall": false}
+                ],
+                "isEngineeringStation": false,
+                "isKnownScanner": false,
+                "cves": [
+                  {
+                    "id": "CVE-2015-6490",
+                    "score": 10,
+                    "description": "Frosty URL - Stack-based buffer overflow on Allen-Bradley MicroLogix 1100 devices."
+                  }
+                ],
+                "isUnauthorized": false,
+                "malwareIndicationsDetected": true
+              }
+            },
+            {
+              "name": "HMI #22",
+              "ipAddresses": ["10.2.9.99"],
+              "securityScore": 62,
+              "vendor": "Siemens AG",
+              "firmwareVersion": "4.2.1",
+              "model": "SIMATIC HMI",
+              "operatingSystem": {"name": "Windows", "type": "windows", "version": "6.1.7601", "latestVersion": "10.0.19045"},
+              "vulnerabilities": {
+                "antiViruses": [],
+                "plainTextPasswords": [],
+                "weakAuthentication": ["FTP Server", "Telnet"],
+                "remoteAccess": [],
+                "isBackupServer": false,
+                "openedPorts": [],
+                "isEngineeringStation": false,
+                "isKnownScanner": false,
+                "cves": [
+                  {"id": "cve-2020-15782", "score": 8.1, "description": "Memory protection bypass in SIMATIC controllers."},
+                  {"id": "ICSA-21-159-01", "score": 7.0, "description": "Advisory identifier that is not shaped like a CVE."}
+                ],
+                "isUnauthorized": true,
+                "malwareIndicationsDetected": false
+              }
+            },
+            {
+              "name": "Historian #5",
+              "ipAddresses": ["10.2.1.55"],
+              "securityScore": 41,
+              "vendor": "OSIsoft",
+              "firmwareVersion": null,
+              "model": null,
+              "operatingSystem": {"name": "Windows Server 2012", "type": "windows", "version": "6.2.9200", "latestVersion": null},
+              "vulnerabilities": {
+                "openedPorts": [{"port": 5450, "transport": "TCP", "protocol": "PI", "isConflictingWithFirewall": true}],
+                "cves": [{"id": "CVE-2017-0144", "score": 9.3, "description": "SMBv1 remote code execution."}],
+                "isUnauthorized": false,
+                "malwareIndicationsDetected": false
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 10,
+              "name": "IED #10",
+              "ipAddresses": ["10.2.1.10"],
+              "macAddresses": ["00:1b:1b:cc:00:10"],
+              "vendor": "ABB",
+              "operatingSystem": null,
+              "type": "IED",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": [{"id": 7, "name": "IEC-61850", "ipAddresses": ["10.2.1.10"]}],
+              "firmware": []
+            },
+            {
+              "id": 22,
+              "name": "HMI #22",
+              "ipAddresses": ["10.2.1.22"],
+              "macAddresses": ["00:1b:1b:cc:00:22"],
+              "vendor": "Siemens AG",
+              "operatingSystem": "Windows 7",
+              "type": "HMI",
+              "engineeringStation": false,
+              "authorized": false,
+              "scanner": false,
+              "hasDynamicAddress": true,
+              "protocols": [{"id": 8, "name": "Siemens S7", "ipAddresses": ["10.2.1.22"]}],
+              "firmware": []
+            },
+            {
+              "id": 30,
+              "name": "quiet-plc.plant.example.com",
+              "ipAddresses": ["10.2.1.30"],
+              "macAddresses": ["00:1b:1b:cc:00:30"],
+              "vendor": "Rockwell Automation",
+              "operatingSystem": null,
+              "type": "PLC",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": [],
+              "firmware": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "microsoft-defender-for-iot:$HOST:10",
+      "microsoft-defender-for-iot:$HOST:22",
+      "microsoft-defender-for-iot:$HOST:30",
+      "microsoft-defender-for-iot:$HOST:report:10.2.1.55:historian-5"
+    ],
+    "assets": [
+      {
+        "id": "microsoft-defender-for-iot:$HOST:10",
+        "fields": {
+          "ipAddresses": "10.2.1.10",
+          "macAddresses": "00:1b:1b:cc:00:10",
+          "deviceType": "Industrial Control",
+          "manufacturer": "ABB",
+          "microsoft_defender_for_iot_vulnerability_join": "ip",
+          "microsoft_defender_for_iot_security_score": "100",
+          "microsoft_defender_for_iot_anti_viruses": "McAfee",
+          "microsoft_defender_for_iot_plaintext_password_count": "1",
+          "microsoft_defender_for_iot_plaintext_password_protocols": "HTTP",
+          "microsoft_defender_for_iot_plaintext_password_strengths": "Very Weak",
+          "microsoft_defender_for_iot_remote_access_ports": "5900",
+          "microsoft_defender_for_iot_remote_access_transports": "TCP",
+          "microsoft_defender_for_iot_remote_access_clients": "10.2.1.20",
+          "microsoft_defender_for_iot_remote_access_software": "VNC",
+          "microsoft_defender_for_iot_report_os_name": "ABB Switzerland Ltd, Power Systems"
+        },
+        "fields_absent": [
+          "hostnames", "os",
+          "microsoft_defender_for_iot_plaintext_passwords",
+          "microsoft_defender_for_iot_plaintext_password",
+          "microsoft_defender_for_iot_plaintext_password_values",
+          "microsoft_defender_for_iot_plaintext_password_secrets",
+          "microsoft_defender_for_iot_passwords",
+          "microsoft_defender_for_iot_password",
+          "microsoft_defender_for_iot_credentials"
+        ]
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:22",
+        "fields": {
+          "ipAddresses": "10.2.1.22",
+          "os": "Windows 7",
+          "osVersion": "6.1.7601",
+          "model": "SIMATIC HMI",
+          "microsoft_defender_for_iot_vulnerability_join": "name",
+          "microsoft_defender_for_iot_weak_authentication_count": "2",
+          "microsoft_defender_for_iot_weak_authentication_applications": "FTP Server,Telnet"
+        }
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:report:10.2.1.55:historian-5",
+        "fields": {
+          "ipAddresses": "10.2.1.55",
+          "manufacturer": "OSIsoft",
+          "microsoft_defender_for_iot_record_source": "vulnerability_report"
+        },
+        "fields_absent": ["hostnames", "macAddresses"]
+      }
+    ],
+    "request_count": 2,
+    "min_vulnerabilities_total": 4,
+    "min_services_total": 3,
+    "log_contains": [
+      "microsoft-defender-for-iot: indexed vulnerability findings for 3 devices",
+      "microsoft-defender-for-iot: reported 1 devices seen only in the vulnerability report",
+      "microsoft-defender-for-iot: reported 4 assets from sensor"
+    ]
+  },
+  "check_determinism": true
+}

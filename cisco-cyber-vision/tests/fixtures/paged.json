@@ -1,0 +1,113 @@
+{
+  "name": "paged",
+  "integration": "cisco-cyber-vision",
+  "description": "Three pages of /api/3.0/devices at a page size of 2, asserting that each request carries the page number the walk is on and that the walk stops on the first short page rather than asking for a fourth. Page 1 carries a component row, so the page that holds two rows still yields one asset and the short-page test is made on the row count the Center returned, not on the asset count the script produced.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "collect_vulnerabilities": "false",
+    "page_size": "2"
+  },
+  "routes": [
+    {
+      "name": "devices-page-1",
+      "match": {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "aaaa0001-0000-4000-8000-000000000001",
+              "label": "Cell2-PLC-01",
+              "ip": "10.21.0.11",
+              "mac": "00:1d:9c:11:00:01",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0
+            },
+            {
+              "id": "cccc0001-0000-4000-8000-000000000001",
+              "label": "Cell2-PLC-01 - Ethernet",
+              "ip": "10.21.0.11",
+              "mac": "00:1d:9c:11:00:01",
+              "isDevice": false
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "aaaa0002-0000-4000-8000-000000000002",
+              "label": "Cell2-HMI",
+              "ip": "10.21.0.40",
+              "mac": "00:0f:73:22:00:02",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0
+            },
+            {
+              "id": "aaaa0003-0000-4000-8000-000000000003",
+              "label": "Cell2-Switch",
+              "ip": "10.21.0.2",
+              "mac": "00:0f:73:22:00:03",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-3",
+      "match": {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=3"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "aaaa0004-0000-4000-8000-000000000004",
+              "label": "Cell2-Historian",
+              "ip": "10.21.0.60",
+              "mac": "00:0f:73:22:00:04",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "cisco-cyber-vision:$HOST:aaaa0001-0000-4000-8000-000000000001",
+      "cisco-cyber-vision:$HOST:aaaa0002-0000-4000-8000-000000000002",
+      "cisco-cyber-vision:$HOST:aaaa0003-0000-4000-8000-000000000003",
+      "cisco-cyber-vision:$HOST:aaaa0004-0000-4000-8000-000000000004"
+    ],
+    "ids_absent": ["cisco-cyber-vision:$HOST:cccc0001-0000-4000-8000-000000000001"],
+    "request_count": 3,
+    "requests_include": [
+      {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=1"},
+      {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=2"},
+      {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=3"}
+    ],
+    "requests_absent": [
+      {"query_contains": "page=4"},
+      {"path_contains": "/vulnerabilities"}
+    ],
+    "log_contains": [
+      "cisco-cyber-vision: skipped 1 component rows that belong to an imported device",
+      "cisco-cyber-vision: reported 4 devices"
+    ]
+  },
+  "check_determinism": true
+}

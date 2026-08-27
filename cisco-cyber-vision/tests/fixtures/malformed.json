@@ -1,0 +1,131 @@
+{
+  "name": "malformed",
+  "integration": "cisco-cyber-vision",
+  "description": "Every shape the parser must survive without losing the rest of the page, since no recorded response for this API exists to pin the real one down.\n\nA null id is skipped rather than given a synthetic one. A bare string where an object is documented is dropped by the row reader. group arrives as a string instead of an object, normalizedProperties as a string instead of a list, and tags as a bare string instead of a list of objects: none of the three may abort the run, and the tag still survives because a bare string is accepted as a tag value. isDevice arrives as the string \"false\", which still means component. ip and mac arrive as lists on the last device even though both are documented singular: the link-local address in that list is dropped, and the second MAC becomes a second interface rather than being discarded.\n\nThe loopback device is the record-level loopback assertion the invariant cannot make: 127.0.0.1 with the name \"localhost\" leaves nothing to correlate on, so the record is skipped outright rather than imported as a nameless, addressless stub.\n\nThe vulnerability response arrives wrapped in an object rather than as the bare array Cisco's client expects. Updated when the documented vulnerability schema was applied: a finding that names no usable CVE is no longer dropped, because a Cisco advisory with cve null still carries a title, a CVSS and a solution and is a real finding. CVE-20-1 is too malformed to assert as Vulnerability.cve, which is validated and would fail the whole record, so that finding imports under its title with cve unset; the identifier survives as the cve_raw attribute. The third row carries no cve at all and a CVSS that arrived as a string rather than the documented double. All three import, and only the fourth row -- no cve, no id, no title, so nothing to key a finding on that would reconcile against itself on the next poll -- is skipped, along with the bare string that is not an object at all.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "device-vulnerabilities",
+      "match": {"method": "GET", "path_regex": "/api/3.0/devices/[0-9a-z-]+/vulnerabilities$"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total": 5,
+            "results": [
+              {"id": "v-a", "cve": "CVE-20-1", "title": "Truncated identifier"},
+              {"id": "v-b", "cve": "cve-2023-1234", "title": "Well-formed but lower case"},
+              {"id": "v-c", "title": "Cleartext protocol in use", "CVSS": "4.0"},
+              {"id": null, "cve": null, "title": null},
+              "a bare string where a finding is documented"
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/3.0/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": null,
+              "label": "Row with no id",
+              "ip": "10.23.0.5",
+              "mac": "00:1d:9c:44:00:05",
+              "isDevice": true
+            },
+            "a bare string where an object is documented",
+            {
+              "id": "dddd0001-0000-4000-8000-000000000001",
+              "label": "Cell4-PLC-01",
+              "ip": "10.23.0.11",
+              "mac": "00:1d:9c:44:00:11",
+              "isDevice": true,
+              "vulnerabilitiesCount": 3,
+              "group": "Cell 4",
+              "tags": "OT",
+              "normalizedProperties": "vendor-name=Rockwell Automation"
+            },
+            {
+              "id": "dddd0002-0000-4000-8000-000000000002",
+              "label": "localhost",
+              "originalLabel": "127.0.0.1",
+              "ip": "127.0.0.1",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0
+            },
+            {
+              "id": "dddd0003-0000-4000-8000-000000000003",
+              "label": "Cell4-PLC-01 - Ethernet",
+              "ip": "10.23.0.12",
+              "mac": "00:1d:9c:44:00:12",
+              "isDevice": "false",
+              "vulnerabilitiesCount": 3
+            },
+            {
+              "id": "dddd0004-0000-4000-8000-000000000004",
+              "label": "Cell4-Multihomed",
+              "ip": ["10.23.0.20", "169.254.1.1"],
+              "mac": ["00:1d:9c:44:00:20", "00:1d:9c:44:00:21"],
+              "isDevice": true,
+              "vulnerabilitiesCount": 0,
+              "tags": [{"label": "OT"}, "Cell 4"]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cisco-cyber-vision:$HOST:dddd0001-0000-4000-8000-000000000001",
+      "cisco-cyber-vision:$HOST:dddd0004-0000-4000-8000-000000000004"
+    ],
+    "ids_absent": [
+      "cisco-cyber-vision:$HOST:dddd0002-0000-4000-8000-000000000002",
+      "cisco-cyber-vision:$HOST:dddd0003-0000-4000-8000-000000000003",
+      "cisco-cyber-vision:$HOST:"
+    ],
+    "assets": [
+      {
+        "id": "cisco-cyber-vision:$HOST:dddd0001-0000-4000-8000-000000000001",
+        "fields": {
+          "hostnames": "Cell4-PLC-01",
+          "tags": "OT"
+        },
+        "fields_absent": ["manufacturer", "model"]
+      },
+      {
+        "id": "cisco-cyber-vision:$HOST:dddd0004-0000-4000-8000-000000000004",
+        "fields": {
+          "ipAddresses": "10.23.0.20",
+          "macAddresses": "00:1d:9c:44:00:20\t00:1d:9c:44:00:21",
+          "tags": "Cell 4\tOT"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 3,
+    "requests_absent": [
+      {"path_contains": "dddd0003-0000-4000-8000-000000000003/vulnerabilities"}
+    ],
+    "log_contains": [
+      "cisco-cyber-vision: skipped 1 component rows that belong to an imported device",
+      "cisco-cyber-vision: skipped 1 rows with no device id",
+      "cisco-cyber-vision: skipped 1 devices with no MAC, IP, or hostname",
+      "cisco-cyber-vision: imported 2 findings that name no CVE, under their titles",
+      "cisco-cyber-vision: skipped 1 findings with no CVE, id, or title",
+      "cisco-cyber-vision: reported 2 devices"
+    ]
+  },
+  "check_determinism": true
+}

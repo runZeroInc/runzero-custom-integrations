@@ -1,0 +1,101 @@
+{
+  "name": "never-seen",
+  "integration": "forescout-eyeinspect",
+  "description": "REGRESSION LOCK on the 'never seen' sentinels. eyeInspect reports a host it has never observed with the epoch sentinel 1970-01-01T01:00:00.000+01:00 -- the value is lifted verbatim from the XSOAR pack's recorded test_data -- and parse_ts does NOT return None for it: it returns unix=0, which survives both a `!= None` check and a plain truth test. An ISO year-1 value (Go's zero time) likewise parses to unix=-62135596800. Without the _seen_ts guard both import as real timestamps, so every never-seen OT host looks like it was last seen in 1970. Host 7001 carries the epoch sentinel, 7002 the year-1 sentinel, and 7003 a genuine timestamp that must still survive -- proving the guard rejects sentinels without discarding real data.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-pass",
+    "include_alerts": "false",
+    "include_cve_details": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 3,
+            "results": [
+              {
+                "id": 7001,
+                "ip": "10.90.1.11",
+                "mac_addresses": [
+                  "00:1b:1b:00:70:01"
+                ],
+                "main_name": "syn-never-01",
+                "os_version": "VxWorks 6.9",
+                "first_seen": "1970-01-01T01:00:00.000+01:00",
+                "last_seen": "1970-01-01T01:00:00.000+01:00",
+                "alert_count": 0
+              },
+              {
+                "id": 7002,
+                "ip": "10.90.1.12",
+                "mac_addresses": [
+                  "00:1b:1b:00:70:02"
+                ],
+                "main_name": "syn-never-02",
+                "os_version": "VxWorks 6.9",
+                "first_seen": "0001-01-01T00:00:00Z",
+                "last_seen": "0001-01-01T00:00:00Z",
+                "alert_count": 0
+              },
+              {
+                "id": 7003,
+                "ip": "10.90.1.13",
+                "mac_addresses": [
+                  "00:1b:1b:00:70:03"
+                ],
+                "main_name": "syn-real-03",
+                "os_version": "VxWorks 6.9",
+                "first_seen": "2026-01-05T08:15:00Z",
+                "last_seen": "2026-08-01T09:00:00Z",
+                "alert_count": 0
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_count": 3,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "forescout-eyeinspect:$HOST:7001",
+        "fields_absent": [
+          "firstSeenTS",
+          "lastSeenTS"
+        ]
+      },
+      {
+        "id": "forescout-eyeinspect:$HOST:7002",
+        "fields_absent": [
+          "firstSeenTS",
+          "lastSeenTS"
+        ]
+      },
+      {
+        "id": "forescout-eyeinspect:$HOST:7003",
+        "fields": {
+          "lastSeenTS": "1785574800"
+        }
+      }
+    ]
+  },
+  "check_determinism": true
+}

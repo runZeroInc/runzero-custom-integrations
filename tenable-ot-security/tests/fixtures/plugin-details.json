@@ -1,0 +1,219 @@
+{
+  "name": "plugin-details",
+  "integration": "tenable-ot-security",
+  "description": "The PluginDetails block. Plugin publishes cvss3Score: Float and details: PluginDetails! (non-null), and PluginDetails publishes cves, cpes, description, solution, cvssV3BaseScore and cvssBaseScore -- so a finding does not have to be reduced to a plugin name and a severity-derived stand-in score. Asset 0001 carries four plugins covering every path. 500730 has real details: its CVE comes from details.cves rather than from its name, its severityScore is the published 9.8 from cvss3Score rather than the 10.0 the CRITICAL row of the stand-in table would have invented, its riskScore is the 9.9 VPR, and it carries a description, a solution, and a cpe23 from the CPE 2.3 binding (Vulnerability.cpe23 accepts any cpe: prefix, unlike Software.cpe23). 500731 has details.cves: [] and no score anywhere, and must still IMPORT -- with rank 2 from severity and 5.0 from the stand-in table -- because most OT plugins are configuration checks with no CVE and dropping them would hide the findings the product exists to report. 500732's whole NAME is a CVE, in lower case, which is the only CVE source a console publishing no details would give us; it must still be found and upper-cased, because Vulnerability.cve is validated ^CVE-[0-9]{4}-[0-9]{4,19}$ and is NOT upper-cased by the platform. 500733's details.cves carries a malformed CVE-BOGUS ahead of a lower-case real one, proving the regex gate picks the first PUBLISHABLE entry rather than the first entry -- a malformed value would fail the whole record. Asset 0002 exists because its only score is details.cvssV3BaseScore, which the schema types as String: it proves the string is parsed into a real 7.5 rather than falling through to the Low row of the table (2.0). The plugin_cves and plugin_max_cvss attributes are the observable half of this -- a vulnerability's own fields are not searchable from the asset -- and plugin_cves is asserted in emitted order, which additionally pins the severity-then-CVSS sort that decides which findings survive the 99-per-asset cap: 500730 and 500733 are both Critical, and the one carrying a published 9.8 sorts ahead of the one carrying no score at all, so the CVE order 44228 then 1472 then 3595 is the sort itself rather than the console's listing order.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "true",
+    "import_software": "false",
+    "import_services": "false"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "getAssets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "d1d1d1d1-0001-4001-8001-000000000001",
+                    "name": "ENG-STATION-77",
+                    "type": "EngineeringStation",
+                    "superType": "Server",
+                    "purdueLevel": "Level3",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-20T04:00:00Z",
+                    "lastUpdate": "2026-08-20T04:00:02Z",
+                    "macs": {"nodes": ["00:0c:29:aa:00:77"]},
+                    "ips": {"nodes": ["10.120.4.77"]},
+                    "directMacs": {"nodes": ["00:0c:29:aa:00:77"]},
+                    "directIps": {"nodes": ["10.120.4.77"]},
+                    "directNetworkInterfaces": {"nodes": []},
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {
+                      "nodes": [
+                        {
+                          "id": 500730,
+                          "name": "Apache Log4j Remote Code Execution",
+                          "source": "Tenable",
+                          "family": "Misc.",
+                          "severity": "Critical",
+                          "vprScore": 9.9,
+                          "cvss3Score": 9.8,
+                          "comment": "operator note: scheduled for the November window",
+                          "totalAffectedAssets": 6,
+                          "details": {
+                            "cves": ["CVE-2021-44228"],
+                            "cpes": ["cpe:2.3:a:apache:log4j:2.14.1:*:*:*:*:*:*:*"],
+                            "description": "The remote host runs a version of Apache Log4j affected by a JNDI lookup flaw that allows an unauthenticated attacker to execute arbitrary code.",
+                            "solution": "Upgrade Apache Log4j to 2.17.1 or later, or remove the JndiLookup class from the classpath.",
+                            "cvssV3BaseScore": "10.0",
+                            "cvssBaseScore": "9.3"
+                          }
+                        },
+                        {
+                          "id": 500731,
+                          "name": "Modbus Unauthenticated Write Access",
+                          "source": "Tenable",
+                          "family": "SCADA",
+                          "severity": "Medium",
+                          "vprScore": null,
+                          "cvss3Score": null,
+                          "totalAffectedAssets": 21,
+                          "details": {
+                            "cves": [],
+                            "cpes": [],
+                            "description": "The controller accepts Modbus write function codes without authentication.",
+                            "solution": null,
+                            "cvssV3BaseScore": null,
+                            "cvssBaseScore": null
+                          }
+                        },
+                        {
+                          "id": 500732,
+                          "name": "cve-2023-3595",
+                          "source": "Tenable",
+                          "family": "SCADA",
+                          "severity": "High",
+                          "vprScore": null,
+                          "cvss3Score": null,
+                          "totalAffectedAssets": 4,
+                          "details": {
+                            "cves": null,
+                            "cpes": null,
+                            "description": null,
+                            "solution": null,
+                            "cvssV3BaseScore": null,
+                            "cvssBaseScore": null
+                          }
+                        },
+                        {
+                          "id": 500733,
+                          "name": "Netlogon Elevation of Privilege",
+                          "source": "Tenable",
+                          "family": "Windows",
+                          "severity": "Critical",
+                          "vprScore": null,
+                          "cvss3Score": null,
+                          "totalAffectedAssets": 2,
+                          "details": {
+                            "cves": ["CVE-BOGUS", "cve-2020-1472"],
+                            "cpes": ["not-a-cpe"],
+                            "description": "The remote host is missing the Netlogon secure channel hardening update.",
+                            "solution": "Apply the vendor update and enable enforcement mode.",
+                            "cvssV3BaseScore": null,
+                            "cvssBaseScore": null
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "d1d1d1d1-0002-4002-8002-000000000002",
+                    "name": "HMI-PANEL-12",
+                    "type": "Hmi",
+                    "superType": "Hmi",
+                    "purdueLevel": "Level2",
+                    "criticality": "LowCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-19T09:15:00Z",
+                    "lastUpdate": "2026-08-19T09:15:04Z",
+                    "macs": {"nodes": ["00:0c:29:aa:00:12"]},
+                    "ips": {"nodes": ["10.120.4.12"]},
+                    "directMacs": {"nodes": ["00:0c:29:aa:00:12"]},
+                    "directIps": {"nodes": ["10.120.4.12"]},
+                    "directNetworkInterfaces": {"nodes": []},
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {
+                      "nodes": [
+                        {
+                          "id": 500740,
+                          "name": "SMB Signing not required",
+                          "source": "Tenable",
+                          "family": "Windows",
+                          "severity": "Low",
+                          "vprScore": null,
+                          "cvss3Score": null,
+                          "totalAffectedAssets": 9,
+                          "details": {
+                            "cves": [],
+                            "cpes": [],
+                            "description": "Signing is not required on the remote SMB server.",
+                            "solution": "Enforce message signing in the host's configuration.",
+                            "cvssV3BaseScore": "7.5",
+                            "cvssBaseScore": "6.4"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "details { cves cpes description solution cvssV3BaseScore cvssBaseScore }"
+      },
+      {
+        "body_contains": "cvss3Score"
+      },
+      {
+        "body_contains": "sort: [{field: severity, direction: DescNullLast}]"
+      }
+    ],
+    "min_vulnerabilities_total": 5,
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:d1d1d1d1-0001-4001-8001-000000000001",
+        "fields": {
+          "hostnames": "ENG-STATION-77",
+          "tenable_ot_security_plugin_count": "4",
+          "tenable_ot_security_plugin_cves": "CVE-2021-44228,CVE-2020-1472,CVE-2023-3595",
+          "tenable_ot_security_plugin_max_cvss": "9.8"
+        }
+      },
+      {
+        "id": "tenable-ot-security:$HOST:d1d1d1d1-0002-4002-8002-000000000002",
+        "fields": {
+          "hostnames": "HMI-PANEL-12",
+          "tenable_ot_security_plugin_count": "1",
+          "tenable_ot_security_plugin_max_cvss": "7.5"
+        },
+        "fields_absent": [
+          "tenable_ot_security_plugin_cves"
+        ]
+      }
+    ],
+    "log_contains": [
+      "tenable-ot-security: reported 2 assets"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,119 @@
+{
+  "name": "multi-homed",
+  "integration": "armis",
+  "description": "REGRESSION LOCK on Armis v1's comma-joined multi-value fields. When v1 knows several addresses it joins them into the one scalar string rather than returning an array -- Elastic's shipping Armis pipeline splits ipAddress, macAddress and names on exactly that, and its recorded sample carries 'boundaries': 'Corporate, Guest' in the same shape. Unsplit, '10.5.0.11, 10.5.0.12' parses as no address at all: routable_ips and network_interface both reject it, so device 7001 lost every IP, every MAC and every name, and was then DROPPED for having no correlator -- silently, and doubly damaging because this integration runs with no-id-match so the id cannot correlate either. Row 7002 is the single-valued control and 7003 is the v3 array shape, which must keep working. asset_count is 3: before the split it was 2 and the suite still passed.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret",
+    "include_vulnerabilities": "false",
+    "page_size": "1000"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/access_token/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "access_token": "fixture-token",
+              "expiration_utc": "2030-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/search/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 3,
+              "total": 3,
+              "next": null,
+              "results": [
+                {
+                  "id": 7001,
+                  "name": "",
+                  "ipAddress": "10.5.0.11, 10.5.0.12",
+                  "macAddress": "00:11:22:33:44:01, 00:11:22:33:44:02",
+                  "type": "Infusion Pump",
+                  "category": "Medical",
+                  "riskLevel": 5,
+                  "firstSeen": "2026-01-04T08:00:00Z",
+                  "lastSeen": "2026-08-20T09:00:00Z",
+                  "names": "host-a,host-b",
+                  "boundaries": "Corporate, Guest"
+                },
+                {
+                  "id": 7002,
+                  "name": "pump-single",
+                  "ipAddress": "10.5.0.20",
+                  "macAddress": "00:11:22:33:44:20",
+                  "type": "Infusion Pump",
+                  "category": "Medical",
+                  "riskLevel": 5,
+                  "firstSeen": "2026-01-04T08:00:00Z",
+                  "lastSeen": "2026-08-20T09:00:00Z"
+                },
+                {
+                  "id": 7003,
+                  "name": "pump-array",
+                  "ipAddress": [
+                    "10.5.0.30",
+                    "10.5.0.31"
+                  ],
+                  "macAddress": [
+                    "00:11:22:33:44:30",
+                    "00:11:22:33:44:31"
+                  ],
+                  "type": "Infusion Pump",
+                  "category": "Medical",
+                  "riskLevel": 5,
+                  "firstSeen": "2026-01-04T08:00:00Z",
+                  "lastSeen": "2026-08-20T09:00:00Z"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "armis:$HOST:7001",
+      "armis:$HOST:7002",
+      "armis:$HOST:7003"
+    ],
+    "assets": [
+      {
+        "id": "armis:$HOST:7001",
+        "fields": {
+          "ipAddresses": "10.5.0.11\t10.5.0.12",
+          "hostnames": "host-a\thost-b"
+        }
+      },
+      {
+        "id": "armis:$HOST:7003",
+        "fields": {
+          "ipAddresses": "10.5.0.30\t10.5.0.31"
+        }
+      }
+    ]
+  },
+  "check_determinism": true
+}

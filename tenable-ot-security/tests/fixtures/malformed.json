@@ -1,0 +1,146 @@
+{
+  "name": "malformed",
+  "integration": "tenable-ot-security",
+  "description": "Every shape the parser must survive without losing the run. Two nodes carry no usable id (null and empty) and are skipped and tallied rather than reaching ImportAsset. One node is a bare string where the schema documents an object, and is dropped by the dict coercion. On the surviving nodes: ips arrives as a plain string instead of a StringConnection, macs.nodes carries a null, a number, and an unparseable value, risk arrives as a string instead of an object, segments arrives as a string, osDetails arrives as a string, firstSeen is prose, lastSeen is the Go zero time the console emits for \"never\", and plugins.nodes carries a bare string alongside real nodes. The plugin names cover the CVE rule from both sides: `cve-2025-40002` must be upper-cased before it is set, because Vulnerability.cve is validated against ^CVE-[0-9]{4}-[0-9]{4,19}$ and is NOT upper-cased by the platform, and a miss fails the WHOLE record; `CVE-25-1` must be refused and kept as a plain name. The fourth plugin has neither an id nor a name and is dropped, so only two of the four reach the asset. Address hygiene is asserted at record level, which is the only way to see it: loopback-only-host keeps a hostname and no address at all, and apipa-host keeps only its routable address after 169.254/16 is dropped.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "true",
+    "import_software": "true"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "getAssets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  "this node is a string, not an object",
+                  {
+                    "id": null,
+                    "name": "null-id-host",
+                    "type": "OtDevice",
+                    "ips": {"nodes": ["10.140.5.1"]},
+                    "macs": {"nodes": ["00:1d:9c:cc:00:01"]}
+                  },
+                  {
+                    "id": "",
+                    "name": "empty-id-host",
+                    "type": "OtDevice",
+                    "ips": {"nodes": ["10.140.5.2"]},
+                    "macs": {"nodes": ["00:1d:9c:cc:00:02"]}
+                  },
+                  {
+                    "id": "e1e1e1e1-0001-4001-8001-000000000001",
+                    "name": "wrong-shapes-host",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "hidden": false,
+                    "ips": "10.140.5.10",
+                    "macs": {"nodes": [null, 42, "not-a-mac", "00:1d:9c:cc:00:10"]},
+                    "directIps": {"nodes": ["10.140.5.10"]},
+                    "directMacs": "00:1d:9c:cc:00:10",
+                    "segments": "no segments here",
+                    "risk": "high",
+                    "osDetails": "Windows",
+                    "backplane": "1756-A10",
+                    "firstSeen": "yesterday afternoon",
+                    "lastSeen": "0001-01-01T00:00:00Z",
+                    "lastHit": "2026-08-18T06:00:00Z",
+                    "plugins": {"nodes": [
+                      "a plugin that is a string",
+                      {"id": "800001", "name": "cve-2025-40002", "severity": "Medium", "vprScore": "4.4"},
+                      {"id": "800002", "name": "CVE-25-1", "severity": "not-a-known-severity"},
+                      {"severity": "High"}
+                    ]}
+                  },
+                  {
+                    "id": "e1e1e1e1-0002-4002-8002-000000000002",
+                    "name": "loopback-only-host",
+                    "type": "Server",
+                    "superType": "Server",
+                    "hidden": false,
+                    "ips": {"nodes": ["127.0.0.1", "::1"]},
+                    "macs": {"nodes": []},
+                    "directIps": {"nodes": ["127.0.0.1"]},
+                    "directMacs": {"nodes": []},
+                    "segments": {"nodes": [null, "a string segment", {"id": "seg-1", "name": "Server / 127.0.0.X"}]},
+                    "risk": {"totalRisk": null}
+                  },
+                  {
+                    "id": "e1e1e1e1-0003-4003-8003-000000000003",
+                    "name": "apipa-host",
+                    "type": "OtDevice",
+                    "hidden": null,
+                    "ips": {"nodes": ["169.254.10.5", "10.140.5.30", "fe80::1"]},
+                    "macs": {"nodes": ["00:1d:9c:cc:00:30"]},
+                    "directIps": {"nodes": []},
+                    "directMacs": {"nodes": []},
+                    "segments": {"nodes": []},
+                    "osDetails": {"name": "Embedded Linux", "version": null, "hotFixes": {"nodes": [null, "a string hotfix", {"name": ""}, {"name": "KB9999999", "installDate": "not-a-date"}]}}
+                  }
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tenable-ot-security:$HOST:e1e1e1e1-0001-4001-8001-000000000001",
+      "tenable-ot-security:$HOST:e1e1e1e1-0002-4002-8002-000000000002",
+      "tenable-ot-security:$HOST:e1e1e1e1-0003-4003-8003-000000000003"
+    ],
+    "ids_absent": [
+      "tenable-ot-security:$HOST:",
+      "tenable-ot-security:$HOST:null"
+    ],
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:e1e1e1e1-0001-4001-8001-000000000001",
+        "fields": {
+          "hostnames": "wrong-shapes-host",
+          "macAddresses": "00:1d:9c:cc:00:10",
+          "ipAddresses": "10.140.5.10",
+          "tenable_ot_security_plugin_count": "2"
+        },
+        "fields_absent": ["firstSeenTS", "tenable_ot_security_total_risk"]
+      },
+      {
+        "id": "tenable-ot-security:$HOST:e1e1e1e1-0002-4002-8002-000000000002",
+        "fields": {"hostnames": "loopback-only-host"},
+        "fields_absent": ["ipAddresses", "macAddresses"]
+      },
+      {
+        "id": "tenable-ot-security:$HOST:e1e1e1e1-0003-4003-8003-000000000003",
+        "fields": {
+          "hostnames": "apipa-host",
+          "ipAddresses": "10.140.5.30",
+          "os": "Embedded Linux",
+          "tenable_ot_security_hotfix_count": "1"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 2,
+    "log_contains": [
+      "tenable-ot-security: skipping asset with no id: name=null-id-host",
+      "tenable-ot-security: skipping asset with no id: name=empty-id-host",
+      "tenable-ot-security: skipped 2 assets with no id",
+      "tenable-ot-security: reported 3 assets"
+    ]
+  },
+  "check_determinism": true
+}

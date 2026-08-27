@@ -1,0 +1,186 @@
+{
+  "name": "dns-hostnames",
+  "integration": "tenable-ot-security",
+  "description": "The directNetworkInterfaces block, which fixes two things at once. First, hostnames: Asset.name is usually a console-generated label like 'OT Device #966', which clean_hostnames rightly refuses, so before this the great majority of assets imported with no hostname at all. NetworkInterface.dnsNames and IpDetails.dnsNames are the real hostname source and pyTenable selects both, so both are read and the console name drops to being the fallback it always was -- 0001 proves a synthetic-named asset now gets scada-hist-01 from its interface, and 0002 proves an IpDetails-level name is picked up too while a real console name is still kept alongside it (the platform sorts the emitted list, so the assertion is on the set rather than on the order the script builds). Second, MAC-to-IP pairing: the flat directIps/directMacs lists cannot say which address sits on which MAC, so with two MACs and three addresses the first MAC took every address and the second became an address-less interface. 0002 has two genuinely separate interfaces and their addresses must stay separated, which is what macPairs shows. directNetworkInterfaces is the DIRECT connection deliberately, not networkInterfaces: NetworkInterface carries directAsset, so the associated connection includes interfaces belonging to a sibling backplane module or to a fronting gateway, exactly the over-association that directIps exists to avoid. 0003 is the fallback lock -- it returns an empty interface connection, as a console that has not built one will, and must still import on its flat directIps/directMacs. 0001's second interface has a null MAC and a loopback address, so it contributes nothing and must not produce a None interface, which would abort the entire run.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "false",
+    "import_software": "false",
+    "import_services": "false"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "getAssets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "b3b3b3b3-0001-4001-8001-000000000001",
+                    "name": "OT Device #966",
+                    "type": "OtDevice",
+                    "superType": "OtDevice",
+                    "purdueLevel": "Level2",
+                    "criticality": "MediumCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-24T11:00:00Z",
+                    "lastUpdate": "2026-08-24T11:00:03Z",
+                    "macs": {"nodes": ["f8:75:a4:f5:c6:37"]},
+                    "ips": {"nodes": ["10.170.3.10", "10.170.3.99"]},
+                    "directMacs": {"nodes": ["f8:75:a4:f5:c6:37"]},
+                    "directIps": {"nodes": ["10.170.3.10"]},
+                    "directNetworkInterfaces": {
+                      "nodes": [
+                        {
+                          "mac": "f8:75:a4:f5:c6:37",
+                          "dnsNames": {"nodes": ["scada-hist-01.plant.example.com"]},
+                          "ips": {
+                            "nodes": [
+                              {"ip": "10.170.3.10", "dnsNames": {"nodes": []}}
+                            ]
+                          }
+                        },
+                        {
+                          "mac": null,
+                          "dnsNames": {"nodes": []},
+                          "ips": {
+                            "nodes": [
+                              {"ip": "127.0.0.1", "dnsNames": {"nodes": ["localhost"]}}
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {"nodes": []}
+                  },
+                  {
+                    "id": "b3b3b3b3-0002-4002-8002-000000000002",
+                    "name": "ENG-STATION-09",
+                    "type": "EngineeringStation",
+                    "superType": "Server",
+                    "purdueLevel": "Level3",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-24T11:05:00Z",
+                    "lastUpdate": "2026-08-24T11:05:02Z",
+                    "macs": {"nodes": ["00:0c:29:5b:aa:71", "00:0c:29:5b:aa:72"]},
+                    "ips": {"nodes": ["10.170.4.20", "10.170.5.20"]},
+                    "directMacs": {"nodes": ["00:0c:29:5b:aa:71", "00:0c:29:5b:aa:72"]},
+                    "directIps": {"nodes": ["10.170.4.20", "10.170.5.20"]},
+                    "directNetworkInterfaces": {
+                      "nodes": [
+                        {
+                          "mac": "00:0c:29:5b:aa:71",
+                          "dnsNames": {"nodes": []},
+                          "ips": {
+                            "nodes": [
+                              {"ip": "10.170.4.20", "dnsNames": {"nodes": ["eng09.corp.example.com"]}}
+                            ]
+                          }
+                        },
+                        {
+                          "mac": "00:0c:29:5b:aa:72",
+                          "dnsNames": {"nodes": []},
+                          "ips": {
+                            "nodes": [
+                              {"ip": "10.170.5.20", "dnsNames": {"nodes": []}}
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {"nodes": []}
+                  },
+                  {
+                    "id": "b3b3b3b3-0003-4003-8003-000000000003",
+                    "name": "PLC-NO-IFACES",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "purdueLevel": "Level1",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-24T11:10:00Z",
+                    "lastUpdate": "2026-08-24T11:10:01Z",
+                    "macs": {"nodes": ["00:1d:9c:aa:00:03"]},
+                    "ips": {"nodes": ["10.170.6.30"]},
+                    "directMacs": {"nodes": []},
+                    "directIps": {"nodes": ["10.170.6.30"]},
+                    "directNetworkInterfaces": {"nodes": []},
+                    "segments": {"nodes": []},
+                    "osDetails": null,
+                    "plugins": {"nodes": []}
+                  }
+                ],
+                "pageInfo": {"hasNextPage": false, "endCursor": null}
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "request_count": 1,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "directNetworkInterfaces(first: 20) { nodes { mac dnsNames(first: 8) { nodes } ips(first: 16) { nodes { ip dnsNames(first: 8) { nodes } } } } }"
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "openPorts"
+      }
+    ],
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:b3b3b3b3-0001-4001-8001-000000000001",
+        "fields": {
+          "hostnames": "scada-hist-01.plant.example.com",
+          "ipAddresses": "10.170.3.10",
+          "macAddresses": "f8:75:a4:f5:c6:37",
+          "tenable_ot_security_name": "OT Device #966",
+          "tenable_ot_security_dns_names": "scada-hist-01.plant.example.com"
+        }
+      },
+      {
+        "id": "tenable-ot-security:$HOST:b3b3b3b3-0002-4002-8002-000000000002",
+        "fields": {
+          "hostnames": "ENG-STATION-09\teng09.corp.example.com",
+          "macPairs": "00:0c:29:5b:aa:71=10.170.4.20\t00:0c:29:5b:aa:72=10.170.5.20"
+        }
+      },
+      {
+        "id": "tenable-ot-security:$HOST:b3b3b3b3-0003-4003-8003-000000000003",
+        "fields": {
+          "hostnames": "PLC-NO-IFACES",
+          "ipAddresses": "10.170.6.30",
+          "macAddresses": "00:1d:9c:aa:00:03"
+        }
+      }
+    ],
+    "log_contains": [
+      "tenable-ot-security: reported 3 assets"
+    ]
+  },
+  "check_determinism": true
+}

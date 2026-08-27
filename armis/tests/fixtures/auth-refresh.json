@@ -1,0 +1,95 @@
+{
+  "name": "auth-refresh",
+  "integration": "armis",
+  "description": "A 401 mid-run. An Armis v1 access token lives exactly 30 minutes and Armis supports only one session per token, so any tenant that takes longer than half an hour to walk WILL be handed a 401 partway through -- this is the ordinary case, not an error case. Page 1 of the device walk succeeds under token-one; page 2 answers 401; the script must mint token-two, rebuild its HTTP options rather than mutate the snapshot get_http_options took, retry the same offset exactly once, and finish the walk with every asset. A run that treated the 401 as fatal would report a silently partial inventory.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "token-one", "expiration_utc": "2026-08-26T18:04:56.123456+00:00"}}},
+        {"status": 200, "json": {"data": {"access_token": "token-two", "expiration_utc": "2026-08-26T18:34:56.123456+00:00"}}}
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/", "query_contains": "orderBy=lastSeen"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 1,
+              "next": 1,
+              "prev": null,
+              "results": [
+                {
+                  "category": "Computers",
+                  "firstSeen": "2024-05-01T00:00:00.000000+00:00",
+                  "id": 5001,
+                  "ipAddress": "10.91.0.1",
+                  "lastSeen": "2026-08-20T11:04:05.000000+00:00",
+                  "macAddress": "44:33:22:00:00:01",
+                  "name": "refresh-host-before",
+                  "operatingSystem": "Windows",
+                  "type": "Laptops"
+                }
+              ]
+            }
+          }
+        },
+        {"status": 401, "json": {"message": "Invalid access token"}},
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 1,
+              "next": null,
+              "prev": 0,
+              "results": [
+                {
+                  "category": "Cameras",
+                  "firstSeen": "2024-06-01T00:00:00.000000+00:00",
+                  "id": 5002,
+                  "ipAddress": "10.91.0.2",
+                  "lastSeen": "2026-08-20T11:05:05.000000+00:00",
+                  "macAddress": "44:33:22:00:00:02",
+                  "name": "refresh-camera-after",
+                  "manufacturer": "Axis Communications",
+                  "model": "P3245",
+                  "type": "IP Cameras"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "armis:$HOST:5001",
+      "armis:$HOST:5002"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1/access_token/"},
+      {"method": "GET", "path": "/api/v1/search/", "header_contains": "token-one"},
+      {"method": "GET", "path": "/api/v1/search/", "header_contains": "token-two"},
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "from=1"}
+    ],
+    "log_contains": [
+      "armis: access token rejected mid-run, requesting a new one"
+    ]
+  },
+  "check_determinism": true
+}

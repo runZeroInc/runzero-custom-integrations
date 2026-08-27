@@ -1,0 +1,128 @@
+{
+  "name": "id-stability-legacy",
+  "integration": "forescout-counteract",
+  "description": "The other half of the pair started in id-stability-discovery: the SAME endpoint -- 10.42.1.156, MAC 0050568b007f, hostname em-stable-01 -- reached this time through GET /api/hosts after the paginated endpoint 404s, and asserting the SAME foreign id forescout-counteract:$HOST:170525084. The two scenarios differ only in which Web API endpoint answered; the asserted id literal is identical in both files, so a change to what the id means breaks exactly one of them.\n\nThe index rows here are the guide's own documented example values, hostId 170525084 with ip 10.42.1.156 and hostId 170524982 with ip 10.42.1.54, which is where the packed-IPv4 reading of the host key comes from in the first place. Only forescout_counteract_source_endpoint differs from the discovery half, and that is deliberate: it is the one thing that tells an operator which path an asset came in on, since the id deliberately does not.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdGFibGUifQ.c3RhYmxlLXNpZ25hdHVyZQ"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-not-implemented",
+      "match": {"method": "POST", "path": "/api/hosts/discovery"},
+      "responses": [
+        {"status": 404, "text": "Not Found"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "hostfields",
+      "match": {"method": "GET", "path": "/api/hostfields"},
+      "responses": [
+        {"status": 200, "json": {"hostFields": [{"name": "hostname_calculated"}, {"name": "online"}]}}
+      ]
+    },
+    {
+      "name": "host-detail-170525084",
+      "match": {"method": "GET", "path": "/api/hosts/170525084"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "ip": "10.42.1.156",
+              "mac": "0050568b007f",
+              "fields": {
+                "hostname_calculated": {"timestamp": 1724839643, "value": "em-stable-01"},
+                "online": {"timestamp": 1724839643, "value": "true"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-detail-170524982",
+      "match": {"method": "GET", "path": "/api/hosts/170524982"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "ip": "10.42.1.54",
+              "fields": {
+                "hostname_calculated": {"timestamp": 1724839643, "value": "em-stable-02"},
+                "online": {"timestamp": 1724839643, "value": "true"}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "host-index",
+      "match": {"method": "GET", "path": "/api/hosts"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {
+                "hostId": 170525084,
+                "ip": "10.42.1.156",
+                "mac": "0050568b007f",
+                "_links": {"self": {"href": "https://10.42.1.45/api/hosts/170525084"}}
+              },
+              {
+                "hostId": 170524982,
+                "ip": "10.42.1.54",
+                "mac": null,
+                "_links": {"self": {"href": "https://10.42.1.45/api/hosts/170524982"}}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:170525084",
+      "forescout-counteract:$HOST:170524982"
+    ],
+    "ids_absent": [
+      "forescout-counteract:$HOST:10.42.1.156"
+    ],
+    "requests_include": [
+      {"method": "POST", "path": "/api/hosts/discovery"},
+      {"method": "GET", "path": "/api/hosts"},
+      {"method": "GET", "path": "/api/hosts/170525084"}
+    ],
+    "assets": [
+      {
+        "id": "forescout-counteract:$HOST:170525084",
+        "fields": {
+          "hostnames": "em-stable-01",
+          "ipAddresses": "10.42.1.156",
+          "macAddresses": "00:50:56:8b:00:7f",
+          "forescout_counteract_host_id": "170525084",
+          "forescout_counteract_source_endpoint": "index",
+          "lastSeenTS": "1724839643"
+        }
+      }
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

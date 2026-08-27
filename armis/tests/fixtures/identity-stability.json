@@ -1,0 +1,122 @@
+{
+  "name": "identity-stability",
+  "integration": "armis",
+  "description": "Regression pair for the happy scenario. The same three Armis device ids come back with every mutable field changed -- new name, new IP, new MAC, new OS, new site, new tags, a moved firstSeen -- and the emitted foreign ids must be byte-identical to the ones happy.json asserts. That is what proves the id is built from the Armis id and the tenant HOST alone: the host is deliberately taken without its port, because the fixture server binds a fresh ephemeral port on every run and a port in the namespace would re-key the whole estate whenever the console moved. The scenario is not a claim that a changed record is the same device -- Armis ids are recycled, which is exactly why CONFIG bars the id from matching -- only that the script's id construction has not quietly absorbed an address or a name.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key",
+    "page_size": "1000",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "stability-token", "expiration_utc": "2026-08-26T18:04:56.123456+00:00"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/", "query_contains": "orderBy=lastSeen"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "count": 3,
+              "next": null,
+              "prev": null,
+              "results": [
+                {
+                  "category": "Network Equipment",
+                  "firstSeen": "2025-06-30T08:00:00.000000+00:00",
+                  "id": 469,
+                  "ipAddress": "192.0.2.77",
+                  "ipv6": ["2001:db8:99::77"],
+                  "lastSeen": "2026-08-20T02:02:09.124100+00:00",
+                  "macAddress": "44:A7:4B:99:99:99",
+                  "manufacturer": "Juniper",
+                  "model": "EX4300",
+                  "name": "geneva-file-01-renamed",
+                  "operatingSystem": "Junos",
+                  "operatingSystemVersion": "21.4R3",
+                  "riskLevel": 20,
+                  "site": {"location": "Zurich", "name": "Zurich Enterprise"},
+                  "tags": ["Relocated"],
+                  "type": "Switches",
+                  "typeEnum": "SWITCH",
+                  "visibility": "Limited"
+                },
+                {
+                  "category": "Computers",
+                  "firstSeen": "2026-01-15T00:00:00.000000+00:00",
+                  "id": 2172,
+                  "ipAddress": "192.0.2.78",
+                  "ipv6": "fe80::dead:beef:1",
+                  "lastSeen": "2026-08-20T18:42:50.190248+00:00",
+                  "macAddress": "50:76:AF:11:11:11",
+                  "manufacturer": "Apple",
+                  "model": "MacBook Pro 16",
+                  "name": "reimaged-laptop.corporate.acme.com",
+                  "operatingSystem": "macOS",
+                  "operatingSystemVersion": "14.4.1",
+                  "riskLevel": 60,
+                  "site": {"location": "Denver", "name": "Denver Office"},
+                  "tags": ["Corporate", "Jamf"],
+                  "type": "Laptops",
+                  "user": "acme\\adifferentuser",
+                  "userIds": [99],
+                  "visibility": "Full"
+                },
+                {
+                  "category": "Computers",
+                  "firstSeen": "2026-02-02T00:00:00.000000+00:00",
+                  "id": 74745,
+                  "ipAddress": "192.0.2.79",
+                  "lastSeen": "2026-08-20T09:12:00.000000+00:00",
+                  "macAddress": "44:AA:BB:CC:DD:EE",
+                  "manufacturer": "Hewlett Packard",
+                  "model": "ProLiant DL380",
+                  "name": "was-an-access-point-now-a-server",
+                  "operatingSystem": "Windows",
+                  "operatingSystemVersion": "Server 2022",
+                  "riskLevel": 90,
+                  "site": {"location": "Denver", "name": "Denver Office"},
+                  "tags": ["Datacenter"],
+                  "type": "Servers",
+                  "typeEnum": "SERVER",
+                  "visibility": "Full"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "armis:$HOST:469",
+      "armis:$HOST:2172",
+      "armis:$HOST:74745"
+    ],
+    "assets": [
+      {
+        "id": "armis:$HOST:469",
+        "fields": {
+          "hostnames": "geneva-file-01-renamed",
+          "ipAddresses": "192.0.2.77\t2001:db8:99::77",
+          "macAddresses": "44:a7:4b:99:99:99",
+          "deviceType": "Switches"
+        }
+      }
+    ],
+    "request_count": 2
+  },
+  "check_determinism": true
+}

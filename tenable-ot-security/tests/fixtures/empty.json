@@ -1,0 +1,36 @@
+{
+  "name": "empty",
+  "integration": "tenable-ot-security",
+  "description": "A console with nothing to return, which is what a fresh deployment or a lookback window shorter than the quiet period looks like. The assets connection answers with an empty nodes list, hasNextPage false, and a null endCursor. The run must report zero assets, make exactly one request, and finish cleanly rather than failing or paging on a null cursor.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "7",
+    "include_hidden": "true",
+    "import_vulnerabilities": "true",
+    "import_software": "true"
+  },
+  "routes": [
+    {
+      "name": "assets",
+      "match": {"method": "POST", "path": "/graphql", "body_contains": "getAssets"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {"data": {"assets": {"nodes": [], "pageInfo": {"hasNextPage": false, "endCursor": null}}}}
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "log_contains": [
+      "tenable-ot-security: reported 0 assets",
+      "tenable-ot-security: no assets retrieved"
+    ]
+  },
+  "check_determinism": true
+}

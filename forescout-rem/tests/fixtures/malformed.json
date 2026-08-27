@@ -1,0 +1,102 @@
+{
+  "name": "malformed",
+  "integration": "forescout-rem",
+  "description": "Forescout publishes no schema for this API, so every field shape in the script is a reconstruction from one client's field mapping and has to survive being wrong. This window carries a bare string where an entity object is documented, an entity whose id is null, ip_addresses as a scalar string instead of a list, mac_addresses as an object instead of a list, a number where a vendor string is documented, and an unparseable last_seen. Each must be skipped or coerced without ending the run.\n\nTwo entities are dropped for having nothing to correlate on, which is the consequence of the no-id-match decision rather than an accident: one carries the placeholder hostname `unknown` and no address, and one carries `localhost` with 127.0.0.1 as its only address. The second is asserted at record level, by id, because the runtime filters loopback before it ever reaches an asset -- so an asset that merely lacks the address would prove nothing about the script.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "search",
+      "match": {"method": "GET", "path": "/api/data-exchange/v3/rem-asset-search"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 5,
+            "entities": [
+              "this-should-have-been-an-object",
+              {
+                "id": null,
+                "hostname": "null-id-host",
+                "ip_addresses": ["10.50.0.1"],
+                "mac_addresses": ["00:aa:00:00:11:01"],
+                "rem_category": "IT"
+              },
+              {
+                "id": "rem-coerced",
+                "hostname": "coerced-host",
+                "ip_addresses": "10.50.0.2",
+                "mac_addresses": {"value": "00:aa:00:00:11:22"},
+                "rem_category": "Network Device",
+                "rem_function": "Router",
+                "rem_vendor": 42,
+                "risk_score": "4.5",
+                "last_seen": "not-a-timestamp"
+              },
+              {
+                "id": "rem-no-correlator",
+                "hostname": "unknown",
+                "ip_addresses": [],
+                "mac_addresses": [],
+                "rem_category": "Unknown"
+              },
+              {
+                "id": "rem-loopback-only",
+                "hostname": "localhost",
+                "ip_addresses": ["127.0.0.1"],
+                "mac_addresses": [],
+                "rem_category": "IT"
+              },
+              {
+                "id": "rem-good",
+                "hostname": "good-host",
+                "ip_addresses": ["10.50.0.9"],
+                "mac_addresses": ["00:aa:00:00:11:99"],
+                "rem_category": "IT",
+                "rem_function": "Server",
+                "rem_vendor": "Synthetic Devices",
+                "rem_os": "Linux",
+                "last_seen": "2026-05-06T08:55:23.777Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-rem:$HOST:rem-coerced",
+      "forescout-rem:$HOST:rem-good"
+    ],
+    "ids_absent": [
+      "forescout-rem:$HOST:rem-no-correlator",
+      "forescout-rem:$HOST:rem-loopback-only"
+    ],
+    "assets": [
+      {
+        "id": "forescout-rem:$HOST:rem-coerced",
+        "fields": {
+          "hostnames": "coerced-host",
+          "ipAddresses": "10.50.0.2",
+          "manufacturer": "42",
+          "deviceType": "Router"
+        },
+        "fields_absent": ["macAddresses", "lastSeenTS"]
+      }
+    ],
+    "request_count": 1,
+    "log_contains": [
+      "skipped 1 entities with no asset id",
+      "skipped 2 assets with no MAC, IP, or hostname to correlate on",
+      "reported 2 assets from 1 search windows"
+    ]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,62 @@
+{
+  "name": "rate-limit",
+  "integration": "forescout-rem",
+  "description": "Forescout documents no rate limit for this API, but the one shipped client of it retries 429 and honours Retry-After, and its error text says the platform may be throttling. A 429 must therefore be absorbed by the shared HTTP helper's own retry budget -- get_json already retries three times with backoff -- rather than ending the sweep and reporting a partial estate as a complete one. Nothing about retrying is hand-rolled in the script.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "search",
+      "match": {"method": "GET", "path": "/api/data-exchange/v3/rem-asset-search"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"message": "too many requests"}},
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 2,
+            "entities": [
+              {
+                "id": "rem-throttled-1",
+                "hostname": "throttled-host-1",
+                "ip_addresses": ["10.70.0.1"],
+                "mac_addresses": ["00:cc:00:00:00:01"],
+                "rem_category": "IT",
+                "rem_function": "Server",
+                "rem_vendor": "Synthetic Devices",
+                "risk_score": 5.5,
+                "risk_severity": "Medium",
+                "last_seen": "2026-05-06T08:55:23.777Z"
+              },
+              {
+                "id": "rem-throttled-2",
+                "hostname": "throttled-host-2",
+                "ip_addresses": ["10.70.0.2"],
+                "mac_addresses": ["00:cc:00:00:00:02"],
+                "rem_category": "IoT",
+                "rem_function": "IP Camera",
+                "risk_score": 0,
+                "risk_severity": "None",
+                "last_seen": "2026-05-06T08:55:24.100Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-rem:$HOST:rem-throttled-1",
+      "forescout-rem:$HOST:rem-throttled-2"
+    ],
+    "request_count": 2,
+    "log_contains": ["reported 2 assets from 1 search windows"]
+  },
+  "check_determinism": true
+}

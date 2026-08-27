@@ -1,0 +1,189 @@
+{
+  "name": "window-scaled-depth",
+  "integration": "forescout-rem",
+  "description": "REGRESSION LOCK on the split allowance following the search window instead of being a fixed count. Depth is shared by both axes: seven halvings reduce the 0-100 tenths of the risk scale to a single tenth, so a fixed ceiling of twelve would leave exactly five for time whatever the window was. Five suits the 7-day default at about five hours; against sync_strategy=full's 10-year window the same five are a 114-DAY floor, at which point any single-tenth band holding more than 1000 assets caps out and the run reports a shortfall it did not have to have. The allowance is therefore derived: keep halving until a slice is no longer than six hours.\n\nThis scenario runs the SAME truncate-everything estate as truncation-reported but over a ONE-DAY window, where the derivation yields two time halvings rather than five. That makes the numbers a discriminator rather than a description: 6 time-window queries and 4 windows still capped at the limit, against the 62 and 32 a fixed twelve would have produced. 24 search windows in total -- 1 bound-free probe, 2 zero-score halves, 8 queries down the truncated low edge of the risk scale, its 7 complete siblings, and the 6 time windows under the single 0.0-0.0 band.\n\nThe zero-score probe is answered complete on its second call here, which keeps this scenario cheap and focused; zero-score-overflow.json is where that path is exercised properly.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "1"
+  },
+  "routes": [
+    {
+      "name": "truncated-low-band",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min=0.0"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1500,
+            "entities": [
+              {
+                "id": "rem-low-1",
+                "hostname": "low-risk-1",
+                "ip_addresses": [
+                  "10.91.0.1"
+                ],
+                "mac_addresses": [
+                  "00:91:00:00:00:01"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Badge Reader",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T08:55:23.777Z"
+              },
+              {
+                "id": "rem-low-2",
+                "hostname": "low-risk-2",
+                "ip_addresses": [
+                  "10.91.0.2"
+                ],
+                "mac_addresses": [
+                  "00:91:00:00:00:02"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Badge Reader",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T08:55:23.800Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "complete-band",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-high-1",
+                "hostname": "high-risk-1",
+                "ip_addresses": [
+                  "10.91.1.1"
+                ],
+                "mac_addresses": [
+                  "00:91:00:00:01:01"
+                ],
+                "rem_category": "OT",
+                "rem_function": "PLC",
+                "risk_score": 9.9,
+                "risk_severity": "Critical",
+                "last_seen": "2026-08-20T08:55:22.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "unbanded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1500,
+            "entities": [
+              {
+                "id": "rem-zero-1",
+                "hostname": "zero-risk-1",
+                "ip_addresses": [
+                  "10.91.9.1"
+                ],
+                "mac_addresses": [
+                  "00:91:00:00:09:01"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Sensor",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T08:55:10.000Z"
+              },
+              {
+                "id": "rem-zero-2",
+                "hostname": "zero-risk-2",
+                "ip_addresses": [
+                  "10.91.9.2"
+                ],
+                "mac_addresses": [
+                  "00:91:00:00:09:02"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Sensor",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T08:55:11.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-zero-3",
+                "hostname": "zero-risk-3",
+                "ip_addresses": [
+                  "10.91.9.3"
+                ],
+                "mac_addresses": [
+                  "00:91:00:00:09:03"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Sensor",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T08:55:12.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 6,
+    "ids": [
+      "forescout-rem:$HOST:rem-zero-1",
+      "forescout-rem:$HOST:rem-zero-2",
+      "forescout-rem:$HOST:rem-zero-3",
+      "forescout-rem:$HOST:rem-low-1",
+      "forescout-rem:$HOST:rem-low-2",
+      "forescout-rem:$HOST:rem-high-1"
+    ],
+    "request_count": 24,
+    "requests_include": [
+      {
+        "query_contains": "risk_score_max=0.0&risk_score_min=0.0"
+      },
+      {
+        "query_contains": "risk_score_max=10.0&risk_score_min=5.1"
+      }
+    ],
+    "log_contains": [
+      "banding the risk scale to cover it",
+      "narrowing it on time",
+      "4 windows were still truncated after the maximum number of splits; about 5992 assets were not imported",
+      "reported 6 assets from 24 search windows"
+    ]
+  },
+  "check_determinism": true
+}

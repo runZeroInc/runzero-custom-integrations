@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "forescout-counteract",
-  "description": "Every documented shape is violated somewhere: the field index carries a bare string and an unnamed entry, the host index carries a string element, a null hostId, a blank hostId, and a duplicate row, and the property documents come back as a list, as a host with a string fields member, and as a 404. Every bad record must be skipped and the run must still import the three real hosts. Host 4004 carries only placeholder names (UNKNOWN, a bare IP) in its NBT/DHCP properties; it must import on its address with no hostname at all, because a shared placeholder name is a merge hazard.",
+  "description": "Every documented shape is violated somewhere on the legacy path: the field index carries a bare string and an unnamed entry, the host index carries a string element, a null hostId, a blank hostId, and a duplicate row, and the property documents come back as a list, as a host with a string fields member, and as a 404. Every bad record must be skipped and the run must still import the three real hosts.\n\nHost 4004 carries only placeholder names (UNKNOWN, a bare IP) in its NBT/DHCP properties; it must import on its address with no hostname at all, because a shared placeholder name is a merge hazard. It also pins the date properties against a real deployment shape: a captured property document returns ipv4_report_time as {\"value\": \"true\"} -- a boolean under a date name -- and a deployment rendering that same boolean as \"1\" would parse to epoch 1 and stamp the endpoint 1970-01-01. The unix <= 0 guard does NOT catch that, because unix 1 is above zero, so anything shorter than 10 digits is refused as not-a-date. Neither value may produce a lastSeenTS. POST /api/hosts/discovery answers 404 so the scenario states which path it exercises, and the fallback log line is asserted.",
   "kwargs": {
     "url": "$BASE",
     "username": "webapi-fixture",
@@ -18,6 +18,20 @@
         {
           "status": 200,
           "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYWQifQ.YmFkLXNpZ25hdHVyZS1maXh0dXJl"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-not-implemented",
+      "match": {
+        "method": "POST",
+        "path": "/api/hosts/discovery"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "text": "Not Found"
         }
       ],
       "when_exhausted": "repeat_last"
@@ -125,6 +139,12 @@
                 },
                 "dhcp_hostname": {
                   "value": "10.70.0.14"
+                },
+                "ipv4_report_time": {
+                  "value": "true"
+                },
+                "last_nbt_report_time": {
+                  "value": "1"
                 }
               }
             }
@@ -197,6 +217,7 @@
       "forescout-counteract:$HOST:"
     ],
     "log_contains": [
+      "falling back to the host index and per-host properties",
       "forescout-counteract: skipping host with no object id: ip=10.70.0.9",
       "forescout-counteract: skipping host with no object id: ip=10.70.0.10",
       "forescout-counteract: failed to fetch properties for host 4003",
@@ -206,12 +227,20 @@
       {
         "id": "forescout-counteract:$HOST:4004",
         "fields_absent": [
-          "hostnames"
+          "hostnames",
+          "lastSeenTS"
         ]
+      }
+    ],
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/hosts/discovery"
       }
     ]
   },
   "invariants": {
     "skip": []
-  }
+  },
+  "check_determinism": true
 }

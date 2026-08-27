@@ -1,0 +1,153 @@
+{
+  "name": "v2-online-shapes",
+  "integration": "miradore",
+  "description": "The v2 responses Miradore Online actually returns, recorded on 2026-08-26 rather than invented. Three findings are pinned here. (1) GET /api/v2/Device/SuspendedDevices answers 401 to every credential -- the same byte-identical padded plaintext body for a working key, an invalid key, and no key at all -- so on Miradore Online the suspended list is never available and no asset may ever carry miradore_suspended. (2) The two per-device GETs do work with the same key and return a bare JSON array; on a site that defines no custom attributes and records no locations that array is empty, which must produce no miradore_attr_* or miradore_geo_* attributes rather than an empty-string one. (3) A v2 failure is enrichment-only: both devices still import from v1, the failure is logged once for the run rather than once per device, and the per-device reads are still attempted after the estate-wide one failed. The v1 payload is a real record from the live site with its addresses and owner anonymised, including the Security and Enrollment wildcard children exactly as the site returns them and a device name carrying a typographic apostrophe, which is not a DNS-valid hostname.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "examplecorp",
+    "page_size": "50"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/examplecorp/API/Device"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"2\"><Device><ID>21</ID><Platform>macOS</Platform><OSVersionName>macOS 11.5.2</OSVersionName><IPAddress>203.0.113.106</IPAddress><MACAddress>00:11:22:AA:00:21</MACAddress><InvDevice><DeviceName>Loaner's MacBook Pro</DeviceName><Manufacturer>Apple</Manufacturer><Model>Apple MacBookPro17,1</Model><SerialNumber>SN-MIR-0021</SerialNumber></InvDevice><InvOS><Platform>macOS</Platform><Version>11.5.2</Version></InvOS><Status>New</Status><User><Email>user3@example.com</Email></User><Security><PasscodeSet>Unknown</PasscodeSet><EncryptionStatus>Enabled</EncryptionStatus></Security><Enrollment><ID>314</ID><Created>28.07.2023 13:57:54</Created><Completed>28.07.2023 14:00:21</Completed><Type>EnrolledByMDM</Type></Enrollment><InvApplications><InvApplication><Name>FaceTime</Name><Version>5.0</Version><Identifier>com.apple.FaceTime</Identifier><Size>1</Size></InvApplication></InvApplications></Device><Device><ID>5</ID><Platform>macOS</Platform><Status>Deleted</Status><MACAddress>00:11:22:AA:00:22</MACAddress><InvDevice><DeviceName>retired-mac-05</DeviceName></InvDevice></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "suspended-401",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/SuspendedDevices"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "headers": {
+            "Content-Type": "text/plain"
+          },
+          "text": "Status Code: 401; Unauthorized                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    "
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "custom-attributes-empty",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/21/CustomAttribute"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "location-empty",
+      "match": {
+        "method": "GET",
+        "path": "/api/v2/Device/21/Location"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": []
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "miradore:examplecorp:21"
+    ],
+    "log_contains": [
+      "using /examplecorp/API/Device",
+      "v2 suspended device list unavailable",
+      "skipped 1 devices",
+      "reported 1 of 2 devices matched by the query"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path_contains": "/api/v2/Device/SuspendedDevices",
+        "header": {
+          "X-API-Key": "1_fixturekey",
+          "X-Instance-Name": "examplecorp"
+        }
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v2/Device/21/CustomAttribute"
+      },
+      {
+        "method": "GET",
+        "path_contains": "/api/v2/Device/21/Location",
+        "query_contains": "startDate"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path_contains": "/examplecorp/api/v2"
+      },
+      {
+        "path_contains": "/api/v2/Device/5/"
+      },
+      {
+        "path_contains": "/api/v2/Devices"
+      }
+    ],
+    "assets": [
+      {
+        "id": "miradore:examplecorp:21",
+        "fields": {
+          "os": "macOS",
+          "osVersion": "11.5.2",
+          "deviceType": "Laptop",
+          "manufacturer": "Apple",
+          "model": "Apple MacBookPro17,1",
+          "miradore_device_name": "Loaner's MacBook Pro",
+          "miradore_status": "New",
+          "miradore_serial_number": "SN-MIR-0021",
+          "miradore_public_ip": "203.0.113.106",
+          "miradore_security_encryption_status": "Enabled",
+          "miradore_security_passcode_set": "Unknown",
+          "miradore_enrollment_type": "EnrolledByMDM",
+          "miradore_enrollment_id": "314"
+        },
+        "fields_absent": [
+          "miradore_suspended",
+          "hostnames",
+          "ipAddresses",
+          "miradore_attr_asset_tag",
+          "miradore_geo_latitude"
+        ]
+      }
+    ],
+    "min_software_total": 1
+  },
+  "check_determinism": true,
+  "invariants": {
+    "skip": []
+  }
+}

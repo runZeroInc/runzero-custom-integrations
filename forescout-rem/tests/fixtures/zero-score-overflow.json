@@ -1,0 +1,158 @@
+{
+  "name": "zero-score-overflow",
+  "integration": "forescout-rem",
+  "description": "REGRESSION LOCK on zero-score asset loss. Forescout documents the risk score as ranging 0.1 to 10, with 0 meaning 'the information necessary to calculate the Risk Score is not available' -- a no-data class whose size is unbounded and which is largest exactly where this integration is most useful, on freshly onboarded or passive-only estates. Sending EITHER risk bound makes the API drop score-0 assets, so the one bound-free probe is the only call that can ever see them. Issuing that probe once and using its truncation only as a boolean to decide whether to start banding would discard the shortfall: a tenant with more than 1000 unscored assets would lose the excess permanently while the run printed a clean success line. Here the probe is capped (total_hits 4300, two rows returned) and must be narrowed on time, recovering rows 3 and 4 from its halves.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "banded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-zero-09",
+                "hostname": "unscored-09",
+                "ip_addresses": [
+                  "10.60.0.9"
+                ],
+                "mac_addresses": [
+                  "00:60:00:00:00:09"
+                ],
+                "rem_category": "OT",
+                "rem_function": "IO Module",
+                "rem_vendor": "Fixture Controls",
+                "risk_score": 7.4,
+                "last_seen": "2026-08-20T09:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "unbanded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 4300,
+            "entities": [
+              {
+                "id": "rem-zero-01",
+                "hostname": "unscored-01",
+                "ip_addresses": [
+                  "10.60.0.1"
+                ],
+                "mac_addresses": [
+                  "00:60:00:00:00:01"
+                ],
+                "rem_category": "OT",
+                "rem_function": "IO Module",
+                "rem_vendor": "Fixture Controls",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T09:00:00.000Z"
+              },
+              {
+                "id": "rem-zero-02",
+                "hostname": "unscored-02",
+                "ip_addresses": [
+                  "10.60.0.2"
+                ],
+                "mac_addresses": [
+                  "00:60:00:00:00:02"
+                ],
+                "rem_category": "OT",
+                "rem_function": "IO Module",
+                "rem_vendor": "Fixture Controls",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T09:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-zero-03",
+                "hostname": "unscored-03",
+                "ip_addresses": [
+                  "10.60.0.3"
+                ],
+                "mac_addresses": [
+                  "00:60:00:00:00:03"
+                ],
+                "rem_category": "OT",
+                "rem_function": "IO Module",
+                "rem_vendor": "Fixture Controls",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T09:00:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-zero-04",
+                "hostname": "unscored-04",
+                "ip_addresses": [
+                  "10.60.0.4"
+                ],
+                "mac_addresses": [
+                  "00:60:00:00:00:04"
+                ],
+                "rem_category": "OT",
+                "rem_function": "IO Module",
+                "rem_vendor": "Fixture Controls",
+                "risk_score": 0,
+                "last_seen": "2026-08-20T09:00:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "ids": [
+      "forescout-rem:$HOST:rem-zero-01",
+      "forescout-rem:$HOST:rem-zero-02",
+      "forescout-rem:$HOST:rem-zero-03",
+      "forescout-rem:$HOST:rem-zero-04"
+    ],
+    "requests_include": [
+      {
+        "query_contains": "order_by=risk_score"
+      }
+    ],
+    "log_contains": [
+      "narrowing it on time"
+    ]
+  },
+  "check_determinism": true
+}

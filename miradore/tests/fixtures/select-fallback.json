@@ -1,11 +1,12 @@
 {
   "name": "select-fallback",
   "integration": "miradore",
-  "description": "A live Miradore site answers 500 -- not 400 -- to a query it dislikes, and fails it whole. This walks the entire attribute ladder: the full set is refused, the core set is refused, and only the third rung, which sends no select at all, succeeds. The path probe also sends no select, so it succeeds first and picks the endpoint. Proves an import still happens when every attribute list is rejected, and that the log names the rung it ended on.",
+  "description": "A live Miradore site fails a query it dislikes WHOLE, and reports it as a 400 carrying an <Error> envelope that names the offending entity and property -- recorded from online.miradore.com on 2026-08-26, where asking for the non-existent InvApplication.Vendor returned exactly this body. Note the body has no <?xml?> prolog and escapes its quotes, both as the live service sends them. This walks the entire attribute ladder: every rung that sends a select is refused, one group at a time, and only the last rung -- which sends no select at all -- succeeds. The path probe also sends no select, so it succeeds first and picks the endpoint. Proves an import still happens when every attribute list is rejected, that a 400 is recognised as retryable, that the description is lifted out of the envelope and logged, that the ladder degrades a group at a time rather than jumping to the core set, and that the log names the rung it ended on.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "1_fixturekey",
-    "site_name": "acme"
+    "site_name": "acme",
+    "include_v2_details": "false"
   },
   "routes": [
     {
@@ -17,11 +18,11 @@
       },
       "responses": [
         {
-          "status": 500,
+          "status": 400,
           "headers": {
             "Content-Type": "application/xml"
           },
-          "text": "<Content><Error><Description>Internal server error</Description><Code>500</Code></Error></Content>"
+          "text": "<Content><Error><Description>Entity &#39;InvApplication&#39; does not have property &#39;Vendor&#39;.</Description><Code>400</Code></Error></Content>"
         }
       ],
       "when_exhausted": "repeat_last"
@@ -35,11 +36,11 @@
       },
       "responses": [
         {
-          "status": 500,
+          "status": 400,
           "headers": {
             "Content-Type": "application/xml"
           },
-          "text": "<Content><Error><Description>Internal server error</Description><Code>500</Code></Error></Content>"
+          "text": "<Content><Error><Description>Entity &#39;Device&#39; does not have property &#39;NoSuchAttribute&#39;.</Description><Code>400</Code></Error></Content>"
         }
       ],
       "when_exhausted": "repeat_last"
@@ -56,7 +57,7 @@
           "headers": {
             "Content-Type": "application/xml"
           },
-          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"1\"><Device><ID>7</ID><Platform>iOS</Platform><IPAddress>10.40.0.7</IPAddress><MACAddress>00:11:22:CC:00:07</MACAddress><Status>Active</Status><InvDevice><DeviceName>core-only-07</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone15,2</Model></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"1\"><Device><ID>7</ID><Platform>iOS</Platform><IPAddress>198.51.100.7</IPAddress><LocalIPAddress>10.40.0.7</LocalIPAddress><MACAddress>00:11:22:CC:00:07</MACAddress><Status>Active</Status><InvDevice><DeviceName>core-only-07</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone15,2</Model></InvDevice><InvOS><Platform>iOS</Platform><Version>18.1</Version></InvOS></Device></Items></Content>"
         }
       ],
       "when_exhausted": "repeat_last"
@@ -67,10 +68,13 @@
     "ids": [
       "miradore:acme:7"
     ],
-    "request_count": 4,
+    "request_count": 6,
     "log_contains": [
-      "Internal server error",
-      "retrying with core attribute set",
+      "Entity 'InvApplication' does not have property 'Vendor'.",
+      "Entity 'Device' does not have property 'NoSuchAttribute'.",
+      "retrying with the inventory and application attributes",
+      "retrying with the inventory attributes alone",
+      "retrying with the core attribute set",
       "retrying with the API's default attribute set",
       "ran with the API's default attribute set",
       "reported 1 of 1 devices matched by the query"
@@ -82,7 +86,8 @@
           "os": "iOS",
           "model": "iPhone15,2",
           "hostnames": "core-only-07",
-          "ipAddresses": "10.40.0.7"
+          "ipAddresses": "10.40.0.7",
+          "miradore_public_ip": "198.51.100.7"
         }
       }
     ]

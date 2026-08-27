@@ -1,0 +1,40 @@
+{
+  "name": "empty",
+  "integration": "armis",
+  "description": "A tenant whose ASQ filter matches nothing. The search answers 200 with an empty results array and a null next, which must end the walk after one page, report zero assets with the 'no assets retrieved' notice, and exit cleanly. The difference between a scoped tenant and a broken credential has to be a log line rather than a failed task, or every operator who narrows device_filter too far opens a support case.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key",
+    "device_filter": "riskLevel:High",
+    "page_size": "1000",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "empty-token", "expiration_utc": "2026-08-26T18:04:56.123456+00:00"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"count": 0, "next": null, "prev": null, "results": []}}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/search/", "query_contains": "riskLevel%3AHigh"}
+    ],
+    "log_contains": ["armis: no assets retrieved"]
+  },
+  "check_determinism": true
+}

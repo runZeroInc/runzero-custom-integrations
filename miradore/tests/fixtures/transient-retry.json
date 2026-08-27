@@ -7,7 +7,8 @@
     "api_key": "1_fixturekey",
     "site_name": "acme",
     "page_size": "2",
-    "include_software": "false"
+    "include_software": "false",
+    "include_v2_details": "false"
   },
   "routes": [
     {

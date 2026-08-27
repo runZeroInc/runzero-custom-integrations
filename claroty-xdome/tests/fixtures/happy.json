@@ -1,0 +1,494 @@
+{
+  "name": "happy",
+  "integration": "claroty-xdome",
+  "description": "One page of device-vulnerability relations followed by one page of devices, built from Claroty's own OpenAPI examples and from the raw tenant JSON in the Elastic integration's mock server.\n\nFour devices carry the four structural facts this API forces on a mapper. The SCADA server is multi-homed and proves the parallel _list arrays are zipped BY INDEX rather than cross-producted: ip_list[1] belongs to mac_list[1] and to nothing else, which macPairs asserts exactly. Its second address carries the documented ' / (annotation)' suffix, and is deliberately NOT imported as an address: the vendor documents the annotation as either a child device id or (Last Known IP), so the address is either historical or belongs to a different device that has its own uid and its own row. Importing it would assert this asset currently holds an address it does not, and in the child case would make two assets from one import claim the same address. The paired MAC still yields a MAC-only interface, and the raw entry is kept as claroty_xdome_ip_list_annotated. Every device_name in this set is a bare IP address -- that is what the vendor's own samples look like -- and none of them may become a hostname, because the same string would land on whichever device holds the address next; the Siemens controller has no protocol-derived name at all and therefore emits no hostname rather than its device_name.\n\nThe nurse call station carries the vendor's FragAttacks example, where one Claroty vulnerability_id fans out to twelve CVEs, plus a single-CVE row and a legacy advisory whose cve_ids hold one lower-case id and one string that is not a CVE at all. Vulnerability.cve is regex-validated and is not upper-cased for the script, so the lower-case id must be folded and the non-CVE one dropped without failing the record. A relation row for a device that is not in the inventory is dropped rather than turned into an asset: the relation endpoint is a different grain, and building inventory from it would resurrect retired devices.\n\nThe request assertions pin the shape of the retired filter, not just its presence. `in` over a single-element array is what Claroty's own XSOAR client sends and the only equality operation in the spec's conventions table; `equals` appears in one documentation example and in Brinqa's connector. A filter the tenant rejects is not a degraded import but a failed request, and the run would report zero assets, so the vendor's own spelling is the one worth asserting.\n\nThe SCADA server also carries the switch group and the printer the wireless group. They are per-NIC `_list` fields like every other one, so their entries index-align with the interfaces built from mac_list, and the comma-joined attribute values assert that the order survives.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-relations",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/device_vulnerability_relations/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices_vulnerabilities": [
+              {
+                "device_uid": "811997e7-cb4f-448f-9b68-68022d745404",
+                "device_asset_id": "FDNTIUE",
+                "vulnerability_id": "ALKIFVSA",
+                "vulnerability_name": "FragAttacks",
+                "vulnerability_type": "Platform",
+                "vulnerability_cve_ids": [
+                  "CVE-2020-24586",
+                  "CVE-2020-24587",
+                  "CVE-2020-24588",
+                  "CVE-2020-26139",
+                  "CVE-2020-26140",
+                  "CVE-2020-26141",
+                  "CVE-2020-26142",
+                  "CVE-2020-26143",
+                  "CVE-2020-26144",
+                  "CVE-2020-26145",
+                  "CVE-2020-26146",
+                  "CVE-2020-26147"
+                ],
+                "vulnerability_cvss_v2_score": 3.3,
+                "vulnerability_cvss_v3_score": 6.5,
+                "vulnerability_adjusted_vulnerability_score": 5.9,
+                "vulnerability_adjusted_vulnerability_score_level": "Medium",
+                "vulnerability_relevance": "Potentially Relevant",
+                "vulnerability_is_known_exploited": false,
+                "vulnerability_epss_score": 0.0043,
+                "vulnerability_published_date": "2021-05-12T00:00:00.485000+00:00",
+                "device_vulnerability_detection_date": "2025-02-11T04:31:00+00:00"
+              },
+              {
+                "device_uid": "811997e7-cb4f-448f-9b68-68022d745404",
+                "device_asset_id": "FDNTIUE",
+                "vulnerability_id": "CJYASHKR",
+                "vulnerability_name": "CVE-2021-31998",
+                "vulnerability_type": "Platform",
+                "vulnerability_cve_ids": [
+                  "CVE-2021-31998"
+                ],
+                "vulnerability_cvss_v2_score": 7.2,
+                "vulnerability_cvss_v3_score": 7.8,
+                "vulnerability_adjusted_vulnerability_score_level": "High",
+                "vulnerability_relevance": "Confirmed",
+                "vulnerability_is_known_exploited": true,
+                "vulnerability_epss_score": 0.3182,
+                "vulnerability_exploits_count": 2,
+                "vulnerability_recommendations": "Upgrade to the vendor's 2021.06 maintenance release.",
+                "vulnerability_published_date": "2021-06-10T12:15:00+00:00",
+                "device_vulnerability_detection_date": "2025-02-11T04:31:00+00:00"
+              },
+              {
+                "device_uid": "811997e7-cb4f-448f-9b68-68022d745404",
+                "vulnerability_id": "ZZTOPAAA",
+                "vulnerability_name": "Legacy remote code execution advisory",
+                "vulnerability_type": "Application",
+                "vulnerability_cve_ids": [
+                  "cve-2019-0708",
+                  "CLAROTY-ADVISORY-77"
+                ],
+                "vulnerability_cvss_v3_score": 9.8,
+                "vulnerability_relevance": "Confirmed",
+                "device_vulnerability_detection_date": "2025-03-01T00:00:00+00:00"
+              },
+              {
+                "device_uid": "00000000-0000-4000-8000-00000000dead",
+                "vulnerability_id": "ORPHANID",
+                "vulnerability_name": "Finding for a device outside the inventory page set",
+                "vulnerability_cve_ids": [
+                  "CVE-2022-22965"
+                ],
+                "vulnerability_relevance": "Confirmed"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "uid": "002b2962-6964-4b0d-9faa-3a46e9057241",
+                "asset_id": "OOZNNQK",
+                "device_name": "81.2.69.144",
+                "device_category": "OT",
+                "device_subcategory": "Operation",
+                "device_type": "SCADA Server",
+                "device_type_family": "SCADA Server",
+                "windows_last_seen_hostname": "scada-sv2-01",
+                "dhcp_last_seen_hostname": null,
+                "http_last_seen_hostname": null,
+                "snmp_last_seen_hostname": null,
+                "local_name": null,
+                "other_hostnames": [],
+                "domains": [
+                  "plant.example.com"
+                ],
+                "mac_list": [
+                  "a8:99:69:54:0f:f3",
+                  "a8:99:69:54:0f:f4"
+                ],
+                "ip_list": [
+                  "81.2.69.144",
+                  "10.20.30.40 / (Last Known IP)"
+                ],
+                "mac_oui_list": [
+                  "Dell Inc.",
+                  "Dell Inc."
+                ],
+                "ip_assignment_list": [
+                  "Static",
+                  "DHCP"
+                ],
+                "vlan_list": [
+                  122,
+                  122
+                ],
+                "vlan_name_list": [
+                  "VLAN 122",
+                  "VLAN 122"
+                ],
+                "switch_mac_list": [
+                  "00:12:00:36:4e:5f",
+                  "00:12:00:36:4e:60"
+                ],
+                "switch_port_list": [
+                  "Fa/1/12",
+                  "Fa/1/13"
+                ],
+                "switch_name_list": [
+                  "plant-idf-3",
+                  "plant-idf-4"
+                ],
+                "switch_ip_list": [
+                  "10.20.0.2",
+                  "10.20.0.3"
+                ],
+                "switch_location_list": [
+                  "Bldg 2 IDF 3",
+                  "Bldg 2 IDF 4"
+                ],
+                "connection_type_list": [
+                  "Ethernet",
+                  "Ethernet"
+                ],
+                "network_list": [
+                  "Industrial",
+                  "Industrial"
+                ],
+                "network_scope_list": [
+                  "Default",
+                  "Default"
+                ],
+                "number_of_nics": 2,
+                "first_seen_list": [
+                  "2024-12-30T07:00:35.923519+00:00",
+                  "2025-01-04T09:11:02.100000+00:00"
+                ],
+                "last_seen_list": [
+                  "2025-03-28T02:19:42.757340+00:00",
+                  "2025-03-27T22:04:11.000000+00:00"
+                ],
+                "is_online": true,
+                "retired": false,
+                "os_name": "Windows",
+                "os_version": "Server 2012 R2",
+                "os_category": "Windows",
+                "os_subcategory": "Windows 8.1 & Equivalent",
+                "combined_os": "Windows Server 2012 R2",
+                "os_eol_date": "2023-10-10T00:00:00+00:00",
+                "manufacturer": "ABB",
+                "model": "ABB Ability System 800xA DCS",
+                "software_or_firmware_version": "6.2",
+                "site_name": "SV_2",
+                "purdue_level": "Level 2",
+                "risk_score": "Critical",
+                "risk_score_points": 69.76715,
+                "known_vulnerabilities": "Critical",
+                "insecure_protocols": "Very Low",
+                "labels": [
+                  "criticality"
+                ],
+                "machine_type": "Physical"
+              },
+              {
+                "uid": "0d4b011f-fe47-46d0-9b9c-b102e3309aaa",
+                "asset_id": "JLSXVOK",
+                "device_name": "81.2.69.145",
+                "device_category": "OT",
+                "device_subcategory": "Building Management",
+                "device_type": "Building Automation Controller",
+                "device_type_family": "Building Automation Controller",
+                "local_name": null,
+                "windows_last_seen_hostname": null,
+                "other_hostnames": [],
+                "manufacturer": "Siemens",
+                "model": "PXC100-PE96.A",
+                "serial_number": "150214B94630",
+                "hw_version": "PXME V2.8.18",
+                "os_name": "Nucleus",
+                "os_version": "3.1.1",
+                "os_revision": "M1AJQ",
+                "os_category": "Other",
+                "os_subcategory": "Nucleus",
+                "combined_os": "Nucleus 3.1.1",
+                "mac_list": [
+                  "00:c0:e4:4b:d4:a8"
+                ],
+                "mac_oui_list": [
+                  "Siemens Building"
+                ],
+                "ip_list": [
+                  "81.2.69.145"
+                ],
+                "ip_assignment_list": [
+                  "Static"
+                ],
+                "vlan_list": [
+                  108
+                ],
+                "vlan_name_list": [
+                  "Bldg1-Flr8"
+                ],
+                "network_list": [
+                  "Industrial"
+                ],
+                "network_scope_list": [
+                  "Default"
+                ],
+                "number_of_nics": 1,
+                "first_seen_list": [
+                  "2024-12-05T05:08:40.208303+00:00"
+                ],
+                "last_seen_list": [
+                  "2025-03-28T02:54:47.042124+00:00"
+                ],
+                "is_online": true,
+                "retired": false,
+                "site_name": "SV_1",
+                "purdue_level": "Level 1",
+                "risk_score": "Medium",
+                "risk_score_points": 56.04282,
+                "labels": [
+                  "Asset Owner",
+                  "criticality"
+                ],
+                "assignees": [
+                  "Jose Alegria",
+                  "Kelvin Kan"
+                ],
+                "machine_type": "Physical"
+              },
+              {
+                "uid": "8e7354b2-c6e9-46a0-bca6-3bb9c7bb05c9",
+                "asset_id": "DNFLVYE",
+                "device_name": "10.100.3.79",
+                "risk_score": "Medium",
+                "os_category": "Other",
+                "labels": [],
+                "device_type_family": "Printer",
+                "vlan_list": [
+                  5
+                ],
+                "mac_list": [
+                  "0a:65:bc:43:38:97"
+                ],
+                "device_subcategory": "General IoT",
+                "retired": false,
+                "assignees": [],
+                "network_list": [
+                  "Corporate"
+                ],
+                "model": "Laser Printer",
+                "device_type": "Printer",
+                "device_category": "IoT",
+                "snmp_last_seen_hostname": "floor3-laser",
+                "ip_list": [
+                  "10.100.3.79"
+                ],
+                "connection_type_list": [
+                  "Wireless"
+                ],
+                "ssid_list": [
+                  "Guest"
+                ],
+                "bssid_list": [
+                  "00:11:22:33:44:55"
+                ],
+                "ap_name_list": [
+                  "ap-floor3"
+                ],
+                "dhcp_fingerprint": "1,15,3,6,44,46,47,31,33,121,249,43"
+              },
+              {
+                "uid": "811997e7-cb4f-448f-9b68-68022d745404",
+                "asset_id": "FDNTIUE",
+                "device_name": "10.100.5.21",
+                "device_category": "Medical",
+                "device_subcategory": "Clinical IoT",
+                "device_type": "Nurse Call",
+                "windows_last_seen_hostname": "nursecall-4f",
+                "dhcp_last_seen_hostname": "NURSECALL-4F",
+                "other_hostnames": [
+                  "nursecall-4f.ward.example.org"
+                ],
+                "mac_list": [
+                  "b4:2e:99:11:22:33"
+                ],
+                "ip_list": [
+                  "10.100.5.21"
+                ],
+                "network_list": [
+                  "Corporate"
+                ],
+                "number_of_nics": 1,
+                "manufacturer": "Rauland",
+                "model": "Responder 5",
+                "site_name": "Main Campus",
+                "purdue_level": "Level 4",
+                "risk_score": "Medium",
+                "retired": false,
+                "labels": [],
+                "first_seen_list": [
+                  "2024-06-01T00:00:00+00:00"
+                ],
+                "last_seen_list": [
+                  "2025-03-28T01:00:00+00:00"
+                ],
+                "connection_type_list": [
+                  "Ethernet"
+                ],
+                "ad_distinguished_name": "CN=NURSECALL-4F,OU=Clinical,DC=ward,DC=example,DC=org",
+                "last_domain_user": "ward\\rn.duty",
+                "ae_titles": [
+                  "NURSECALL4F"
+                ],
+                "note": "Replaced 2024-11; on the clinical VLAN by exception.",
+                "internet_communication": "No Communication",
+                "last_scan_time": "2025-03-20T06:00:00+00:00"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "claroty-xdome:002b2962-6964-4b0d-9faa-3a46e9057241",
+      "claroty-xdome:0d4b011f-fe47-46d0-9b9c-b102e3309aaa",
+      "claroty-xdome:8e7354b2-c6e9-46a0-bca6-3bb9c7bb05c9",
+      "claroty-xdome:811997e7-cb4f-448f-9b68-68022d745404"
+    ],
+    "ids_absent": [
+      "claroty-xdome:00000000-0000-4000-8000-00000000dead"
+    ],
+    "assets": [
+      {
+        "id": "claroty-xdome:002b2962-6964-4b0d-9faa-3a46e9057241",
+        "fields": {
+          "macPairs": "a8:99:69:54:0f:f3=81.2.69.144",
+          "hostnames": "scada-sv2-01",
+          "deviceType": "SCADA Server",
+          "os": "Windows",
+          "osVersion": "Server 2012 R2",
+          "manufacturer": "ABB",
+          "claroty_xdome_ip_assignment_list": "Static,DHCP",
+          "claroty_xdome_number_of_nics": "2",
+          "claroty_xdome_device_name": "81.2.69.144",
+          "claroty_xdome_ip_list_annotated": "10.20.30.40 / (Last Known IP)",
+          "claroty_xdome_switch_name_list": "plant-idf-3,plant-idf-4",
+          "claroty_xdome_switch_port_list": "Fa/1/12,Fa/1/13",
+          "claroty_xdome_switch_mac_list": "00:12:00:36:4e:5f,00:12:00:36:4e:60",
+          "claroty_xdome_switch_ip_list": "10.20.0.2,10.20.0.3",
+          "claroty_xdome_switch_location_list": "Bldg 2 IDF 3,Bldg 2 IDF 4"
+        }
+      },
+      {
+        "id": "claroty-xdome:0d4b011f-fe47-46d0-9b9c-b102e3309aaa",
+        "fields": {
+          "osVersion": "3.1.1 M1AJQ",
+          "claroty_xdome_serial_number": "150214B94630",
+          "claroty_xdome_device_name": "81.2.69.145",
+          "ipAddresses": "81.2.69.145"
+        },
+        "fields_absent": [
+          "hostnames"
+        ]
+      },
+      {
+        "id": "claroty-xdome:8e7354b2-c6e9-46a0-bca6-3bb9c7bb05c9",
+        "fields": {
+          "claroty_xdome_connection_type_list": "Wireless",
+          "claroty_xdome_ssid_list": "Guest",
+          "claroty_xdome_bssid_list": "00:11:22:33:44:55",
+          "claroty_xdome_ap_name_list": "ap-floor3",
+          "claroty_xdome_dhcp_fingerprint": "1,15,3,6,44,46,47,31,33,121,249,43"
+        }
+      },
+      {
+        "id": "claroty-xdome:811997e7-cb4f-448f-9b68-68022d745404",
+        "fields": {
+          "hostnames": "nursecall-4f\tnursecall-4f.ward.example.org",
+          "deviceType": "Nurse Call",
+          "claroty_xdome_vulnerability_count": "14",
+          "claroty_xdome_ad_distinguished_name": "CN=NURSECALL-4F,OU=Clinical,DC=ward,DC=example,DC=org",
+          "claroty_xdome_last_domain_user": "ward\\rn.duty",
+          "claroty_xdome_ae_titles": "NURSECALL4F",
+          "claroty_xdome_note": "Replaced 2024-11; on the clinical VLAN by exception.",
+          "claroty_xdome_internet_communication": "No Communication",
+          "claroty_xdome_last_scan_time": "2025-03-20T06:00:00+00:00"
+        }
+      }
+    ],
+    "min_vulnerabilities_total": 14,
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/api/v1/device_vulnerability_relations/",
+        "body_contains": "vulnerability_relevance"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/devices/",
+        "body_contains": "\"offset\":0"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/devices/",
+        "body_contains": "\"retired\""
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/devices/",
+        "body_contains": "\"operation\":\"in\""
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/devices/",
+        "body_contains": "\"value\":[false]"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/devices/",
+        "body_contains": "\"switch_port_list\""
+      },
+      {
+        "header_contains": "fixture-token"
+      }
+    ],
+    "log_contains": [
+      "indexed 4 vulnerability relations across 2 devices",
+      "dropped findings for 1 devices absent from the inventory",
+      "reported 4 devices"
+    ]
+  },
+  "check_determinism": true
+}

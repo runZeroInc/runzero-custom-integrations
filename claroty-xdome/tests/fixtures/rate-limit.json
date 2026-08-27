@@ -1,0 +1,77 @@
+{
+  "name": "rate-limit",
+  "integration": "claroty-xdome",
+  "description": "Claroty documents no rate limit at all -- the OpenAPI document declares no 429 on any operation, and none of the shipping partner connectors implement backoff -- so a 429 here is possible but unproven. This scenario proves the run survives one anyway: post_json retries transient statuses three times by default with exponential backoff and honours Retry-After, so the script hand-rolls nothing and both endpoints still return their rows on the second attempt.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-relations",
+      "match": {"method": "POST", "path": "/api/v1/device_vulnerability_relations/"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"detail": "too many requests"}},
+        {
+          "status": 200,
+          "json": {
+            "devices_vulnerabilities": [
+              {
+                "device_uid": "20000000-0000-4000-8000-000000000701",
+                "vulnerability_id": "RLVULN01",
+                "vulnerability_name": "CVE-2024-3400",
+                "vulnerability_cve_ids": ["CVE-2024-3400"],
+                "vulnerability_cvss_v3_score": 10.0,
+                "vulnerability_adjusted_vulnerability_score_level": "Critical",
+                "vulnerability_relevance": "Confirmed",
+                "vulnerability_is_known_exploited": true
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "POST", "path": "/api/v1/devices/"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"detail": "too many requests"}},
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {
+                "uid": "20000000-0000-4000-8000-000000000701",
+                "asset_id": "RLDEVICE",
+                "device_name": "10.90.0.7",
+                "device_type": "Patient Monitor",
+                "device_category": "Medical",
+                "manufacturer": "Philips",
+                "model": "IntelliVue MX40",
+                "windows_last_seen_hostname": "mx40-ward-3",
+                "ip_list": ["10.90.0.7"],
+                "mac_list": ["00:1e:c0:aa:bb:cc"],
+                "retired": false,
+                "last_seen_list": ["2025-03-28T02:19:42.757340+00:00"]
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["claroty-xdome:20000000-0000-4000-8000-000000000701"],
+    "min_vulnerabilities_total": 1,
+    "min_requests": 4,
+    "log_contains": [
+      "indexed 1 vulnerability relations across 1 devices",
+      "reported 1 devices"
+    ]
+  },
+  "check_determinism": true
+}

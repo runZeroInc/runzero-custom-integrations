@@ -1,0 +1,143 @@
+{
+  "name": "never-seen",
+  "integration": "claroty-ctd",
+  "description": "REGRESSION LOCK on the 'never seen' sentinels. build_asset used to pass parse_ts straight into the ImportAsset constructor with no guard, and parse_ts does NOT return None for either sentinel -- verified against the runtime, a 1970-01-01 value returns unix=0 and an ISO year-1 value (Go's zero time) returns unix=-62135596800. Both would import as real timestamps, making a never-seen OT asset look decades old rather than unknown. Asset 9101 carries the epoch sentinel, 9102 the year-1 sentinel, and 9103 a genuine pair that must still survive so the guard cannot be satisfied by dropping every timestamp.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "false",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "auth",
+      "match": {
+        "method": "POST",
+        "path": "/auth/authenticate"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "token": "fixture-token",
+            "password_expired": false
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets",
+      "match": {
+        "method": "GET",
+        "path": "/ranger/assets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "count_total": 3,
+            "count_filtered": 3,
+            "count_in_page": 3,
+            "objects": [
+              {
+                "id": 9101,
+                "resource_id": "9101-1",
+                "site_id": 1,
+                "site_name": "site-fixture",
+                "name": "never-epoch",
+                "display_name": "never-epoch",
+                "ipv4": [
+                  "10.91.0.11"
+                ],
+                "mac": [
+                  "00:50:56:8d:91:01"
+                ],
+                "vendor": "Fixture Controls",
+                "class_type": "OT",
+                "purdue_level": 2,
+                "first_seen": "1970-01-01T00:00:00+00:00",
+                "last_seen": "1970-01-01T00:00:00+00:00"
+              },
+              {
+                "id": 9102,
+                "resource_id": "9102-1",
+                "site_id": 1,
+                "site_name": "site-fixture",
+                "name": "never-year1",
+                "display_name": "never-year1",
+                "ipv4": [
+                  "10.91.0.12"
+                ],
+                "mac": [
+                  "00:50:56:8d:91:02"
+                ],
+                "vendor": "Fixture Controls",
+                "class_type": "OT",
+                "purdue_level": 2,
+                "first_seen": "0001-01-01T00:00:00Z",
+                "last_seen": "0001-01-01T00:00:00Z"
+              },
+              {
+                "id": 9103,
+                "resource_id": "9103-1",
+                "site_id": 1,
+                "site_name": "site-fixture",
+                "name": "real-seen",
+                "display_name": "real-seen",
+                "ipv4": [
+                  "10.91.0.13"
+                ],
+                "mac": [
+                  "00:50:56:8d:91:03"
+                ],
+                "vendor": "Fixture Controls",
+                "class_type": "OT",
+                "purdue_level": 2,
+                "first_seen": "2023-04-17T07:30:22+00:00",
+                "last_seen": "2024-07-04T13:01:30+00:00"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "count_total": 3,
+            "count_filtered": 3,
+            "count_in_page": 0,
+            "objects": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:9101-1",
+        "fields_absent": [
+          "firstSeenTS",
+          "lastSeenTS"
+        ]
+      },
+      {
+        "id": "claroty-ctd:$HOST:9102-1",
+        "fields_absent": [
+          "firstSeenTS",
+          "lastSeenTS"
+        ]
+      },
+      {
+        "id": "claroty-ctd:$HOST:9103-1",
+        "fields": {
+          "lastSeenTS": "1720098090"
+        }
+      }
+    ]
+  },
+  "check_determinism": true
+}

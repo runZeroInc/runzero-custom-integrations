@@ -1,0 +1,76 @@
+{
+  "name": "full-disabled",
+  "integration": "forescout-eyeinspect",
+  "description": "full_host_details=false omits the full parameter, for a Command Center that rejects it. The compact record carries none of the enrichment properties, so the asset must still import cleanly with only the base fields and emit no services, software or host-CVE findings.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-pass",
+    "full_host_details": "false",
+    "include_alerts": "false"
+  },
+  "routes": [
+    {
+      "name": "hosts",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "results": [
+              {
+                "id": 9101,
+                "ip": "10.80.2.21",
+                "mac_addresses": [
+                  "00:1b:1b:00:91:01"
+                ],
+                "main_name": "syn-rtu-01",
+                "os_version": "VxWorks 6.9",
+                "vlan": 210,
+                "first_seen": "2026-02-01T08:15:00Z",
+                "last_seen": "2026-08-02T09:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "status": 200,
+          "json": {
+            "total_count": 1,
+            "results": []
+          }
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "forescout-eyeinspect:$HOST:9101"
+    ],
+    "requests_include": [
+      {
+        "method": "GET",
+        "path": "/api/v1/hosts"
+      }
+    ],
+    "requests_absent": [
+      {
+        "path": "/api/v1/hosts",
+        "query_contains": "full=true"
+      },
+      {
+        "path": "/api/v1/alerts"
+      }
+    ],
+    "log_contains": [
+      "reported 1 assets"
+    ]
+  },
+  "check_determinism": true
+}

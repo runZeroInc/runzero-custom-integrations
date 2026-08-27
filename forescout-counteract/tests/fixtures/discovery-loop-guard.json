@@ -1,0 +1,75 @@
+{
+  "name": "discovery-loop-guard",
+  "integration": "forescout-counteract",
+  "description": "The documented end of the paginated walk is the absence of a next_link, so an Enterprise Manager that keeps handing back one it has already served never says stop. pager() would eventually catch that, but it catches it by raising at CONFIG maxPages and reporting the import as incomplete -- the wrong answer for a walk that had in fact finished, and a thousand wasted requests against a 20-per-minute limit before it gets there. So a next_link naming a page and node already visited ends the walk cleanly instead. Here page 1 points back at itself: the walk must make exactly two paginated requests, keep both endpoints, and say why it stopped. The pager() guard stays underneath as the backstop for a server that varies the page number without ever running out.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "webapi-fixture",
+    "password": "fixture-password",
+    "include_details": "false"
+  },
+  "routes": [
+    {
+      "name": "login",
+      "match": {"method": "POST", "path": "/api/login"},
+      "responses": [
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJsb29wIn0.bG9vcC1zaWduYXR1cmU"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-page-0",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "next_link": "https://enterprise-manager.example.com/api/hosts/discovery?pageSize=1000&page=1&nodeId=0"
+            },
+            "hosts": [
+              {"id": 167838209, "ip": "10.1.2.1", "mac": "0022e51f9018", "fields": {}}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "discovery-page-1-repeating",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=1"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "next_link": "https://enterprise-manager.example.com/api/hosts/discovery?pageSize=1000&page=1&nodeId=0"
+            },
+            "hosts": [
+              {"id": 167838210, "ip": "10.1.2.2", "mac": "0022e51f9019", "fields": {}}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "forescout-counteract:$HOST:167838209",
+      "forescout-counteract:$HOST:167838210"
+    ],
+    "request_count": 3,
+    "requests_absent": [
+      {"path": "/api/hostfields"},
+      {"path": "/api/hosts"}
+    ],
+    "log_contains": [
+      "forescout-counteract: the paginated walk repeated page 1 of node 0; stopping",
+      "forescout-counteract: imported 2 assets from the paginated endpoint over 2 request(s)"
+    ]
+  },
+  "check_determinism": true,
+  "invariants": {"skip": []}
+}

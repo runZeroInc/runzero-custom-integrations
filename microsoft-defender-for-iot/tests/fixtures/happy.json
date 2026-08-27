@@ -1,0 +1,210 @@
+{
+  "name": "happy",
+  "integration": "microsoft-defender-for-iot",
+  "description": "One OT sensor's unpaginated inventory. Covers a fully populated device with firmware modules and a protocols array, a device that carries only a MAC, a device that carries only an IP, a device with several MACs and both address families, a device with no addresses at all, and a device whose only addresses are loopback and APIPA. The last two must be skipped: with no-id-match set, a record with no MAC, IP, or usable hostname has nothing runZero could ever correlate it on, and routable_ips drops 127.0.0.1 and 169.254/16 before the interface is built. Sensor-assigned labels (PLC #14, OT Device #966, RTU #3) are deliberately not imported as hostnames -- they are per-sensor display counters, not DNS names. The vulnerability report answers with an empty array, which is the documented shape when no device has findings. Device 44's type is the literal string 'Unknown', which is not a device type: the type mapping folds it to nothing rather than importing it, so deviceType is asserted absent while the raw spelling still survives in the type: tag.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-report",
+      "match": {"method": "GET", "path": "/api/v1/reports/vulnerabilities/devices"},
+      "responses": [{"status": 200, "json": []}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 42,
+              "name": "hmi-line3.plant.example.com",
+              "ipAddresses": ["10.20.30.40"],
+              "macAddresses": ["00:1b:1b:aa:bb:01"],
+              "vendor": "Siemens AG",
+              "operatingSystem": "Windows 10",
+              "type": "HMI",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": [
+                {"id": 1, "name": "Siemens S7", "ipAddresses": ["10.20.30.40"]},
+                {"id": 2, "name": "Profinet DCP", "ipAddresses": ["10.20.30.40"]}
+              ],
+              "firmware": [
+                {
+                  "address": "10.20.30.40",
+                  "moduleAddress": "rack0-slot2",
+                  "serial": "SN-77120",
+                  "model": "SIMATIC HMI TP1200 Comfort",
+                  "firmwareVersion": "15.1.0.0",
+                  "additionalData": "",
+                  "rack": "0",
+                  "slot": "2"
+                }
+              ]
+            },
+            {
+              "id": 43,
+              "name": "PLC #14",
+              "ipAddresses": [],
+              "macAddresses": ["00:1b:1b:aa:bb:02"],
+              "vendor": "Rockwell Automation",
+              "operatingSystem": null,
+              "type": "PLC",
+              "engineeringStation": false,
+              "authorized": false,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": {"id": 3, "name": "EtherNet/IP", "ipAddresses": []},
+              "firmware": []
+            },
+            {
+              "id": 44,
+              "name": "OT Device #966",
+              "ipAddresses": ["10.20.30.44"],
+              "macAddresses": null,
+              "vendor": null,
+              "operatingSystem": null,
+              "type": "Unknown",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": true,
+              "hasDynamicAddress": true,
+              "protocols": null,
+              "firmware": []
+            },
+            {
+              "id": 45,
+              "name": "RTU #3",
+              "ipAddresses": [],
+              "macAddresses": [],
+              "vendor": "Schneider Electric",
+              "type": "RTU",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "firmware": []
+            },
+            {
+              "id": 46,
+              "name": "Meter #7",
+              "ipAddresses": ["127.0.0.1", "169.254.10.5"],
+              "macAddresses": [],
+              "vendor": "Landis+Gyr",
+              "type": "Meter",
+              "engineeringStation": false,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": true,
+              "firmware": []
+            },
+            {
+              "id": 47,
+              "name": "eng-station-01.plant.example.com",
+              "ipAddresses": ["10.20.30.47", "2001:db8:aa::47"],
+              "macAddresses": ["00:1b:1b:aa:bb:07", "00:1b:1b:aa:bb:08"],
+              "vendor": "Dell Inc.",
+              "operatingSystem": "Windows Server 2019",
+              "type": "Engineering Station",
+              "engineeringStation": true,
+              "authorized": true,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": [{"id": 4, "name": "OPC UA", "ipAddresses": ["10.20.30.47"]}],
+              "firmware": [
+                {"moduleAddress": "cpu0", "serial": "DL-4471", "model": "PowerEdge R640", "firmwareVersion": "2.11.2"}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 4,
+    "ids": [
+      "microsoft-defender-for-iot:$HOST:42",
+      "microsoft-defender-for-iot:$HOST:43",
+      "microsoft-defender-for-iot:$HOST:44",
+      "microsoft-defender-for-iot:$HOST:47"
+    ],
+    "ids_absent": [
+      "microsoft-defender-for-iot:$HOST:45",
+      "microsoft-defender-for-iot:$HOST:46"
+    ],
+    "assets": [
+      {
+        "id": "microsoft-defender-for-iot:$HOST:42",
+        "fields": {
+          "hostnames": "hmi-line3.plant.example.com",
+          "ipAddresses": "10.20.30.40",
+          "macAddresses": "00:1b:1b:aa:bb:01",
+          "deviceType": "HMI",
+          "os": "Windows 10",
+          "manufacturer": "Siemens AG",
+          "model": "SIMATIC HMI TP1200 Comfort",
+          "microsoft_defender_for_iot_device_name": "hmi-line3.plant.example.com",
+          "microsoft_defender_for_iot_protocols": "Siemens S7,Profinet DCP",
+          "microsoft_defender_for_iot_serial_number": "SN-77120",
+          "microsoft_defender_for_iot_sensor": "$HOST"
+        }
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:43",
+        "fields": {
+          "macAddresses": "00:1b:1b:aa:bb:02",
+          "deviceType": "PLC",
+          "microsoft_defender_for_iot_device_name": "PLC #14",
+          "microsoft_defender_for_iot_protocols": "EtherNet/IP"
+        },
+        "fields_absent": ["hostnames", "ipAddresses"]
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:44",
+        "fields": {
+          "ipAddresses": "10.20.30.44",
+          "microsoft_defender_for_iot_has_dynamic_address": "true"
+        },
+        "fields_absent": ["hostnames", "macAddresses", "deviceType"]
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:47",
+        "fields": {
+          "hostnames": "eng-station-01.plant.example.com",
+          "ipAddresses": "10.20.30.47\t2001:db8:aa::47",
+          "macAddresses": "00:1b:1b:aa:bb:07\t00:1b:1b:aa:bb:08",
+          "os": "Windows Server 2019",
+          "model": "PowerEdge R640"
+        }
+      }
+    ],
+    "request_count": 2,
+    "min_software_total": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/reports/vulnerabilities/devices"},
+      {"method": "GET", "path": "/api/v1/devices/"},
+      {"header_contains": "fixture-sensor-token"}
+    ],
+    "requests_absent": [
+      {"path": "/api/v1/devices/", "query_contains": "authorized="}
+    ],
+    "log_contains": [
+      "microsoft-defender-for-iot: indexed vulnerability findings for 0 devices",
+      "microsoft-defender-for-iot: skipping device 45 with no MAC, IP, or usable hostname to correlate on",
+      "microsoft-defender-for-iot: skipping device 46 with no MAC, IP, or usable hostname to correlate on",
+      "microsoft-defender-for-iot: reported 4 assets from sensor"
+    ]
+  },
+  "check_determinism": true
+}

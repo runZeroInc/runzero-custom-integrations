@@ -1,0 +1,64 @@
+{
+  "name": "rate-limit",
+  "integration": "cisco-cyber-vision",
+  "description": "The Center answers the first device request with 429 and the retry with data, and rejects the first per-device vulnerability lookup the same way. Cyber Vision publishes no rate limit, so this is defensive rather than documented: get_json retries 408/425/429/5xx three times with backoff and honors Retry-After, and the script adds no retry logic of its own. Both the inventory walk and the N+1 enrichment must survive it.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "device-vulnerabilities",
+      "match": {"method": "GET", "path_regex": "/api/3.0/devices/[0-9a-f-]+/vulnerabilities$"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "too many requests"}},
+        {
+          "status": 200,
+          "json": [
+            {"id": "v-1", "cve": "CVE-2022-1161", "title": "Rockwell Logix firmware modification", "score": 10.0}
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/3.0/devices"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "too many requests"}},
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "bbbb0001-0000-4000-8000-000000000011",
+              "label": "Cell3-PLC-01",
+              "ip": "10.22.0.11",
+              "mac": "00:1d:9c:33:00:11",
+              "isDevice": true,
+              "vulnerabilitiesCount": 1,
+              "normalizedProperties": [
+                {"key": "vendor-name", "value": "Rockwell Automation"},
+                {"key": "model-name", "value": "1756-L61"},
+                {"key": "fw-version", "value": "20.014"}
+              ]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": ["cisco-cyber-vision:$HOST:bbbb0001-0000-4000-8000-000000000011"],
+    "min_requests": 4,
+    "min_vulnerabilities_total": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=1"},
+      {"method": "GET", "path_contains": "/vulnerabilities"}
+    ],
+    "log_contains": ["cisco-cyber-vision: reported 1 devices"]
+  },
+  "check_determinism": true
+}

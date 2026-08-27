@@ -1,0 +1,94 @@
+{
+  "name": "rate-limit",
+  "integration": "microsoft-defender-for-iot",
+  "description": "Microsoft publishes no rate limit for the OT sensor API, so an appliance under load answering 429 has to be absorbed rather than treated as a failed import. Both routes answer 429 with a Retry-After once and then succeed. The script hand-rolls no backoff: get_json retries 408/425/429/5xx three times by default and honors Retry-After, so the same run still emits the device and its finding.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "unauthorized",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-report",
+      "match": {"method": "GET", "path": "/api/v1/reports/vulnerabilities/devices"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"message": "too many requests"}},
+        {
+          "status": 200,
+          "json": [
+            {
+              "name": "throttled-rtu.plant.example.com",
+              "ipAddresses": ["10.60.0.5"],
+              "securityScore": 55,
+              "vendor": "Schneider Electric",
+              "vulnerabilities": {
+                "openedPorts": [{"port": 502, "transport": "TCP", "protocol": "MODBUS", "isConflictingWithFirewall": false}],
+                "cves": [{"id": "CVE-2021-22779", "score": 9.8, "description": "Authentication bypass in Modicon controllers."}],
+                "isUnauthorized": true,
+                "malwareIndicationsDetected": false
+              }
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/devices/"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"message": "too many requests"}},
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 5,
+              "name": "throttled-rtu.plant.example.com",
+              "ipAddresses": ["10.60.0.5"],
+              "macAddresses": ["00:1b:1b:dd:00:05"],
+              "vendor": "Schneider Electric",
+              "operatingSystem": null,
+              "type": "RTU",
+              "engineeringStation": false,
+              "authorized": false,
+              "scanner": false,
+              "hasDynamicAddress": false,
+              "protocols": [{"id": 9, "name": "MODBUS", "ipAddresses": ["10.60.0.5"]}],
+              "firmware": []
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["microsoft-defender-for-iot:$HOST:5"],
+    "assets": [
+      {
+        "id": "microsoft-defender-for-iot:$HOST:5",
+        "fields": {
+          "hostnames": "throttled-rtu.plant.example.com",
+          "ipAddresses": "10.60.0.5",
+          "macAddresses": "00:1b:1b:dd:00:05",
+          "deviceType": "Industrial Control",
+          "microsoft_defender_for_iot_vulnerability_join": "ip"
+        }
+      }
+    ],
+    "min_requests": 4,
+    "min_vulnerabilities_total": 1,
+    "min_services_total": 1,
+    "requests_include": [
+      {"method": "GET", "path": "/api/v1/devices/", "query_contains": "authorized=false"}
+    ],
+    "log_contains": [
+      "microsoft-defender-for-iot: indexed vulnerability findings for 1 devices",
+      "microsoft-defender-for-iot: reported 1 assets from sensor"
+    ]
+  },
+  "check_determinism": true
+}

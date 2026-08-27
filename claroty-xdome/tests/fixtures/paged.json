@@ -1,0 +1,151 @@
+{
+  "name": "paged",
+  "integration": "claroty-xdome",
+  "description": "Both walks paged with page_size 2. xDome has no cursor at all: offset and limit travel in the POST body, and the documented termination rule is 'until less than `limit` results are returned' rather than 'until an empty page arrives'. Devices answer 2, 2 and then 1 row, so the third response ends the walk without a fourth request; relations answer 2 and then 1. Each page's offset is asserted on the request body, which is the only place a broken offset would show.\n\nThis scenario also drives the device_fields override: a narrow operator-supplied list must replace the built-in one verbatim, and uid must be prepended even though the operator did not list it -- a response carries only the fields the request asked for, so a list without uid would leave every record unidentifiable. requests_absent pins that a field from the built-in list is no longer being requested.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "page_size": "2",
+    "device_fields": "asset_id,device_name,device_type,ip_list,mac_list,retired"
+  },
+  "routes": [
+    {
+      "name": "relations-page-1",
+      "match": {"method": "POST", "path": "/api/v1/device_vulnerability_relations/", "body_contains": "\"offset\":0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices_vulnerabilities": [
+              {
+                "device_uid": "10000000-0000-4000-8000-000000000001",
+                "vulnerability_id": "AAAAAAAA",
+                "vulnerability_name": "CVE-2023-38408",
+                "vulnerability_cve_ids": ["CVE-2023-38408"],
+                "vulnerability_cvss_v3_score": 9.8,
+                "vulnerability_adjusted_vulnerability_score_level": "Critical",
+                "vulnerability_relevance": "Confirmed"
+              },
+              {
+                "device_uid": "10000000-0000-4000-8000-000000000002",
+                "vulnerability_id": "BBBBBBBB",
+                "vulnerability_name": "CVE-2021-44228",
+                "vulnerability_cve_ids": ["CVE-2021-44228"],
+                "vulnerability_cvss_v3_score": 10.0,
+                "vulnerability_adjusted_vulnerability_score_level": "Critical",
+                "vulnerability_relevance": "Confirmed"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "relations-page-2",
+      "match": {"method": "POST", "path": "/api/v1/device_vulnerability_relations/", "body_contains": "\"offset\":2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices_vulnerabilities": [
+              {
+                "device_uid": "10000000-0000-4000-8000-000000000005",
+                "vulnerability_id": "CCCCCCCC",
+                "vulnerability_name": "CVE-2020-1472",
+                "vulnerability_cve_ids": ["CVE-2020-1472"],
+                "vulnerability_cvss_v3_score": 10.0,
+                "vulnerability_adjusted_vulnerability_score_level": "Critical",
+                "vulnerability_relevance": "Confirmed"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-1",
+      "match": {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"offset\":0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {"uid": "10000000-0000-4000-8000-000000000001", "asset_id": "PAGE001",
+               "device_name": "10.60.0.1", "device_type": "PLC", "retired": false,
+               "ip_list": ["10.60.0.1"], "mac_list": ["00:1b:1b:00:00:01"]},
+              {"uid": "10000000-0000-4000-8000-000000000002", "asset_id": "PAGE002",
+               "device_name": "10.60.0.2", "device_type": "PLC", "retired": false,
+               "ip_list": ["10.60.0.2"], "mac_list": ["00:1b:1b:00:00:02"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-2",
+      "match": {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"offset\":2"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {"uid": "10000000-0000-4000-8000-000000000003", "asset_id": "PAGE003",
+               "device_name": "10.60.0.3", "device_type": "HMI", "retired": false,
+               "ip_list": ["10.60.0.3"], "mac_list": ["00:1b:1b:00:00:03"]},
+              {"uid": "10000000-0000-4000-8000-000000000004", "asset_id": "PAGE004",
+               "device_name": "10.60.0.4", "device_type": "HMI", "retired": false,
+               "ip_list": ["10.60.0.4"], "mac_list": ["00:1b:1b:00:00:04"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "devices-page-3",
+      "match": {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"offset\":4"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "devices": [
+              {"uid": "10000000-0000-4000-8000-000000000005", "asset_id": "PAGE005",
+               "device_name": "10.60.0.5", "device_type": "Historian", "retired": false,
+               "ip_list": ["10.60.0.5"], "mac_list": ["00:1b:1b:00:00:05"]}
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "claroty-xdome:10000000-0000-4000-8000-000000000001",
+      "claroty-xdome:10000000-0000-4000-8000-000000000005"
+    ],
+    "min_vulnerabilities_total": 3,
+    "request_count": 5,
+    "requests_include": [
+      {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"offset\":2"},
+      {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"offset\":4"},
+      {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"limit\":2"},
+      {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"uid\""},
+      {"method": "POST", "path": "/api/v1/device_vulnerability_relations/", "body_contains": "\"offset\":2"}
+    ],
+    "requests_absent": [
+      {"method": "POST", "path": "/api/v1/devices/", "body_contains": "\"offset\":6"},
+      {"method": "POST", "path": "/api/v1/devices/", "body_contains": "risk_score_points"}
+    ],
+    "log_contains": [
+      "indexed 3 vulnerability relations across 3 devices",
+      "reported 5 devices"
+    ]
+  },
+  "check_determinism": true
+}

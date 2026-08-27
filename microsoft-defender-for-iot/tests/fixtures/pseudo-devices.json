@@ -1,0 +1,117 @@
+{
+  "name": "pseudo-devices",
+  "integration": "microsoft-defender-for-iot",
+  "description": "REGRESSION LOCK on the sensor's non-physical rows. The documented type vocabulary includes Internet, Multicast/Broadcast, Group and Physical Location -- map constructs, not hosts -- and Microsoft's own console hides multicast and broadcast by default. They are dangerous here specifically because this integration runs with no-id-match: MAC and IP do all the correlating, and routable_ips drops multicast IPs but nothing filtered the MACs. A broadcast or multicast MAC parses cleanly, so all four rows would have carried the same address, merging them onto one asset and onto any real asset that ever reported it. Rows 101 and 102 are genuine and must survive, proving the filter is typed rather than a blanket drop.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 101,
+              "name": "hmi-real-01",
+              "ipAddresses": [
+                "10.31.0.11"
+              ],
+              "macAddresses": [
+                "00:1b:1b:31:00:01"
+              ],
+              "type": "HMI",
+              "authorized": true
+            },
+            {
+              "id": 102,
+              "name": "plc-real-02",
+              "ipAddresses": [
+                "10.31.0.12"
+              ],
+              "macAddresses": [
+                "00:1b:1b:31:00:02"
+              ],
+              "type": "PLC",
+              "authorized": true
+            },
+            {
+              "id": 103,
+              "name": "Internet",
+              "ipAddresses": [
+                "10.31.0.13"
+              ],
+              "macAddresses": [
+                "ff:ff:ff:ff:ff:ff"
+              ],
+              "type": "Internet",
+              "authorized": true
+            },
+            {
+              "id": 104,
+              "name": "Multicast/Broadcast",
+              "ipAddresses": [
+                "239.255.255.250"
+              ],
+              "macAddresses": [
+                "ff:ff:ff:ff:ff:ff"
+              ],
+              "type": "Multicast/Broadcast",
+              "authorized": true
+            },
+            {
+              "id": 105,
+              "name": "Engineering Group",
+              "ipAddresses": [
+                "10.31.0.15"
+              ],
+              "macAddresses": [
+                "01:00:5e:00:00:fb"
+              ],
+              "type": "Group",
+              "authorized": true
+            },
+            {
+              "id": 106,
+              "name": "Plant Floor A",
+              "ipAddresses": [
+                "10.31.0.16"
+              ],
+              "macAddresses": [
+                "01:80:c2:00:00:0e"
+              ],
+              "type": "Physical Location",
+              "authorized": true
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "microsoft-defender-for-iot:$HOST:101",
+      "microsoft-defender-for-iot:$HOST:102"
+    ],
+    "ids_absent": [
+      "microsoft-defender-for-iot:$HOST:103",
+      "microsoft-defender-for-iot:$HOST:104",
+      "microsoft-defender-for-iot:$HOST:105",
+      "microsoft-defender-for-iot:$HOST:106"
+    ],
+    "log_contains": [
+      "skipped 4 Internet, multicast/broadcast, group, and physical-location records"
+    ]
+  },
+  "check_determinism": true
+}

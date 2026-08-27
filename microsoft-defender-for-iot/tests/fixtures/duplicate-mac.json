@@ -1,0 +1,108 @@
+{
+  "name": "duplicate-mac",
+  "integration": "microsoft-defender-for-iot",
+  "description": "PINS WHAT HAPPENS WHEN ONE MAC APPEARS ON TWO INVENTORY ROWS. This is a real hazard for this integration specifically, because id matching is off and the MAC is therefore doing the correlating. A sensor produces this shape routinely: a device behind a NAT or a serial-to-Ethernet gateway, two logical endpoints reached through one physical adapter, or the same host observed on two segments and not yet deduplicated by the sensor itself.\n\nThe script does not attempt to resolve it, and this scenario asserts that non-decision explicitly rather than leaving it to be discovered in a tenant. Both rows are reported, each keeping its own sensor id, so nothing is dropped and the export is what the sensor said. runZero then merges them on the shared MAC, which is the correct outcome when the two rows really are one device and the visible one when they are not -- an operator can see both sensor ids on the merged asset through the device_id attribute. Guessing which row to discard here would be worse: the script cannot tell a genuine duplicate from a gateway.\n\nRow 203 is the control. It carries a different MAC and must stay separate, proving the behavior is not 'collapse everything'.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "false"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/devices/"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": 201,
+              "name": "gateway-side-a",
+              "ipAddresses": [
+                "10.41.0.11"
+              ],
+              "macAddresses": [
+                "00:1b:1b:41:00:aa"
+              ],
+              "vendor": "Moxa",
+              "type": "PLC",
+              "authorized": true
+            },
+            {
+              "id": 202,
+              "name": "gateway-side-b",
+              "ipAddresses": [
+                "10.41.0.12"
+              ],
+              "macAddresses": [
+                "00:1b:1b:41:00:aa"
+              ],
+              "vendor": "Moxa",
+              "type": "PLC",
+              "authorized": true
+            },
+            {
+              "id": 203,
+              "name": "unrelated-hmi",
+              "ipAddresses": [
+                "10.41.0.13"
+              ],
+              "macAddresses": [
+                "00:1b:1b:41:00:bb"
+              ],
+              "vendor": "Siemens AG",
+              "type": "HMI",
+              "authorized": true
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "microsoft-defender-for-iot:$HOST:201",
+      "microsoft-defender-for-iot:$HOST:202",
+      "microsoft-defender-for-iot:$HOST:203"
+    ],
+    "assets": [
+      {
+        "id": "microsoft-defender-for-iot:$HOST:201",
+        "fields": {
+          "macAddresses": "00:1b:1b:41:00:aa",
+          "ipAddresses": "10.41.0.11",
+          "deviceType": "PLC",
+          "microsoft_defender_for_iot_device_id": "201"
+        }
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:202",
+        "fields": {
+          "macAddresses": "00:1b:1b:41:00:aa",
+          "ipAddresses": "10.41.0.12",
+          "deviceType": "PLC",
+          "microsoft_defender_for_iot_device_id": "202"
+        }
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:203",
+        "fields": {
+          "macAddresses": "00:1b:1b:41:00:bb",
+          "ipAddresses": "10.41.0.13",
+          "deviceType": "HMI"
+        }
+      }
+    ],
+    "request_count": 1,
+    "log_contains": [
+      "microsoft-defender-for-iot: reported 3 assets from sensor"
+    ]
+  },
+  "check_determinism": true
+}

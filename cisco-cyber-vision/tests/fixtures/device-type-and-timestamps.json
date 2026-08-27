@@ -1,0 +1,102 @@
+{
+  "name": "device-type-and-timestamps",
+  "integration": "cisco-cyber-vision",
+  "description": "deviceType and the activity timestamps, and the epoch trap that comes with them.\n\ndeviceType is on the documented device schema (https://developer.cisco.com/docs/cyber-vision/5-3/risk-score-of-a-device/ carries it on the embedded device object) and Cisco's own export script reads it off a live response, so it becomes the asset's device type. The longer deviceTypeDescription stays an attribute.\n\nfirstActivity and lastActivity are epoch MILLISECONDS -- the activity list documents its sibling from and to parameters as \"ms since January 1, 1970 UTC\" -- so the values are asserted rather than just their presence. Cell8-PLC-01 carries 1735689600000 and 1755000000000, which must reach the asset as the second values 1735689600 and 1755000000. Reading them as seconds would put the whole estate in the year 57000, where parse_ts clamps to now and the assertion fails on a value that changes every run.\n\nCell8-HMI is the sentinel case. parse_ts returns a real year-1 time for 0001-01-01T00:00:00Z and unix 0 for a zero, and both survive a != None check, so an unguarded parse stamps a never-seen device with an ancient date. Both are rejected here and the fields stay absent. Its deviceType is an empty string, which must not reach the asset as a blank device type.\n\nCell8-Historian is the mis-scaled case: a Center that reported lastActivity in seconds. 1755000000 read as milliseconds is 1970-01-21, so it falls below the floor and is dropped rather than importing an estate that was last seen in 1970. The raw value is kept as an attribute either way, because parse_ts clamps and the attribute is the only place what the Center actually sent survives.\n\nThe row also carries otherProperties, which sits beside normalizedProperties in the documented schema and used to be ignored entirely.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "inventory_source": "devices",
+    "collect_vulnerabilities": "false",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/3.0/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "8a0b1c2d-3e4f-4051-8263-7485a6b7c8d1",
+              "label": "Cell8-PLC-01",
+              "ip": "10.28.0.11",
+              "mac": "00:1d:9c:88:00:11",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0,
+              "deviceType": "PLC",
+              "deviceTypeDescription": "Programmable Logic Controller",
+              "firstActivity": 1735689600000,
+              "lastActivity": 1755000000000,
+              "normalizedProperties": [
+                {"key": "vendor-name", "value": "Siemens"},
+                {"key": "model-name", "value": "SIMATIC S7-1500"}
+              ],
+              "otherProperties": [
+                {"key": "serial-number", "value": "SVPQ1234567"},
+                {"key": "rack-slot", "value": "0/1"}
+              ]
+            },
+            {
+              "id": "8a0b1c2d-3e4f-4051-8263-7485a6b7c8d2",
+              "label": "Cell8-HMI",
+              "ip": "10.28.0.40",
+              "mac": "00:0f:73:88:00:40",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0,
+              "deviceType": "",
+              "firstActivity": 0,
+              "lastActivity": "0001-01-01T00:00:00Z"
+            },
+            {
+              "id": "8a0b1c2d-3e4f-4051-8263-7485a6b7c8d3",
+              "label": "Cell8-Historian",
+              "ip": "10.28.0.60",
+              "mac": "00:0f:73:88:00:60",
+              "isDevice": true,
+              "vulnerabilitiesCount": 0,
+              "deviceType": "Engineering Station",
+              "lastActivity": 1755000000
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "assets": [
+      {
+        "id": "cisco-cyber-vision:$HOST:8a0b1c2d-3e4f-4051-8263-7485a6b7c8d1",
+        "fields": {
+          "deviceType": "PLC",
+          "firstSeenTS": "1735689600",
+          "lastSeenTS": "1755000000",
+          "cisco_cyber_vision_device_type_description": "Programmable Logic Controller",
+          "cisco_cyber_vision_first_activity": "1735689600000",
+          "cisco_cyber_vision_last_activity": "1755000000000",
+          "cisco_cyber_vision_other_property_serial_number": "SVPQ1234567",
+          "cisco_cyber_vision_other_property_rack_slot": "0/1",
+          "manufacturer": "Siemens"
+        }
+      },
+      {
+        "id": "cisco-cyber-vision:$HOST:8a0b1c2d-3e4f-4051-8263-7485a6b7c8d2",
+        "fields_absent": ["deviceType", "firstSeenTS", "lastSeenTS"]
+      },
+      {
+        "id": "cisco-cyber-vision:$HOST:8a0b1c2d-3e4f-4051-8263-7485a6b7c8d3",
+        "fields": {
+          "deviceType": "Engineering Station",
+          "cisco_cyber_vision_last_activity": "1755000000"
+        },
+        "fields_absent": ["firstSeenTS", "lastSeenTS"]
+      }
+    ],
+    "request_count": 1,
+    "requests_absent": [{"path_contains": "/vulnerabilities"}],
+    "log_contains": ["cisco-cyber-vision: reported 3 devices"]
+  },
+  "check_determinism": true
+}

@@ -1,0 +1,228 @@
+{
+  "name": "paged",
+  "integration": "tenable-ot-security",
+  "description": "Relay-style forward cursor paging. Page one reports hasNextPage true with endCursor YXNzZXRzOjE5OQ==, and the only route that can serve page two matches on that exact cursor value appearing in the request body, so a walk that dropped or re-invented the `after` variable would starve on an unrouted document. This scenario runs lookback_days=30 with include_hidden=false, which now produces a single And wrapping the hidden equality and the lastUpdate/firstSeen Or rather than the Or alone; the structural assertion on that filter lives in hidden-with-lookback, and the GreaterEqual match here still pins the lookback half of it. Page two reports hasNextPage false, which is the documented termination condition -- Elastic's CEL program keeps paging on exactly body.data.assets.pageInfo.hasNextPage -- and page three's route asserts that no third request is made even though page two still publishes an endCursor. The lookback window is on, so this also proves the Or expression over lastUpdate and firstSeen is sent instead of the hidden filter.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "2",
+    "lookback_days": "30",
+    "include_hidden": "false",
+    "import_vulnerabilities": "false",
+    "import_software": "false"
+  },
+  "routes": [
+    {
+      "name": "assets-page-2",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "YXNzZXRzOjE5OQ=="
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "3c9d0f11-6b2a-4e55-9d07-8a1c2b3d4e5f",
+                    "name": "paged-plc-03",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "criticality": "LowCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-21T09:00:00Z",
+                    "macs": {
+                      "nodes": [
+                        "00:1d:9c:aa:00:03"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.120.3.3"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": [
+                        "00:1d:9c:aa:00:03"
+                      ]
+                    },
+                    "directIps": {
+                      "nodes": [
+                        "10.120.3.3"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": []
+                    },
+                    "risk": {
+                      "totalRisk": "12.5"
+                    }
+                  }
+                ],
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "YXNzZXRzOjI5OQ=="
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "assets-page-3-must-not-be-requested",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "YXNzZXRzOjI5OQ=="
+      },
+      "responses": [
+        {
+          "status": 500,
+          "json": {
+            "errors": [
+              {
+                "message": "page three must never be requested"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "assets-page-1",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "getAssets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "1a7b3c5d-1111-4222-8333-444455556666",
+                    "name": "paged-plc-01",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "criticality": "MediumCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-21T08:00:00Z",
+                    "macs": {
+                      "nodes": [
+                        "00:1d:9c:aa:00:01"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.120.3.1"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": [
+                        "00:1d:9c:aa:00:01"
+                      ]
+                    },
+                    "directIps": {
+                      "nodes": [
+                        "10.120.3.1"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": []
+                    },
+                    "risk": {
+                      "totalRisk": "44.25"
+                    }
+                  },
+                  {
+                    "id": "2b8c4d6e-7777-4888-8999-aaaabbbbcccc",
+                    "name": "paged-hmi-02",
+                    "type": "Hmi",
+                    "superType": "OtDevice",
+                    "category": "NetworkAssetsCategory",
+                    "purdueLevel": "Level2",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "lastSeen": "2026-08-21T08:30:00Z",
+                    "macs": {
+                      "nodes": [
+                        "00:1d:9c:aa:00:02"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.120.3.2"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": [
+                        "00:1d:9c:aa:00:02"
+                      ]
+                    },
+                    "directIps": {
+                      "nodes": [
+                        "10.120.3.2"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": []
+                    },
+                    "risk": {
+                      "totalRisk": "58.75"
+                    }
+                  }
+                ],
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "YXNzZXRzOjE5OQ=="
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 3,
+    "ids": [
+      "tenable-ot-security:$HOST:1a7b3c5d-1111-4222-8333-444455556666",
+      "tenable-ot-security:$HOST:2b8c4d6e-7777-4888-8999-aaaabbbbcccc",
+      "tenable-ot-security:$HOST:3c9d0f11-6b2a-4e55-9d07-8a1c2b3d4e5f"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "YXNzZXRzOjE5OQ=="
+      },
+      {
+        "body_contains": "GreaterEqual"
+      }
+    ],
+    "requests_absent": [
+      {
+        "body_contains": "YXNzZXRzOjI5OQ=="
+      }
+    ],
+    "log_contains": [
+      "tenable-ot-security: reported 3 assets"
+    ]
+  },
+  "check_determinism": true
+}

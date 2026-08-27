@@ -1,7 +1,7 @@
 {
   "name": "login-retry",
   "integration": "forescout-counteract",
-  "description": "The login POST is a raw http_post because the JWT comes back as a bare body, and the raw builtin has no retries kwarg -- so one transient 503 at the first login used to end the whole run while every later request would have been retried. The first login answer here is a 503 and the second is the token; the run must retry, log the transient failure, and import the host.",
+  "description": "The login POST is a raw http_post because the JWT comes back as a bare body, and the raw builtin has no retries kwarg -- so without the hand-rolled retry, one transient 503 at the first login would end the whole run while every later request would have been retried. The first login answer here is a 503 and the second is the token; the run must retry, log the transient failure, and import the host. POST /api/hosts/discovery answers 404 so the scenario states which path it exercises, and the fallback log line is asserted.",
   "kwargs": {
     "url": "$BASE",
     "username": "webapi-fixture",
@@ -10,49 +10,130 @@
   "routes": [
     {
       "name": "login",
-      "match": {"method": "POST", "path": "/api/login"},
+      "match": {
+        "method": "POST",
+        "path": "/api/login"
+      },
       "responses": [
-        {"status": 503, "text": "service unavailable"},
-        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYWQifQ.YmFkLXNpZ25hdHVyZS1maXh0dXJl"}
+        {
+          "status": 503,
+          "text": "service unavailable"
+        },
+        {
+          "status": 200,
+          "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiYWQifQ.YmFkLXNpZ25hdHVyZS1maXh0dXJl"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-not-implemented",
+      "match": {
+        "method": "POST",
+        "path": "/api/hosts/discovery"
+      },
+      "responses": [
+        {
+          "status": 404,
+          "text": "Not Found"
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "hostfields",
-      "match": {"method": "GET", "path": "/api/hostfields"},
+      "match": {
+        "method": "GET",
+        "path": "/api/hostfields"
+      },
       "responses": [
-        {"status": 200, "json": {"hostFields": [{"name": "hostname"}]}}
+        {
+          "status": 200,
+          "json": {
+            "hostFields": [
+              {
+                "name": "hostname"
+              }
+            ]
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "host-detail",
-      "match": {"method": "GET", "path": "/api/hosts/5001"},
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts/5001"
+      },
       "responses": [
-        {"status": 200, "json": {"host": {"id": 5001, "fields": {"hostname": {"value": "retry01.corp.example.com"}}}}}
+        {
+          "status": 200,
+          "json": {
+            "host": {
+              "id": 5001,
+              "fields": {
+                "hostname": {
+                  "value": "retry01.corp.example.com"
+                }
+              }
+            }
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "host-index",
-      "match": {"method": "GET", "path": "/api/hosts"},
+      "match": {
+        "method": "GET",
+        "path": "/api/hosts"
+      },
       "responses": [
-        {"status": 200, "json": {"hosts": [{"hostId": 5001, "ip": "10.70.1.1", "mac": "00:11:22:dd:00:01"}]}}
+        {
+          "status": 200,
+          "json": {
+            "hosts": [
+              {
+                "hostId": 5001,
+                "ip": "10.70.1.1",
+                "mac": "00:11:22:dd:00:01"
+              }
+            ]
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     }
   ],
-  "default_response": {"status": 404, "text": "no fixture route"},
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
   "expect": {
     "asset_count": 1,
-    "ids": ["forescout-counteract:$HOST:5001"],
+    "ids": [
+      "forescout-counteract:$HOST:5001"
+    ],
     "requests_include": [
-      {"method": "POST", "path": "/api/login"},
-      {"method": "GET", "path": "/api/hosts"}
+      {
+        "method": "POST",
+        "path": "/api/hosts/discovery"
+      },
+      {
+        "method": "POST",
+        "path": "/api/login"
+      },
+      {
+        "method": "GET",
+        "path": "/api/hosts"
+      }
     ],
     "log_contains": [
+      "falling back to the host index and per-host properties",
       "forescout-counteract: transient Web API login failure (attempt 1 of 4): 503",
       "forescout-counteract: reported 1 assets"
     ]
-  }
+  },
+  "check_determinism": true
 }

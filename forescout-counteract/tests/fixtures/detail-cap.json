@@ -1,7 +1,7 @@
 {
   "name": "detail-cap",
   "integration": "forescout-counteract",
-  "description": "The per-host property document is an N+1 call, so detail_limit caps it. With the limit at 1 and three hosts in the index, only the first host may be enriched, the other two must still be imported from the index alone, and the skip count must be reported.",
+    "description": "Why detail_limit exists: the per-host property document is an N+1 call that ONLY the legacy path makes, so the cap applies there and nowhere else. With the limit at 1 and three hosts in the index, only the first host may be enriched, the other two must still be imported from the index alone, and the skip count must be reported. The paginated path selects properties inline and has nothing to cap, which is why the parameter is labelled legacy-only rather than removed -- removing a declared parameter changes the credential form for every existing deployment. The request count includes the POST /api/hosts/discovery 404 the walk probes before falling back.",
   "kwargs": {
     "url": "$BASE",
     "username": "webapi-fixture",
@@ -14,6 +14,14 @@
       "match": {"method": "POST", "path": "/api/login"},
       "responses": [
         {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjYXAifQ.Y2FwLXNpZ25hdHVyZS1maXh0dXJl"}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "discovery-not-implemented",
+      "match": {"method": "POST", "path": "/api/hosts/discovery"},
+      "responses": [
+        {"status": 404, "text": "Not Found"}
       ],
       "when_exhausted": "repeat_last"
     },
@@ -74,8 +82,9 @@
       "forescout-counteract:$HOST:3002",
       "forescout-counteract:$HOST:3003"
     ],
-    "request_count": 4,
+    "request_count": 5,
     "requests_include": [
+      {"method": "POST", "path": "/api/hosts/discovery"},
       {"method": "GET", "path": "/api/hosts/3001"}
     ],
     "requests_absent": [
@@ -83,8 +92,10 @@
       {"path": "/api/hosts/3003"}
     ],
     "log_contains": [
+      "falling back to the host index and per-host properties",
       "forescout-counteract: detail limit of 1 reached; classification, services, and software were not imported for 2 of 3 hosts"
     ]
   },
+  "check_determinism": true,
   "invariants": {"skip": []}
 }

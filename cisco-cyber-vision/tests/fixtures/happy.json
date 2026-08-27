@@ -1,0 +1,188 @@
+{
+  "name": "happy",
+  "integration": "cisco-cyber-vision",
+  "description": "The device/component double-count regression test, and the reason this integration exists in the shape it does.\n\nCyber Vision returns a physical device and each of its constituent components as sibling rows in the same list, told apart only by the isDevice boolean. The PLC here arrives four times: once as the device 0f3c1a8e-... and again as its three components (two Ethernet interfaces and a backplane module), each carrying an address of its own. Importing the rows flat would turn one PLC into four assets, three of which would then merge unpredictably with the real one by MAC and IP. The scenario asserts exactly two assets, names the three component ids as ids_absent, and asserts through requests_absent that no per-component vulnerability lookup is even attempted.\n\nThe vulnerability rows follow the response schema DevNet publishes for this exact route (cve, CVSS, CVSSVersion, title, summary, solution), constructed from those documented names rather than recorded from a Center. The lower-case cve on the first finding proves the value is upper-cased before it reaches Vulnerability.cve, which is validated and is not upper-cased by the platform. The field-by-field mapping has its own scenario in vulnerability-fields.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_token": "fixture-token",
+    "inventory_source": "auto",
+    "collect_vulnerabilities": "true",
+    "page_size": "500"
+  },
+  "routes": [
+    {
+      "name": "device-vulnerabilities",
+      "match": {"method": "GET", "path": "/api/3.0/devices/0f3c1a8e-6d2b-4c19-9a77-3f5b1c2d4e60/vulnerabilities"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "b1e0a531-ce4b-4309-af7a-6e1aa4616b81",
+              "cve": "cve-2021-22681",
+              "title": "Rockwell Logix controllers hard-coded key",
+              "summary": "The key used to verify Logix controller connections can be extracted from the product.",
+              "solution": "Upgrade the controller firmware to v32 or later.",
+              "CVSS": 10.0,
+              "CVSSVersion": 3.1,
+              "publishTime": "2021-03-05T00:00:00Z"
+            },
+            {
+              "id": "c2f1b642-df5c-441a-b08b-7f2bb5727c92",
+              "cve": "CVE-2020-6998",
+              "title": "Studio 5000 Logix Designer key handling",
+              "summary": "A crafted connection can alter the controller's application code.",
+              "CVSS": 7.5,
+              "CVSSVersion": 3.1,
+              "publishTime": "2020-12-01T00:00:00Z"
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/3.0/devices"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            {
+              "id": "0f3c1a8e-6d2b-4c19-9a77-3f5b1c2d4e60",
+              "label": "Line1-PLC-01",
+              "originalLabel": "Rockwell 1756-L71",
+              "customLabel": "Line1-PLC-01",
+              "ip": "10.20.30.11",
+              "mac": "00:1d:9c:d4:c3:95",
+              "isDevice": true,
+              "riskScore": 78,
+              "bestAchievableScore": 32,
+              "vulnerabilitiesCount": 2,
+              "icon": "library/plc.svg",
+              "tags": [{"label": "OT"}, {"label": "Critical Process"}],
+              "group": {"label": "Cell 1", "color": "#d33", "criticalness": "high"},
+              "normalizedProperties": [
+                {"key": "vendor-name", "value": "Rockwell Automation"},
+                {"key": "model-name", "value": "1756-L71"},
+                {"key": "model-ref", "value": "1756-L71/B"},
+                {"key": "fw-version", "value": "31.011"},
+                {"key": "hw-version", "value": "B"}
+              ]
+            },
+            {
+              "id": "1a4d2b9f-7e3c-4d2a-8b66-4e6c2d3f5a71",
+              "label": "Line1-PLC-01 - Ethernet",
+              "originalLabel": "00:1d:9c:d4:c3:95",
+              "ip": "10.20.30.11",
+              "mac": "00:1d:9c:d4:c3:95",
+              "isDevice": false,
+              "vulnerabilitiesCount": 2,
+              "icon": "library/default.svg",
+              "normalizedProperties": [
+                {"key": "vendor-name", "value": "Rockwell Automation"}
+              ]
+            },
+            {
+              "id": "2b5e3c0a-8f4d-4e3b-9c77-5f7d3e4a6b82",
+              "label": "Line1-PLC-01 - Ethernet 2",
+              "originalLabel": "00:1d:9c:d4:c3:96",
+              "ip": "10.20.31.11",
+              "mac": "00:1d:9c:d4:c3:96",
+              "isDevice": false,
+              "vulnerabilitiesCount": 0,
+              "icon": "library/default.svg"
+            },
+            {
+              "id": "3c6f4d1b-9a5e-4f4c-8d88-6a8e4f5b7c93",
+              "label": "Line1-PLC-01 - Backplane",
+              "isDevice": false,
+              "vulnerabilitiesCount": 0,
+              "normalizedProperties": [
+                {"key": "model-name", "value": "1756-A10"}
+              ]
+            },
+            {
+              "id": "4d7a5e2c-0b6f-4a5d-9e99-7b9f5a6c8d04",
+              "label": "Line1-HMI",
+              "originalLabel": "PanelView Plus 7",
+              "ip": "10.20.30.40",
+              "mac": "00:0f:73:aa:bb:cc",
+              "isDevice": true,
+              "riskScore": 21,
+              "bestAchievableScore": 12,
+              "vulnerabilitiesCount": 0,
+              "icon": "library/hmi.svg",
+              "tags": [{"label": "OT"}],
+              "group": {"label": "Cell 1", "color": "#d33", "criticalness": "high"},
+              "normalizedProperties": [
+                {"key": "vendor-name", "value": "Rockwell Automation"},
+                {"key": "model-name", "value": "2711P-T10C22D9P"},
+                {"key": "fw-version", "value": "11.00"}
+              ]
+            }
+          ]
+        },
+        {"status": 200, "json": []}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "cisco-cyber-vision:$HOST:0f3c1a8e-6d2b-4c19-9a77-3f5b1c2d4e60",
+      "cisco-cyber-vision:$HOST:4d7a5e2c-0b6f-4a5d-9e99-7b9f5a6c8d04"
+    ],
+    "ids_absent": [
+      "cisco-cyber-vision:$HOST:1a4d2b9f-7e3c-4d2a-8b66-4e6c2d3f5a71",
+      "cisco-cyber-vision:$HOST:2b5e3c0a-8f4d-4e3b-9c77-5f7d3e4a6b82",
+      "cisco-cyber-vision:$HOST:3c6f4d1b-9a5e-4f4c-8d88-6a8e4f5b7c93",
+      "0f3c1a8e-6d2b-4c19-9a77-3f5b1c2d4e60"
+    ],
+    "assets": [
+      {
+        "id": "cisco-cyber-vision:$HOST:0f3c1a8e-6d2b-4c19-9a77-3f5b1c2d4e60",
+        "fields": {
+          "hostnames": "Line1-PLC-01",
+          "ipAddresses": "10.20.30.11",
+          "macAddresses": "00:1d:9c:d4:c3:95",
+          "manufacturer": "Rockwell Automation",
+          "model": "1756-L71",
+          "tags": "Critical Process\tOT\tgroup:Cell 1",
+          "cisco_cyber_vision_property_fw_version": "31.011",
+          "cisco_cyber_vision_property_hw_version": "B",
+          "cisco_cyber_vision_risk_score": "78",
+          "cisco_cyber_vision_vulnerabilities_count": "2"
+        }
+      },
+      {
+        "id": "cisco-cyber-vision:$HOST:4d7a5e2c-0b6f-4a5d-9e99-7b9f5a6c8d04",
+        "fields": {
+          "hostnames": "Line1-HMI",
+          "ipAddresses": "10.20.30.40",
+          "model": "2711P-T10C22D9P"
+        }
+      }
+    ],
+    "min_requests": 2,
+    "requests_include": [
+      {"method": "GET", "path": "/api/3.0/devices", "query_contains": "page=1"},
+      {"query_contains": "size=500"},
+      {"header_contains": "fixture-token"},
+      {"method": "GET", "path_contains": "/api/3.0/devices/0f3c1a8e-6d2b-4c19-9a77-3f5b1c2d4e60/vulnerabilities"}
+    ],
+    "requests_absent": [
+      {"path_contains": "1a4d2b9f-7e3c-4d2a-8b66-4e6c2d3f5a71"},
+      {"path_contains": "4d7a5e2c-0b6f-4a5d-9e99-7b9f5a6c8d04/vulnerabilities"},
+      {"path_contains": "/api/3.0/presets"}
+    ],
+    "min_vulnerabilities_total": 2,
+    "min_software_total": 2,
+    "log_contains": [
+      "cisco-cyber-vision: skipped 3 component rows that belong to an imported device",
+      "cisco-cyber-vision: reported 2 devices"
+    ]
+  },
+  "check_determinism": true
+}

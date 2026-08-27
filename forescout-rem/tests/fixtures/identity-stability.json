@@ -1,0 +1,105 @@
+{
+  "name": "identity-stability",
+  "integration": "forescout-rem",
+  "description": "The regression lock on the foreign id. One device is returned twice in one run -- once by the unbounded sweep and once by the risk band that follows it -- with a different hostname, a different address and a different MAC each time, and the only field the two records share is `id`. The run must emit exactly one asset under exactly one id.\n\nThat proves two things at once. The id embeds nothing mutable: not the address, not the name, not the timestamp. And the id is scoped on the instance hostname alone with the port stripped, which check_determinism enforces by re-running the whole scenario against a new ephemeral port and requiring the same id back.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "banded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-9001",
+                "hostname": "geneva-pump-01-renamed",
+                "ip_addresses": [
+                  "192.0.2.77"
+                ],
+                "mac_addresses": [
+                  "00:bb:00:00:00:99"
+                ],
+                "rem_category": "Medical Device",
+                "rem_function": "Infusion Pump",
+                "rem_vendor": "Acme Medical",
+                "risk_score": 6.6,
+                "risk_severity": "High",
+                "last_seen": "2026-05-06T09:10:00.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    },
+    {
+      "name": "unbanded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 2,
+            "entities": [
+              {
+                "id": "rem-9001",
+                "hostname": "geneva-pump-01",
+                "ip_addresses": [
+                  "10.60.0.10"
+                ],
+                "mac_addresses": [
+                  "00:bb:00:00:00:01"
+                ],
+                "rem_category": "Medical Device",
+                "rem_function": "Infusion Pump",
+                "rem_vendor": "Acme Medical",
+                "risk_score": 6.6,
+                "risk_severity": "High",
+                "last_seen": "2026-05-06T08:55:23.777Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "forescout-rem:$HOST:rem-9001"
+    ],
+    "assets": [
+      {
+        "id": "forescout-rem:$HOST:rem-9001",
+        "fields": {
+          "hostnames": "geneva-pump-01",
+          "ipAddresses": "10.60.0.10",
+          "macAddresses": "00:bb:00:00:00:01",
+          "deviceType": "Infusion Pump"
+        }
+      }
+    ],
+    "request_count": 6,
+    "log_contains": [
+      "1 entities were returned by more than one window and imported once",
+      "reported 1 assets from 2 search windows"
+    ]
+  },
+  "check_determinism": true
+}

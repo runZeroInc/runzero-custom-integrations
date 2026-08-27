@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "forescout-eyeinspect",
-  "description": "One page of OT hosts with the per-host alerts fetch behind it. Proves the {total_count, results} envelope is unwrapped, that ids are namespaced by the Command Center hostname, that open_ports is accepted in all three shapes eyeInspect emits (a bare int, a \"502/tcp\" string, and a {port, protocol} object) with a missing transport recorded as assumed tcp, that a host record's complex_cves become CVE findings and its alerts become severity-ranked findings bound to the port they targeted, that vendor_model/firmware_version become a Software row, and that a host advertising alert_count 0 costs NO alerts request at all.",
+  "description": "Three hosts with alerts, services and firmware software. Asserts the hosts request carries full=true, which is what makes the Full-only properties (software, patches, open_ports, cves, main_role, purdue_level, criticality, main_vendor_model, firmware_version) present at all.\n\nsort_field must be ABSENT: `id` is not one of the accepted sort_field values in the API Guide, and with the parameter omitted the guide specifies the result is sorted by ID only, ascending -- exactly the order the walk needs.\n\nAlerts are fetched for every host, including host 9002. alert_count is not a Host record field (it appears only in the sort_field enum), so it is never present on real data and no short-circuit keyed on it can fire; 9002's alerts call is asserted present rather than absent, which is what a real Command Center does.\n\nThe hosts here deliberately carry OFF-CONTRACT value shapes -- purdue_level '1', criticality 'high', security_risk 'high' -- to prove a Command Center or a hand-edited record outside the documented domain still imports: the raw value survives as a custom attribute and simply produces no tag. vendor-schema.json covers the documented shapes.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-operator",
@@ -13,7 +13,10 @@
   "routes": [
     {
       "name": "hosts",
-      "match": {"method": "GET", "path": "/api/v1/hosts"},
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/hosts"
+      },
       "responses": [
         {
           "status": 200,
@@ -23,7 +26,10 @@
               {
                 "id": 9001,
                 "ip": "10.80.1.11",
-                "mac_addresses": ["00:1b:1b:00:90:01", "00:1b:1b:00:90:02"],
+                "mac_addresses": [
+                  "00:1b:1b:00:90:01",
+                  "00:1b:1b:00:90:02"
+                ],
                 "main_name": "syn-plc-01",
                 "role": "PLC",
                 "purdue_level": "1",
@@ -37,11 +43,28 @@
                 "vlan": 110,
                 "first_seen": "2026-01-05T08:15:00Z",
                 "last_seen": "2026-08-01T09:00:00Z",
-                "alert_count": 2,
-                "open_ports": [102, "502/tcp", {"port": 44818, "protocol": "udp"}, {"port": 80}],
+                "open_ports": [
+                  102,
+                  "502/tcp",
+                  {
+                    "port": 44818,
+                    "protocol": "udp"
+                  },
+                  {
+                    "port": 80
+                  }
+                ],
                 "complex_cves": "CVE-2022-38465, CVE-2020-15782",
                 "security_risk": "high",
-                "operational_risk": "medium"
+                "operational_risk": "medium",
+                "all_roles": [
+                  "PLC",
+                  "Engineering Station"
+                ],
+                "all_vendors_models": [
+                  "Synthetic Controls S7-1500",
+                  "Synthetic Controls S7-1200"
+                ]
               },
               {
                 "id": 9002,
@@ -53,8 +76,10 @@
                 "os_version": "Windows 7 Embedded",
                 "first_seen": "2026-02-11T11:00:00Z",
                 "last_seen": "2026-08-02T14:30:00Z",
-                "alert_count": 0,
-                "open_ports": ["3389/tcp", "445/tcp"]
+                "open_ports": [
+                  "3389/tcp",
+                  "445/tcp"
+                ]
               },
               {
                 "id": 9003,
@@ -62,19 +87,28 @@
                 "main_name": "syn-rtu-01",
                 "role": "RTU",
                 "last_seen": "2026-08-03T02:00:00Z",
-                "alert_count": 1,
                 "open_ports": []
               }
             ]
           }
         },
-        {"status": 200, "json": {"total_count": 3, "results": []}}
+        {
+          "status": 200,
+          "json": {
+            "total_count": 3,
+            "results": []
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "alerts-9001",
-      "match": {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=9001"},
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/alerts",
+        "query_contains": "host_id=9001"
+      },
       "responses": [
         {
           "status": 200,
@@ -88,8 +122,12 @@
                 "engine": "Industrial Threat Library",
                 "profile_module_name": "modbus",
                 "description": "Synthetic fixture alert: unauthorized write to a holding register.",
-                "event_type_names": ["Unauthorized Modbus write"],
-                "event_type_ids": ["ITL-1001"],
+                "event_type_names": [
+                  "Unauthorized Modbus write"
+                ],
+                "event_type_ids": [
+                  "ITL-1001"
+                ],
                 "src_ip": "10.80.9.99",
                 "dst_ip": "10.80.1.11",
                 "dst_port": 502,
@@ -105,7 +143,9 @@
                 "timestamp": "2026-07-31T04:05:00Z",
                 "engine": "Network Behavior",
                 "description": "Synthetic fixture alert referencing CVE-2020-15782 in its text.",
-                "event_type_names": ["New host communication"],
+                "event_type_names": [
+                  "New host communication"
+                ],
                 "src_ip": "10.80.1.11",
                 "dst_ip": "10.80.2.50",
                 "dst_port": 443,
@@ -119,13 +159,27 @@
       "when_exhausted": "repeat_last"
     },
     {
-      "name": "alerts-9003",
-      "match": {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=9003"},
-      "responses": [{"status": 200, "json": {"total_count": 0, "results": []}}],
+      "name": "alerts-quiet-hosts",
+      "match": {
+        "method": "GET",
+        "path": "/api/v1/alerts"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_count": 0,
+            "results": []
+          }
+        }
+      ],
       "when_exhausted": "repeat_last"
     }
   ],
-  "default_response": {"status": 404, "text": "no fixture route"},
+  "default_response": {
+    "status": 404,
+    "text": "no fixture route"
+  },
   "expect": {
     "asset_count": 3,
     "ids": [
@@ -134,18 +188,62 @@
       "forescout-eyeinspect:127.0.0.1:9003"
     ],
     "requests_include": [
-      {"method": "GET", "path": "/api/v1/hosts", "query_contains": "sort_field=id"},
-      {"method": "GET", "path": "/api/v1/alerts", "query_contains": "host_id=9001"},
-      {"method": "GET", "path": "/api/v1/alerts", "query_contains": "limit=100"},
-      {"header_contains": "Basic"}
+      {
+        "method": "GET",
+        "path": "/api/v1/hosts",
+        "query_contains": "full=true"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/alerts",
+        "query_contains": "host_id=9001"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/alerts",
+        "query_contains": "host_id=9002"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/alerts",
+        "query_contains": "host_id=9003"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/alerts",
+        "query_contains": "limit=100"
+      },
+      {
+        "header_contains": "Basic"
+      }
     ],
     "requests_absent": [
-      {"path": "/api/v1/alerts", "query_contains": "host_id=9002"},
-      {"path_contains": "/api/v1/cve_info/"}
+      {
+        "path": "/api/v1/hosts",
+        "query_contains": "sort_field"
+      },
+      {
+        "path_contains": "/api/v1/cve_info"
+      }
     ],
     "min_services_total": 6,
     "min_software_total": 1,
-    "log_contains": ["reported 3 assets"]
+    "log_contains": [
+      "reported 3 assets"
+    ],
+    "assets": [
+      {
+        "id": "forescout-eyeinspect:127.0.0.1:9001",
+        "fields": {
+          "forescout_eyeinspect_all_roles": "PLC,Engineering Station",
+          "forescout_eyeinspect_purdue_level": "1",
+          "forescout_eyeinspect_criticality": "high",
+          "tags": "forescout-eyeinspect\tot\trole:PLC"
+        }
+      }
+    ]
   },
-  "invariants": {"skip": []}
+  "invariants": {
+    "skip": []
+  }
 }

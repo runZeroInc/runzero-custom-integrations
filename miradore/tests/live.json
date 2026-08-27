@@ -1,0 +1,8 @@
+{
+  "invariants": {
+    "skip": [
+      "child_caps"
+    ]
+  },
+  "//": "child_caps flags more than 99 software rows on one asset. Miradore returns a Mac's whole application inventory and a real one is several hundred entries -- the live test estate averages ~350 and peaks at 557 -- so a 99-row cap would silently discard two thirds of what the API returned. MAX_CHILDREN is 999 deliberately: the page is parsed either way and assets are streamed out one at a time with report_asset, so the bound costs one asset's memory rather than the run's. Confirmed against a live site on 2026-08-26."
+}

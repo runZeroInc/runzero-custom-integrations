@@ -1,0 +1,151 @@
+{
+  "name": "query-fallback",
+  "integration": "tenable-ot-security",
+  "description": "The extended field selection comes from pyTenable's ASSETS_QUERY rather than from a captured console response, and GraphQL validates the whole document -- so a release that does not publish one of those fields rejects the entire query and returns nothing at all. Both documents now carry a server-side `first:` bound on every nested connection, the minimal one included, so this scenario also proves the bounded minimal document is still accepted. This scenario is the lock on the defensive fallback: the console answers the extended document with a 400 naming firmwareVersion as an unknown field, and the run must retry once with the narrower field set Elastic's shipping integration uses, log that it did so, and still import the asset. The retry must not be attempted a second time, so exactly two requests are made. The emitted asset carries no manufacturer, because vendor is not in the narrower selection -- which is the visible cost of the fallback and the reason it is logged.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-api-key",
+    "page_size": "200",
+    "lookback_days": "0",
+    "include_hidden": "false",
+    "import_vulnerabilities": "true",
+    "import_software": "true"
+  },
+  "routes": [
+    {
+      "name": "extended-selection-rejected",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "firmwareVersion"
+      },
+      "responses": [
+        {
+          "status": 400,
+          "json": {
+            "errors": [
+              {
+                "message": "Cannot query field \"firmwareVersion\" on type \"Asset\"."
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "minimal-selection",
+      "match": {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "getAssets"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "assets": {
+                "nodes": [
+                  {
+                    "id": "b0b0b0b0-1111-4111-8111-111111111111",
+                    "name": "fallback-plc-01",
+                    "type": "Plc",
+                    "superType": "Controller",
+                    "category": "ControllersCategory",
+                    "purdueLevel": "Level1",
+                    "criticality": "HighCriticality",
+                    "hidden": false,
+                    "firstSeen": "2025-05-05T00:00:00Z",
+                    "lastSeen": "2026-08-23T07:00:00Z",
+                    "lastUpdate": "2026-08-23T07:00:03Z",
+                    "runStatus": "Running",
+                    "runStatusTime": "2026-08-23T06:00:00Z",
+                    "macs": {
+                      "nodes": [
+                        "00:1d:9c:dd:00:01"
+                      ]
+                    },
+                    "ips": {
+                      "nodes": [
+                        "10.150.6.1"
+                      ]
+                    },
+                    "directMacs": {
+                      "nodes": [
+                        "00:1d:9c:dd:00:01"
+                      ]
+                    },
+                    "directIps": {
+                      "nodes": [
+                        "10.150.6.1"
+                      ]
+                    },
+                    "segments": {
+                      "nodes": [
+                        {
+                          "id": "seg-150",
+                          "name": "Controller / 10.150.6.X",
+                          "type": "Filter"
+                        }
+                      ]
+                    },
+                    "risk": {
+                      "totalRisk": "48.125"
+                    }
+                  }
+                ],
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 1,
+    "ids": [
+      "tenable-ot-security:$HOST:b0b0b0b0-1111-4111-8111-111111111111"
+    ],
+    "request_count": 2,
+    "requests_include": [
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "firmwareVersion"
+      },
+      {
+        "method": "POST",
+        "path": "/graphql",
+        "body_contains": "hasNextPage"
+      }
+    ],
+    "assets": [
+      {
+        "id": "tenable-ot-security:$HOST:b0b0b0b0-1111-4111-8111-111111111111",
+        "fields": {
+          "deviceType": "Plc",
+          "hostnames": "fallback-plc-01",
+          "ipAddresses": "10.150.6.1",
+          "macAddresses": "00:1d:9c:dd:00:01",
+          "tags": "criticality:High\tpurdue:Level1\trun-status:Running\tsegment:Controller / 10.150.6.X\ttype:Plc"
+        },
+        "fields_absent": [
+          "manufacturer",
+          "model",
+          "os"
+        ]
+      }
+    ],
+    "log_contains": [
+      "tenable-ot-security: the console rejected the extended field selection, retrying with the minimal field set",
+      "tenable-ot-security: reported 1 assets"
+    ]
+  },
+  "check_determinism": true
+}

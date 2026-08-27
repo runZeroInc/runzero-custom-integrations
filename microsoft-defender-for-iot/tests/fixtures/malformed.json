@@ -1,0 +1,100 @@
+{
+  "name": "malformed",
+  "integration": "microsoft-defender-for-iot",
+  "description": "Every shape the sensor field table says should not happen, in one response. A bare string where a device object is documented, a null id on a record that is documented not-nullable, ipAddresses sent as a scalar instead of an array, an object inside macAddresses, protocols sent as a string, firmware sent as a string, operatingSystem sent as an object instead of the documented enum string, and a numeric vendor. The vulnerability report answers with an object rather than the documented array. Each bad record has to be skipped or coerced and the run has to continue: Starlark has no exceptions, so one unguarded field aborts the whole import.",
+  "kwargs": {
+    "url": "$BASE",
+    "access_token": "fixture-sensor-token",
+    "authorized_filter": "all",
+    "include_vulnerabilities": "true"
+  },
+  "routes": [
+    {
+      "name": "vulnerability-report",
+      "match": {"method": "GET", "path": "/api/v1/reports/vulnerabilities/devices"},
+      "responses": [{"status": 200, "json": {"error": "an object where an array is documented"}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/devices/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": [
+            "not-a-device-object",
+            {
+              "id": null,
+              "name": "record with no id",
+              "ipAddresses": ["10.9.9.1"],
+              "macAddresses": ["00:1b:1b:ee:00:01"],
+              "type": "PLC"
+            },
+            {
+              "id": 60,
+              "name": "ok-device.plant.example.com",
+              "ipAddresses": "10.9.9.60",
+              "macAddresses": [{"address": "00:1b:1b:ee:00:60"}],
+              "vendor": "Honeywell",
+              "operatingSystem": {"unexpected": "object"},
+              "type": "DCS Controller",
+              "protocols": "MODBUS",
+              "firmware": "not-an-array"
+            },
+            {
+              "id": 61,
+              "name": null,
+              "ipAddresses": ["10.9.9.61"],
+              "macAddresses": null,
+              "vendor": 12345,
+              "operatingSystem": "Linux",
+              "type": null,
+              "protocols": [{"name": null}, "BACNet"],
+              "firmware": [{"model": null, "serial": null, "firmwareVersion": null}]
+            }
+          ]
+        }
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "microsoft-defender-for-iot:$HOST:60",
+      "microsoft-defender-for-iot:$HOST:61"
+    ],
+    "assets": [
+      {
+        "id": "microsoft-defender-for-iot:$HOST:60",
+        "fields": {
+          "hostnames": "ok-device.plant.example.com",
+          "ipAddresses": "10.9.9.60",
+          "deviceType": "Industrial Control",
+          "manufacturer": "Honeywell",
+          "microsoft_defender_for_iot_protocols": "MODBUS"
+        },
+        "fields_absent": ["macAddresses", "os"]
+      },
+      {
+        "id": "microsoft-defender-for-iot:$HOST:61",
+        "fields": {
+          "ipAddresses": "10.9.9.61",
+          "os": "Linux",
+          "manufacturer": "12345",
+          "microsoft_defender_for_iot_protocols": "BACNet"
+        },
+        "fields_absent": ["hostnames", "macAddresses", "deviceType"]
+      }
+    ],
+    "request_count": 2,
+    "log_contains": [
+      "microsoft-defender-for-iot: indexed vulnerability findings for 0 devices",
+      "microsoft-defender-for-iot: skipping an inventory entry that is not a device object",
+      "microsoft-defender-for-iot: skipping a device record with no documented id",
+      "microsoft-defender-for-iot: reported 2 assets from sensor"
+    ]
+  },
+  "check_determinism": true
+}

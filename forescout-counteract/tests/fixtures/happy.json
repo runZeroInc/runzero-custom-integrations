@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "forescout-counteract",
-  "description": "Full Web API walk: login mints a JWT, the host field index drives which properties are requested, and the per-host property documents produce classification, services, software, and CVE findings. Also covers the two skip paths -- a row with no hostId and a host whose only address is loopback with no MAC or name. The _match.behavior assertion is the point of the identity rule: the CounterACT object id is derived from the endpoint's IPv4 address, so it is kept as a record key but must never match or break a merge. Host 1002's all-zero index MAC must not reach an interface.",
+  "description": "The primary path, POST /api/hosts/discovery, which selects properties inline in the request body so the whole estate costs one request per page instead of one per endpoint. The two-page walk here makes exactly three requests after login and the field index, and requests_absent proves no per-host GET /api/hosts/{id} was made at all; legacy-fallback covers the index walk instead. Page 2 is reached only by reading metadata.next_link off page 1, and the walk stops when page 2 returns no next_link.\n\nThe property document mirrors a recorded live one: hostname_calculated is the ONLY hostname it carries, so a field list without it imports no hostname from this deployment at all. lastSeenTS comes from the wrapper timestamp on `online` (1724839643), not from otsm_details_last_seen (1724826194), because the wrapper says when eyeSight last decided the endpoint was up and exists on every deployment; firstSeenTS comes from otsm_details_first_seen, the only first-seen the Web API has. os_classification is \"Unknown\" and must NOT become the OS. Host 169090600 arrives with its id in the address form the vendor sample shows and must still key on the integer the host index would have returned -- see id-stability-discovery and id-stability-legacy for the pair that pins that. sinceTime is absent because since_days defaults to 0.",
   "kwargs": {
     "url": "$BASE",
     "username": "webapi-fixture",
@@ -11,84 +11,165 @@
   "routes": [
     {
       "name": "login",
-      "match": {
-        "method": "POST",
-        "path": "/api/login"
-      },
+      "match": {"method": "POST", "path": "/api/login"},
       "responses": [
-        {
-          "status": 200,
-          "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.c2lnbmF0dXJlLWZpeHR1cmU"
-        }
+        {"status": 200, "text": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.c2lnbmF0dXJlLWZpeHR1cmU"}
       ],
       "when_exhausted": "repeat_last"
     },
     {
       "name": "hostfields",
-      "match": {
-        "method": "GET",
-        "path": "/api/hostfields"
-      },
+      "match": {"method": "GET", "path": "/api/hostfields"},
       "responses": [
         {
           "status": 200,
           "json": {
             "hostFields": [
+              {"name": "hostname_calculated", "label": "Hostname", "type": "string"},
+              {"name": "otsm_details_host_name", "label": "OT Host Name", "type": "string"},
+              {"name": "macs", "label": "MAC Addresses", "type": "list"},
+              {"name": "openports", "label": "Open Ports", "type": "list"},
+              {"name": "online", "label": "Online", "type": "boolean"},
+              {"name": "engine_seen_packet", "label": "Seen Packet", "type": "boolean"},
+              {"name": "onsite", "label": "Onsite", "type": "boolean"},
+              {"name": "nbtdomain", "label": "NetBIOS Domain", "type": "string"},
+              {"name": "prim_classification", "label": "Function", "type": "tree_path"},
+              {"name": "os_classification", "label": "Operating System", "type": "tree_path"},
+              {"name": "vendor_classification", "label": "Vendor and Model", "type": "tree_path"},
+              {"name": "model_classification", "label": "Model", "type": "string"},
+              {"name": "cl_type", "label": "Classified By", "type": "string"},
+              {"name": "segment_name_calculated", "label": "Segment", "type": "string"},
+              {"name": "otsm_details_first_seen", "label": "OT First Seen", "type": "date"},
+              {"name": "otsm_details_last_seen", "label": "OT Last Seen", "type": "date"},
+              {"name": "ipv4_report_time", "label": "IPv4 Report Time", "type": "date"},
+              {"name": "otsm_details_cves", "label": "OT CVEs", "type": "composite"},
+              {"name": "cysiv_risk_cve_list", "label": "Risk CVEs", "type": "composite"},
+              {"name": "installed_applications", "label": "Applications Installed", "type": "composite"},
+              {"name": "not a property name", "label": "Rejected by the field-name screen"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "discovery-page-0",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=0"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "metadata": {
+              "next_link": "https://enterprise-manager.example.com/api/hosts/discovery?pageSize=1000&sinceTime=0&page=1&nodeId=0"
+            },
+            "hosts": [
               {
-                "name": "hostname",
-                "label": "Hostname"
+                "id": 167838209,
+                "ip": "10.1.2.1",
+                "mac": null,
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724395424, "value": "wioc-1f903a"},
+                  "otsm_details_host_name": {"timestamp": 1724826201, "value": "wioc-1f903a"},
+                  "macs": [{"timestamp": 1724839650, "value": "0022e51f9018"}],
+                  "online": {"timestamp": 1724839643, "value": "true"},
+                  "engine_seen_packet": {"timestamp": 1724839643, "value": "true"},
+                  "onsite": {"timestamp": 1724395424, "value": "true"},
+                  "prim_classification": {"timestamp": 1724839679, "value": "Operational Technology/Industrial Control Systems/PLC"},
+                  "os_classification": {"timestamp": 1724839679, "value": "Unknown"},
+                  "vendor_classification": {"timestamp": 1724839675, "value": "Emerson"},
+                  "model_classification": {"timestamp": 1724826201, "value": "Wireless I/O Card"},
+                  "segment_name_calculated": {"timestamp": 1724395424, "value": "Operational Technology"},
+                  "otsm_details_first_seen": {"timestamp": 1724826201, "value": "1635282777"},
+                  "otsm_details_last_seen": {"timestamp": 1724826201, "value": "1724826194"},
+                  "ipv4_report_time": {"timestamp": 1724826081, "value": "true"},
+                  "openports": [
+                    {"timestamp": 1724398100, "value": "18507/UDP"},
+                    {"timestamp": 1724398100, "value": "18519/TCP"}
+                  ],
+                  "otsm_details_cves": [
+                    {
+                      "timestamp": 1724826201,
+                      "value": {
+                        "cve_id": "CVE-2014-2350",
+                        "id": "CVE-2014-2350",
+                        "cvss_score": "7.5",
+                        "cvss_temporal_score": "6.2",
+                        "title": "Emerson DeltaV uses hardcoded credentials for diagnostic services",
+                        "matching_confidence": "product",
+                        "icsa_id": "ICSA-14-133-02",
+                        "cvss_access_vector": "NETWORK",
+                        "cvss_access_complexity": "LOW",
+                        "cvss_authentication": "NONE",
+                        "cvss_confidentiality_impact": "PARTIAL",
+                        "cvss_integrity_impact": "PARTIAL",
+                        "cvss_availability_impact": "PARTIAL",
+                        "cvss_remediation_level": "OFFICIAL_FIX",
+                        "suppressed": "false"
+                      }
+                    },
+                    {
+                      "timestamp": 1724826201,
+                      "value": {
+                        "cve_id": "cve-2022-29965",
+                        "id": "cve-2022-29965",
+                        "cvss_score": "8.8",
+                        "cvss_temporal_score": "0.0",
+                        "title": "Emerson OpenBSI privilege escalation",
+                        "icsa_id": "ICSA-22-181-03",
+                        "cvss_confidentiality_impact": "HIGH",
+                        "cvss_integrity_impact": "HIGH",
+                        "cvss_availability_impact": "HIGH",
+                        "suppressed": "false"
+                      }
+                    },
+                    {
+                      "timestamp": 1724826201,
+                      "value": {
+                        "cve_id": "CVE-2022-30620",
+                        "cvss_score": "6.3",
+                        "title": "Dismissed by the operator",
+                        "suppressed": "true"
+                      }
+                    },
+                    {
+                      "timestamp": 1724826201,
+                      "value": {
+                        "cve_id": "not-a-cve",
+                        "cvss_score": "9.9",
+                        "title": "Must not reach a finding"
+                      }
+                    }
+                  ],
+                  "cysiv_risk_cve_list": [
+                    {
+                      "timestamp": 1724755548,
+                      "value": {
+                        "cysiv_cve_id": "CVE-2022-30260",
+                        "cysiv_cve_cvss_score": "7.8",
+                        "cysiv_cve_exploitability_level": "Low",
+                        "cysiv_cve_exploitability_percentile": "0.268",
+                        "cysiv_cve_cisa": "false",
+                        "cysiv_cve_reported_time": "1672035310"
+                      }
+                    }
+                  ],
+                  "installed_applications": [
+                    {"timestamp": 1724755548, "value": {"app_name": "DeltaV Workstation", "app_version": "12.3.0"}}
+                  ]
+                }
               },
               {
-                "name": "nbtdomain",
-                "label": "NetBIOS Domain"
-              },
-              {
-                "name": "os_classification",
-                "label": "Operating System"
-              },
-              {
-                "name": "prim_classification",
-                "label": "Function"
-              },
-              {
-                "name": "vendor_classification",
-                "label": "Vendor and Model"
-              },
-              {
-                "name": "mac_vendor_string",
-                "label": "NIC Vendor"
-              },
-              {
-                "name": "cl_type",
-                "label": "Classified By"
-              },
-              {
-                "name": "online",
-                "label": "Online"
-              },
-              {
-                "name": "onsite",
-                "label": "Onsite"
-              },
-              {
-                "name": "macs",
-                "label": "MAC Addresses"
-              },
-              {
-                "name": "openports",
-                "label": "Open Ports"
-              },
-              {
-                "name": "installed_applications",
-                "label": "Windows Applications Installed"
-              },
-              {
-                "name": "va_cve_list",
-                "label": "Vulnerabilities"
-              },
-              {
-                "name": "not_a_property name",
-                "label": "Rejected by the field-name screen"
+                "id": "10.20.30.40",
+                "ip": "10.20.30.40",
+                "mac": "001122334455",
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724395400, "value": "acct-ws-01"},
+                  "nbtdomain": {"timestamp": 1724395400, "value": "CORP"},
+                  "prim_classification": {"timestamp": 1724395400, "value": "Computer/Desktop"},
+                  "os_classification": {"timestamp": 1724395400, "value": "Computer/Windows Machine/Windows 10"},
+                  "vendor_classification": {"timestamp": 1724395400, "value": "Dell Inc./OptiPlex 7090"},
+                  "cl_type": {"timestamp": 1724395400, "value": "Classification Engine"},
+                  "online": {"timestamp": 1724395401, "value": "true"}
+                }
               }
             ]
           }
@@ -96,175 +177,35 @@
       ]
     },
     {
-      "name": "host-detail-1001",
-      "match": {
-        "method": "GET",
-        "path": "/api/hosts/1001"
-      },
+      "name": "discovery-page-1",
+      "match": {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=1"},
       "responses": [
         {
           "status": 200,
           "json": {
-            "host": {
-              "id": 1001,
-              "ip": "10.20.30.40",
-              "fields": {
-                "hostname": {
-                  "value": "acct-ws-01"
-                },
-                "nbtdomain": {
-                  "value": "CORP"
-                },
-                "os_classification": {
-                  "value": "Computer/Windows Machine/Windows 10"
-                },
-                "prim_classification": {
-                  "value": "Computer/Desktop"
-                },
-                "vendor_classification": {
-                  "value": "Dell Inc./OptiPlex 7090"
-                },
-                "mac_vendor_string": {
-                  "value": "Dell Inc."
-                },
-                "cl_type": {
-                  "value": "Classification Engine"
-                },
-                "online": {
-                  "value": "true"
-                },
-                "onsite": {
-                  "value": "true"
-                },
-                "macs": [
-                  {
-                    "value": "001122334455"
-                  },
-                  {
-                    "value": "00:11:22:33:44:66"
-                  }
-                ],
-                "openports": [
-                  {
-                    "value": "445/tcp"
-                  },
-                  {
-                    "value": "3389"
-                  },
-                  {
-                    "value": "161/udp"
-                  },
-                  {
-                    "value": "0/tcp"
-                  }
-                ],
-                "installed_applications": [
-                  {
-                    "value": "7-Zip 23.01"
-                  },
-                  {
-                    "value": {
-                      "name": "Notepad Plus",
-                      "version": "8.6.2",
-                      "vendor": "Fixture Software"
-                    }
-                  },
-                  {
-                    "value": "7-Zip 23.01"
-                  }
-                ],
-                "va_cve_list": [
-                  {
-                    "value": "cve-2024-12345 and CVE-2023-45678"
-                  },
-                  {
-                    "value": "CVE-2024-12345"
-                  }
-                ]
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "host-detail-1002",
-      "match": {
-        "method": "GET",
-        "path": "/api/hosts/1002"
-      },
-      "responses": [
-        {
-          "status": 200,
-          "json": {
-            "host": {
-              "id": 1002,
-              "fields": {
-                "hostname": {
-                  "value": "plc-line-3"
-                },
-                "prim_classification": {
-                  "value": "Operational Technology/PLC"
-                },
-                "vendor_classification": {
-                  "value": "Fixture Automation"
-                },
-                "online": {
-                  "value": "false"
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "host-detail-1003",
-      "match": {
-        "method": "GET",
-        "path": "/api/hosts/1003"
-      },
-      "responses": [
-        {
-          "status": 200,
-          "json": {
-            "host": {
-              "id": 1003,
-              "fields": {}
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "host-index",
-      "match": {
-        "method": "GET",
-        "path": "/api/hosts"
-      },
-      "responses": [
-        {
-          "status": 200,
-          "json": {
+            "metadata": {},
             "hosts": [
               {
-                "hostId": 1001,
-                "ip": "10.20.30.40",
-                "mac": "001122334455"
-              },
-              {
-                "hostId": 1002,
-                "ip": "10.20.30.41",
-                "mac": "000000000000"
-              },
-              {
-                "hostId": 1003,
+                "id": 2130706433,
                 "ip": "127.0.0.1",
-                "mac": "000000000000"
+                "mac": "000000000000",
+                "fields": {}
               },
               {
+                "id": null,
                 "ip": "10.20.30.44",
-                "mac": "00:11:22:33:44:99"
+                "mac": "00:11:22:33:44:99",
+                "fields": {}
+              },
+              {
+                "id": 169090601,
+                "ip": "10.20.30.41",
+                "mac": "000000000000",
+                "fields": {
+                  "hostname_calculated": {"timestamp": 1724395500, "value": "plc-line-3"},
+                  "prim_classification": {"timestamp": 1724395500, "value": "Operational Technology/PLC"},
+                  "online": {"timestamp": 1724395500, "value": "false"}
+                }
               }
             ]
           }
@@ -272,69 +213,80 @@
       ]
     }
   ],
+  "default_response": {"status": 404, "text": "no fixture route"},
   "expect": {
-    "asset_count": 2,
+    "asset_count": 3,
     "ids": [
-      "forescout-counteract:$HOST:1001",
-      "forescout-counteract:$HOST:1002"
+      "forescout-counteract:$HOST:167838209",
+      "forescout-counteract:$HOST:169090600",
+      "forescout-counteract:$HOST:169090601"
     ],
-    "min_requests": 6,
+    "request_count": 4,
     "requests_include": [
-      {
-        "method": "POST",
-        "path": "/api/login",
-        "body_contains": "username=webapi-fixture"
-      },
-      {
-        "method": "GET",
-        "path": "/api/hostfields"
-      },
-      {
-        "method": "GET",
-        "path": "/api/hosts"
-      },
-      {
-        "method": "GET",
-        "path": "/api/hosts/1001",
-        "query_contains": "fields=hostname"
-      }
+      {"method": "POST", "path": "/api/login", "body_contains": "username=webapi-fixture"},
+      {"method": "GET", "path": "/api/hostfields"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=0", "body_contains": "hostname_calculated"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "pageSize=1000"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "nodeId=0"},
+      {"method": "POST", "path": "/api/hosts/discovery", "query_contains": "page=1"}
+    ],
+    "requests_absent": [
+      {"path": "/api/hosts"},
+      {"path": "/api/hosts/167838209"},
+      {"query_contains": "sinceTime="}
     ],
     "log_contains": [
       "forescout-counteract: skipping host with no object id: ip=10.20.30.44",
-      "forescout-counteract: skipping host 1003 with no address, MAC, or name to correlate on",
-      "the host index returned 4 hosts"
+      "forescout-counteract: skipping host 2130706433 with no address, MAC, or name to correlate on",
+      "forescout-counteract: imported 3 assets from the paginated endpoint over 2 request(s)",
+      "forescout-counteract: imported 3 CVE finding(s), 3 of them carrying a CVSS score",
+      "forescout-counteract: skipped 1 CVE record(s) the deployment has marked suppressed"
     ],
-    "min_services_total": 3,
-    "min_software_total": 2,
+    "min_services_total": 2,
+    "min_software_total": 1,
+    "min_vulnerabilities_total": 3,
     "assets": [
       {
-        "id": "forescout-counteract:$HOST:1001",
+        "id": "forescout-counteract:$HOST:167838209",
+        "fields": {
+          "hostnames": "wioc-1f903a",
+          "ipAddresses": "10.1.2.1",
+          "macAddresses": "00:22:e5:1f:90:18",
+          "deviceType": "Industrial Control System",
+          "manufacturer": "Emerson",
+          "model": "Wireless I/O Card",
+          "lastSeenTS": "1724839643",
+          "firstSeenTS": "1635282777",
+          "forescout_counteract_source_endpoint": "discovery",
+          "forescout_counteract_last_seen_source": "online",
+          "forescout_counteract_segment_name_calculated": "Operational Technology"
+        },
+        "fields_absent": ["os"]
+      },
+      {
+        "id": "forescout-counteract:$HOST:169090600",
         "fields": {
           "hostnames": "acct-ws-01",
           "ipAddresses": "10.20.30.40",
-          "macAddresses": "00:11:22:33:44:55\t00:11:22:33:44:66",
+          "macAddresses": "00:11:22:33:44:55",
           "os": "Windows 10",
           "deviceType": "Desktop",
           "domain": "CORP",
           "manufacturer": "Dell Inc.",
-          "model": "OptiPlex 7090",
-          "forescout_counteract_detail_enriched": "true"
+          "model": "OptiPlex 7090"
         }
       },
       {
-        "id": "forescout-counteract:$HOST:1002",
+        "id": "forescout-counteract:$HOST:169090601",
         "fields": {
-          "deviceType": "Industrial Control System",
-          "ipAddresses": "10.20.30.41"
+          "hostnames": "plc-line-3",
+          "ipAddresses": "10.20.30.41",
+          "deviceType": "Industrial Control System"
         },
-        "fields_absent": [
-          "macAddresses"
-        ]
+        "fields_absent": ["macAddresses"]
       }
-    ],
-    "min_vulnerabilities_total": 2
+    ]
   },
-  "invariants": {
-    "skip": []
-  }
+  "check_determinism": true,
+  "invariants": {"skip": []}
 }

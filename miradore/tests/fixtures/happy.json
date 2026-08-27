@@ -1,12 +1,13 @@
 {
   "name": "happy",
   "integration": "miradore",
-  "description": "One page from the site-path endpoint. Proves the wrapped list containers (<Tags>/<Tag>, <InvApplications>/<InvApplication>, <InvStorages>/<InvStorage>) are read -- reading the singular name as a direct child of <Device> finds nothing and silently drops software, tags and storage. Also proves the dd.MM.yyyy parse, the LocalIPAddress spelling, an application with no Identifier still building (Software requires an id), a Deleted device and an ID-less device being skipped, 127.0.0.1 never reaching an interface, and a future LastReported being clamped instead of failing the record. Request 1 is the path probe. The configured page size of 500 must be clamped to 10 because application inventory is on: a page of devices with their applications is ~34x larger, and one page holding a whole estate exceeded the Explorer's memory limit and reported nothing.",
+  "description": "One page from the site-path endpoint, with the API v2 detail requests switched off so the request count is a statement about the v1 walk alone; v2-detail covers those. Proves the wrapped list containers (<Tags>/<Tag>, <InvApplications>/<InvApplication>, <InvStorages>/<InvStorage>) are read -- reading the singular name as a direct child of <Device> finds nothing and silently drops software, tags and storage. Also proves the dd.MM.yyyy parse, the LocalIPAddress spelling, an application with no Identifier still building (Software requires an id), a vendor derived from a reverse DNS bundle identifier, a Deleted device and an ID-less device being skipped, a loopback LocalIPAddress never reaching an interface, that the public IPAddress is kept as miradore_public_ip and never becomes an asset address, and a future LastReported being clamped instead of failing the record. Request 1 is the path probe. The configured page size of 500 must be clamped to 25 because application inventory is on: a page of devices with their applications is ~34x larger, and one page holding a whole estate exceeded the Explorer's memory limit and reported nothing.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "1_fixturekey",
     "site_name": "acme",
-    "page_size": "500"
+    "page_size": "500",
+    "include_v2_details": "false"
   },
   "routes": [
     {
@@ -21,7 +22,7 @@
           "headers": {
             "Content-Type": "application/xml"
           },
-          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"6\"><Device><ID>1</ID><Platform>iOS</Platform><OSVersionName>17.5.1</OSVersionName><IPAddress>10.20.0.11</IPAddress><MACAddress>00:11:22:AA:00:01</MACAddress><Status>Active</Status><OnlineStatus>Active</OnlineStatus><LastReported>17.08.2026 09:15:00</LastReported><Created>04.01.2025 08:00:00</Created><InvDevice><DeviceName>field-phone-11</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone14,5</Model><MarketingName>iPhone 13</MarketingName><SerialNumber>SN-MIR-0001</SerialNumber><IMEI>990000862471854</IMEI><UDID>00008110-000A4D2E0C90801E</UDID><WiFiMAC>00:11:22:AA:00:02</WiFiMAC><BluetoothMAC>00:11:22:AA:00:03</BluetoothMAC><DeviceType>iPhone14,5</DeviceType></InvDevice><InvOS><Platform>iOS</Platform><Version>17.5.1</Version><Build>21F90</Build></InvOS><User><Name>Fixture User1</Name><Email>user1@example.com</Email></User><Location><Name>Helsinki</Name></Location><Organization><Name>Field Services</Name></Organization><Tags><Tag><Name>field</Name></Tag><Tag><Name>kiosk</Name></Tag></Tags><InvApplications><InvApplication><Name>Salesforce</Name><Version>250.3</Version><Identifier>com.salesforce.chatter</Identifier></InvApplication><InvApplication><Name>Authenticator</Name><Version>6.8.1</Version></InvApplication></InvApplications><InvStorages><InvStorage><TotalSpace>128000000000</TotalSpace><FreeSpace>64000000000</FreeSpace><Type>Internal</Type></InvStorage></InvStorages></Device><Device><ID>2</ID><Platform>WindowsDesktop</Platform><OSVersionName>10.0.22631</OSVersionName><IPAddress>127.0.0.1</IPAddress><LocalIPAddress>10.20.0.12</LocalIPAddress><MACAddress>00:11:22:AA:00:04</MACAddress><Status>Active</Status><LastReported>17.08.2026 10:00:00</LastReported><InvDevice><DeviceName>wks-fin-02</DeviceName><Manufacturer>LENOVO</Manufacturer><Model>21F6CTO1WW</Model><MarketingName>ThinkPad X1 Carbon</MarketingName><SerialNumber>SN-MIR-0002</SerialNumber></InvDevice><InvOS><Platform>WindowsDesktop</Platform><Version>10.0.22631</Version></InvOS><User><Email>user2@example.com</Email><Firstname>Fixture</Firstname><Lastname>User2</Lastname></User><InvApplications><InvApplication><Name>Google Chrome</Name><Version>141.0.7390.55</Version><Identifier>com.google.chrome</Identifier></InvApplication></InvApplications></Device><Device><ID>3</ID><Platform>Android</Platform><OSVersionName>14</OSVersionName><LocalIPAddress>10.20.0.13</LocalIPAddress><MACAddress>00:11:22:AA:00:05</MACAddress><Status>New</Status><InvDevice><DeviceName>Loaner's Galaxy Tab</DeviceName><Manufacturer>samsung</Manufacturer><Model>SM-X710</Model><MarketingName>Galaxy Tab S9</MarketingName></InvDevice><InvOS><Platform>Android</Platform><Version>14</Version></InvOS><Tags><Tag><Name>loaner</Name></Tag></Tags></Device><Device><ID>4</ID><Platform>iOS</Platform><MACAddress>00:11:22:AA:00:06</MACAddress><Status>Deleted</Status><InvDevice><DeviceName>retired-phone-04</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>16.0</Version></InvOS></Device><Device><ID>5</ID><Platform>macOS</Platform><LocalIPAddress>10.20.0.15</LocalIPAddress><MACAddress>00:11:22:AA:00:07</MACAddress><Status>Active</Status><LastReported>01.01.2099 00:00:00</LastReported><InvDevice><DeviceName>mac-lab-05</DeviceName><Manufacturer>Apple</Manufacturer><Model>Mac14,12</Model><MarketingName>Mac mini</MarketingName></InvDevice><InvOS><Platform>macOS</Platform><Version>14.6</Version></InvOS></Device><Device><Platform>iOS</Platform><Status>Active</Status><InvDevice><DeviceName>nameless</DeviceName></InvDevice></Device></Items></Content>"
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"6\"><Device><ID>1</ID><Platform>iOS</Platform><OSVersionName>17.5.1</OSVersionName><IPAddress>10.20.0.11</IPAddress><MACAddress>00:11:22:AA:00:01</MACAddress><Status>Active</Status><OnlineStatus>Active</OnlineStatus><LastReported>17.08.2026 09:15:00</LastReported><Created>04.01.2025 08:00:00</Created><InvDevice><DeviceName>field-phone-11</DeviceName><Manufacturer>Apple</Manufacturer><Model>iPhone14,5</Model><MarketingName>iPhone 13</MarketingName><SerialNumber>SN-MIR-0001</SerialNumber><IMEI>990000862471854</IMEI><UDID>00008110-000A4D2E0C90801E</UDID><WiFiMAC>00:11:22:AA:00:02</WiFiMAC><BluetoothMAC>00:11:22:AA:00:03</BluetoothMAC><DeviceType>iPhone14,5</DeviceType></InvDevice><InvOS><Platform>iOS</Platform><Version>17.5.1</Version><Build>21F90</Build></InvOS><User><Name>Fixture User1</Name><Email>user1@example.com</Email></User><Location><Name>Helsinki</Name></Location><Organization><Name>Field Services</Name></Organization><Tags><Tag><Name>field</Name></Tag><Tag><Name>kiosk</Name></Tag></Tags><InvApplications><InvApplication><Name>Salesforce</Name><Version>250.3</Version><Identifier>com.salesforce.chatter</Identifier></InvApplication><InvApplication><Name>Authenticator</Name><Version>6.8.1</Version></InvApplication></InvApplications><InvStorages><InvStorage><TotalSpace>128000000000</TotalSpace><FreeSpace>64000000000</FreeSpace><Type>Internal</Type></InvStorage></InvStorages></Device><Device><ID>2</ID><Platform>WindowsDesktop</Platform><OSVersionName>10.0.22631</OSVersionName><IPAddress>203.0.113.9</IPAddress><LocalIPAddress>10.20.0.12</LocalIPAddress><MACAddress>00:11:22:AA:00:04</MACAddress><Status>Active</Status><LastReported>17.08.2026 10:00:00</LastReported><InvDevice><DeviceName>wks-fin-02</DeviceName><Manufacturer>LENOVO</Manufacturer><Model>21F6CTO1WW</Model><MarketingName>ThinkPad X1 Carbon</MarketingName><SerialNumber>SN-MIR-0002</SerialNumber></InvDevice><InvOS><Platform>WindowsDesktop</Platform><Version>10.0.22631</Version></InvOS><User><Email>user2@example.com</Email><Firstname>Fixture</Firstname><Lastname>User2</Lastname></User><InvApplications><InvApplication><Name>Google Chrome</Name><Version>141.0.7390.55</Version><Identifier>com.google.chrome</Identifier></InvApplication></InvApplications></Device><Device><ID>3</ID><Platform>Android</Platform><OSVersionName>14</OSVersionName><LocalIPAddress>127.0.0.1</LocalIPAddress><MACAddress>00:11:22:AA:00:05</MACAddress><Status>New</Status><InvDevice><DeviceName>Loaner's Galaxy Tab</DeviceName><Manufacturer>samsung</Manufacturer><Model>SM-X710</Model><MarketingName>Galaxy Tab S9</MarketingName></InvDevice><InvOS><Platform>Android</Platform><Version>14</Version></InvOS><Tags><Tag><Name>loaner</Name></Tag></Tags></Device><Device><ID>4</ID><Platform>iOS</Platform><MACAddress>00:11:22:AA:00:06</MACAddress><Status>Deleted</Status><InvDevice><DeviceName>retired-phone-04</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>16.0</Version></InvOS></Device><Device><ID>5</ID><Platform>macOS</Platform><LocalIPAddress>10.20.0.15</LocalIPAddress><MACAddress>00:11:22:AA:00:07</MACAddress><Status>Active</Status><LastReported>01.01.2099 00:00:00</LastReported><InvDevice><DeviceName>mac-lab-05</DeviceName><Manufacturer>Apple</Manufacturer><Model>Mac14,12</Model><MarketingName>Mac mini</MarketingName></InvDevice><InvOS><Platform>macOS</Platform><Version>14.6</Version></InvOS></Device><Device><Platform>iOS</Platform><Status>Active</Status><InvDevice><DeviceName>nameless</DeviceName></InvDevice></Device></Items></Content>"
         }
       ],
       "when_exhausted": "repeat_last"
@@ -78,14 +79,17 @@
           "manufacturer": "Apple",
           "model": "iPhone 13",
           "hostnames": "field-phone-11",
-          "ipAddresses": "10.20.0.11",
           "miradore_user_email": "user1@example.com",
           "miradore_user_name": "Fixture User1",
           "miradore_serial_number": "SN-MIR-0001",
           "miradore_tags": "field,kiosk",
           "miradore_location": "Helsinki",
-          "miradore_storage": "Internal:64000000000/128000000000"
-        }
+          "miradore_storage": "Internal:64000000000/128000000000",
+          "miradore_public_ip": "10.20.0.11"
+        },
+        "fields_absent": [
+          "ipAddresses"
+        ]
       },
       {
         "id": "miradore:acme:2",
@@ -94,9 +98,9 @@
           "osVersion": "10.0.22631",
           "model": "ThinkPad X1 Carbon",
           "ipAddresses": "10.20.0.12",
-          "miradore_ip_address": "127.0.0.1",
           "miradore_local_ip_address": "10.20.0.12",
-          "miradore_user_name": "Fixture User2"
+          "miradore_user_name": "Fixture User2",
+          "miradore_public_ip": "203.0.113.9"
         },
         "fields_absent": [
           "deviceType"
@@ -109,10 +113,12 @@
           "deviceType": "Tablet",
           "model": "Galaxy Tab S9",
           "miradore_device_name": "Loaner's Galaxy Tab",
-          "miradore_tags": "loaner"
+          "miradore_tags": "loaner",
+          "miradore_local_ip_address": "127.0.0.1"
         },
         "fields_absent": [
-          "hostnames"
+          "hostnames",
+          "ipAddresses"
         ]
       },
       {

@@ -182,8 +182,15 @@ def cli_path(environ=None):
 # --------------------------------------------------------------------------
 
 def _matching_brace(text, open_idx):
+    """Index of the brace closing the one at open_idx, or -1.
+
+    Comments are skipped as well as quotes: an apostrophe in a CONFIG comment
+    ("the site's own key") would otherwise open a string that never closes, so
+    brace depth never returns to zero.
+    """
     depth, quote, escape = 0, None, False
-    for idx in range(open_idx, len(text)):
+    idx = open_idx
+    while idx < len(text):
         ch = text[idx]
         if quote:
             if escape:
@@ -192,8 +199,13 @@ def _matching_brace(text, open_idx):
                 escape = True
             elif ch == quote:
                 quote = None
-            continue
-        if ch in "'\"":
+        elif ch == "#":
+            # Outside a string, # runs to end of line.
+            newline = text.find("\n", idx)
+            if newline == -1:
+                return -1
+            idx = newline
+        elif ch in "'\"":
             quote = ch
         elif ch == "{":
             depth += 1
@@ -201,6 +213,7 @@ def _matching_brace(text, open_idx):
             depth -= 1
             if depth == 0:
                 return idx
+        idx += 1
     return -1
 
 
@@ -214,24 +227,37 @@ def load_config(script_path):
     """
     with open(script_path) as handle:
         text = handle.read()
+
+    # A script with no CONFIG legitimately returns {}. A CONFIG that is present
+    # but unparseable raises instead: answering {} there reports every declared
+    # credential as unknown, which reads as a credential problem rather than a
+    # parser one.
     idx = text.find("CONFIG")
     if idx == -1:
         return {}
     equals = text.find("=", idx + len("CONFIG"))
     open_idx = text.find("{", equals)
     if equals == -1 or open_idx == -1:
-        return {}
+        raise LiveError("%s declares CONFIG but no dict literal follows it"
+                        % script_path)
     close_idx = _matching_brace(text, open_idx)
     if close_idx == -1:
-        return {}
+        raise LiveError(
+            "%s: could not find the brace closing the CONFIG dict. An "
+            "unbalanced quote inside CONFIG -- most often an apostrophe in a "
+            "comment -- will do this." % script_path)
     literal = text[open_idx:close_idx + 1]
     for identifier in OPTION_SET_IDENTIFIERS:
         literal = literal.replace(identifier, repr(identifier))
     try:
         parsed = ast.literal_eval(literal)
-    except Exception:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+    except Exception as err:
+        raise LiveError("%s: CONFIG is not a Python-parseable literal: %s"
+                        % (script_path, err))
+    if not isinstance(parsed, dict):
+        raise LiveError("%s: CONFIG parsed as %s, not a dict"
+                        % (script_path, type(parsed).__name__))
+    return parsed
 
 
 # --------------------------------------------------------------------------

@@ -1,0 +1,106 @@
+{
+  "name": "rate-limit",
+  "integration": "claroty-ctd",
+  "description": "Claroty documents no rate limit for this API and no reviewed client handles 429, but the appliance is customer-owned hardware whose CPU is the real constraint, so a 503 or a 429 under load has to be survivable rather than fatal. A 429 with Retry-After on the vulnerability walk and a 503 on the asset walk must both be absorbed by the shared HTTP helper's retry budget - the script sets retries=3 and hand-rolls no backoff of its own - so the same run still emits every asset.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "fixture-password",
+    "include_vulnerabilities": "true",
+    "last_updated_days": "0"
+  },
+  "routes": [
+    {
+      "name": "authenticate",
+      "match": {"method": "POST", "path": "/auth/authenticate"},
+      "responses": [{"status": 200, "json": {"token": "ratelimit-token", "password_expired": false}}],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "asset-vulnerabilities",
+      "match": {"method": "GET", "path": "/ranger/asset-vulnerabilities"},
+      "responses": [
+        {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "too many requests"}},
+        {"status": 200, "json": {
+          "count_filtered": 1,
+          "count_in_page": 1,
+          "count_total": 1,
+          "objects": [
+            {
+              "resource_id": "700-1",
+              "asset_id": "410-1",
+              "asset_name": "throttled-plc",
+              "cve_id": "CVE-2022-1161",
+              "cvss_v3_score": {"value": 10.0, "label": "Critical"},
+              "epss_score": {"value": 0.9012},
+              "actively_exploited": true,
+              "vulnerability_type": "Known Vulnerability",
+              "detection_date": "2024-04-01T00:00:00+00:00",
+              "relevance__": "Confirmed"
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    },
+    {
+      "name": "assets",
+      "match": {"method": "GET", "path": "/ranger/assets"},
+      "responses": [
+        {"status": 503, "json": {"error": "appliance busy"}},
+        {"status": 200, "json": {
+          "count_filtered": 1,
+          "count_in_page": 1,
+          "count_total": 1,
+          "objects": [
+            {
+              "id": 410,
+              "resource_id": "410-1",
+              "site_id": 1,
+              "site_name": "site-throttled",
+              "name": "throttled-plc",
+              "hostname": "throttled-plc",
+              "ipv4": ["10.40.0.11"],
+              "mac": ["00:0B:AB:1A:DD:DD"],
+              "vendor": "Schneider Electric",
+              "model": "TM241CE40R",
+              "firmware": "V4.0.3.0",
+              "asset_type__": "ePLC",
+              "class_type": "OT",
+              "criticality__": "eHigh",
+              "risk_level": 3,
+              "purdue_level": 1,
+              "ghost": false,
+              "special_hint": 0
+            }
+          ]
+        }}
+      ],
+      "when_exhausted": "empty"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "ids": ["claroty-ctd:$HOST:410-1"],
+    "assets": [
+      {
+        "id": "claroty-ctd:$HOST:410-1",
+        "fields": {
+          "claroty_ctd_risk_level_label": "Critical",
+          "claroty_ctd_vulnerability_count": "1"
+        }
+      }
+    ],
+    "min_requests": 5,
+    "min_vulnerabilities_total": 1,
+    "requests_absent": [
+      {"path": "/ranger/assets", "query_contains": "page=2"}
+    ],
+    "log_contains": [
+      "indexed 1 vulnerabilities across 1 assets",
+      "reported 1 assets"
+    ]
+  },
+  "check_determinism": true
+}

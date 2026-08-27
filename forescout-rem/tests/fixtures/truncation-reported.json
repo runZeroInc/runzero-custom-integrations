@@ -1,0 +1,165 @@
+{
+  "name": "truncation-reported",
+  "integration": "forescout-rem",
+  "description": "An estate that cannot be covered, and must say so. Every query whose lower risk bound is 0.0 comes back truncated, so the splitter walks the low edge of the scale all the way down: seven risk splits reduce 0.0-10.0 to the single tenth 0.0-0.0, and five time bisections then halve the last_seen window under it. At the twelfth split the window can be narrowed no further, and the run has to report a shortfall rather than finish quietly.\n\nThat is the whole point of the scenario. This API returns total_hits and nothing else -- no cursor, no page count -- so a window that is still truncated at the split limit is an import that is silently incomplete unless the script counts it. log_contains asserts both halves of that: the number of windows still truncated, and the number of assets in them that were not imported.\n\nThe request count is exact and worth reading as a shape: 1 unbounded sweep, its zero-score halves, 15 risk-band queries (8 down the truncated low edge and their 7 complete siblings), and 62 time-window queries under the single 0.0-0.0 band, of which the 32 at the depth limit are the ones that report.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "fixture-key",
+    "sync_strategy": "incremental",
+    "lookback_days": "7"
+  },
+  "routes": [
+    {
+      "name": "truncated-low-band",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min=0.0"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1500,
+            "entities": [
+              {
+                "id": "rem-low-1",
+                "hostname": "low-risk-1",
+                "ip_addresses": [
+                  "10.90.0.1"
+                ],
+                "mac_addresses": [
+                  "00:dd:00:00:00:01"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Badge Reader",
+                "risk_score": 0,
+                "last_seen": "2026-05-06T08:55:23.777Z"
+              },
+              {
+                "id": "rem-low-2",
+                "hostname": "low-risk-2",
+                "ip_addresses": [
+                  "10.90.0.2"
+                ],
+                "mac_addresses": [
+                  "00:dd:00:00:00:02"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Badge Reader",
+                "risk_score": 0,
+                "last_seen": "2026-05-06T08:55:23.800Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "complete-band",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search",
+        "query_contains": "risk_score_min"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1,
+            "entities": [
+              {
+                "id": "rem-high-1",
+                "hostname": "high-risk-1",
+                "ip_addresses": [
+                  "10.90.1.1"
+                ],
+                "mac_addresses": [
+                  "00:dd:00:00:01:01"
+                ],
+                "rem_category": "OT",
+                "rem_function": "PLC",
+                "risk_score": 9.9,
+                "risk_severity": "Critical",
+                "last_seen": "2026-05-06T08:55:22.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "unbanded",
+      "match": {
+        "method": "GET",
+        "path": "/api/data-exchange/v3/rem-asset-search"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "total_hits": 1500,
+            "entities": [
+              {
+                "id": "rem-zero-1",
+                "hostname": "zero-risk-1",
+                "ip_addresses": [
+                  "10.90.9.1"
+                ],
+                "mac_addresses": [
+                  "00:dd:00:00:09:01"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Sensor",
+                "risk_score": 0,
+                "last_seen": "2026-05-06T08:55:10.000Z"
+              },
+              {
+                "id": "rem-zero-2",
+                "hostname": "zero-risk-2",
+                "ip_addresses": [
+                  "10.90.9.2"
+                ],
+                "mac_addresses": [
+                  "00:dd:00:00:09:02"
+                ],
+                "rem_category": "IoT",
+                "rem_function": "Sensor",
+                "risk_score": 0,
+                "last_seen": "2026-05-06T08:55:11.000Z"
+              }
+            ]
+          }
+        }
+      ],
+      "when_exhausted": "error"
+    }
+  ],
+  "expect": {
+    "asset_count": 5,
+    "ids": [
+      "forescout-rem:$HOST:rem-zero-1",
+      "forescout-rem:$HOST:rem-zero-2",
+      "forescout-rem:$HOST:rem-low-1",
+      "forescout-rem:$HOST:rem-low-2",
+      "forescout-rem:$HOST:rem-high-1"
+    ],
+    "request_count": 82,
+    "requests_include": [
+      {
+        "query_contains": "risk_score_max=0.0&risk_score_min=0.0"
+      },
+      {
+        "query_contains": "risk_score_max=10.0&risk_score_min=5.1"
+      }
+    ],
+    "log_contains": [
+      "banding the risk scale to cover it",
+      "32 windows were still truncated after the maximum number of splits; about 47936 assets were not imported",
+      "reported 5 assets from 78 search windows"
+    ]
+  },
+  "check_determinism": true
+}
