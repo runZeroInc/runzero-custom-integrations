@@ -79,7 +79,7 @@
               "manufacturers_id": "Dell Inc.",
               "computermodels_id": "OptiPlex 7090",
               "computertypes_id": "Desktop",
-              "users_id": "jdoe",
+              "users_id": "user1",
               "comment": "Bench unit &#38; spare",
               "is_template": 0,
               "is_dynamic": 1,

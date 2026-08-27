@@ -147,7 +147,7 @@ version, storage volumes, and the raw addresses and timestamps — is imported a
 Some deliberate choices worth knowing:
 
 - **Device names are not always hostnames.** MDM display names like
-  `Ana's Galaxy Tab` are not valid DNS names, and importing them as hostnames
+  `Loaner's Galaxy Tab` are not valid DNS names, and importing them as hostnames
   would correlate unrelated devices. Only DNS-valid names become `hostnames`; the
   display name is always kept as `miradore_device_name`.
 - **Loopback addresses are filtered off interfaces.** An agent that reports

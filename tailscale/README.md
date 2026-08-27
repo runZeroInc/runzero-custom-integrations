@@ -209,7 +209,7 @@ That has a direct consequence: a Tailscale device carries only overlay addresses
 The hostname situation is itself a deliberate choice worth knowing. Tailscale exposes two names and the script uses them differently:
 
 - `name` is the **MagicDNS FQDN** (`my-laptop.tailnet.ts.net`), a valid DNS hostname, and it is what gets asserted as the runZero hostname.
-- `hostname` is the **raw machine name**, which can contain spaces and apostrophes (`Andrew's Work Laptop (2)`) and would be rejected as a bogus hostname. It is kept as the `tailscale_machine_name` attribute only.
+- `hostname` is the **raw machine name**, which can contain spaces and apostrophes (`<owner>'s Work Laptop (2)`) and would be rejected as a bogus hostname. It is kept as the `tailscale_machine_name` attribute only.
 
 That is correct, and it also means the asserted hostname is a `.ts.net` name that no scan will ever resolve — so `name-break` staying on is harmless here rather than protective, and relaxing it would buy nothing.
 

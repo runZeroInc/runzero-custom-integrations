@@ -134,7 +134,7 @@ UNUSABLE_IP_PREFIXES = ["127.", "169.254.", "fe8", "fe9", "fea", "feb"]
 UNUSABLE_IPS = ["::1", "::", "0.0.0.0", "0:0:0:0:0:0:0:1"]
 
 # displayName defaults to the hostname but administrators routinely rewrite it
-# into a human label ("Jane's MacBook Pro"), which is not a name anything can
+# into a human label ("<owner>'s MacBook Pro"), which is not a name anything can
 # resolve. It is only promoted to a hostname when it is still hostname shaped;
 # the raw value is kept as a custom attribute either way.
 HOSTNAME_RE = r"^[A-Za-z0-9]([A-Za-z0-9._-]{0,252}[A-Za-z0-9])?$"

@@ -286,7 +286,7 @@ and leaving those fields unset lets runZero's own fingerprinting decide rather t
   last seen from, shared by every device behind one gateway. It is kept as `jumpcloud_remote_ip`.
 - **Hostnames are filtered.** `hostname` is reported by the host itself and used directly. `displayName`
   defaults to the hostname but administrators routinely rewrite it into a human label
-  (`Jane's MacBook Pro`), so it is only promoted to a hostname when it is still hostname shaped. The raw
+  (`<owner>'s MacBook Pro`), so it is only promoted to a hostname when it is still hostname shaped. The raw
   value is always kept as `jumpcloud_display_name`.
 - **Software.** With `include_software` enabled, macOS systems are read from
   `GET /api/v2/systeminsights/apps` and Windows systems from `GET /api/v2/systeminsights/programs`, both

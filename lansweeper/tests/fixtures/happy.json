@@ -72,7 +72,7 @@
                         "name": "WKS-0001",
                         "fqdn": "wks-0001.corp.example.com",
                         "domain": "corp.example.com",
-                        "userName": "jdoe",
+                        "userName": "user1",
                         "userDomain": "CORP",
                         "description": "Finance workstation",
                         "type": "Windows",
@@ -107,7 +107,7 @@
                         {
                           "name": "7-Zip",
                           "version": "24.09",
-                          "publisher": "Igor Pavlov",
+                          "publisher": "Fixture Software Ltd",
                           "cpe": "cpe:2.3:a:7-zip:7-zip:24.09:*:*:*:*:*:*:*"
                         },
                         {

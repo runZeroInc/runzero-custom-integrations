@@ -15,7 +15,7 @@
       "name": "user-directory",
       "match": {"method": "GET", "path": "/api/systemusers"},
       "responses": [
-        {"status": 200, "json": {"totalCount": 1, "results": [{"_id": "6600000000000000000000a1", "username": "jane", "email": "jane@example.com"}]}}
+        {"status": 200, "json": {"totalCount": 1, "results": [{"_id": "6600000000000000000000a1", "username": "user1", "email": "user1@example.com"}]}}
       ],
       "when_exhausted": "empty"
     },
