@@ -675,8 +675,7 @@ def main(**kwargs):
     base_url = get_url_base(kwargs)
     scope = _appliance_host(base_url)
     if not scope:
-        print("truenas: could not determine the host from the configured URL")
-        return None
+        fail("truenas: could not determine the host from the configured URL")
 
     max_records = get_int(kwargs, "max_records", default=5000)
     if max_records < 0:

@@ -1,7 +1,7 @@
 {
   "name": "logon-failure",
   "integration": "cyberark-epm",
-  "description": "A rejected logon. Proves a bad credential ends the run after exactly one request with a printed diagnostic naming the likely cause -- including the SAML-only-user trap -- and a clean zero-asset return rather than an abort or a misleading empty-tenant success.",
+  "description": "A rejected logon. Proves a bad credential ends the run after exactly one request with a printed diagnostic naming the likely cause -- including the SAML-only-user trap -- and a clean zero-asset return rather than an abort or a misleading empty-tenant success.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -22,8 +22,12 @@
     "asset_count": 0,
     "request_count": 1,
     "log_contains": [
-      "cyberark-epm: logon failed:",
       "cyberark-epm: check the username and password; SAML-only users cannot use this endpoint"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "cyberark-epm: logon failed",
+      "status 401"
     ]
   },
   "invariants": {"skip": []}

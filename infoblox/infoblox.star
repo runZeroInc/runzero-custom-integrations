@@ -444,9 +444,10 @@ def fetch_network_views(base, http_options, page_size):
     while _pager1.next():
         records, page_id, err = _get_page(url, http_options, params)
         if err:
-            print("infoblox: failed to list network views:", err)
             _auth_hint(err)
-            return views
+            # Every later read is scoped by a network view, so a failed view
+            # list is the run and not a NIOS with no views defined.
+            fail("infoblox: failed to list network views: {}".format(err))
         for record in records:
             if type(record) != "dict":
                 continue

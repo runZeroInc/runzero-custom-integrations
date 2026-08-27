@@ -140,18 +140,15 @@ def fetch_results(base_url, creds, config_kwargs, query):
     http_options = get_http_options(config_kwargs, headers=headers)
     response = http_get(url, params={'query': query}, **http_options)
     if not response:
-        print('swis: failed to retrieve assets: no response from the Information Service')
-        return None
+        fail('swis: failed to retrieve assets: no response from the Information Service')
     if response.status_code != 200:
-        print('swis: failed to retrieve assets: status {}: {}'.format(
+        fail('swis: failed to retrieve assets: status {}: {}'.format(
             response.status_code, str(response.body)[:200]))
-        return None
     body = response.body
     # A 200 from a proxy can carry an HTML body, and decoding that aborts the
     # whole run; a SWIS answer is always a JSON object.
     if not body or body[0:1] != '{':
-        print('swis: failed to retrieve assets: the response body was not JSON')
-        return None
+        fail('swis: failed to retrieve assets: the response body was not JSON')
     return body
 
 

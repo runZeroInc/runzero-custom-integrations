@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "infoblox",
-  "description": "A rejected credential. The network-view bootstrap answers 401, and the run must end cleanly with zero assets, a printed error naming the failed read, and the credential hint -- never an abort or a retry storm. 401 is deliberately outside get_json's transient retry list, so exactly one request is made.",
+  "description": "A rejected credential. The network-view bootstrap answers 401, and the run must end cleanly with zero assets, a printed error naming the failed read, and the credential hint -- never an abort or a retry storm. 401 is deliberately outside get_json's transient retry list, so exactly one request is made.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -22,9 +22,12 @@
     "asset_count": 0,
     "request_count": 1,
     "log_contains": [
-      "infoblox: failed to list network views:",
-      "infoblox: check the username and password and that the NIOS user has API access",
-      "infoblox: no network views retrieved"
+      "infoblox: check the username and password and that the NIOS user has API access"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "infoblox: failed to list network views",
+      "status 401"
     ]
   },
   "invariants": {

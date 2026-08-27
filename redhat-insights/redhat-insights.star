@@ -835,8 +835,7 @@ def main(**kwargs):
     parsed = url_parse(console_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("redhat-insights: could not determine the console host from the configured URL")
-        return None
+        fail("redhat-insights: could not determine the console host from the configured URL")
 
     headers = {"Accept": "application/json"}
     client_id = get_string(kwargs, "client_id", default="").strip()

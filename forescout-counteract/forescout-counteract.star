@@ -1350,8 +1350,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("forescout-counteract: could not determine the Enterprise Manager host from the configured URL")
-        return None
+        fail("forescout-counteract: could not determine the Enterprise Manager host from the configured URL")
 
     http_options = get_http_options(kwargs, headers={"Accept": "application/hal+json"})
     # The JWT is installed on the collected headers dict in place, so every

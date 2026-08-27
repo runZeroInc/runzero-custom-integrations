@@ -944,8 +944,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("{}: could not determine the console host from the configured URL".format(VENDOR))
-        return None
+        fail("{}: could not determine the console host from the configured URL".format(VENDOR))
 
     api_key = get_string(kwargs, "api_key")
     # The documented header is X-APIKeys with a "key=" prefix and no bearer

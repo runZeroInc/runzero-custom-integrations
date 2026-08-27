@@ -494,8 +494,7 @@ def main(*args, **kwargs):
 
     stream, err = stream_agents(ctx)
     if err:
-        print("{}: failed to list agents: {}".format(VENDOR, err))
-        return None
+        fail("{}: failed to list agents: {}".format(VENDOR, err))
 
     ceiling = now()
     reported = 0

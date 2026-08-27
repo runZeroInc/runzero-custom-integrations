@@ -762,8 +762,7 @@ def main(**kwargs):
     endpoint = _base(url)
     scope = _scope(url)
     if not scope or endpoint == "/graphql":
-        print("unraid: could not determine the server host from the configured URL")
-        return None
+        fail("unraid: could not determine the server host from the configured URL")
 
     max_containers = get_int(kwargs, "max_containers", default=500)
     ctx = {

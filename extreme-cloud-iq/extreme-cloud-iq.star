@@ -142,20 +142,18 @@ def main(*args, **kwargs):
 
     # post_json checks the status BEFORE decoding and reports a non-JSON 200
     # body as an error string, so the HTML page a proxy answers with -- or an
-    # empty body -- ends the run with a clean message instead of aborting the
-    # task inside json_decode. Logging in mints a token and changes nothing, so
-    # the default retry policy is safe here.
+    # empty body -- ends the task naming the login rather than aborting inside
+    # json_decode. Logging in mints a token and changes nothing, so the default
+    # retry policy is safe here.
     login_body, err = post_json(base_url + "/login",
                                 json={"username": username, "password": password},
                                 **http_options)
     if err:
-        print("extreme-cloud-iq: login failed:", err)
         if err.startswith("status 401") or err.startswith("status 403"):
             print("extreme-cloud-iq: check the username and password")
-        return None
+        fail("extreme-cloud-iq: login failed: {}".format(err))
     if type(login_body) != "dict":
-        print("extreme-cloud-iq: unexpected login response shape, wanted an object")
-        return None
+        fail("extreme-cloud-iq: the login endpoint returned an unexpected response shape, wanted an object")
 
     token = login_body.get("access_token")
     if not token:
@@ -186,14 +184,12 @@ def main(*args, **kwargs):
         print("Fetching page:", page)
         devices_body, err = get_json(url, **http_options)
         if err:
-            print("extreme-cloud-iq: failed to fetch page {}: {}".format(page, err))
-            break
+            fail("extreme-cloud-iq: failed to fetch page {}: {}".format(page, err))
 
         # The documented response is an object with a "data" array; reading .get
         # off a list would abort the script.
         if type(devices_body) != "dict":
-            print("Unexpected response shape on page", page, "- wanted an object")
-            break
+            fail("extreme-cloud-iq: unexpected response shape on page {}, wanted an object".format(page))
 
         reported_total = devices_body.get("total_count")
         if type(reported_total) == "int" and reported_total >= 0:

@@ -225,13 +225,12 @@ def fetch(ctx, path):
     url = ctx["base_url"] + API_PATH + path
     data, err = get_json(url, **ctx["http_options"])
     if err:
+        if "401" in err or "403" in err:
+            fail("unifi-protect: {} was rejected: {}. Check the API key and that it was created on this console.".format(path, err))
         if "404" in err:
             print(("unifi-protect: {} returned 404. Either this Protect release predates the " +
                    "Integration API (added in Protect 5.3), or the Protect application is not " +
                    "installed or not running on this console.").format(path))
-            return None
-        if "401" in err or "403" in err:
-            print("unifi-protect: {} was rejected: {}. Check the API key and that it was created on this console.".format(path, err))
             return None
         print("unifi-protect: {} failed: {}".format(path, err))
         return None
@@ -437,8 +436,7 @@ def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))
     scope = _scope(base_url)
     if not base_url or not scope:
-        print("unifi-protect: could not determine the console host from the configured URL")
-        return None
+        fail("unifi-protect: could not determine the console host from the configured URL")
 
     ctx = {
         "base_url": base_url,
@@ -456,7 +454,10 @@ def main(**kwargs):
 
     version, proceed = preflight(ctx)
     if not proceed:
-        return None
+        # preflight has printed which of the two definitive failures happened -
+        # no Integration API, or a rejected key. Neither leaves anything to
+        # collect, so the task ends in error rather than reporting no cameras.
+        fail("unifi-protect: the Protect Integration API preflight failed; nothing was collected")
     ctx["version"] = version
     if version:
         print("unifi-protect: Protect {} on {}".format(version, scope))

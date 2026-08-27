@@ -211,8 +211,7 @@ def get_and_report_assets(base_url, tenant_id, token, config_kwargs):
     while _pager.next():
         data, err = get_json(url, **http_options)
         if err:
-            print('ivanti-neurons: failed to retrieve devices from ' + url + ': ' + err)
-            break
+            fail('ivanti-neurons: failed to retrieve devices from ' + url + ': ' + err)
         if not data:
             break
 
@@ -266,23 +265,21 @@ def get_token(base_url, tenant_id, client_id, client_secret, config_kwargs):
                'X-ClientId': client_id}
     auth_data, err = get_json(url, **get_http_options(config_kwargs, headers=headers))
     if err:
-        print('ivanti-neurons: authentication failed: ' + err)
-        return None
+        fail('ivanti-neurons: authentication failed: ' + err)
     if not auth_data:
-        print('ivanti-neurons: invalid authentication data')
-        return None
+        fail('ivanti-neurons: the token endpoint returned an empty response')
 
     # The token call answers with a JSON object whose access_token field holds
     # the bearer token. This used to return the raw response body, so every
     # device request carried the entire JSON document after the Bearer keyword
     # and Ivanti refused all of them.
     if type(auth_data) != "dict":
-        print('ivanti-neurons: authentication response was not a JSON object')
-        return None
+        fail('ivanti-neurons: the authentication response was not a JSON object')
     token = auth_data.get('access_token')
     if not token:
-        print('ivanti-neurons: authentication response carried no access_token')
-        return None
+        # A rejected client pair is reported here rather than in the status
+        # line: a 200 with no access_token is the whole signal.
+        fail('ivanti-neurons: authentication response carried no access_token')
 
     return token
 
@@ -291,13 +288,10 @@ def main(*args, **kwargs):
     tenant_id = get_string(kwargs, 'tenant_id')
     client_id = kwargs['client_id']
     client_secret = kwargs['client_secret']
+    # get_token ends the task in error itself when the exchange fails or the
+    # response carries no access_token, so the token here is always usable --
+    # 'Bearer ' + None would otherwise abort with a type error.
     token = get_token(base_url, tenant_id, client_id, client_secret, kwargs)
-    # 'Bearer ' + None aborts the script, so a token call that failed has to end
-    # the run here. This line is also what separates a clean stop from that
-    # abort in the task log -- an aborted run never reaches it.
-    if not token:
-        print('ivanti-neurons: no access token, nothing to import')
-        return None
 
     # Each page is built and streamed inside the walk, so nothing is buffered
     # across pages.

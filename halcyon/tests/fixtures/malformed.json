@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "halcyon",
-  "description": "Malformed responses must degrade, never abort. Page one returns a documented envelope whose items list carries a bare string where an object is documented -- that row is skipped with a log line -- plus a good row whose detail record answers with \"ipAddresses\": null and \"macAddresses\": null, the present-but-null shape .get(key, []) does not defend; that asset must import carrying its hostname and no interface. Page two answers 200 with a bare JSON array where an object carrying \"items\" is documented -- the shape a gateway or a changed API version returns -- and the walk must stop cleanly with a printed diagnostic rather than aborting on list.get.\n\nThis scenario used to be a regression lock asserting the abort ('list has no .get field or method'); the guards are now in place and it asserts the fixed behaviour.\n\nnamespaced_ids is skipped: the id is the bare Halcyon asset uuid with no tenant scope, as in happy.",
+  "description": "Malformed responses must degrade, never abort. Page one returns a documented envelope whose items list carries a bare string where an object is documented -- that row is skipped with a log line -- plus a good row whose detail record answers with \"ipAddresses\": null and \"macAddresses\": null, the present-but-null shape .get(key, []) does not defend; that asset must import carrying its hostname and no interface. Page two answers 200 with a bare JSON array where an object carrying \"items\" is documented -- the shape a gateway or a changed API version returns -- and the walk must stop cleanly with a printed diagnostic rather than aborting on list.get.\n\nThis scenario used to be a regression lock asserting the abort ('list has no .get field or method'); the guards are now in place and it asserts the fixed behaviour.\n\nnamespaced_ids is skipped: the id is the bare Halcyon asset uuid with no tenant scope, as in happy.  Page 2's unreadable body truncates the walk, so the task ends in error while page 1's good asset stays exported. Skipping a bad ROW is still not an error; losing a PAGE is.",
   "kwargs": {
     "url": "$BASE",
     "username": "svc-runzero@example.com",
@@ -125,6 +125,10 @@
     "log_contains": [
       "halcyon: skipping non-object search row",
       "halcyon: asset search returned an unexpected response shape; expected an object with items"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "asset search returned an unexpected response shape"
     ]
   },
   "invariants": {

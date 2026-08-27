@@ -113,6 +113,9 @@ shared harness is top-level.
     ],
     "requests_absent": [{"path_contains": "/admin"}],
     "log_contains": ["skipping device with no id"],
+    "log_absent": ["imported"],           // must NOT appear
+    "script_error": true,                 // the run must END THE TASK IN ERROR
+    "error_contains": ["status 401"],     // ...and say this (implies script_error)
     "min_services_total": 1,
     "min_software_total": 2,
     "min_vulnerabilities_total": 3
@@ -192,6 +195,54 @@ authentication happened without a password reaching the request log.
 The listener is started only when a scenario declares `gmp`, so HTTP scenarios
 are unaffected. It needs `openssl` on PATH to mint a throwaway certificate.
 
+## Asserting that a run failed
+
+Zero assets and a successful run is what an **empty tenant** looks like. It is
+also what a rejected API key used to look like, which is the whole reason these
+two keys exist:
+
+```jsonc
+"expect": {
+  "asset_count": 0,
+  "script_error": true,                                  // the task ended in error
+  "error_contains": ["could not read the device list",   // and named the cause
+                     "status 401: the authentication key was rejected"]
+}
+```
+
+`error_contains` implies `script_error`, so an error-path scenario usually only
+needs the one key. Both are matched against the combined stdout+stderr of the
+run, which carries the `fail()` message.
+
+**The exit status is checked whether or not a scenario mentions it.** The
+default is that the run succeeded, so a script that aborts unexpectedly fails
+its scenario even when every other expectation still holds - which is how a
+scenario used to report PASS while the script died. When a run legitimately
+ends in error, say so with `script_error`; the harness prints the lines that
+name the cause, not the CLI usage block that follows them.
+
+Runs that end in error on purpose, and therefore declare it:
+
+- a refused credential, at whatever call first sees it
+- the primary listing failing, including mid-walk on page N
+- CONFIG parameter validation refusing a value before `main()` runs
+- the `pager()` backstop tripping, which raises rather than returning
+
+Assets streamed with `report_asset` before the failure are still exported, so a
+mid-walk scenario asserts **both** - the assets that made it and the error:
+
+```jsonc
+"expect": {
+  "asset_count": 2,
+  "ids": ["vendor:acme:1", "vendor:acme:2"],
+  "script_error": true,
+  "error_contains": ["page 2 failed", "status 500"]
+}
+```
+
+See [Failing the task](../AGENTS.md#failing-the-task) for which failures belong
+in which category.
+
 ## Invariants
 
 Every scenario runs these against the emitted assets. They encode defects found
@@ -243,7 +294,12 @@ exercise. Each one corresponds to a class of bug found in this repo:
   happens and the run continues.
 - **rate-limit** — a 429 followed by success. `get_json`/`post_json` retry three
   times by default; no integration should hand-roll this.
-- **empty** — a tenant with no records. Must report zero assets, not fail.
+- **auth-failure** — a rejected credential. Must end the task in error
+  (`script_error`), naming the credential, and must not walk anything with a
+  dead one.
+- **empty** — a tenant with no records. Must report zero assets and *succeed*.
+  Worth writing next to `auth-failure`: together they pin the distinction the
+  exit status carries.
 - **malformed** — a string where an object is documented, a number where a
   string is, a null id. Must skip the record and keep going.
 - **detail-cap** — for N+1 enrichment, prove the cap is honoured and the skip

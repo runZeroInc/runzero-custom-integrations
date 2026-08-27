@@ -114,8 +114,7 @@ def get_assets(base_url, token, config_kwargs):
         response, err = get_json(url, timeout=300, **http_options)
 
         if err:
-            print('failed to retrieve assets:', err)
-            return reported
+            fail('netskope: failed to retrieve assets after reporting {}: {}'.format(reported, err))
 
         # `result` can arrive present-but-null; dicts() turns that (and any
         # stray non-dict rows) into a clean list instead of aborting on

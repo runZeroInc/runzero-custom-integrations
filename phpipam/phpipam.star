@@ -603,8 +603,7 @@ def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))
     scope = _scope(base_url)
     if not base_url or not scope:
-        print("phpipam: could not determine the phpIPAM host from the configured URL")
-        return None
+        fail("phpipam: could not determine the phpIPAM host from the configured URL")
     if not base_url.startswith("https://"):
         print("phpipam: warning: the configured URL is not https. phpIPAM answers 503 " +
               "'SSL connection is required for API' to every API request that does not arrive over TLS.")

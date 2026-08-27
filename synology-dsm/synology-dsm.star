@@ -944,8 +944,7 @@ def main(**kwargs):
     base = _base(url)
     scope = _scope(url)
     if not scope or base == "/webapi":
-        print("synology: could not determine the NAS host from the configured URL")
-        return None
+        fail("synology: could not determine the NAS host from the configured URL")
 
     max_assets = get_int(kwargs, "max_assets", default=5000)
     ctx = {
@@ -970,14 +969,15 @@ def main(**kwargs):
 
     ctx["apis"] = discover(ctx)
     if not ctx["apis"]:
-        print("synology: could not read the API catalog. Check the URL and port " +
+        fail("synology: could not read the API catalog. Check the URL and port " +
               "(DSM serves the webapi on 5000 for HTTP and 5001 for HTTPS by default) " +
               "and that the Explorer can reach DSM.")
-        return None
 
     if not login(ctx, get_string(kwargs, "username"), get_string(kwargs, "password"),
                  get_string(kwargs, "otp_code", default="")):
-        return None
+        # login() has already named which refusal happened; nothing after it can
+        # read anything without a session.
+        fail("synology: could not authenticate to DSM")
 
     # SYNO.DSM.Info is version 2 only and works for a non-administrator, so it
     # is the reliable source of model, serial, and DSM version.

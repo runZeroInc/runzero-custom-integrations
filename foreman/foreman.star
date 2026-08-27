@@ -870,8 +870,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("foreman: could not determine the Foreman server host from the configured URL")
-        return None
+        fail("foreman: could not determine the Foreman server host from the configured URL")
 
     username = get_string(kwargs, "username", default="").strip()
     password = get_string(kwargs, "password", default="")

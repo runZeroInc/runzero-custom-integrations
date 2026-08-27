@@ -158,7 +158,7 @@ def fetch_rows(base_url, http_options, service, where, orderby, page_size, label
         offset += page_size
     return rows
 
-def stream_rows(base_url, http_options, service, where, orderby, page_size, label, handler):
+def stream_rows(base_url, http_options, service, where, orderby, page_size, label, handler, fatal=False):
     """Walk one list service, calling handler(row) per row instead of
     accumulating, so a large address estate is never held in memory."""
     count = 0
@@ -174,6 +174,11 @@ def stream_rows(base_url, http_options, service, where, orderby, page_size, labe
         options["params"] = params
         data, err = get_json(rest_url(base_url, service), **options)
         if err:
+            # The IPv4 address service IS the inventory, so its failure ends the
+            # task. The IPv6 service and the enrichment reads are not: an
+            # install without them still has an estate worth importing.
+            if fatal:
+                fail("efficientip: {} failed: {}".format(service, err))
             print("efficientip: {} failed: {}".format(service, err))
             break
         if data == None:
@@ -459,7 +464,7 @@ def main(**kwargs):
 
         where = "site_id='{}' AND type='ip'".format(quote_where(site_id))
         count = stream_rows(base_url, http_options, ADDRESS_SERVICE, where,
-                            "ip_addr", page_size, "eip-addr4", report_v4)
+                            "ip_addr", page_size, "eip-addr4", report_v4, fatal=True)
         reported += count
         print("efficientip: space {}: reported {} IPv4 addresses".format(site_name, count))
 

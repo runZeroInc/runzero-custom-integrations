@@ -1,7 +1,7 @@
 {
   "name": "permission-denied",
   "integration": "mikrotik-routeros",
-  "description": "An account whose group is missing the rest-api or read policy. RouterOS answers this with HTTP 500 and 'not enough permissions', NOT 403 - branching on the status code would classify a permissions problem as a server fault and tell the operator to look in the wrong place. This scenario proves the message names the exact /user group add command that fixes it, and that the run ends cleanly rather than half-importing. The router menu is refused too, so no assets are produced and the summary explains the version, service, and policy preconditions in one line. request_count pins the fail-fast: the permission 500 is excluded from get_json's transient retry list, so the first refused menu costs exactly one request instead of four backoff attempts.",
+  "description": "An account whose group is missing the rest-api or read policy. RouterOS answers this with HTTP 500 and 'not enough permissions', NOT 403 - branching on the status code would classify a permissions problem as a server fault and tell the operator to look in the wrong place. This scenario proves the message names the exact /user group add command that fixes it, and that the run ends cleanly rather than half-importing. The router menu is refused too, so no assets are produced and the summary explains the version, service, and policy preconditions in one line. request_count pins the fail-fast: the permission 500 is excluded from get_json's transient retry list, so the first refused menu costs exactly one request instead of four backoff attempts.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-underprivileged",
@@ -29,8 +29,11 @@
     "request_count": 1,
     "log_contains": [
       "the account's group is missing a policy",
-      "/system/resource returned nothing",
       "RouterOS 7.1 or newer is required"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "/system/resource returned nothing"
     ]
   },
   "check_determinism": true

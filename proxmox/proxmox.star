@@ -231,9 +231,7 @@ def main(*args, **kwargs):
     # here with a credential diagnostic instead of walking the whole cluster
     # printing the same error and ending as a plausible-looking empty import.
     if ctx["auth_refused"]:
-        print("proxmox: authentication failed; nothing collected")
-        print("proxmox: reported 0 assets")
-        return None
+        fail("proxmox: authentication failed; nothing collected")
     version = ver_data.get('release', '')
 
     # Get cluster name from cluster status. This value scopes every asset id, so

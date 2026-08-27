@@ -1,7 +1,7 @@
 {
   "name": "rc-error",
   "integration": "ntopng",
-  "description": "An interface id that ntopng does not know. Every v2 endpoint answers with its own rc field alongside the HTTP status, and rc -2 is INVALID_INTERFACE. The run must report the named code rather than an empty result.",
+  "description": "An interface id that ntopng does not know. Every v2 endpoint answers with its own rc field alongside the HTTP status, and rc -2 is INVALID_INTERFACE. The run must report the named code rather than an empty result.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "fixture-token",
@@ -46,8 +46,12 @@
       }
     ],
     "log_contains": [
+      "fetching hosts on interface 99"
+     ],
+    "script_error": true,
+    "error_contains": [
       "fetching hosts on interface 99",
-      "ntopng: no assets retrieved"
+      "status 400"
     ]
   },
   "invariants": {

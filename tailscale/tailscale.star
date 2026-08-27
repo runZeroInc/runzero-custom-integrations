@@ -105,6 +105,11 @@ def _log(msg):
     print("tailscale: " + msg)
 
 
+def _fail(msg):
+    """End the task in error, prefixed the same way as _log."""
+    fail("tailscale: " + msg)
+
+
 def _strings(value):
     """Return only the string members of a list, or [] for anything else.
 
@@ -118,11 +123,12 @@ def _strings(value):
 
 
 def oauth_access_token(token_url, client_id, secret, config_kwargs):
-    """Exchange OAuth client credentials for an access token, or return "".
+    """Exchange OAuth client credentials for an access token.
 
-    oauth2_token() raises on any non-2xx, and a raise from a builtin aborts the
-    whole task with a raw error - so the exchange is done with post_json, which
-    hands failures back as an err string that can be logged cleanly.
+    A refused exchange ends the task in error, as it must: no later request
+    works without a token. The exchange goes through post_json rather than
+    oauth2_token() because that builtin raises with a raw error of its own,
+    where post_json hands the failure back as a string this can name.
     """
     form = url_encode({
         "grant_type": "client_credentials",
@@ -136,15 +142,12 @@ def oauth_access_token(token_url, client_id, secret, config_kwargs):
         **get_http_options(config_kwargs, headers={"Content-Type": "application/x-www-form-urlencoded"})
     )
     if err:
-        _log("OAuth token exchange failed: " + err)
-        return ""
+        _fail("OAuth token exchange failed: " + err)
     if type(data) != "dict":
-        _log("OAuth token exchange returned an unexpected response shape")
-        return ""
+        _fail("OAuth token exchange returned an unexpected response shape")
     token = data.get("access_token")
     if type(token) != "string" or not token:
-        _log("OAuth token exchange returned no access_token")
-        return ""
+        _fail("OAuth token exchange returned no access_token")
     return token
 
 
@@ -330,9 +333,9 @@ def main(*args, **kwargs):
     # abort - see oauth_access_token.
     if client_id:
         _log("using OAuth client credentials")
+        # oauth_access_token ends the task in error itself when the exchange
+        # fails, so the token here is always usable.
         token = oauth_access_token(token_url, client_id, secret, kwargs)
-        if not token:
-            return None
     else:
         _log("using an API key")
         token = secret

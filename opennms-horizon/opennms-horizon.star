@@ -675,10 +675,8 @@ def collect(ctx, ip_index, snmp_index, service_index):
                                   page * ctx["page_size"], "nodes")
         if err:
             if err.startswith("status 401") or err.startswith("status 403"):
-                print("opennms: authentication to the OpenNMS server failed:", err)
-            else:
-                print("opennms: failed to fetch nodes:", err)
-            return reported
+                fail("opennms: authentication to the OpenNMS server failed: {}".format(err))
+            fail("opennms: failed to fetch nodes after reporting {}: {}".format(reported, err))
         if not records:
             break
 
@@ -721,8 +719,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("opennms: could not determine the OpenNMS host from the configured URL")
-        return None
+        fail("opennms: could not determine the OpenNMS host from the configured URL")
 
     username = get_string(kwargs, "username", default="").strip()
     password = get_string(kwargs, "password", default="")

@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "openwrt",
-  "description": "A wrong password. This is the single most important negative case for ubus, because the failure does NOT arrive as a JSON-RPC error object: a real OpenWrt 24.10.8 answers a bad session.login with {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":[6]} - HTTP 200, no error key, and a result array with ONE element carrying ubus status 6 (permission denied). A script that reads result[1] without checking the length aborts the whole run on an index error, and one that only inspects the error key reports success while collecting nothing. Proves the status is decoded to a named reason, that no assets are emitted, and that the operator is told what to check.",
+  "description": "A wrong password. This is the single most important negative case for ubus, because the failure does NOT arrive as a JSON-RPC error object: a real OpenWrt 24.10.8 answers a bad session.login with {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":[6]} - HTTP 200, no error key, and a result array with ONE element carrying ubus status 6 (permission denied). A script that reads result[1] without checking the length aborts the whole run on an index error, and one that only inspects the error key reports success while collecting nothing. Proves the status is decoded to a named reason, that no assets are emitted, and that the operator is told what to check.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-root",
@@ -41,7 +41,11 @@
     "request_count": 1,
     "log_contains": [
       "login failed",
-      "permission denied",
+      "permission denied"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "no session, nothing collected",
       "uci get uhttpd.main.ubus_prefix"
     ]
   },

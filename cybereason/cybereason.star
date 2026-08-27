@@ -742,8 +742,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     host = parsed.hostname if parsed else ""
     if not host:
-        print("cybereason: could not determine the tenant host from the configured URL")
-        return None
+        fail("cybereason: could not determine the tenant host from the configured URL")
 
     page_size = get_int(kwargs, "page_size", default=DEFAULT_PAGE_SIZE)
     if page_size < 1 or page_size > MAX_PAGE_SIZE:

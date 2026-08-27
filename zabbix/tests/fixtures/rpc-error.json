@@ -1,7 +1,7 @@
 {
   "name": "rpc-error",
   "integration": "zabbix",
-  "description": "Zabbix reports failures inside a 200 response, not with an HTTP status, so an integration that only checks status codes reports success while importing nothing. This scenario returns the JSON-RPC error envelope on both the group listing and the host read: hostgroup.get answers -32500 'Application error.' with data 'No permissions to referred object or it does not exist!', which is what an under-privileged token really produces (permission failures map to ZBX_API_ERROR_PERMISSIONS / -32500, NOT to -32602 as an auth failure does), and the fallback host.get answers -32602 'Invalid params.' with 'Not authorized.'. Both messages must reach the log, the fallback must be attempted, and the run must end with zero assets rather than an abort. It also proves the streamed host.get path decodes an error envelope safely: jsonstream.iter_array ABORTS the script when its path is missing, so the body is checked for a result member before it is ever streamed.",
+  "description": "Zabbix reports failures inside a 200 response, not with an HTTP status, so an integration that only checks status codes reports success while importing nothing. This scenario returns the JSON-RPC error envelope on both the group listing and the host read: hostgroup.get answers -32500 'Application error.' with data 'No permissions to referred object or it does not exist!', which is what an under-privileged token really produces (permission failures map to ZBX_API_ERROR_PERMISSIONS / -32500, NOT to -32602 as an auth failure does), and the fallback host.get answers -32602 'Invalid params.' with 'Not authorized.'. Both messages must reach the log, the fallback must be attempted, and the run must end with zero assets rather than an abort. It also proves the streamed host.get path decodes an error envelope safely: jsonstream.iter_array ABORTS the script when its path is missing, so the body is checked for a result member before it is ever streamed.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "under-privileged-token"
@@ -59,10 +59,12 @@
     "log_contains": [
       "hostgroup.get returned an error",
       "No permissions to referred object",
-      "falling back to a single unfiltered host.get",
+      "falling back to a single unfiltered host.get"
+     ],
+    "script_error": true,
+    "error_contains": [
       "host.get returned an error",
-      "Not authorized.",
-      "no assets retrieved"
+      "Not authorized."
     ]
   },
   "check_determinism": true

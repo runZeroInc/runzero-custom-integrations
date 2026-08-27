@@ -199,8 +199,7 @@ def main(**kwargs):
         params = {"pagelimit": PAGE_LIMIT, "page": page}
         body, err = get_json(url, params=params, timeout=3600, **http_options)
         if err:
-            print('Scan API error:', err)
-            return None
+            fail('Scan API error:', err)
 
         body    = body or {}
         # message_response is documented as an object; reading .get off a list

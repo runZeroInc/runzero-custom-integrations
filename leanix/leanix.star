@@ -273,8 +273,7 @@ def main(**kwargs):
             data, errors, err = graphql(base_url, token, kwargs, query, variables)
 
         if err:
-            print("leanix: fact sheet query failed:", err)
-            break
+            fail("leanix: fact sheet query failed: {}".format(err))
         if errors and query == QUERY_FULL:
             # A customized meta model can reject a standard field; retry the
             # same cursor with the minimal field set instead of importing
@@ -284,8 +283,7 @@ def main(**kwargs):
             query = QUERY_MINIMAL
             continue
         if errors:
-            print("leanix: query failed:", error_summary(errors))
-            break
+            fail("leanix: query failed: {}".format(error_summary(errors)))
 
         sheets = {}
         if type(data) == "dict":

@@ -1,0 +1,45 @@
+{
+  "name": "auth-failure",
+  "integration": "ninjaone",
+  "description": "The OAuth client credentials are wrong or the client has been disabled, so /ws/oauth/token answers 401 every time. A permanently refused credential, as opposed to the one-off 401 that auth-refresh covers. The run must END THE TASK IN ERROR: reporting zero assets and exiting 0 is what an empty tenant does, so without the error an operator sees a green task and an estate that appears to have emptied itself. The refusal is not retried either -- 401 is outside the transient retry set -- which is what the pinned request count carries. No device request may be made with no token.  The failure comes from oauth2_token() itself, which raises on any non-2xx rather than handing back an err string -- so this integration already ended the task in error, and the assertion is the builtin's own message. main() keeps a guard for the other shape the same call can produce, a 2xx carrying no token, which oauth2_token does not raise on.",
+  "kwargs": {
+    "api_url": "$BASE",
+    "client_id": "fixture-client",
+    "client_secret": "wrong-secret"
+  },
+  "routes": [
+    {
+      "name": "token-refused",
+      "match": {
+        "method": "POST",
+        "path": "/ws/oauth/token"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "json": {
+            "error": "invalid_client"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {
+        "path_contains": "/v2/devices"
+      }
+    ],
+    "script_error": true,
+    "error_contains": [
+      "http.oauth2_token: token endpoint returned status 401"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

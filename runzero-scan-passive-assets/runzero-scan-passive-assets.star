@@ -204,19 +204,20 @@ def main(*args, **kwargs):
     response = session.get(asset_url, timeout=3600)
 
     if not response or response.status_code != 200:
-        print("Failed to fetch assets")
-        return []
+        fail("runzero-scan-passive-assets: failed to fetch assets: {}".format(
+            "status {}".format(response.status_code) if response else "no response"))
 
-    # json_decode aborts the whole run on a body it cannot parse, and a 200
-    # with an HTML proxy body is a real failure mode; the export is always a
-    # JSON array.
-    if not response.body or response.body[0:1] != "[":
-        print("The asset export returned a non-JSON body; nothing to do")
+    # An export matching nothing answers 200 with an empty body: a legitimate
+    # result, not a failure. A NON-empty body that is not a JSON array is one -
+    # a 200 carrying an HTML proxy page would otherwise abort json_decode.
+    if not response.body:
+        print("runzero-scan-passive-assets: no assets matched the search")
         return []
+    if response.body[0:1] != "[":
+        fail("runzero-scan-passive-assets: the asset export returned a non-JSON body")
     data = json_decode(response.body)
     if type(data) != "list":
-        print("The asset export returned an unexpected shape; nothing to do")
-        return []
+        fail("runzero-scan-passive-assets: the asset export returned an unexpected shape, wanted an array")
 
     # Step 2: Filter assets and group IPs by agent
     agent_ip_map = {}  # {agent_id: [ip, ip, ...]}

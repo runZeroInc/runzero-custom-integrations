@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "netskope",
-  "description": "A tenant that rejects the credential outright: the datasearch answers 401 on the first call. The run must end with a printed diagnostic and zero assets rather than looping, retrying, or aborting -- and the request must carry the token in BOTH the documented Netskope-Api-Token header and the Authorization: Bearer form, so a tenant honoring either one authenticates. Skips namespaced_ids for consistency with the other netskope scenarios (no assets are emitted).",
+  "description": "A tenant that rejects the credential outright: the datasearch answers 401 on the first call. The run must end with a printed diagnostic and zero assets rather than looping, retrying, or aborting -- and the request must carry the token in BOTH the documented Netskope-Api-Token header and the Authorization: Bearer form, so a tenant honoring either one authenticates. Skips namespaced_ids for consistency with the other netskope scenarios (no assets are emitted).  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "fixture-netskope-token"
@@ -23,9 +23,10 @@
       {"header": {"Netskope-Api-Token": "fixture-netskope-token"}},
       {"header": {"Authorization": "Bearer fixture-netskope-token"}}
     ],
-    "log_contains": [
-      "failed to retrieve assets:",
-      "no assets retrieved"
+    "script_error": true,
+    "error_contains": [
+      "netskope: failed to retrieve assets",
+      "status 401"
     ]
   },
   "invariants": {

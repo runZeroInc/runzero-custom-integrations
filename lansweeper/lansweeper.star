@@ -370,14 +370,14 @@ def fetch_sites(endpoint, http_options):
     data, err = post_json(endpoint, json={"query": SITES_QUERY}, retries=HTTP_RETRIES,
                           **http_options)
     if err:
-        print("lansweeper: failed to fetch authorized sites:", err)
-        return []
+        # Nothing downstream works without a site, and the failure is almost
+        # always the application identity code being wrong or revoked.
+        fail("lansweeper: could not read the authorized sites: {}".format(err))
     data = data or {}
     errors = data.get("errors", []) or []
     if errors:
-        print("lansweeper: authorized site query returned an error:",
-              graphql_error_message(errors))
-        return []
+        fail("lansweeper: the authorized site query was rejected: {}".format(
+            graphql_error_message(errors)))
     authorized = (data.get("data") or {}).get("authorizedSites") or {}
     return authorized.get("sites", []) or []
 

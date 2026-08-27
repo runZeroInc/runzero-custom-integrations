@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "synology-dsm",
-  "description": "A wrong password. DSM answers HTTP 200 with {\"success\": false, \"error\": {\"code\": 400}} - the status code says nothing and the body is the only signal, so an integration that checks the HTTP status reports a successful run that collected nothing. The code range also OVERLAPS between APIs: 400-410 are the authentication codes here, but the identical numbers mean completely different things when a File Station call returns them, which is why the auth table is only consulted while authenticating. Proves the code is translated into the actual reason rather than echoed as a number, that no assets are emitted, and that discovery still ran first so the failure is attributable to the credential and not to reachability.",
+  "description": "A wrong password. DSM answers HTTP 200 with {\"success\": false, \"error\": {\"code\": 400}} - the status code says nothing and the body is the only signal, so an integration that checks the HTTP status reports a successful run that collected nothing. The code range also OVERLAPS between APIs: 400-410 are the authentication codes here, but the identical numbers mean completely different things when a File Station call returns them, which is why the auth table is only consulted while authenticating. Proves the code is translated into the actual reason rather than echoed as a number, that no assets are emitted, and that discovery still ran first so the failure is attributable to the credential and not to reachability.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-runzero",
@@ -43,6 +43,10 @@
     "request_count": 2,
     "log_contains": [
       "login refused: error 400: no such account or incorrect password"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "could not authenticate to DSM"
     ]
   },
   "check_determinism": true

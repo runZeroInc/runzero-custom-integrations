@@ -805,8 +805,7 @@ def main(**kwargs):
     # baking it into the foreign id would rewrite the id of every asset.
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("claroty-ctd: could not determine the appliance host from the configured URL")
-        return None
+        fail("claroty-ctd: could not determine the appliance host from the configured URL")
 
     ctx = {
         "base_url": base_url,

@@ -1125,14 +1125,15 @@ def main(*args, **kwargs):
 
     path_err = choose_path(ctx)
     if path_err != None:
-        print("miradore: could not read the device list: {}".format(path_err))
         if "401" not in path_err:
             # The API answers 500 both for a site that does not exist and for one
             # in the wrong case, and the error never says which.
             print("miradore: check the site name. It is the segment in your console URL " +
                   "(https://<server>/<site name>/) and it is case-sensitive; the API answers " +
                   "500 rather than 404 when it does not match.")
-        return None
+        # Ends the task in error: reporting zero assets here would be
+        # indistinguishable from a site that genuinely has no devices.
+        fail("miradore: could not read the device list: {}".format(path_err))
 
     # X-Instance-Name is case-sensitive and answers a wrong casing with 403 where
     # v1's path answers 500: two different errors for one mistake. v1 has just
@@ -1151,6 +1152,10 @@ def main(*args, **kwargs):
     seen_total = -1
     previous = None
     stage = 0
+    # Set when the walk stops on an error rather than on its own terms. The
+    # assets already streamed are kept, but the task still ends in error: a
+    # truncated estate reported as a success reads as devices having gone away.
+    walk_err = None
 
     p = pager("devices")
     while p.next():
@@ -1169,7 +1174,7 @@ def main(*args, **kwargs):
             ctx["include_software"] = stages[stage][2]
             devices, total, err, retryable = fetch_page(ctx, p.page)
         if err != None:
-            print("miradore: {} failed: {}".format(safe_label(ctx, p.page), err))
+            walk_err = "{} failed: {}".format(safe_label(ctx, p.page), err)
             break
         # Recorded before the empty check, so a site matching nothing still ends
         # the run saying "0 of 0" rather than leaving it ambiguous whether the
@@ -1208,4 +1213,6 @@ def main(*args, **kwargs):
         print("miradore: reported {} of {} devices matched by the query".format(reported, seen_total))
     else:
         print("miradore: reported {} devices".format(reported))
+    if walk_err != None:
+        fail("miradore: {}".format(walk_err))
     return None

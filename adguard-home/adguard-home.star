@@ -608,8 +608,7 @@ def main(**kwargs):
     base_url = get_url_base(kwargs)
     scope = _appliance_host(base_url)
     if not scope:
-        print("adguard-home: could not determine the host from the configured URL")
-        return None
+        fail("adguard-home: could not determine the host from the configured URL")
 
     max_clients = get_int(kwargs, "max_clients", default=20000)
     if max_clients < 0:

@@ -664,8 +664,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("cyberwatch: could not determine the master scanner host from the configured URL")
-        return None
+        fail("cyberwatch: could not determine the master scanner host from the configured URL")
 
     http_options = get_http_options(kwargs, headers={
         "Authorization": basic(get_string(kwargs, "api_access_key"), get_string(kwargs, "api_secret_key")),

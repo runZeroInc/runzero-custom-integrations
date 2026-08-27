@@ -729,8 +729,7 @@ def main(**kwargs):
     parsed = url_parse(url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("ocs-inventory: could not determine the OCS host from the configured URL")
-        return None
+        fail("ocs-inventory: could not determine the OCS host from the configured URL")
 
     headers = {"Accept": "application/json"}
     username = get_string(kwargs, "username", default="").strip()

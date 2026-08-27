@@ -674,10 +674,10 @@ def fetch_page(ctx, path, body, label, tunable):
                " parameter to a narrower list and retry.").format(label, tunable))
         return None, "field list rejected"
     if err.startswith("status 401") or err.startswith("status 403"):
-        print("claroty-xdome: the API rejected the token. xDome tokens expire on the date" +
-              " chosen when they were generated and cannot be refreshed, so generate a new" +
-              " one and confirm the API user still holds the Read-Only role and its site" +
-              " permissions.")
+        fail("claroty-xdome: the API rejected the token. xDome tokens expire on the date" +
+             " chosen when they were generated and cannot be refreshed, so generate a new" +
+             " one and confirm the API user still holds the Read-Only role and its site" +
+             " permissions.")
         return None, "token rejected"
     return None, err
 

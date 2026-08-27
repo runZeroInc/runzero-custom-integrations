@@ -835,8 +835,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("puppetdb: could not determine the PuppetDB host from the configured URL")
-        return None
+        fail("puppetdb: could not determine the PuppetDB host from the configured URL")
 
     auth_token = get_string(kwargs, "auth_token", default="").strip()
     headers = {"Accept": "application/json"}

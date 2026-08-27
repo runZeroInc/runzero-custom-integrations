@@ -679,8 +679,7 @@ def main(**kwargs):
     # would re-identify every asset on the next run, so the run stops instead.
     appliance_uuids = fetch_appliance_uuids(ctx)
     if appliance_uuids == None:
-        print("extrahop: cannot resolve appliance UUIDs, no assets imported")
-        return None
+        fail("extrahop: cannot resolve appliance UUIDs, no assets imported")
 
     reported = fetch_and_report_devices(ctx, appliance_uuids,
                                         page_size, lookback_days,

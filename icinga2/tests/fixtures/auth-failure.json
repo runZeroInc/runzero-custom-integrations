@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "icinga2",
-  "description": "The ApiUser credential is rejected. The host query must name the credential as the cause rather than reporting an empty inventory, because a silent zero-asset run reads as an emptied estate.",
+  "description": "The ApiUser credential is rejected. The host query must name the credential as the cause rather than reporting an empty inventory, because a silent zero-asset run reads as an emptied estate.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "runzero",
@@ -70,8 +70,12 @@
     "asset_count": 0,
     "min_requests": 2,
     "log_contains": [
-      "status 401: the ApiUser name or password was rejected",
-      "icinga2: no assets retrieved"
+      "status 401: the ApiUser name or password was rejected"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "icinga2: failed to fetch hosts",
+      "the ApiUser name or password was rejected"
     ]
   },
   "invariants": {

@@ -1,7 +1,7 @@
 {
   "name": "query-rejected",
   "integration": "solarwinds-information-service",
-  "description": "The Information Service rejects the SWQL and the run must end cleanly with nothing imported, rather than treating a rejection as an empty estate.\n\nA bad column name is the realistic failure here, not a bad credential: which columns exist depends on the Orion version and the modules installed, so an operator narrowing or extending the default query is the most likely way this call fails. SWIS answers 400 with a message naming the column -- exactly how a stock Orion answered the phantom columns the old default query selected.\n\nThe assertion is that fetch_results returns None on a non-200, the failure (status and body snippet) reaches the log, and the run still prints its zero count rather than aborting. request_count 1 pins that a rejected query is not retried into a loop.",
+  "description": "The Information Service rejects the SWQL and the run must end cleanly with nothing imported, rather than treating a rejection as an empty estate.\n\nA bad column name is the realistic failure here, not a bad credential: which columns exist depends on the Orion version and the modules installed, so an operator narrowing or extending the default query is the most likely way this call fails. SWIS answers 400 with a message naming the column -- exactly how a stock Orion answered the phantom columns the old default query selected.\n\nThe assertion is that fetch_results returns None on a non-200, the failure (status and body snippet) reaches the log, and the run still prints its zero count rather than aborting. request_count 1 pins that a rejected query is not retried into a loop.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -24,8 +24,12 @@
     "asset_count": 0,
     "request_count": 1,
     "log_contains": [
+      "swis: failed to retrieve assets"
+     ],
+    "script_error": true,
+    "error_contains": [
       "swis: failed to retrieve assets",
-      "swis: reported 0 assets"
+      "status 400"
     ]
   }
 }

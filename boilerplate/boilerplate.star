@@ -287,8 +287,11 @@ def example_http_usage(config_kwargs):
     #                      params={"limit": 100},
     #                      **http_options)
     # if err:
-    #     print("device fetch failed:", err)
-    #     return []
+    #     # fail() ends the TASK in error. Returning [] instead reports a
+    #     # successful run that imported nothing, which is what an empty
+    #     # tenant looks like too -- so a refused credential reads as an
+    #     # estate that emptied itself. See "Failing the task" in AGENTS.md.
+    #     fail("example: could not read the device list: {}".format(err))
     #
     # data, err = post_json("https://example.com/api/search",
     #                       json={"q": "alive:t"},

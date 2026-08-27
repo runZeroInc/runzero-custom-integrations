@@ -766,8 +766,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("fleet-osquery: could not determine the Fleet server host from the configured URL")
-        return None
+        fail("fleet-osquery: could not determine the Fleet server host from the configured URL")
 
     headers = {"Accept": "application/json"}
     token = get_string(kwargs, "api_token", default="").strip()

@@ -658,8 +658,7 @@ def main(*args, **kwargs):
 
     token, request_count = get_bearer_token(base_url, client_id, client_secret, kwargs)
     if not token:
-        print("Failed to get bearer token")
-        return None
+        fail("jamf: could not obtain a bearer token; check the client id, the client secret, and that the API role is still enabled")
 
     start_date = activity_start_date(get_int(kwargs, "activity_days", default=60))
 

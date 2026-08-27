@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "bitsight",
-  "description": "A rejected API token. The Basic header is built from token-as-username, so a bad token answers 401 on the first assets request. Proves the run ends with a printed diagnostic and a clean zero-asset return instead of aborting, and that the 401 is not retried (it is not in get_json's transient status list). The pinned request count is the assertion that no findings walk was attempted with a dead credential.",
+  "description": "A rejected API token. The Basic header is built from token-as-username, so a bad token answers 401 on the first assets request. Proves the run ends with a printed diagnostic and a clean zero-asset return instead of aborting, and that the 401 is not retried (it is not in get_json's transient status list). The pinned request count is the assertion that no findings walk was attempted with a dead credential.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "company_id": "co-fixture",
@@ -24,9 +24,10 @@
   "expect": {
     "asset_count": 0,
     "request_count": 1,
-    "log_contains": [
-      "bitsight: failed to retrieve assets: status 401",
-      "bitsight: reported 0 assets"
+    "script_error": true,
+    "error_contains": [
+      "bitsight: failed to retrieve assets",
+      "status 401"
     ]
   },
   "invariants": {"skip": []}

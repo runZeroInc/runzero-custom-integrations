@@ -450,7 +450,7 @@ def expand_seed(value, seed):
 # --- The scanner run -----------------------------------------------------
 
 def run_scanner(script, kwargs, scanner, timeout):
-    """Run the real scanner against the live container and return (assets, log).
+    """Run the scanner against the live container; returns (assets, log, rc).
 
     Deliberately mirrors `runner.run_once` minus the fixture server: same
     binary, same flags, same export parser, so an integration behaves here
@@ -464,7 +464,8 @@ def run_scanner(script, kwargs, scanner, timeout):
             argv += ["--kwargs", "%s=%s" % (key, value)]
         argv += ["--custom-integration-id", runner.INTEGRATION_ID, "--output", output]
         proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
-        return runner.read_assets(output), (proc.stdout or "") + (proc.stderr or "")
+        return (runner.read_assets(output),
+                (proc.stdout or "") + (proc.stderr or ""), proc.returncode)
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
@@ -540,20 +541,20 @@ def run_manifest(path, scanner, repo_root, verbose=True):
                 "second parameter, so this case cannot test what it declares"
                 % ", ".join(repr(k) for k in comma_kwargs))
 
-        assets, run_log = run_scanner(script, kwargs, scanner, manifest.get("timeout", 600))
+        assets, run_log, rc = run_scanner(script, kwargs, scanner, manifest.get("timeout", 600))
         log("      scanner emitted %d asset(s)" % len(assets))
 
         # The whole `expect` vocabulary and every invariant come from the fixture
         # harness. `requests` is empty because there is no proxy in front of the
         # container; request assertions are rejected at manifest load.
-        failures += runner.check_expectations(resolved, assets, [], run_log, base)
+        failures += runner.check_expectations(resolved, assets, [], run_log, base, None, rc)
 
         skip = set((resolved.get("invariants") or {}).get("skip") or [])
         for name, message in invariants.run(assets, skip):
             failures.append("invariant %s: %s" % (name, message))
 
         if resolved.get("check_determinism", True):
-            again, _ = run_scanner(script, kwargs, scanner, manifest.get("timeout", 600))
+            again = run_scanner(script, kwargs, scanner, manifest.get("timeout", 600))[0]
             first = sorted(a.get("id", "") for a in assets)
             second = sorted(a.get("id", "") for a in again)
             if first != second:

@@ -95,11 +95,19 @@ def get_tasks(src_url, src_org_id, src_task_search_filter, src_token, config_kwa
         **get_http_options(config_kwargs, "src_http_", "src_tls_", {"Authorization": bearer(src_token)})
     )
     if err:
-        print("Failed to get tasks:", err)
-        return []
+        # The task list IS the work list, so a failed read is the run and not a
+        # source org with no matching tasks.
+        fail("runzero-task-sync: failed to get tasks: {}".format(err))
     return data or []
 
 def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_org_id, dst_site_id, hide_tasks_on_sync, config_kwargs):
+    """Mirror one task. Returns "ok", "not_ready", or "failed".
+
+    "not_ready" is kept apart from "failed" because the source search selects on
+    name and type, never on status: a task still queued or running is listed and
+    then 404s its data, which the next run picks up. Only a real failure is
+    worth ending the task in error over.
+    """
     # Download data from SaaS. The org id travels on this call too: with an
     # account-level token, the task list resolves against ?_oid= while a /data
     # call without it resolves against the token's default org and 404s, so
@@ -111,9 +119,12 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
         timeout=3600,
         **get_http_options(config_kwargs, "src_http_", "src_tls_", {"Authorization": bearer(src_token), "Accept": "application/octet-stream", "Content-Encoding": "gzip"}),
     )
+    if download and download.status_code == 404:
+        print("Task data is not available yet (still queued or running); it will sync on a later run:", task_id)
+        return "not_ready"
     if not download or download.status_code != 200:
         print("Failed to download task:", task_id)
-        return False
+        return "failed"
 
     # Upload data to self-hosted
     print("Uploading task with ID {}".format(task_id))
@@ -128,14 +139,14 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
     unzipped = download.body
     if not unzipped:
         print("Task data was empty; skipping task:", task_id)
-        return False
+        return "failed"
     if unzipped[0:1] != "{":
         # Only a real gzip member (magic byte 0x1f) may reach gzip_decompress:
         # a 200 carrying an HTML proxy page or a truncated body would otherwise
         # raise, aborting the run and silently skipping every later task.
         if unzipped[0:1] != "\x1f":
             print("Task data was neither JSON nor gzip; skipping task:", task_id)
-            return False
+            return "failed"
         unzipped = gzip_decompress(unzipped)
     upload_url = "{}/api/v1.0/org/sites/{}/import?_oid={}".format(dst_url, dst_site_id, dst_org_id)
     upload = http_put(
@@ -147,7 +158,7 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
 
     if not upload or upload.status_code != 200:
         print("Failed to upload task:", task_id)
-        return False
+        return "failed"
 
     print("Successfully synced task:", task_id)
 
@@ -165,7 +176,7 @@ def sync_task(task_id, src_token, dst_token, src_url, dst_url, src_org_id, dst_o
             print("Failed to hide task {}: status {}".format(
                 task_id, hide.status_code if hide else "no response"))
 
-    return True
+    return "ok"
 
 def main(**kwargs):
     src_url = kwargs.get("src_url", "https://console.runzero.com").rstrip("/")
@@ -188,11 +199,16 @@ def main(**kwargs):
         print("No tasks found.")
         return
 
+    # Every task is attempted before the run is judged: one unreadable task
+    # should not cost the rest of the batch. The count is what the task error
+    # carries, so a partial sync is not filed as a complete one.
+    failed = []
+    not_ready = 0
     for task in tasks:
         task_id = task.get("id", "")
         if not task_id:
             continue
-        success = sync_task(
+        status = sync_task(
             task_id,
             src_token,
             dst_token,
@@ -204,7 +220,14 @@ def main(**kwargs):
             hide_tasks_on_sync,
             kwargs,
         )
-        if not success:
-            print("Sync failed for task:", task_id)
+        if status == "not_ready":
+            not_ready += 1
+        elif status != "ok":
+            failed.append(task_id)
 
+    if not_ready:
+        print("{} task(s) had no data to sync yet".format(not_ready))
+    if failed:
+        fail("runzero-task-sync: {} of {} task(s) did not sync: {}".format(
+            len(failed), len(tasks), ", ".join(failed[:10])))
     return None

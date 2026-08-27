@@ -421,8 +421,7 @@ def main(*args, **kwargs):
 
     nodes, path_used, err = _fetch_nodes(base_url, api_version, options)
     if err:
-        _log("could not list nodes: " + err)
-        return None
+        fail("netdata: could not list nodes: " + err)
     _log("listed {} node(s) from {}".format(len(nodes), path_used))
     progress_info("netdata: {} node(s) reported by {}".format(len(nodes), agent_host))
 

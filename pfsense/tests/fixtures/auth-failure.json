@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "pfsense",
-  "description": "A revoked or mistyped API key. All four v2 endpoints answer 401 in pfrest's error envelope. Proves the run reports ZERO assets with a printed credential diagnostic, rather than emitting a placeholder asset whose id falls back to the sanitized base URL with an empty hostname, no interfaces, and osVersion 'unknown' stamped as trusted - the uncorrelatable junk asset that used to be created on every auth failure and became a permanent duplicate once the credential was fixed and the id flipped to the netgate_id form.",
+  "description": "A revoked or mistyped API key. All four v2 endpoints answer 401 in pfrest's error envelope. Proves the run reports ZERO assets with a printed credential diagnostic, rather than emitting a placeholder asset whose id falls back to the sanitized base URL with an empty hostname, no interfaces, and osVersion 'unknown' stamped as trusted - the uncorrelatable junk asset that used to be created on every auth failure and became a permanent duplicate once the credential was fixed and the id flipped to the netgate_id form.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "base_url": "$BASE",
     "api_token": "revoked-token"
@@ -52,8 +52,11 @@
     ],
     "log_contains": [
       "pfsense: no usable response from /api/v2/system/hostname: status 401",
-      "every endpoint refused the credential (401/403)",
       "Reported 0 assets"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "every endpoint refused the credential (401/403)"
     ]
   },
   "check_determinism": true

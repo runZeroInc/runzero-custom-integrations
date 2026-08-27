@@ -286,18 +286,15 @@ def main(**kwargs):
         body, err = get_json(url, **http_options)
 
         if err:
-            print('device42: API error: {}'.format(err))
-            return None
+            fail('device42: API error: {}'.format(err))
         # Device42 answers with an object carrying code/msg/Devices. Check that
         # before reading it: .get on a list aborts the script, so an error
         # document returned as a bare array would end the run silently instead
         # of reporting the problem here.
         if type(body) != "dict":
-            print('device42: API error: unexpected response shape, wanted an object')
-            return None
+            fail('device42: API error: unexpected response shape, wanted an object')
         if body.get('code', 0) != 0:
-            print('device42: API logical error: {}'.format(body.get('msg')))
-            return None
+            fail('device42: API logical error: {}'.format(body.get('msg')))
 
         page = body.get('Devices', [])
         if not page:

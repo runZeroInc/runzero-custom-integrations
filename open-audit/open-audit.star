@@ -848,8 +848,7 @@ def main(**kwargs):
 
     scope = _server_host(base_url)
     if not scope:
-        print("open-audit: could not determine the server host from the configured URL")
-        return None
+        fail("open-audit: could not determine the server host from the configured URL")
 
     app_path = get_string(kwargs, "app_path", default=DEFAULT_APP_PATH)
     page_size = get_int(kwargs, "page_size", default=DEFAULT_PAGE_SIZE)

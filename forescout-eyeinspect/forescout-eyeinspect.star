@@ -891,8 +891,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("forescout-eyeinspect: could not determine the Command Center host from the configured URL")
-        return None
+        fail("forescout-eyeinspect: could not determine the Command Center host from the configured URL")
 
     http_options = get_http_options(kwargs, headers={
         "Authorization": basic(get_string(kwargs, "username"), get_string(kwargs, "password")),

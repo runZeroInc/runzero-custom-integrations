@@ -632,8 +632,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("nozomi-networks: could not determine the appliance host from the configured URL")
-        return None
+        fail("nozomi-networks: could not determine the appliance host from the configured URL")
 
     headers = {"Accept": "application/json"}
     # The sign-in call needs the raw http.post builtin so it can read a

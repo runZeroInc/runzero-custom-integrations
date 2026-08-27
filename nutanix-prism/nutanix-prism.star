@@ -452,11 +452,11 @@ def fetch_cluster(ctx):
     """
     data, err = get_json(ctx["base_url"] + API_BASE + CLUSTER_PATH, **ctx["http_options"])
     if err:
+        # The cluster uuid scopes every asset id, so there is nothing to fall
+        # back to and no partial run worth reporting.
         if _auth_failure(err):
-            print("nutanix-prism: authentication rejected, check the username and password:", err)
-        else:
-            print("nutanix-prism: failed to fetch the cluster record:", err)
-        return False
+            fail("nutanix-prism: authentication rejected, check the username and password: {}".format(err))
+        fail("nutanix-prism: failed to fetch the cluster record: {}".format(err))
     data = data or {}
     if type(data) != "dict":
         print("nutanix-prism: unexpected cluster response shape")
@@ -585,8 +585,7 @@ def main(**kwargs):
     require(kwargs, "url", "username", "password")
     base_url = get_url_base(kwargs)
     if not base_url:
-        print("nutanix-prism: could not determine the Prism Element URL")
-        return None
+        fail("nutanix-prism: could not determine the Prism Element URL")
 
     page_size = get_int(kwargs, "page_size", default=DEFAULT_PAGE_SIZE)
     if page_size < 1 or page_size > MAX_PAGE_SIZE:

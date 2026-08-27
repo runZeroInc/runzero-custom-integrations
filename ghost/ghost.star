@@ -239,8 +239,7 @@ def main(*args, **kwargs):
     # script still works if it is invoked without one.
     base_url = (kwargs.get("url") or DEFAULT_GHOST_API_URL).rstrip("/")
     if not api_token:
-        print("Ghost API token missing.")
-        return []
+        fail("Ghost API token missing.")
 
     severity_map = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 

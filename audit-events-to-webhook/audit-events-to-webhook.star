@@ -105,11 +105,9 @@ def main(*args, **kwargs):
     rz_token = kwargs.get('rz_account_token') or creds.get('rz_account_token')
 
     if not webhook_url:
-        print("Missing destination webhook URL.")
-        return []
+        fail("Missing destination webhook URL.")
     if not rz_token:
-        print("Missing runZero account token.")
-        return []
+        fail("Missing runZero account token.")
 
     # We'll assume search query supports time filters (e.g. "timestamp > now-1h")
     search_query = "created:<1h"
@@ -135,8 +133,7 @@ def main(*args, **kwargs):
     )
 
     if err:
-        print("Failed to fetch events from runZero:", err)
-        return []
+        fail("Failed to fetch events from runZero:", err)
 
     # Send to Webhook
     headers = {

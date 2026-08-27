@@ -2,7 +2,7 @@
   "name": "download-unavailable",
   "integration": "runzero-task-sync",
   "script": "runzero-task-sync/runzero-task-sync.star",
-  "description": "A task in the list whose scan data cannot be downloaded. This is ordinary, not exotic: the source search filter selects on name and type, never on status, while APIOrgTaskScanDataGet 404s unless the task is `processed` and of a data-bearing type -- so any task still queued or running when the sync starts is listed and then refuses its data. It must be reported and SKIPPED, and the walk must continue: the assertion that matters is that the healthy task after it is still downloaded, imported, and hidden. A run that gave up on the first 404 would need every task in the source org to be finished at the instant it ran. Note also that the failed task must NOT be hidden -- hiding is gated on a successful sync, and hiding a task whose data never transferred would remove it from the source view of what still needs mirroring, losing it permanently.",
+  "description": "A task in the list whose scan data cannot be downloaded. This is ordinary, not exotic: the source search filter selects on name and type, never on status, while APIOrgTaskScanDataGet 404s unless the task is `processed` and of a data-bearing type -- so any task still queued or running when the sync starts is listed and then refuses its data. It must be reported and SKIPPED, and the walk must continue: the assertion that matters is that the healthy task after it is still downloaded, imported, and hidden. A run that gave up on the first 404 would need every task in the source org to be finished at the instant it ran. Note also that the failed task must NOT be hidden -- hiding is gated on a successful sync, and hiding a task whose data never transferred would remove it from the source view of what still needs mirroring, losing it permanently.  A 404 on the data endpoint is now told apart from a real failure: the search selects on name and type and never on status, so a task still queued or running is listed and then refuses its data every time. It is skipped, counted, and left for a later run, and the task does NOT end in error -- which is what keeps a routine sync from going red daily. bad-data-body beside this one covers the failure that does.",
 
   "kwargs": {
     "src_url": "$BASE",
@@ -147,10 +147,12 @@
       {"method": "POST", "path": "/api/v1.0/org/tasks/d5d5d5d5-3333-4444-8555-666666666666/hide"}
     ],
     "log_contains": [
-      "Failed to download task: d5d5d5d5-3333-4444-8555-666666666666",
-      "Sync failed for task: d5d5d5d5-3333-4444-8555-666666666666",
       "Successfully synced task: d6d6d6d6-6666-4777-8888-999999999999",
       "Task hidden: d6d6d6d6-6666-4777-8888-999999999999"
+     ],
+    "log_contains": [
+      "Task data is not available yet (still queued or running)",
+      "1 task(s) had no data to sync yet"
     ]
   }
 }

@@ -185,12 +185,14 @@ def get_token(client_id, client_secret, base_url, scope, config):
 
     response = http_post(token_url, body=bytes(url_encode(form)), **get_http_options(config, headers=headers))
     if response.status_code != 200:
-        print("nexthink: failed to get token from {}: status {}".format(
+        fail("nexthink: the token endpoint {} answered status {}; check the client id and secret".format(
             _log_path(token_url), response.status_code))
-        return None
 
     data = json_decode(response.body)
-    return data.get("access_token")
+    token = data.get("access_token")
+    if not token:
+        fail("nexthink: the token endpoint {} returned no access_token".format(_log_path(token_url)))
+    return token
 
 def start_nql_export(token, api_url, query_id, config):
     # Nexthink documents the export start as POST /api/v1/nql/export with a

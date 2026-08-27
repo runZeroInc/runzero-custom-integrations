@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "stairwell",
-  "description": "A token both header forms reject. The script tries the Bearer spelling, retries the same request once with the raw token, and when that is also refused it must end with a printed diagnostic and zero assets rather than aborting or spinning: exactly two requests, the fallback log line, and the final error line carrying the 401.",
+  "description": "A token both header forms reject. The script tries the Bearer spelling, retries the same request once with the raw token, and when that is also refused it must end with a printed diagnostic and zero assets rather than aborting or spinning: exactly two requests, the fallback log line, and the final error line carrying the 401.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "environment_id": "env-1",
@@ -26,6 +26,11 @@
     "log_contains": [
       "stairwell: Bearer authorization rejected (401), retrying with the raw token form",
       "failed to retrieve assets: status 401"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "stairwell: failed to retrieve assets",
+      "status 401"
     ]
   },
   "invariants": {

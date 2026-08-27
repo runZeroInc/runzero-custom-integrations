@@ -2,7 +2,7 @@
   "name": "auth-failure",
   "integration": "akamai-guardicore-centra",
   "script": "akamai-guardicore-centra/centra-v4-api.star",
-  "description": "A rejected credential. get_token returns None, and passing that None to bearer() used to abort the run with a type error (verified against the real scanner) instead of stopping cleanly. The run must end with zero assets, a printed diagnostic, and no asset request ever issued.",
+  "description": "A rejected credential. get_token returns None, and passing that None to bearer() used to abort the run with a type error (verified against the real scanner) instead of stopping cleanly. The run must end with zero assets, a printed diagnostic, and no asset request ever issued.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -22,9 +22,10 @@
     "requests_absent": [
       {"path_contains": "/assets"}
     ],
-    "log_contains": [
-      "authentication failed:",
-      "centra-v4: authentication failed; no assets retrieved"
+    "script_error": true,
+    "error_contains": [
+      "centra-v4: authentication failed",
+      "status 401"
     ]
   },
   "invariants": {"skip": []}

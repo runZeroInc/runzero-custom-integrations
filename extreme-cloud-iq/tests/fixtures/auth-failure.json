@@ -1,7 +1,7 @@
 {
  "name": "auth-failure",
  "integration": "extreme-cloud-iq",
- "description": "A rejected login. The 401 must end the run with a clean message naming the credentials -- the old code decoded the login body and called .keys() on it BEFORE checking the status, so any non-JSON error body aborted the task with a decode error instead. 401 is not a retryable status, so exactly one login request may be made and no /devices request may follow.",
+ "description": "A rejected login. The 401 must end the run with a clean message naming the credentials -- the old code decoded the login body and called .keys() on it BEFORE checking the status, so any non-JSON error body aborted the task with a decode error instead. 401 is not a retryable status, so exactly one login request may be made and no /devices request may follow.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
  "kwargs": {
   "url": "$BASE",
   "username": "fixture-user",
@@ -30,13 +30,17 @@
   "asset_count": 0,
   "request_count": 1,
   "log_contains": [
-   "extreme-cloud-iq: login failed: status 401",
    "extreme-cloud-iq: check the username and password"
   ],
   "requests_absent": [
    {
     "path": "/devices"
    }
+  ],
+  "script_error": true,
+  "error_contains": [
+   "extreme-cloud-iq: login failed",
+   "status 401"
   ]
  },
  "invariants": {

@@ -181,6 +181,11 @@ ERROR_CODES = {
     100: "INTERNAL_ERROR",
 }
 
+# The subset of ERROR_CODES that means the credential was refused rather than
+# the request being wrong: UNAUTHORIZED, MISSING_AUTH_USER, MISSING_AUTH_PWD.
+AUTH_ERROR_CODES = [1, 5, 6]
+
+
 PLACEHOLDER_NAMES = ["localhost", "localhost.localdomain", "unknown", "n/a", "none", "-", "undefined"]
 HOSTNAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._"
 DIGITS = "0123456789"
@@ -282,7 +287,14 @@ def call(ctx, payload, what):
     code = data.get("code")
     if code != 0:
         label = ERROR_CODES.get(code, "code {}".format(code))
-        return None, "{}: {} - {}".format(what, label, as_text(data.get("message")))
+        detail = "{}: {} - {}".format(what, label, as_text(data.get("message")))
+        if code in AUTH_ERROR_CODES:
+            # iTop answers a refused credential with HTTP 200 and code 1, so
+            # this is the only place the difference is visible. No class read
+            # succeeds afterwards, so the run ends here rather than reporting an
+            # empty CMDB.
+            fail("itop: {}. The account needs the REST Services User profile.".format(detail))
+        return None, detail
     return data, None
 
 def build_interface_map(ctx):
@@ -568,8 +580,7 @@ def main(**kwargs):
 
     parsed = url_parse(url)
     if parsed == None or not parsed.hostname:
-        print("itop: could not determine the iTop host from the configured URL")
-        return None
+        fail("itop: could not determine the iTop host from the configured URL")
     scope = parsed.hostname
 
     token = get_string(kwargs, "auth_token", default="").strip()

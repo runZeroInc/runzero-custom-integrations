@@ -133,8 +133,7 @@ def fetch_and_report_devices(base_url, org_key, api_key, api_id, config_kwargs, 
     while p.next():
         response_json, err = post_json(url, json=payload, **http_options)
         if err:
-            print("carbon-black: failed to retrieve devices: {}".format(err))
-            break
+            fail("carbon-black: failed to retrieve devices after reporting {}: {}".format(total, err))
 
         response_json = response_json or {}
         batch = response_json.get("results", [])

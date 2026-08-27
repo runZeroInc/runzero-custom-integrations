@@ -343,11 +343,12 @@ assets.append(ImportAsset(
         # Update url for next page or break
     ```
 
-2.  **Error Handling**: Check `response.status_code` after every HTTP request.
+2.  **Error Handling**: see [Failing the task](#failing-the-task). A run that
+    could not read the inventory must call `fail()`, not print and return `[]`.
     ```python
-    if response.status_code != 200:
-        print("Error: {}".format(response.status_code))
-        return []
+    data, err = get_json(url, **http_options)
+    if err:
+        fail("vendor: could not read the device list: {}".format(err))
     ```
 
 3.  **Data Mapping**: Map third-party fields to `ImportAsset` fields carefully.
@@ -370,6 +371,107 @@ assets.append(ImportAsset(
                 ip6s.append(addr)
         return NetworkInterface(macAddress=mac, ipv4Addresses=ip4s, ipv6Addresses=ip6s)
     ```
+
+## Failing the task
+
+A run has three outcomes, and the script chooses between them.
+
+| Outcome | What it means | What the script does |
+| --- | --- | --- |
+| **Success** | The inventory was read. It may legitimately be empty. | Return normally. |
+| **Degraded** | The inventory was read, but something optional was not. | `print()` a warning and carry on. |
+| **Failed** | The inventory could not be read at all. | `fail("...")`. |
+
+`fail()` aborts the script and the platform reports the message as a task
+error, in red, on the integration page and in the in-browser test run. Nothing
+else does: a script that prints a diagnostic and returns `[]` reports **zero
+assets and a successful run**, which is indistinguishable from a tenant that
+genuinely has no devices. A rejected API key then reads as an estate that
+emptied itself.
+
+### Fail on
+
+- **Authentication.** A refused login, a token exchange that fails or returns
+  no token, a 401 or 403 on the first data call. No later request succeeds
+  after one of these, so there is nothing to degrade to.
+- **The primary listing.** Whatever call yields the estate. If it cannot be
+  read, the run has no inventory.
+- **A value the whole run is scoped by** - a site id, a tenant uuid, an
+  appliance uuid. Falling back to another scope re-identifies every asset on
+  the next run.
+- **Unusable configuration** - a URL no host can be derived from, a missing
+  credential, a parameter the vendor rejects on every request.
+- **A page failing mid-walk.** See below.
+
+### Do not fail on
+
+- **One malformed record.** Skip it, count it, and report the count once at the
+  end. One bad row is not a broken run.
+- **An optional enrichment endpoint.** Detail, software, vulnerability, or
+  location calls that enrich an asset already imported. Log once per cause
+  rather than once per device.
+- **An empty estate.** Zero assets is a legitimate result. Say so plainly, and
+  do not describe it as a failure.
+
+### Failing mid-walk
+
+Assets already handed to `report_asset` / `report_assets` are **written before
+the failure and are kept** - `fail()` after streaming does not discard them.
+So a page that fails partway through a walk should still end the task in error:
+
+```python
+if err:
+    fail("vendor: page {} failed after reporting {}: {}".format(page, reported, err))
+```
+
+The alternative - `break`, then report what was collected as a success - files
+a truncated estate as a complete one, and every device on the pages never read
+looks like it was decommissioned.
+
+Where a walk has a summary worth printing first, carry the cause to the end
+instead of failing in place:
+
+```python
+walk_err = None
+p = pager("devices")
+while p.next():
+    rows, err = fetch_page(ctx, p.page)
+    if err:
+        walk_err = "page {} failed: {}".format(p.page, err)
+        break
+    ...
+
+print("vendor: reported {} of {} devices".format(reported, total))
+if walk_err != None:
+    fail("vendor: {}".format(walk_err))
+```
+
+### Writing the message
+
+The message is what the operator sees on a red task. Name the thing that
+failed, the cause, and the fix where there is one.
+
+```python
+fail("vendor: could not read the device list: status 401: the API key was rejected")
+```
+
+Print the longer guidance separately, before the `fail()`, so the one-line task
+error stays readable:
+
+```python
+if err.startswith("status 403"):
+    print("vendor: the token needs the inventory:read scope")
+fail("vendor: could not read the device list: {}".format(err))
+```
+
+Do not put a credential, a token, or a URL carrying one in the message.
+
+### Testing it
+
+A fixture scenario asserts the failure with `script_error` and
+`error_contains`; see [tests/README.md](tests/README.md). The harness fails any
+scenario whose script exits non-zero without declaring it, so an accidental
+abort cannot pass as a green run either.
 
 ## Library Reference & Examples
 
@@ -672,8 +774,11 @@ def main(**kwargs):
     response = http_get(API_URL, headers=headers)
 
     if response.status_code != 200:
-        print("API Error: {}".format(response.status_code))
-        return []
+        # fail() ends the TASK in error. Returning [] here would report a
+        # successful run that imported nothing, which is what an empty tenant
+        # looks like too. See "Failing the task".
+        fail("example: could not read {}: status {}".format(
+            API_URL, response.status_code))
 
     devices = json_decode(response.body)
 

@@ -674,8 +674,7 @@ def main(**kwargs):
 
     scope = _center_host(base_url)
     if not scope:
-        print("cisco-cyber-vision: could not derive a Center hostname from the configured URL")
-        return None
+        fail("cisco-cyber-vision: could not derive a Center hostname from the configured URL")
     if not get_string(kwargs, "api_token"):
         print("cisco-cyber-vision: no API token configured; create one under Admin > API > Token")
         return None

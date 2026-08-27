@@ -235,10 +235,13 @@ def stream(ctx, path, key, params):
         print("librenms: {} returned 404 ({}); treating it as empty".format(path, _api_error(resp.body)))
         return []
     if resp.status_code == 401 or resp.status_code == 403:
-        print("librenms: {} was refused: {}. Check the API token and the token user's device access.".format(
+        fail("librenms: {} was refused: {}. Check the API token and the token user's device access.".format(
             path, _api_error(resp.body)))
-        return []
     if resp.status_code < 200 or resp.status_code > 299:
+        # Not fatal: callers implement fallbacks against it. An older release
+        # answers 400 for an estate-wide ARP read and is then walked one device
+        # at a time, so the status is handed back rather than ending the run.
+        # A refused credential is different and is failed above.
         print("librenms: {} failed with status {}: {}".format(path, resp.status_code, _api_error(resp.body)))
         return []
 
@@ -629,8 +632,7 @@ def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))
     scope = _scope(base_url)
     if not base_url or not scope:
-        print("librenms: could not determine the LibreNMS host from the configured URL")
-        return None
+        fail("librenms: could not determine the LibreNMS host from the configured URL")
 
     headers = {
         "X-Auth-Token": get_string(kwargs, "api_token"),

@@ -229,19 +229,18 @@ def authenticate_wazuh(host, username, password, config):
     response = http_post(auth_url, timeout=600, **get_http_options(config, headers=headers))
 
     if response.status_code != 200:
-        print("Wazuh authentication failed. Status:", response.status_code)
-        return None
+        fail("Wazuh authentication failed with status {}. Check the username, password, and that the account is permitted from this source address.".format(
+            response.status_code))
 
     auth_data = json_decode(response.body)
 
     if auth_data.get('error', 1) != 0:
-        print("Wazuh API error:", auth_data.get('message', 'Unknown error'))
-        return None
+        fail("Wazuh rejected the authentication request: {}".format(
+            auth_data.get('message', 'unspecified error')))
 
     token = auth_data.get('data', {}).get('token', "")
     if not token:
-        print("No token received from Wazuh API")
-        return None
+        fail("Wazuh accepted the credentials but returned no token")
 
     print("Successfully authenticated with Wazuh API")
     return token
@@ -802,10 +801,9 @@ def main(**kwargs):
     print("Connecting to Wazuh at:", wazuh_host)
 
     # Authenticate with Wazuh
+    # authenticate_wazuh ends the task in error itself; a failed login is
+    # never a run that reports zero agents.
     token = authenticate_wazuh(wazuh_host, username, password, kwargs)
-    if not token:
-        print("Authentication to Wazuh failed; no token returned")
-        return []
 
     # Shared run state. The page walk and the enrichment both read the token
     # from here, so a mid-run re-authentication (Wazuh JWTs default to 900

@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "netdata",
-  "description": "A bearer-protected agent refusing the token. In auto mode a 401 from /api/v3/nodes used to be retried against /api/v2/nodes for a guaranteed second 401; a 401 is an answer about the credentials, not a missing endpoint, so the run now fails fast after exactly one request with a credential-shaped message. request_count and the absent v2 request pin that.",
+  "description": "A bearer-protected agent refusing the token. In auto mode a 401 from /api/v3/nodes used to be retried against /api/v2/nodes for a guaranteed second 401; a 401 is an answer about the credentials, not a missing endpoint, so the run now fails fast after exactly one request with a credential-shaped message. request_count and the absent v2 request pin that.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "revoked-token"
@@ -24,8 +24,12 @@
       {"path_contains": "/api/v2/nodes"}
     ],
     "log_contains": [
-      "netdata: could not list nodes: status 401",
       "the agent requires a bearer token; check api_token"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "netdata: could not list nodes",
+      "status 401"
     ]
   }
 }

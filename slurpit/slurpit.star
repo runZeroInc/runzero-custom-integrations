@@ -402,8 +402,7 @@ def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))
     scope = _scope(base_url)
     if not base_url or not scope:
-        print("slurpit: could not determine the Slurp'it host from the configured URL")
-        return None
+        fail("slurpit: could not determine the Slurp'it host from the configured URL")
 
     ctx = {
         "base_url": base_url,
@@ -419,7 +418,8 @@ def main(**kwargs):
     }
 
     if not preflight(ctx):
-        return None
+        # preflight has already printed which refusal happened.
+        fail("slurpit: the portal preflight failed; no devices were read")
 
     if get_bool(kwargs, "collect_sites", default=True):
         ctx["sites"] = collect_sites(ctx)

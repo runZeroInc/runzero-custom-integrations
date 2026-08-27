@@ -1,7 +1,7 @@
 {
  "name": "login-html",
  "integration": "extreme-cloud-iq",
- "description": "REGRESSION LOCK for the decode-before-status abort. A proxy in front of XIQ can answer the login POST with a 200 whose body is an HTML page (or an empty body); json_decode has no recoverable failure mode in Starlark, and the old code decoded the body before looking at anything else, so the task aborted with a decode error instead of a clean auth message. post_json surfaces the non-JSON 200 as an error string; the run must end with one request, zero assets, and a readable log line.",
+ "description": "REGRESSION LOCK for the decode-before-status abort. A proxy in front of XIQ can answer the login POST with a 200 whose body is an HTML page (or an empty body); json_decode has no recoverable failure mode in Starlark, and the old code decoded the body before looking at anything else, so the task aborted with a decode error instead of a clean auth message. post_json surfaces the non-JSON 200 as an error string; the run must end with one request, zero assets, and a readable log line.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
  "kwargs": {
   "url": "$BASE",
   "username": "fixture-user",
@@ -36,6 +36,11 @@
    {
     "path": "/devices"
    }
+  ],
+  "script_error": true,
+  "error_contains": [
+   "extreme-cloud-iq: login failed",
+   "invalid JSON response"
   ]
  },
  "invariants": {

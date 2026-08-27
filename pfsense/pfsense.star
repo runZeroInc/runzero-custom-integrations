@@ -270,11 +270,9 @@ def main(*args, **kwargs):
     # is fixed and the id flips to the netgate_id form.
     if state["successes"] == 0:
         if state["auth_failures"]:
-            print("pfsense: every endpoint refused the credential (401/403); " +
-                  "check the API key and its privileges. Reported 0 assets.")
-        else:
-            print("pfsense: no endpoint returned usable data; reported 0 assets")
-        return None
+            fail("pfsense: every endpoint refused the credential (401/403); " +
+                 "check the API key and its privileges. Reported 0 assets.")
+        fail("pfsense: no endpoint returned usable data; reported 0 assets")
 
     attrs = {
         "source": "pfSense REST API",

@@ -122,7 +122,7 @@ DEVICE_TYPES = {
 }
 
 
-def logon(dispatcher, username, password, application_id, config):
+def logon(dispatcher, username, password, application_id, config, fatal=True):
     """Authenticate at the dispatcher and return (manager_url, token)."""
     options = get_http_options(config, headers={"Content-Type": "application/json"})
     data, err = post_json(dispatcher + "/EPM/API/Auth/EPM/Logon",
@@ -132,20 +132,29 @@ def logon(dispatcher, username, password, application_id, config):
                               "ApplicationID": application_id,
                           },
                           **options)
+    problem = ""
+    manager = ""
+    token = ""
     if err:
-        print("cyberark-epm: logon failed:", err)
         if err.startswith("status 401") or err.startswith("status 403"):
             print("cyberark-epm: check the username and password; SAML-only users cannot use this endpoint")
-        return "", ""
-    if type(data) != "dict":
-        print("cyberark-epm: unexpected logon response")
-        return "", ""
-    manager = str(data.get("ManagerURL", "") or "").rstrip("/")
-    token = str(data.get("EPMAuthenticationResult", "") or "")
-    if manager and not manager.startswith("http"):
-        manager = "https://" + manager
-    if not manager or not token:
-        print("cyberark-epm: logon response carried no ManagerURL or session token")
+        problem = "logon failed: {}".format(err)
+    elif type(data) != "dict":
+        problem = "the logon endpoint returned an unexpected response shape, wanted an object"
+    else:
+        manager = str(data.get("ManagerURL", "") or "").rstrip("/")
+        token = str(data.get("EPMAuthenticationResult", "") or "")
+        if manager and not manager.startswith("http"):
+            manager = "https://" + manager
+        if not manager or not token:
+            problem = "logon response carried no ManagerURL or session token"
+    if problem:
+        # The FIRST logon is the run: no set is readable without a token, so it
+        # ends the task. A mid-run re-logon is not - the sets already imported
+        # stay, and the caller degrades rather than discarding them.
+        if fatal:
+            fail("cyberark-epm: " + problem)
+        print("cyberark-epm: " + problem)
         return "", ""
     return manager, token
 
@@ -171,7 +180,7 @@ def relogon(ctx):
     """Log on again after the session token aged out mid-run."""
     print("cyberark-epm: session rejected, logging on again")
     manager, token = logon(ctx["dispatcher"], ctx["username"], ctx["password"],
-                           ctx["application_id"], ctx["config"])
+                           ctx["application_id"], ctx["config"], fatal=False)
     if not token:
         return False
     if manager:
@@ -216,10 +225,12 @@ def fetch_sets(ctx):
         data, err = api_get(ctx, ctx["manager"] + "/EPM/API/Sets",
                             params={"Offset": str(offset), "Limit": str(SETS_PAGE)})
         if err:
-            print("cyberark-epm: failed to list sets:", err)
-            return sets
+            # The set list is the estate's index: every endpoint is reached
+            # through it, so a truncated list silently drops whole sets rather
+            # than a few records.
+            fail("cyberark-epm: failed to list sets: {}".format(err))
         if type(data) != "dict":
-            return sets
+            fail("cyberark-epm: the set list returned an unexpected response shape, wanted an object")
         page = data.get("Sets", []) or []
         for entry in page:
             if type(entry) == "dict" and entry.get("Id"):

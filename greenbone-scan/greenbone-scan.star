@@ -518,8 +518,7 @@ def main(*args, **kwargs):
 
     addresses, err = fetch_target_addresses(kwargs)
     if err:
-        print("failed to fetch runZero targets:", err)
-        return None
+        fail("failed to fetch runZero targets:", err)
     # Nothing to scan: stop before connecting to Greenbone and say why.
     if not addresses:
         search = get_string(kwargs, "export_filter", default="")
@@ -532,11 +531,9 @@ def main(*args, **kwargs):
 
     state, err = gmp_connect(kwargs)
     if err:
-        print("connection failed:", err)
-        return None
+        fail("connection failed:", err)
     if state == None:
-        print("connection failed")
-        return None
+        fail("connection failed")
 
     err = gmp_authenticate(state, get_string(kwargs, "gmp_username"), get_string(kwargs, "gmp_password"))
     if err:

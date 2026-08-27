@@ -721,8 +721,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("checkmk: could not determine the Checkmk host from the configured URL")
-        return None
+        fail("checkmk: could not determine the Checkmk host from the configured URL")
 
     site = get_string(kwargs, "site", default="").strip().strip("/")
     username = get_string(kwargs, "username", default="").strip()

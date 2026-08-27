@@ -482,8 +482,7 @@ def main(**kwargs):
     base_url = get_url_base(kwargs)
     scope = _appliance_host(base_url)
     if not scope:
-        print("opnsense: could not determine the firewall host from the configured URL")
-        return None
+        fail("opnsense: could not determine the firewall host from the configured URL")
 
     max_hosts = get_int(kwargs, "max_hosts", default=20000)
     if max_hosts < 0:

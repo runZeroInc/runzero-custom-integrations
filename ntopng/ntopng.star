@@ -503,8 +503,7 @@ def fetch_and_report_interface(ctx, interface):
         }
         data, err = call(ctx, HOSTS_PATH, payload, "fetching hosts on interface {}".format(ifid))
         if err:
-            print("ntopng:", err)
-            break
+            fail("ntopng: {}".format(err))
 
         rows = as_list(as_dict(data.get("rsp")).get("data"))
         if not rows:
@@ -551,8 +550,7 @@ def main(**kwargs):
 
     parsed = url_parse(url)
     if parsed == None or not parsed.hostname:
-        print("ntopng: could not determine the ntopng host from the configured URL")
-        return None
+        fail("ntopng: could not determine the ntopng host from the configured URL")
     scope = parsed.hostname
 
     token = get_string(kwargs, "api_token", default="").strip()

@@ -190,8 +190,7 @@ def main(*args, **kwargs):
     auth_b64 = kwargs.get('basic_auth_credential')
 
     if not auth_b64:
-        print("Missing authentication credentials.")
-        return []
+        fail("Missing authentication credentials.")
 
     sessions = get_endpoints(endpoints_api_url, auth_b64, kwargs)
 

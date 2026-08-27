@@ -1,7 +1,7 @@
 {
   "name": "error-envelope",
   "integration": "trellix-epo",
-  "description": "Both remote commands answer with ePO's plain-text error envelope instead of a JSON document. Nothing decodes, so the run must report the error and finish with zero assets rather than aborting on json_decode, which has no exception handling in Starlark.",
+  "description": "Both remote commands answer with ePO's plain-text error envelope instead of a JSON document. Nothing decodes, so the run must report the error and finish with zero assets rather than aborting on json_decode, which has no exception handling in Starlark.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -42,9 +42,12 @@
     "asset_count": 0,
     "min_requests": 2,
     "log_contains": [
-      "trellix-epo: failed to fetch the System Tree: Error 0: Access denied",
-      "trellix-epo: failed to search for systems: Error 0: Access denied",
-      "trellix-epo: no assets retrieved"
+      "trellix-epo: failed to fetch the System Tree: Error 0: Access denied"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "trellix-epo: failed to search for systems",
+      "Access denied"
     ]
   },
   "invariants": {

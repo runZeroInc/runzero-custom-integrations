@@ -1,7 +1,7 @@
 {
   "name": "body-not-json",
   "integration": "solarwinds-information-service",
-  "description": "A 200 whose body is an HTML error page rather than JSON -- what a reverse proxy or a captive login in front of the SWIS port actually answers. Decoding it would abort the whole run; the guard must print, report zero, and stop. request_count 1 pins that the failure is not retried.",
+  "description": "A 200 whose body is an HTML error page rather than JSON -- what a reverse proxy or a captive login in front of the SWIS port actually answers. Decoding it would abort the whole run; the guard must print, report zero, and stop. request_count 1 pins that the failure is not retried.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-user",
@@ -24,8 +24,11 @@
     "asset_count": 0,
     "request_count": 1,
     "log_contains": [
-      "swis: failed to retrieve assets: the response body was not JSON",
-      "swis: reported 0 assets"
+      "swis: failed to retrieve assets: the response body was not JSON"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "the response body was not JSON"
     ]
   }
 }

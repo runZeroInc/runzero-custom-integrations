@@ -676,8 +676,7 @@ def main(**kwargs):
     if not re_match(SOURCE_RE, source):
         print(("asimily: not starting: the source header value must be alphabetic characters " +
                "only (A-Z, a-z), with no spaces, digits, dots, hyphens or underscores; got '{}'").format(source))
-        print("asimily: Asimily rejects requests carrying a non-compliant source value, so every request in this run would fail")
-        return None
+        fail("asimily: Asimily rejects requests carrying a non-compliant source value, so every request in this run would fail")
 
     http_options = get_http_options(kwargs, headers={
         "Authorization": basic(username, api_key),

@@ -369,11 +369,9 @@ def stream_hosts(ctx, groupids):
         return []
     if resp.status_code < 200 or resp.status_code > 299:
         if resp.status_code == 412:
-            print("zabbix: host.get was refused with 412 before any JSON-RPC handling, " +
-                  "which means the Content-Type was rejected")
-        else:
-            print("zabbix: host.get failed with status {}".format(resp.status_code))
-        return []
+            fail("zabbix: host.get was refused with 412 before any JSON-RPC handling, " +
+                 "which means the Content-Type was rejected")
+        fail("zabbix: host.get failed with status {}".format(resp.status_code))
 
     text = as_text(resp.body, join=",")
     head = text[:400]
@@ -382,10 +380,8 @@ def stream_hosts(ctx, groupids):
             decoded = json_decode(text)
             message = _rpc_error(decoded)
             if message:
-                print("zabbix: host.get returned an error: {}".format(message))
-                return []
-        print("zabbix: host.get returned a body with no result member")
-        return []
+                fail("zabbix: host.get returned an error: {}".format(message))
+        fail("zabbix: host.get returned a body with no result member")
     return iter_array(text, path="result")
 
 def build_interfaces(record, inventory):
@@ -637,8 +633,7 @@ def main(**kwargs):
     endpoint = _endpoint(url)
     scope = _scope(url)
     if not endpoint or not scope:
-        print("zabbix: could not build the API endpoint from the configured URL")
-        return None
+        fail("zabbix: could not build the API endpoint from the configured URL")
 
     headers = {
         # Zabbix checks this before any JSON-RPC handling and answers a bare

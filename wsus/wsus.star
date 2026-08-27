@@ -516,22 +516,26 @@ def main(**kwargs):
     reported = 0
     offset = 0
     total = None
+    # Set when the remote collection stops on an error rather than on its own
+    # terms. The computers already streamed are kept and still summarised; the
+    # task then ends in error, because a truncated read is not a smaller estate.
+    walk_err = None
     p = pager("wsus-computers")
     while p.next():
         script = render_script(offset, page_size, wsus_port, wsus_ssl, downstream,
                                name_includes, import_updates, security_only, max_updates)
         stdout, stderr, exit_code = session.run(PS_LAUNCHER, stdin=script)
         if exit_code != 0:
-            print("wsus: remote collection failed with exit code {}: {}".format(
-                exit_code, stderr[:500]))
+            walk_err = "remote collection failed with exit code {}: {}".format(
+                exit_code, stderr[:500])
             break
 
         meta, computers, error, truncated = parse_page(stdout)
         if error:
-            print("wsus: remote collection error:", error[:500])
+            walk_err = "remote collection error: {}".format(error[:500])
             break
         if meta == None:
-            print("wsus: remote output carried no meta line; stderr:", stderr[:500])
+            walk_err = "remote output carried no meta line; stderr: {}".format(stderr[:500])
             break
         if total == None:
             total = meta.get("total", 0)
@@ -563,4 +567,6 @@ def main(**kwargs):
 
     session.close()
     print("wsus: reported {} assets".format(reported))
+    if walk_err != None:
+        fail("wsus: {}".format(walk_err))
     return None

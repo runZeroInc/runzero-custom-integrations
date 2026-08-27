@@ -1,7 +1,7 @@
 {
   "name": "oauth-failure",
   "integration": "tailscale",
-  "description": "A revoked or wrong OAuth client secret. The token endpoint answers 401, and the exchange used to run through oauth2_token(), which RAISES on any non-2xx - aborting the whole task with a raw error. The exchange now uses post_json, so the failure must arrive as a printed diagnostic and a clean zero-asset return, and the devices endpoint must never be called with an empty or missing token. namespaced_ids is skipped for the reason recorded in happy (no asset is emitted here, but the skip keeps the reason with the scenario).",
+  "description": "A revoked or wrong OAuth client secret. The token endpoint answers 401, and the exchange used to run through oauth2_token(), which RAISES on any non-2xx - aborting the whole task with a raw error. The exchange now uses post_json, so the failure must arrive as a printed diagnostic and a clean zero-asset return, and the devices endpoint must never be called with an empty or missing token. namespaced_ids is skipped for the reason recorded in happy (no asset is emitted here, but the skip keeps the reason with the scenario).  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "tailnet": "T1234CNTRL",
@@ -26,8 +26,12 @@
       {"path_contains": "/devices"}
     ],
     "log_contains": [
-      "tailscale: using OAuth client credentials",
-      "tailscale: OAuth token exchange failed: status 401"
+      "tailscale: using OAuth client credentials"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "tailscale: OAuth token exchange failed",
+      "status 401"
     ]
   },
   "invariants": {

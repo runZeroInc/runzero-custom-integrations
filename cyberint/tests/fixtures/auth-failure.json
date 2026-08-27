@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "cyberint",
-  "description": "The documented real-world auth failure: an expired or invalid access_token cookie does not produce a 401 -- the portal answers with its login page, a 200 whose body is HTML. json-decoding that used to abort the task with a decode error and, because reporting was deferred to the end of the run, nothing at all was imported. The walk must instead end with a clean log line naming the likely expired cookie, import zero assets, and make exactly one request (a 200 is not a retryable status, so the built-in retries must not fire).",
+  "description": "The documented real-world auth failure: an expired or invalid access_token cookie does not produce a 401 -- the portal answers with its login page, a 200 whose body is HTML. json-decoding that used to abort the task with a decode error and, because reporting was deferred to the end of the run, nothing at all was imported. The walk must instead end with a clean log line naming the likely expired cookie, import zero assets, and make exactly one request (a 200 is not a retryable status, so the built-in retries must not fire).  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "access_token": "fixture-expired-cookie"
@@ -27,9 +27,8 @@
     "asset_count": 0,
     "request_count": 1,
     "log_contains": [
-      "cyberint: page 1 returned a non-JSON body; the access token cookie is likely expired or invalid",
-      "cyberint: reported 0 assets"
-    ],
+      "cyberint: page 1 returned a non-JSON body; the access token cookie is likely expired or invalid"
+     ],
     "requests_include": [
       {
         "method": "POST",
@@ -38,6 +37,10 @@
           "Cookie": "access_token=fixture-expired-cookie"
         }
       }
+    ],
+    "script_error": true,
+    "error_contains": [
+      "the access token cookie is likely expired or invalid"
     ]
   },
   "invariants": {

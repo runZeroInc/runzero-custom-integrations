@@ -242,7 +242,7 @@ def _base(url):
     """
     return as_text(url, join=",").strip().rstrip("/")
 
-def login(base_url, username, password, http_options):
+def login(base_url, username, password, http_options, fatal=True):
     """Exchange Basic credentials for an API token.
 
     POST /login answers {"api_key": "..."}. The token is then sent in the
@@ -253,15 +253,22 @@ def login(base_url, username, password, http_options):
     handles that with one mid-run re-login.
     """
     data, err = post_json(base_url + "/login", json={}, **http_options)
+    problem = ""
     if err:
-        print("netdisco: login failed:", err)
-        return ""
-    if type(data) != "dict":
-        print("netdisco: login returned an unexpected body")
-        return ""
-    token = as_text(data.get("api_key"), join=",").strip()
-    if not token:
-        print("netdisco: login succeeded but returned no api_key")
+        problem = "login failed: {}".format(err)
+    elif type(data) != "dict":
+        problem = "login returned an unexpected body"
+    else:
+        token = as_text(data.get("api_key"), join=",").strip()
+        if not token:
+            problem = "login succeeded but returned no api_key"
+    if problem:
+        # The FIRST logon is the run: nothing is readable without a token, so
+        # it ends the task. A mid-run re-login is not - the device phase has
+        # already imported, and the caller degrades rather than discarding it.
+        if fatal:
+            fail("netdisco: " + problem)
+        print("netdisco: " + problem)
         return ""
     return token
 
@@ -278,7 +285,7 @@ def refresh_token(ctx):
         return False
     ctx["relogged"] = True
     print("netdisco: the API token was refused mid-run (tokens expire after api_token_lifetime); logging in again")
-    token = login(ctx["base_url"], "", "", ctx["login_options"])
+    token = login(ctx["base_url"], "", "", ctx["login_options"], fatal=False)
     if not token:
         print("netdisco: re-login failed; continuing with the refused token")
         return False
@@ -673,8 +680,7 @@ def main(**kwargs):
     base_url = _base(get_string(kwargs, "url"))
     scope = _netdisco_host(base_url)
     if not base_url or not scope:
-        print("netdisco: could not determine the Netdisco host from the configured URL")
-        return None
+        fail("netdisco: could not determine the Netdisco host from the configured URL")
 
     login_options = get_http_options(kwargs, headers={
         "Authorization": basic(get_string(kwargs, "username"), get_string(kwargs, "password")),

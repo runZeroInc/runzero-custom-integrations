@@ -716,8 +716,7 @@ def main(**kwargs):
     # sensor reached on a different port is still the same sensor.
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print(VENDOR + ": could not determine the sensor host from the configured URL")
-        return None
+        fail(VENDOR + ": could not determine the sensor host from the configured URL")
 
     # Defender for IoT takes the raw token in an Authorization header with no
     # Bearer prefix: curl -k -H "Authorization: <token>" https://<sensor>/api/v1/devices/

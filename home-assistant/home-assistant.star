@@ -707,8 +707,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("home-assistant: could not determine the Home Assistant host from the configured URL")
-        return None
+        fail("home-assistant: could not determine the Home Assistant host from the configured URL")
 
     api_token = get_string(kwargs, "api_token", default="").strip()
     if not api_token:
@@ -735,10 +734,8 @@ def main(**kwargs):
     entity_index, err = index_entities(ctx)
     if err:
         if err.startswith("status 401"):
-            print("home-assistant: the access token was rejected:", err)
-        else:
-            print("home-assistant: failed to read entity states:", err)
-        return None
+            fail("home-assistant: the access token was rejected: {}".format(err))
+        fail("home-assistant: failed to read entity states: {}".format(err))
 
     total = 0
     claimed = {}

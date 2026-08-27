@@ -432,10 +432,9 @@ def fetch_and_report_search(base_url, http_options, search_text, scope, group_pa
     rows, err = run_command(base_url, FIND_SYSTEMS_COMMAND, {"searchText": search_text},
                             http_options)
     if err:
-        print("trellix-epo: failed to search for systems:", err)
         if err.startswith("status 401") or err.startswith("status 403"):
             print("trellix-epo: check the username and password")
-        return 0
+        fail("trellix-epo: failed to search for systems: {}".format(err))
     return report_systems(rows, scope, group_paths, include_unmanaged)
 
 def fetch_and_report_tree(base_url, http_options, scope, group_paths, include_unmanaged):

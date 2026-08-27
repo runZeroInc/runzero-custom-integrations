@@ -1,7 +1,7 @@
 {
   "name": "no-results-array",
   "integration": "icinga2",
-  "description": "A 200 response whose body is not the documented results array: an Icinga error envelope, and then on a retry an HTML page from a reverse proxy. jsonstream.iter_array aborts the entire script - unrecoverably - when the path is missing, when the value is not an array, or when the body is not JSON, so the shape has to be checked before the parser sees it. This scenario is the regression test for that guard.",
+  "description": "A 200 response whose body is not the documented results array: an Icinga error envelope, and then on a retry an HTML page from a reverse proxy. jsonstream.iter_array aborts the entire script - unrecoverably - when the path is missing, when the value is not an array, or when the body is not JSON, so the shape has to be checked before the parser sees it. This scenario is the regression test for that guard.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "username": "runzero",
@@ -92,6 +92,10 @@
     "log_contains": [
       "the host query returned no results array; nothing was imported",
       "the service query returned no results array; skipping check summaries"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "the host query returned no results array"
     ]
   },
   "invariants": {

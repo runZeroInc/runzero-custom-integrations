@@ -914,17 +914,14 @@ def main(*args, **kwargs):
 
     state, err = gmp_connect(kwargs)
     if err:
-        print("connection failed:", err)
-        return None
+        fail("connection failed:", err)
     if state == None:
-        print("connection failed")
-        return None
+        fail("connection failed")
 
     err = gmp_authenticate(state, gmp_username, gmp_password)
     if err:
-        print(err)
         gmp_close(state)
-        return None
+        fail("greenbone: {}".format(err))
 
     # Enumerate tasks and their latest reports.
     task_filt = "rows=-1"

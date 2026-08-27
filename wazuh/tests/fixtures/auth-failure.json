@@ -1,0 +1,48 @@
+{
+  "name": "auth-failure",
+  "integration": "wazuh",
+  "description": "Wazuh rejects the username and password on /security/user/authenticate. A permanently refused credential, as opposed to the one-off 401 that auth-refresh covers. The run must END THE TASK IN ERROR: reporting zero assets and exiting 0 is what an empty tenant does, so without the error an operator sees a green task and an estate that appears to have emptied itself. The refusal is not retried either -- 401 is outside the transient retry set -- which is what the pinned request count carries. No /agents request may follow a refused logon.",
+  "kwargs": {
+    "url": "$BASE",
+    "username": "fixture-user",
+    "password": "wrong-password",
+    "requests_per_minute": 0
+  },
+  "routes": [
+    {
+      "name": "authenticate-refused",
+      "match": {
+        "method": "POST",
+        "path": "/security/user/authenticate"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "json": {
+            "title": "Unauthorized",
+            "detail": "Invalid credentials"
+          }
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "requests_absent": [
+      {
+        "path_contains": "/agents"
+      }
+    ],
+    "script_error": true,
+    "error_contains": [
+      "Wazuh authentication failed with status 401",
+      "Check the username, password"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  },
+  "check_determinism": false
+}

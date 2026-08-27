@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "slurpit",
-  "description": "A revoked or mistyped API key. The /api/platform/ping preflight answers 401, and the run must end there with a diagnostic naming the key -- one request, no device walk, no assets, no abort. This is the branch the paged scenario never touches.",
+  "description": "A revoked or mistyped API key. The /api/platform/ping preflight answers 401, and the run must end there with a diagnostic naming the key -- one request, no device walk, no assets, no abort. This is the branch the paged scenario never touches.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "revoked-fixture-key"
@@ -28,6 +28,11 @@
     ],
     "log_contains": [
       "slurpit: the API key was rejected by /api/platform/ping"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "the portal preflight failed",
+      "the API key was rejected"
     ]
   }
 }

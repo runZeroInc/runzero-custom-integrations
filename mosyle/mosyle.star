@@ -127,8 +127,8 @@ def get_bearer_token(session, base_url, access_token, email, password):
     }
     resp = session.post(login_url, json=payload)
     if not resp or resp.status_code != 200:
-        print("Login failed: {}".format(resp.status_code if resp else "no response"))
-        return None
+        fail("mosyle: login failed: {}".format(
+            "status {}".format(resp.status_code) if resp else "no response from the server"))
     auth_header = None
     if resp.headers:
         if "Authorization" in resp.headers:
@@ -140,8 +140,7 @@ def get_bearer_token(session, base_url, access_token, email, password):
         print("Login succeeded with bearer token")
         return auth_header[0].split(" ")[1]
     else:
-        print("Login succeeded but bearer token missing from headers")
-        return None
+        fail("mosyle: login succeeded but no Authorization header carried a bearer token")
 
 
 # Mosyle manages Apple hardware only, and the model name is the one field that
@@ -235,8 +234,7 @@ def main(*args, **kwargs):
     if not email or not password:
         email, password = parse_credentials(kwargs.get("legacy_credentials"))
     if not api_token or not email or not password:
-        print("Missing required credentials")
-        return []
+        fail("Missing required credentials")
 
     session = Session(insecure_skip_verify=get_bool(kwargs, 'tls_disable_validation', False))
     session.headers.set("Content-Type", "application/json")

@@ -533,8 +533,9 @@ def fetch_and_report_devices(base_url, http_options, token_id, secret_key, scope
         rows, cursor, err = fetch_page(base_url, http_options, token_id, secret_key,
                                        DEVICES_URI, query)
         if err:
-            print("absolute: failed to fetch devices:", err)
-            return reported
+            # Assets already streamed are kept; the task still ends in error so a
+            # truncated walk is not read as devices having gone away.
+            fail("absolute: failed to fetch devices after reporting {}: {}".format(reported, err))
         if not rows:
             break
         reported += report_assets(build_assets(scope, rows, seen_uids))

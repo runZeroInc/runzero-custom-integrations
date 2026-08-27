@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "itop",
-  "description": "The credential is accepted by the web server but the iTop user lacks the REST Services User profile, which iTop reports as HTTP 200 with code 1 rather than as a 401. A run that only checked the HTTP status would report an empty CMDB, so the body's own code has to be read.",
+  "description": "The credential is accepted by the web server but the iTop user lacks the REST Services User profile, which iTop reports as HTTP 200 with code 1 rather than as a 401. A run that only checked the HTTP status would report an empty CMDB, so the body's own code has to be read.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "restuser",
@@ -39,10 +39,10 @@
   },
   "expect": {
     "asset_count": 0,
-    "log_contains": [
+    "script_error": true,
+    "error_contains": [
       "UNAUTHORIZED",
-      "REST Services User",
-      "itop: no assets retrieved"
+      "REST Services User"
     ]
   },
   "invariants": {

@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "proxmox",
-  "description": "A revoked or mistyped API token. The very first call (/version) answers 401, and every other endpoint would answer the same way. Proves the run stops immediately with a printed credential diagnostic naming the PVEAPIToken form, reports zero assets, and never walks the cluster printing the same error per node - the difference between 'the token was refused' and what used to be a silent 'reported 0 assets' with no explanation, indistinguishable from an empty cluster.",
+  "description": "A revoked or mistyped API token. The very first call (/version) answers 401, and every other endpoint would answer the same way. Proves the run stops immediately with a printed credential diagnostic naming the PVEAPIToken form, reports zero assets, and never walks the cluster printing the same error per node - the difference between 'the token was refused' and what used to be a silent 'reported 0 assets' with no explanation, indistinguishable from an empty cluster.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "base_url": "$BASE",
     "api_token_id": "runzero@pam!inventory",
@@ -23,9 +23,11 @@
     "request_count": 1,
     "log_contains": [
       "could not read the PVE version: status 401",
-      "the API token was refused; check the token id user@realm!tokenid and its secret",
-      "authentication failed; nothing collected",
-      "reported 0 assets"
+      "the API token was refused; check the token id user@realm!tokenid and its secret"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "proxmox: authentication failed; nothing collected"
     ]
   },
   "check_determinism": true

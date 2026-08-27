@@ -361,8 +361,7 @@ def get_computers(base_url, customer_id, creds, config_kwargs):
                     '$skip': str(items_returned)}
         data, err = get_json(url, params=params, **http_options)
         if err:
-            print('failed to retrieve assets at $skip=' + str(items_returned) + ': ' + err)
-            break
+            fail('snow-license-manager: failed to retrieve assets at $skip=' + str(items_returned) + ': ' + err)
         elif data:
             # Direct indexing on the envelope aborts the run if a 200 arrives
             # without the Meta/Body shape, so every level is coerced instead.

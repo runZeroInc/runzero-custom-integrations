@@ -115,7 +115,8 @@ def run_once(scenario, script, scanner, basedir="."):
         requests = server.snapshot()
         if gmp_server:
             requests = requests + gmp_server.snapshot()
-        return read_assets(output), requests, proc.stdout + proc.stderr, base, gmp
+        return (read_assets(output), requests, proc.stdout + proc.stderr,
+                base, gmp, proc.returncode)
     finally:
         server.stop()
         if gmp_server:
@@ -129,12 +130,34 @@ def run_once(scenario, script, scanner, basedir="."):
 EXPECT_KEYS = frozenset([
     "assets", "asset_count", "min_assets", "ids", "ids_absent",
     "request_count", "min_requests", "requests_include", "requests_absent",
-    "log_contains", "min_services_total", "min_software_total",
-    "min_vulnerabilities_total",
+    "log_contains", "log_absent", "min_services_total", "min_software_total",
+    "min_vulnerabilities_total", "script_error", "error_contains",
 ])
 
 
-def check_expectations(scenario, assets, requests, log, base, gmp=None):
+def _error_excerpt(log, limit=3):
+    """The lines of a failed run that name the cause.
+
+    The CLI dumps its full usage block after any error, so the tail of the log
+    is flag documentation. Prefer the lines the scanner wrote about the failure
+    itself, newest last.
+    """
+    wanted = ("Error:", "level=error", "failed to run starlark",
+              "call to starlark entrypoint", "fail:")
+    hits = [ln.strip() for ln in log.split("\n")
+            if any(w in ln for w in wanted)]
+    if not hits:
+        hits = [ln.strip() for ln in log.split("\n") if ln.strip()][-limit:]
+    # Deduplicate: the same message is logged and then repeated as Error:.
+    seen, out = set(), []
+    for ln in hits[-limit:]:
+        if ln not in seen:
+            seen.add(ln)
+            out.append(ln)
+    return "Cause: %s" % " | ".join(out) if out else "No error text in the log."
+
+
+def check_expectations(scenario, assets, requests, log, base, gmp=None, rc=0):
     """Compare the run against the scenario's `expect` block."""
     expect = json.loads(substitute(json.dumps(scenario.get("expect", {})), base, gmp))
     unknown = sorted(set(expect) - EXPECT_KEYS)
@@ -199,6 +222,32 @@ def check_expectations(scenario, assets, requests, log, base, gmp=None):
     for needle in expect.get("log_contains", []):
         if needle not in log:
             failures.append("expected %r in the run log" % needle)
+    for needle in expect.get("log_absent", []):
+        if needle in log:
+            failures.append("did not expect %r in the run log" % needle)
+
+    # Whether the run FAILED is an expectation like any other, and the most
+    # important one an error-path scenario can make. A script that cannot
+    # authenticate, or cannot read the inventory at all, must end the task in
+    # error -- reporting zero assets and exit 0 is indistinguishable from an
+    # empty estate, which is how a rejected API key came to be displayed as a
+    # successful run. `script_error` is therefore checked even when a scenario
+    # does not mention it: the default is that the run succeeded, so an
+    # unexpected failure can no longer hide behind expectations that happen to
+    # hold anyway.
+    # error_contains implies script_error: asserting on a failure message only
+    # makes sense for a run that failed.
+    want_error = expect.get("script_error", False) or bool(expect.get("error_contains"))
+    if want_error and rc == 0:
+        failures.append(
+            "expected the script to end the task in error, but it exited 0")
+    if not want_error and rc != 0:
+        failures.append(
+            "script exited %d; add \"script_error\": true if that is intended. %s"
+            % (rc, _error_excerpt(log)))
+    for needle in expect.get("error_contains", []):
+        if needle not in log:
+            failures.append("expected the failure to mention %r" % needle)
 
     total_services = sum(len(invariants._children(a, "_services")) for a in assets)
     if "min_services_total" in expect and total_services < expect["min_services_total"]:
@@ -287,8 +336,8 @@ def run_scenario(path, scanner, repo_root):
             for k in sorted(bad_kwargs)]
 
     basedir = os.path.dirname(os.path.abspath(path))
-    assets, requests, log, base, gmp = run_once(scenario, script, scanner, basedir)
-    failures = check_expectations(scenario, assets, requests, log, base, gmp)
+    assets, requests, log, base, gmp, rc = run_once(scenario, script, scanner, basedir)
+    failures = check_expectations(scenario, assets, requests, log, base, gmp, rc)
 
     skip = set(scenario.get("invariants", {}).get("skip", []))
     for inv_name, message in invariants.run(assets, skip, {"slug": slug}):
@@ -299,7 +348,7 @@ def run_scenario(path, scanner, repo_root):
     # such a script reconciles against nothing and duplicates its estate on
     # every poll.
     if scenario.get("check_determinism", True):
-        again, _, _, _, _ = run_once(scenario, script, scanner, basedir)
+        again = run_once(scenario, script, scanner, basedir)[0]
         first = sorted(a.get("id", "") for a in assets)
         second = sorted(a.get("id", "") for a in again)
         if first != second:

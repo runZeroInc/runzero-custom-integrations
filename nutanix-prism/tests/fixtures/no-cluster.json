@@ -1,7 +1,7 @@
 {
   "name": "no-cluster",
   "integration": "nutanix-prism",
-  "description": "The /cluster bootstrap is the identity namespace and the integration documents that it aborts without it. Prism rejects the credential on that first call; the run must stop there, report the credential problem, and never fetch hosts or VMs -- because any asset it emitted would carry an unscoped id that collides with the same estate imported through another Controller VM.",
+  "description": "The /cluster bootstrap is the identity namespace and the integration documents that it aborts without it. Prism rejects the credential on that first call; the run must stop there, report the credential problem, and never fetch hosts or VMs -- because any asset it emitted would carry an unscoped id that collides with the same estate imported through another Controller VM.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-viewer",
@@ -27,7 +27,10 @@
       {"path_contains": "/hosts"},
       {"path_contains": "/vms"}
     ],
-    "log_contains": ["authentication rejected, check the username and password"]
+    "script_error": true,
+    "error_contains": [
+      "authentication rejected, check the username and password"
+    ]
   },
   "invariants": {"skip": []}
 }

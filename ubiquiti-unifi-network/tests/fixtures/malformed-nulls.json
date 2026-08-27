@@ -1,7 +1,7 @@
 {
   "name": "malformed-nulls",
   "integration": "ubiquiti-unifi-network",
-  "description": "Present-but-null and junk-element fields on device records, each of which used to abort the whole run: a null `features`/`interfaces` (the ', '.join aborted), a null `model` (the 'USW' in model check aborted), a junk element inside a features list, a null `name`, and a bare-string device row. Every record must degrade to losing just the malformed field while the run imports everything, and the null-model device leaves deviceType unset rather than asserting anything.",
+  "description": "Present-but-null and junk-element fields on device records, each of which used to abort the whole run: a null `features`/`interfaces` (the ', '.join aborted), a null `model` (the 'USW' in model check aborted), a junk element inside a features list, a null `name`, and a bare-string device row. Every record must degrade to losing just the malformed field while the run imports everything, and the null-model device leaves deviceType unset rather than asserting anything.  The device page reports totalCount 3 for the 3 rows it carries. It used to claim 4, so the walk asked for a second page, got the fixture's route-exhausted 500, and stopped on that -- the scenario was proving error-truncation rather than the field degradation it describes. A short page now ends the walk the way a real controller ends it.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "fixture-unifi-key",
@@ -29,7 +29,7 @@
       "responses": [
         {
           "status": 200,
-          "json": {"offset": 0, "limit": 100, "count": 4, "totalCount": 4, "data": [
+          "json": {"offset": 0, "limit": 100, "count": 3, "totalCount": 3, "data": [
             {
               "id": "device-null-01",
               "name": null,

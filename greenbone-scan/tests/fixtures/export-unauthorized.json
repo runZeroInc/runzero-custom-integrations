@@ -2,7 +2,7 @@
   "name": "export-unauthorized",
   "integration": "greenbone-scan",
   "script": "greenbone-scan/greenbone-scan.star",
-  "description": "The runZero export token is wrong or revoked, so the CSV endpoint answers 401. The script must report the status and return before touching Greenbone: a failed target read means the target LIST is unknown, not empty, and the two must not be conflated -- proceeding would create a target from whatever partial parse the body produced. request_count==1 also pins that this is not retried, which is correct here because the integration uses the raw http.get builtin (it needs resp.body as CSV text rather than decoded JSON) and raw http.* accepts no retries argument at all.",
+  "description": "The runZero export token is wrong or revoked, so the CSV endpoint answers 401. The script must report the status and return before touching Greenbone: a failed target read means the target LIST is unknown, not empty, and the two must not be conflated -- proceeding would create a target from whatever partial parse the body produced. request_count==1 also pins that this is not retried, which is correct here because the integration uses the raw http.get builtin (it needs resp.body as CSV text rather than decoded JSON) and raw http.* accepts no retries argument at all.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "runzero_url": "$BASE",
     "runzero_export_token": "ET-revoked-token",
@@ -33,8 +33,10 @@
   "expect": {
     "asset_count": 0,
     "request_count": 1,
-    "log_contains": [
-      "failed to fetch runZero targets: runZero export returned status 401"
+    "script_error": true,
+    "error_contains": [
+      "failed to fetch runZero targets",
+      "status 401"
     ]
   }
 }

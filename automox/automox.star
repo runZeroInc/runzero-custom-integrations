@@ -465,8 +465,7 @@ def main(**kwargs):
     base_url = (kwargs.get("url") or DEFAULT_AUTOMOX_URL).rstrip("/")
 
     if not api_token:
-        print("automox: missing api_token (Automox API token); nothing imported")
-        return None
+        fail("automox: missing api_token (Automox API token); nothing imported")
 
     # Assets are streamed page-by-page via report_assets in build_assets.
     build_assets(base_url, api_token, org_hint, kwargs)

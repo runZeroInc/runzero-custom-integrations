@@ -150,8 +150,7 @@ def stream_endpoints(base_url, api_key, api_key_id, config_kwargs):
         result = do_cortex_api_call(base_url, api_key, api_key_id, "endpoints/get_endpoint", cortex_filter, config_kwargs)
 
         if not result or "reply" not in result:
-            print("Error retrieving endpoints")
-            break
+            fail("cortex-xdr: error retrieving endpoints; the API returned no reply envelope")
 
         reply = result["reply"]
         if type(reply) == "list":

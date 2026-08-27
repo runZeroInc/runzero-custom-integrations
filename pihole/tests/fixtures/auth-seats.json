@@ -1,7 +1,7 @@
 {
   "name": "auth-seats",
   "integration": "pihole",
-  "description": "Every API seat is taken, which is Pi-hole's most common failure for an automated caller: sessions last 30 minutes and the concurrent limit is small, so a task that never logs out locks out the administrator. The run must name the cause and the setting that fixes it, and must not go on to read anything.",
+  "description": "Every API seat is taken, which is Pi-hole's most common failure for an automated caller: sessions last 30 minutes and the concurrent limit is small, so a task that never logs out locks out the administrator. The run must name the cause and the setting that fixes it, and must not go on to read anything.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "password": "fixture-password"
@@ -119,6 +119,10 @@
       {
         "path_contains": "/api/network/devices"
       }
+    ],
+    "script_error": true,
+    "error_contains": [
+      "could not open an API session"
     ]
   },
   "invariants": {

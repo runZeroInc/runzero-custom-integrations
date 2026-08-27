@@ -135,16 +135,15 @@ def stream_assets(base_url, env, token, config_kwargs, max_pages, page_size):
             http_options = get_http_options(config_kwargs, headers=headers)
             body, err = get_json(url, params=params, **http_options)
         if err:
-            print('failed to retrieve assets:', err)
-            return reported
+            # Assets already streamed are kept; the task still ends in error so
+            # a truncated import is not read as an estate that shrank.
+            fail('stairwell: failed to retrieve assets: {}'.format(err))
 
         # The documented response is an object carrying "assets" and
         # "nextPageToken". Verify that before reading it: .get on a list aborts
-        # the script, so a bare array or an error document would end the run
-        # with no explanation rather than stopping cleanly here.
+        # the script with no explanation, where this names what arrived.
         if type(body) != "dict":
-            print('stairwell: unexpected response shape, wanted an object')
-            break
+            fail('stairwell: unexpected response shape, wanted an object')
 
         if total == None:
             total = reported_total(body)
@@ -315,6 +314,6 @@ def main(**kwargs):
     # Assets are streamed page-by-page via report_assets in stream_assets.
     reported = stream_assets(base_url, env, token, kwargs, max_pages, page_size)
     if not reported:
-        print('failed to retrieve assets')
+        print('stairwell: no assets in environment ' + env)
 
     return None

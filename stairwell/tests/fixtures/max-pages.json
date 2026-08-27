@@ -1,7 +1,7 @@
 {
   "name": "max-pages",
   "integration": "stairwell",
-  "description": "Proves the max_pages parameter actually drives the pager() bound rather than being decorative. The scenario passes max_pages=2 and serves three pages with three DIFFERENT nextPageTokens, so the no-progress check cannot fire and every page carries a token, meaning the only thing that can end this walk is the ceiling -- which is what makes the stop attributable to the parameter.\n\nHitting the ceiling now RAISES via pager() rather than logging a friendly truncation line: an incomplete import is reported as an error instead of looking complete. The two pages reported before the raise are still imported, because the script streams per page. log_contains pins the pager error naming the loop label.\n\nwhen_exhausted is `empty` ONLY as a terminator for a regression: the harness's empty response is a bare array, which this script rejects as the wrong shape, so a walk that stopped reading the parameter would take the third page and then stop on that one request later -- failing on request_count and the missing log line rather than running to the 100,000-page CONFIG backstop and timing out.",
+  "description": "Proves the max_pages parameter actually drives the pager() bound rather than being decorative. The scenario passes max_pages=2 and serves three pages with three DIFFERENT nextPageTokens, so the no-progress check cannot fire and every page carries a token, meaning the only thing that can end this walk is the ceiling -- which is what makes the stop attributable to the parameter.\n\nHitting the ceiling now RAISES via pager() rather than logging a friendly truncation line: an incomplete import is reported as an error instead of looking complete. The two pages reported before the raise are still imported, because the script streams per page. log_contains pins the pager error naming the loop label.\n\nwhen_exhausted is `empty` ONLY as a terminator for a regression: the harness's empty response is a bare array, which this script rejects as the wrong shape, so a walk that stopped reading the parameter would take the third page and then stop on that one request later -- failing on request_count and the missing log line rather than running to the 100,000-page CONFIG backstop and timing out.  The pagination backstop raises rather than returning, so the run ends in error and the assets already streamed are kept. That is the point: an import that hit the ceiling is incomplete, not finished.",
   "kwargs": {
     "url": "$BASE",
     "environment_id": "env-1",
@@ -102,6 +102,10 @@
     ],
     "log_contains": [
       "pagination limit reached: \"assets\" ran 2 pages"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "pagination limit reached"
     ]
   },
   "invariants": {

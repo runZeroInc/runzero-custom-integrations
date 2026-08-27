@@ -652,8 +652,7 @@ def main(**kwargs):
     endpoint = _ubus_endpoint(url)
     scope = _scope(url)
     if not scope or endpoint == "/ubus":
-        print("openwrt: could not determine the device host from the configured URL")
-        return None
+        fail("openwrt: could not determine the device host from the configured URL")
 
     max_hosts = get_int(kwargs, "max_hosts", default=5000)
     ctx = {
@@ -676,9 +675,8 @@ def main(**kwargs):
 
     if not login(ctx, get_string(kwargs, "username"), get_string(kwargs, "password"),
                  get_int(kwargs, "session_timeout", default=900)):
-        print("openwrt: no session, nothing collected. Confirm the account can sign in to LuCI, " +
-              "and that uhttpd is serving the ubus endpoint (uci get uhttpd.main.ubus_prefix).")
-        return None
+        fail("openwrt: no session, nothing collected. Confirm the account can sign in to LuCI, " +
+             "and that uhttpd is serving the ubus endpoint (uci get uhttpd.main.ubus_prefix).")
 
     board = call_guarded(ctx, "system", "board", {}, "system board") or {}
     info = call_guarded(ctx, "system", "info", {}, "system info") or {}

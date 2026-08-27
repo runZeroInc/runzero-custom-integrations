@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "librenms",
-  "description": "A bad token. LibreNMS auth failures never reach api_error(), so they come back in Laravel's own default shape - {\"message\": \"Unauthenticated.\"} with NO status key - which is a different envelope from every other error the API produces. An integration that only knows the {status, message} shape reports nothing useful here. The run must name the problem, point at the token, and import zero assets without aborting. The ARP call is still attempted and refused the same way, which is correct: one refused endpoint should not be assumed to mean every endpoint is refused.",
+  "description": "A bad token. LibreNMS auth failures never reach api_error(), so they come back in Laravel's own default shape - {\"message\": \"Unauthenticated.\"} with NO status key - which is a different envelope from every other error the API produces. An integration that only knows the {status, message} shape reports nothing useful here. The run must name the problem, point at the token, and import zero assets without aborting. The ARP call is still attempted and refused the same way, which is correct: one refused endpoint should not be assumed to mean every endpoint is refused.  The run now STOPS at the first refusal and ends the task in error. The earlier note here said the ARP call is still attempted because one refused endpoint should not imply every endpoint is refused -- that reasoning holds for a 404 or a 400, which are still handed back to the caller so its per-device ARP fallback can run, and it does not hold for a 401: the token is the same on every call.",
   "kwargs": {
     "url": "$BASE",
     "api_token": "wrong-token"
@@ -17,10 +17,10 @@
   "default_response": {"status": 404, "json": {"status": "error", "message": "This API route doesn't exist."}},
   "expect": {
     "asset_count": 0,
-    "log_contains": [
-      "was refused: Unauthenticated.",
-      "Check the API token",
-      "no assets retrieved"
+    "script_error": true,
+    "error_contains": [
+      "librenms: /devices was refused",
+      "Check the API token"
     ]
   },
   "check_determinism": true

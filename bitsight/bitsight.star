@@ -311,8 +311,7 @@ def import_assets(base_url, company_id, http_options, ctx):
     while p.next():
         data, err = get_page(url, http_options, params)
         if err:
-            print('bitsight: failed to retrieve assets: {}'.format(err))
-            break
+            fail('bitsight: failed to retrieve assets after reporting {}: {}'.format(reported, err))
         if not data:
             break
         rows = as_list(data.get('results'), wrap=False)

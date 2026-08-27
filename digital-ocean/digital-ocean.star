@@ -159,13 +159,11 @@ def main(**kwargs):
 
         data, err = get_json(url, **http_options)
         if err:
-            print('failed to retrieve droplets:', err)
-            break
+            fail('digital-ocean: failed to retrieve droplets: {}'.format(err))
 
         body = data or {}
         if type(body) != "dict":
-            print('digital-ocean: unexpected response shape, wanted an object')
-            break
+            fail('digital-ocean: unexpected response shape, wanted an object')
 
         # Stream each page via report_assets instead of accumulating the
         # estate. A present-but-null droplets field must not abort the walk.

@@ -146,14 +146,15 @@ def get_token(jwt_url, oid, token, config_kwargs):
     response_json, err = post_json(url, body=body,
                                    **get_http_options(config_kwargs, headers=headers))
     if err:
-        print('Failed to fetch token:', err)
-        return None
+        fail('lima-charlie: could not exchange the API key for a JWT: {}'.format(err))
     # The documented response is an object carrying "jwt". Reading .get off a
     # list would abort the script, so the shape is checked rather than assumed.
     if type(response_json) != 'dict':
-        print('Failed to fetch token: unexpected response shape, wanted an object')
-        return None
-    return response_json.get('jwt')
+        fail('lima-charlie: the token endpoint returned an unexpected response shape, wanted an object')
+    jwt = response_json.get('jwt')
+    if not jwt:
+        fail('lima-charlie: the token endpoint returned no jwt; check the OID and the API key')
+    return jwt
 
 def build_assets(oid, sensors):
     assets = []
@@ -247,12 +248,9 @@ def main(**kwargs):
     base_url = (kwargs.get('url') or DEFAULT_LIMACHARLIE_BASE_URL).rstrip('/')
     jwt_url = (kwargs.get('jwt_url') or DEFAULT_LIMACHARLIE_JWT_URL).rstrip('/')
 
+    # get_token ends the task in error itself when the exchange fails or
+    # returns no jwt, so the token here is always usable.
     token = get_token(jwt_url, oid, access_token, kwargs)
-    # bearer() rejects a None argument outright and aborts the script, so a
-    # failed or empty token exchange has to stop the run here instead.
-    if not token:
-        print('No JWT returned for organization', oid)
-        return None
 
     # Get sensors. The list is paged with a continuation token: a large
     # organization used to import only whatever the first response happened to
@@ -276,12 +274,11 @@ def main(**kwargs):
         # would then have to decode; without it the array arrives as plain JSON.
         data, err = get_json(url, params=params, **http_options)
         if err:
-            print('Failed to fetch sensors on page {}: {}'.format(page, err))
-            break
+            fail('lima-charlie: failed to fetch sensors on page {} after reporting {}: {}'.format(
+                page, reported, err))
 
         if type(data) != 'dict':
-            print('Failed to fetch sensors: unexpected response shape, wanted an object')
-            break
+            fail('lima-charlie: the sensors endpoint returned an unexpected response shape, wanted an object')
 
         sensors_json = data.get('sensors', []) or []
         total_sensors += len(sensors_json)

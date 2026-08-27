@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "maze-security",
-  "description": "A 401 from the search endpoint -- a wrong or revoked API key. 401 is not on the transient retry list, so exactly one request is made, the page error is printed with the status, and the run ends cleanly with zero assets instead of aborting.\n\nnamespaced_ids is skipped for consistency with the other Maze scenarios (no assets are produced here anyway).",
+  "description": "A 401 from the search endpoint -- a wrong or revoked API key. 401 is not on the transient retry list, so exactly one request is made, the page error is printed with the status, and the run ends cleanly with zero assets instead of aborting.\n\nnamespaced_ids is skipped for consistency with the other Maze scenarios (no assets are produced here anyway).  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "revoked-key"
@@ -19,9 +19,10 @@
   "expect": {
     "asset_count": 0,
     "request_count": 1,
-    "log_contains": [
-      "Maze API error on page 1: status 401",
-      "Reported 0 assets from 0 investigations"
+    "script_error": true,
+    "error_contains": [
+      "maze-security: API error on page 1",
+      "status 401"
     ]
   },
   "invariants": {"skip": ["namespaced_ids"]}

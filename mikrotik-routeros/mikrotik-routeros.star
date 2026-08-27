@@ -781,8 +781,7 @@ def main(**kwargs):
     base = _base(get_string(kwargs, "url", default=""))
     scope = _scope(base)
     if not base or not scope:
-        print("mikrotik: could not determine the router host from the configured URL")
-        return None
+        fail("mikrotik: could not determine the router host from the configured URL")
 
     max_hosts = get_int(kwargs, "max_hosts", default=10000)
     current = now()
@@ -803,10 +802,11 @@ def main(**kwargs):
 
     resource = one_row(rest_get(ctx, "/system/resource", True))
     if not resource:
-        print("mikrotik: /system/resource returned nothing. RouterOS 7.1 or newer is required, " +
-              "the www-ssl service must be enabled with a certificate assigned (or www for plain " +
-              "HTTP on 7.9+), and the account needs the read and rest-api policies.")
-        return None
+        # The first read settles whether the credential and the REST service
+        # work at all; nothing after it can succeed if this did not.
+        fail("mikrotik: /system/resource returned nothing. RouterOS 7.1 or newer is required, " +
+             "the www-ssl service must be enabled with a certificate assigned (or www for plain " +
+             "HTTP on 7.9+), and the account needs the read and rest-api policies.")
 
     identity = one_row(rest_get(ctx, "/system/identity", False))
     # /system/routerboard does not exist on CHR or x86 builds. Its absence is

@@ -649,8 +649,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("nautobot: could not determine the Nautobot host from the configured URL")
-        return None
+        fail("nautobot: could not determine the Nautobot host from the configured URL")
 
     api_token = get_string(kwargs, "api_token", default="").strip()
     if not api_token:

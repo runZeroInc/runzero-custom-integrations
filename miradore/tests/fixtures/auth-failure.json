@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "miradore",
-  "description": "A rejected key must end the run at the path probe, in one request. No attribute list and no other request path fixes a bad credential, so neither ladder should be walked. request_count of 1 is what carries this.",
+  "description": "A rejected key must end the run at the path probe, in one request. No attribute list and no other request path fixes a bad credential, so neither ladder should be walked. request_count of 1 is what carries this.  The task ENDS IN ERROR. That is what separates this from an empty site: both report zero assets, and only the exit status tells them apart.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "1_wrongkey",
@@ -30,7 +30,8 @@
   "expect": {
     "asset_count": 0,
     "request_count": 1,
-    "log_contains": [
+    "script_error": true,
+    "error_contains": [
       "could not read the device list",
       "status 401: the authentication key was rejected"
     ]

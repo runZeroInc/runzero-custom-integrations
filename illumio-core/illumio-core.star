@@ -161,6 +161,16 @@ VIRTUAL_INTERFACE_PREFIXES = [
 def _log(msg):
     """Emit one prefixed log line."""
     print("{}: {}".format(VENDOR, msg))
+
+
+def _fail(msg):
+    """End the task in error, prefixed the same way as _log.
+
+    Used where the run cannot do its job at all -- a credential the PCE
+    rejected, or an inventory that could not be read. Returning no assets
+    there is indistinguishable from an empty PCE.
+    """
+    fail("{}: {}".format(VENDOR, msg))
 def _to_int(value):
     """Convert an int or an all-digit string to an int, or -1 when it is not numeric."""
     if type(value) == "int":
@@ -702,8 +712,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        _log("could not determine the PCE host from the configured URL")
-        return None
+        _fail("could not determine the PCE host from the configured URL")
 
     org_id = get_string(kwargs, "org_id", default="1").strip()
     headers = {

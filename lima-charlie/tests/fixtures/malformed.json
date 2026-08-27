@@ -1,7 +1,7 @@
 {
   "name": "malformed",
   "integration": "lima-charlie",
-  "description": "The sensors endpoint answers with a bare JSON array where an object carrying \"sensors\" is documented. Reading .get off a list aborts the script outright, so the type guard has to stop the run cleanly instead. Proves zero assets, one log line, and no crash.",
+  "description": "The sensors endpoint answers with a bare JSON array where an object carrying \"sensors\" is documented. Reading .get off a list aborts the script outright, so the type guard has to stop the run cleanly instead. Proves zero assets, one log line, and no crash.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -27,7 +27,10 @@
   "expect": {
     "asset_count": 0,
     "request_count": 2,
-    "log_contains": ["Failed to fetch sensors: unexpected response shape, wanted an object"]
+    "script_error": true,
+    "error_contains": [
+      "the sensors endpoint returned an unexpected response shape"
+    ]
   },
   "invariants": {"skip": []}
 }

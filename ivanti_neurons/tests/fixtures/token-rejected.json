@@ -2,7 +2,7 @@
   "name": "token-rejected",
   "integration": "ivanti_neurons",
   "script": "ivanti_neurons/ivanti_neurons.star",
-  "description": "REGRESSION LOCK on a token call that answers 200 with no access_token -- the shape a rejected client pair produces on an endpoint that reports failure in the body rather than the status line.\n\nget_token returns None for that, and 'Bearer ' + None aborts the script, so main() has to stop before get_assets rather than hand the token on. The run must end quietly after the single token request, with a reason in the log and no device request at all. Note that zero assets and one request are what the ABORT produces too, so those assertions alone would be vacuous; the discriminator is the second log line, which sits after the guard and is therefore only reached when the run ends deliberately rather than dying.\n\nNo assets is the correct outcome here, so the asset invariants have nothing to check.",
+  "description": "REGRESSION LOCK on a token call that answers 200 with no access_token -- the shape a rejected client pair produces on an endpoint that reports failure in the body rather than the status line.\n\nget_token returns None for that, and 'Bearer ' + None aborts the script, so main() has to stop before get_assets rather than hand the token on. The run must end quietly after the single token request, with a reason in the log and no device request at all. Note that zero assets and one request are what the ABORT produces too, so those assertions alone would be vacuous; the discriminator is the second log line, which sits after the guard and is therefore only reached when the run ends deliberately rather than dying.\n\nNo assets is the correct outcome here, so the asset invariants have nothing to check.  The run now ENDS THE TASK IN ERROR at the token call. The second log line this used to rely on as its discriminator is gone with the guard that printed it; the discriminator is now the exit status and the message on it, which an abort could not produce either -- 'Bearer ' + None dies with 'unknown binary op: string + NoneType' and names nothing.",
   "kwargs": {
     "url": "$BASE",
     "tenant_id": "fixture-tenant",
@@ -33,8 +33,11 @@
       {"path_contains": "/devices"}
     ],
     "log_contains": [
-      "ivanti-neurons: authentication response carried no access_token",
-      "ivanti-neurons: no access token, nothing to import"
+      "ivanti-neurons: authentication response carried no access_token"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "ivanti-neurons: authentication response carried no access_token"
     ]
   }
 }

@@ -764,8 +764,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("bmc-discovery: could not determine the appliance host from the configured URL")
-        return None
+        fail("bmc-discovery: could not determine the appliance host from the configured URL")
 
     api_version = get_string(kwargs, "api_version", default="v1.3").strip().strip("/")
     if not api_version:

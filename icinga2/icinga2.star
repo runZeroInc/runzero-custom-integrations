@@ -500,11 +500,11 @@ def fetch_and_report_hosts(ctx, host_filter, filter_vars):
 
     body, err = _query(ctx, "/v1/objects/hosts", payload, "host")
     if err:
-        print("icinga2: failed to fetch hosts:", err)
-        return 0
+        # The host query IS the inventory, so a refusal is the run rather than
+        # an empty estate.
+        fail("icinga2: failed to fetch hosts: {}".format(err))
     if not _array_at(body, "results"):
-        print("icinga2: the host query returned no results array; nothing was imported")
-        return 0
+        fail("icinga2: the host query returned no results array; nothing was imported")
 
     reported = 0
     skipped = 0
@@ -559,8 +559,7 @@ def main(**kwargs):
 
     parsed = url_parse(url)
     if parsed == None or not parsed.hostname:
-        print("icinga2: could not determine the Icinga host from the configured URL")
-        return None
+        fail("icinga2: could not determine the Icinga host from the configured URL")
     # The hostname alone, without the port, so that moving the API listener off
     # the default 5665 does not re-key every asset the previous runs created.
     scope = parsed.hostname

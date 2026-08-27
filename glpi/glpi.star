@@ -627,8 +627,7 @@ def main(**kwargs):
     parsed = url_parse(url)
     scope = parsed.hostname if parsed else ""
     if not scope:
-        print("glpi: could not determine the GLPI host from the configured URL")
-        return None
+        fail("glpi: could not determine the GLPI host from the configured URL")
 
     app_token = get_string(kwargs, "app_token", default="").strip()
     user_token = get_string(kwargs, "user_token", default="").strip()

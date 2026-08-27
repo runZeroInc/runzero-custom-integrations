@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "absolute",
-  "description": "A rejected credential: the JWS validator answers 401 to the first device request. The run must end cleanly with zero assets and a printed diagnostic rather than aborting, and it must not keep hammering the endpoint -- 401 is not a retried status, so exactly one request is made.",
+  "description": "A rejected credential: the JWS validator answers 401 to the first device request. The run must end cleanly with zero assets and a printed diagnostic rather than aborting, and it must not keep hammering the endpoint -- 401 is not a retried status, so exactly one request is made.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "api_host": "$BASE",
     "token_id": "fixture-token-id",
@@ -20,9 +20,10 @@
   "expect": {
     "asset_count": 0,
     "request_count": 1,
-    "log_contains": [
-      "absolute: failed to fetch devices:",
-      "absolute: no assets retrieved"
+    "script_error": true,
+    "error_contains": [
+      "absolute: failed to fetch devices",
+      "status 401"
     ]
   },
   "invariants": {"skip": []}

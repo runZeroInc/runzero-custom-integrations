@@ -1,7 +1,7 @@
 {
   "name": "max-pages",
   "integration": "tp-link-omada",
-  "description": "The max_pages ceiling now goes through pager(), so hitting it RAISES with the loop label instead of ending the walk silently - a truncated import must read as an error, not as a complete run. max_pages=1 and page_size=1 against a site reporting totalRows=5: page 1 is fetched and its one client streamed, then the guard fires before page 2 is ever requested. The one asset already reported survives the abort because the walk streams per page. request_count pins that no second clients page was fetched.",
+  "description": "The max_pages ceiling now goes through pager(), so hitting it RAISES with the loop label instead of ending the walk silently - a truncated import must read as an error, not as a complete run. max_pages=1 and page_size=1 against a site reporting totalRows=5: page 1 is fetched and its one client streamed, then the guard fires before page 2 is ever requested. The one asset already reported survives the abort because the walk streams per page. request_count pins that no second clients page was fetched.  The pagination backstop raises rather than returning, so the run ends in error and the assets already streamed are kept. That is the point: an import that hit the ceiling is incomplete, not finished.",
   "kwargs": {
     "url": "$BASE",
     "omadac_id": "a5df88fd23ca87e694ceabac309add4b",
@@ -54,6 +54,10 @@
     ],
     "log_contains": [
       "pagination limit reached: \"clients for site site-a\" ran 1 pages"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "pagination limit reached"
     ]
   },
   "invariants": {

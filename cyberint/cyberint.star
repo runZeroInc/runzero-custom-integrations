@@ -93,6 +93,10 @@ def main(*args, **kwargs):
     # An alert with no id cannot be keyed on. Counted across every page and
     # reported once, so a bad export costs a line rather than one per alert.
     skipped = 0
+    # Set when the walk stops on an error rather than on its own terms. The
+    # domains already collected are still reported below; the task then ends in
+    # error, because a truncated read is not a smaller estate.
+    walk_err = None
     p = pager("alerts")
     while p.next():
         page = p.page
@@ -101,15 +105,14 @@ def main(*args, **kwargs):
             # The documented failure mode of an expired or invalid cookie is a
             # 200 login page rather than a 401. The HTML body fails JSON
             # decoding inside post_json and arrives here as an error string, so
-            # it is named for what it is instead of aborting the task with a
-            # decode error. Domains already collected still get reported below.
+            # it is named for what it is rather than aborting inside the decode.
             if err.startswith("status 200") and "invalid JSON" in err:
-                print("cyberint: page {} returned a non-JSON body; the access token cookie is likely expired or invalid (the portal answers a bad cookie with its login page)".format(page))
+                walk_err = "page {} returned a non-JSON body; the access token cookie is likely expired or invalid (the portal answers a bad cookie with its login page)".format(page)
             else:
-                print("cyberint: failed to fetch alerts page {}: {}".format(page, err))
+                walk_err = "failed to fetch alerts page {}: {}".format(page, err)
             break
         if type(data) != "dict":
-            print("cyberint: unexpected response shape on page {}, wanted an object".format(page))
+            walk_err = "unexpected response shape on page {}, wanted an object".format(page)
             break
 
         alerts = data.get("alerts", []) or []
@@ -189,4 +192,6 @@ def main(*args, **kwargs):
         ))
     print("cyberint: reported {} assets".format(reported))
 
+    if walk_err != None:
+        fail("cyberint: {}".format(walk_err))
     return None

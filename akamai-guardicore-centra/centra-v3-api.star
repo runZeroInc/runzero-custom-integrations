@@ -335,32 +335,29 @@ def stream_assets(base_url, token, config_kwargs):
 
     return reported
 
+VERSION_LABEL = 'centra-v3'
+
+
 def get_token(base_url, username, password, config_kwargs):
     url = base_url + '/api/v3.0/authenticate'
     data, err = post_json(url, json={'username': username, 'password': password}, **get_http_options(config_kwargs))
     if err:
-        print('authentication failed:', err)
-        return None
+        fail('{}: authentication failed: {}'.format(VERSION_LABEL, err))
     if not data or type(data) != 'dict':
-        print('invalid authentication data')
-        return None
+        fail('{}: the authenticate endpoint returned an unexpected response shape, wanted an object'.format(VERSION_LABEL))
     token = data.get('access_token')
     if not token:
         # A 2FA-enabled account answers 200 without an access_token.
-        print('authentication response carried no access_token (is 2FA enabled for this account?)')
-        return None
+        fail('{}: the authenticate response carried no access_token (is 2FA enabled for this account?)'.format(VERSION_LABEL))
     return token
 
 def main(*args, **kwargs):
     base_url = get_url_base(kwargs)
     username = kwargs['username']
     password = kwargs['password']
+    # get_token ends the task in error itself: a rejected credential is never a
+    # run that reports zero assets.
     token = get_token(base_url, username, password, kwargs)
-    if not token:
-        # get_token already printed why. Passing None to bearer() would abort
-        # with a type error instead of this clean stop.
-        print('centra-v3: authentication failed; no assets retrieved')
-        return None
 
     # Assets are streamed page-by-page via report_assets in stream_assets.
     reported = stream_assets(base_url, token, kwargs)

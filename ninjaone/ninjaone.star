@@ -284,8 +284,7 @@ def main(**kwargs):
     # get bearer token
     token = get_token(api_url, client_id, client_secret, kwargs)
     if not token:
-        print('failed to retrieve bearer token')
-        return None
+        fail('ninjaone: could not obtain a bearer token; check the client id, the client secret, and the configured region')
 
     # get and stream assets page-by-page via report_assets
     reported = get_assets(api_url, client_id, client_secret, token, kwargs, max_pages)

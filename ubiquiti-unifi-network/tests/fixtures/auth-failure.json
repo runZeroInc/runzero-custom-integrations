@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "ubiquiti-unifi-network",
-  "description": "A revoked or wrong API key. The Integration API answers 401 on the very first call (the sites lookup), and the run must end with a printed diagnostic and zero assets - one request, no client or device fetches attempted against a credential the controller already refused. 401 is outside get_json's retry set, so exactly one request is made.",
+  "description": "A revoked or wrong API key. The Integration API answers 401 on the very first call (the sites lookup), and the run must end with a printed diagnostic and zero assets - one request, no client or device fetches attempted against a credential the controller already refused. 401 is outside get_json's retry set, so exactly one request is made.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "fixture-revoked-key",
@@ -27,6 +27,11 @@
     ],
     "log_contains": [
       "unifi: failed to get the sites list: status 401"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "unifi: failed to get the sites list",
+      "status 401"
     ]
   }
 }

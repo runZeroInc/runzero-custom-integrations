@@ -140,8 +140,7 @@ def stream_devices(api_url, api_token, config_kwargs):
         params = {"limit": str(PAGE_LIMIT), "offset": str(offset)}
         data, err = get_json(api_url + "/devices", params=params, **http_options)
         if err:
-            print("Error fetching device list from Kandji:", err)
-            break
+            fail("kandji: error fetching device list after reporting {}: {}".format(reported, err))
         if not data:
             break
 

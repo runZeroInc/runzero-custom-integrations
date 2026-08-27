@@ -432,8 +432,7 @@ def main(**kwargs):
 
     parsed = url_parse(url)
     if parsed == None or not parsed.hostname:
-        print("pihole: could not determine the Pi-hole host from the configured URL")
-        return None
+        fail("pihole: could not determine the Pi-hole host from the configured URL")
     scope = parsed.hostname
 
     password = get_string(kwargs, "password", default="")
@@ -444,7 +443,9 @@ def main(**kwargs):
     base_headers = {"Accept": "application/json"}
     sid, ok = open_session(api_url, password, get_http_options(kwargs, "http_", "tls_", base_headers))
     if not ok:
-        return None
+        # open_session has already printed which of the refusals happened; the
+        # run cannot read anything without a seat.
+        fail("pihole: could not open an API session")
 
     headers = dict(base_headers)
     if sid:

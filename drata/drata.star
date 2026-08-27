@@ -402,8 +402,7 @@ def main(**kwargs):
         url = '{}/{}?{}&page={}&limit={}'.format(base_url, 'public/assets', filter, page, page_size)
         data, err = get_json(url, **http_options)
         if err:
-            print('failed to retrieve assets:', err)
-            return None
+            fail('failed to retrieve assets:', err)
 
         # The documented response is an object carrying "data" and "total";
         # reading .get off a list would abort the script.

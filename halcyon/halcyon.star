@@ -103,12 +103,13 @@ def _get_access_token(base_url, username, password, config_kwargs):
         **get_http_options(config_kwargs, headers={"Accept": "application/json"})
     )
     if err:
-        print("Halcyon login failed:", err)
-        return None
+        fail("halcyon: login failed: {}".format(err))
     if type(data) != "dict":
-        print("Halcyon login returned an unexpected response shape; expected a JSON object")
-        return None
-    return data.get("accessToken")
+        fail("halcyon: login returned an unexpected response shape; expected a JSON object")
+    token = data.get("accessToken")
+    if not token:
+        fail("halcyon: login succeeded but returned no accessToken")
+    return token
 
 def _build_headers(api_token):
     return {
@@ -174,14 +175,12 @@ def main(*args, **kwargs):
     base_url = (kwargs.get('url') or DEFAULT_HALCYON_URL).rstrip('/')
 
     if not password_or_token:
-        print("Error: Missing password.")
-        return []
+        fail("halcyon: no password or API token was supplied")
 
     api_token = None
     if username:
+        # _get_access_token ends the task in error itself when the login fails.
         api_token = _get_access_token(base_url, username, password_or_token, kwargs)
-        if not api_token:
-            return []
     else:
         # Backward compatible mode: password is already a bearer token.
         api_token = password_or_token
@@ -215,13 +214,11 @@ def main(*args, **kwargs):
 
         data, err = _authorized_post_json(search_url, auth_state, payload)
         if err:
-            print("API Error during asset search:", err)
-            break
+            fail("halcyon: asset search failed on page {}: {}".format(page, err))
         if type(data) != "dict":
             # A gateway or a changed API version can answer 200 with a bare
-            # array or a string; stop cleanly instead of aborting on .get.
-            print("halcyon: asset search returned an unexpected response shape; expected an object with items")
-            break
+            # array or a string.
+            fail("halcyon: asset search returned an unexpected response shape; expected an object with items")
         items = data.get("items", [])
         if type(items) != "list":
             print("halcyon: asset search items field is not a list; stopping")

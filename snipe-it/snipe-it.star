@@ -359,8 +359,7 @@ def main(**kwargs):
     parsed = url_parse(base_url)
     scope = parsed.hostname if parsed else ''
     if not scope:
-        print('snipe-it: could not determine the Snipe-IT host from the configured URL')
-        return None
+        fail('snipe-it: could not determine the Snipe-IT host from the configured URL')
     token = kwargs['api_token']
     http_options = get_http_options(kwargs, headers={'Accept': 'application/json', 'Authorization': bearer(token)})
 

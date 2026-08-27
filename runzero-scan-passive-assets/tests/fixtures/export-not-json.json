@@ -2,7 +2,7 @@
   "name": "export-not-json",
   "integration": "runzero-scan-passive-assets",
   "script": "runzero-scan-passive-assets/runzero-scan-passive-assets.star",
-  "description": "The asset export answers 200 with an HTML body -- what a proxy or a captive login in front of the console actually returns. json_decode on that aborts the whole run; the guard must print, stop, and schedule nothing. Exactly one request, no PUT, no POST.",
+  "description": "The asset export answers 200 with an HTML body -- what a proxy or a captive login in front of the console actually returns. json_decode on that aborts the whole run; the guard must print, stop, and schedule nothing. Exactly one request, no PUT, no POST.  The task now ENDS IN ERROR. A primary response the script cannot read means no inventory, which is not an empty one.",
   "kwargs": {
     "url": "$BASE",
     "site_id": "77777777-6666-5555-4444-333333333333",
@@ -29,8 +29,9 @@
       {"method": "PUT"},
       {"method": "POST"}
     ],
-    "log_contains": [
-      "The asset export returned a non-JSON body; nothing to do"
+    "script_error": true,
+    "error_contains": [
+      "the asset export returned a non-JSON body"
     ]
   }
 }

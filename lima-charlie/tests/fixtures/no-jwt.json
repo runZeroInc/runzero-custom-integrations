@@ -1,7 +1,7 @@
 {
   "name": "no-jwt",
   "integration": "lima-charlie",
-  "description": "The token exchange succeeds at the HTTP level but returns no \"jwt\". bearer() rejects None and would abort the script, so the run must stop at the token check and never reach the sensors endpoint. Proves the guard fires and that no unauthenticated data call is attempted.",
+  "description": "The token exchange succeeds at the HTTP level but returns no \"jwt\". bearer() rejects None and would abort the script, so the run must stop at the token check and never reach the sensors endpoint. Proves the guard fires and that no unauthenticated data call is attempted.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "jwt_url": "$BASE",
@@ -21,7 +21,10 @@
     "asset_count": 0,
     "request_count": 1,
     "requests_absent": [{"path_contains": "/sensors/"}],
-    "log_contains": ["No JWT returned for organization 8bd1f0e2-0000-4000-8000-000000000001"]
+    "script_error": true,
+    "error_contains": [
+      "the token endpoint returned no jwt"
+    ]
   },
   "invariants": {"skip": []}
 }

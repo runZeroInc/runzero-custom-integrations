@@ -1,7 +1,7 @@
 {
   "name": "wrong-path",
   "integration": "slurpit",
-  "description": "The URL points somewhere that is not the Slurp'it portal (or omits a reverse-proxy prefix), so /api/platform/ping answers 404. The preflight must end the run with the guidance message about the URL and prefix -- one request, no device walk, no abort.",
+  "description": "The URL points somewhere that is not the Slurp'it portal (or omits a reverse-proxy prefix), so /api/platform/ping answers 404. The preflight must end the run with the guidance message about the URL and prefix -- one request, no device walk, no abort.  The task now ENDS IN ERROR: the run could not start, which is not the same as a source with nothing in it.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "fixture-api-key"
@@ -24,6 +24,11 @@
     ],
     "log_contains": [
       "slurpit: /api/platform/ping returned 404"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "the portal preflight failed",
+      "/api/platform/ping returned 404"
     ]
   }
 }

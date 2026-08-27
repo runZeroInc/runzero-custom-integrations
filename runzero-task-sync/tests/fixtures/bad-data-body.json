@@ -2,7 +2,7 @@
   "name": "bad-data-body",
   "integration": "runzero-task-sync",
   "script": "runzero-task-sync/runzero-task-sync.star",
-  "description": "A task whose data download answers 200 with a body that is neither JSON nor gzip -- an HTML proxy page is the realistic shape. The old first-byte sniff fed anything not starting with '{' straight to gzip_decompress, which raises on such a body and aborts the whole run, silently skipping every later task. The guard must skip THAT task with a log line and carry on: the healthy task after it is still downloaded, imported, and hidden. The healthy task's hide then answers 500, which must also be logged rather than silent -- with hide_tasks_on_sync on, a persistently failing hide re-syncs the same task every run with no visible cause. The failed-body task must never be hidden and never be imported.",
+  "description": "A task whose data download answers 200 with a body that is neither JSON nor gzip -- an HTML proxy page is the realistic shape. The old first-byte sniff fed anything not starting with '{' straight to gzip_decompress, which raises on such a body and aborts the whole run, silently skipping every later task. The guard must skip THAT task with a log line and carry on: the healthy task after it is still downloaded, imported, and hidden. The healthy task's hide then answers 500, which must also be logged rather than silent -- with hide_tasks_on_sync on, a persistently failing hide re-syncs the same task every run with no visible cause. The failed-body task must never be hidden and never be imported.  The healthy task after it still syncs -- that is what the request count and the PUT assert -- and the run then ends in ERROR naming the task that did not. A body that is neither JSON nor gzip is a real failure, unlike the not-yet-processed 404 in download-unavailable, and a sync that silently dropped a task would be repeated on every run with nothing to say so.",
   "kwargs": {
     "src_url": "$BASE",
     "src_org_id": "aaaaaaaa-1111-4222-8333-444444444444",
@@ -138,9 +138,12 @@
     ],
     "log_contains": [
       "Task data was neither JSON nor gzip; skipping task: d7d7d7d7-1111-4222-8333-444444444444",
-      "Sync failed for task: d7d7d7d7-1111-4222-8333-444444444444",
       "Successfully synced task: d8d8d8d8-6666-4777-8888-999999999999",
       "Failed to hide task d8d8d8d8-6666-4777-8888-999999999999: status 500"
+     ],
+    "script_error": true,
+    "error_contains": [
+      "runzero-task-sync: 1 of 2 task(s) did not sync"
     ]
   }
 }

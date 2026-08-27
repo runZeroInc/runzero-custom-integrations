@@ -187,12 +187,12 @@ def get_site_id(base_url, api_key, site_name, page_limit, config_kwargs):
         response_json, err = get_json(url=sites_url, **get_http_options(config_kwargs, headers=headers))
 
         if err:
-            print("unifi: failed to get the sites list: {}".format(err))
-            return None
+            # Every later read is scoped by the site id, so a failed site list
+            # is the run rather than a console with no sites.
+            fail("unifi: failed to get the sites list: {}".format(err))
 
         if type(response_json) != "dict" or "data" not in response_json:
-            print("unifi: the API did not return a valid sites object")
-            return None
+            fail("unifi: the API did not return a valid sites object")
 
         batch = response_json.get("data")
         if type(batch) != "list" or not batch:
@@ -243,11 +243,9 @@ def get_all_clients(base_url, api_key, site_id, page_limit, client_filter, confi
         response_json, err = get_json(url=clients_url, **get_http_options(config_kwargs, headers=headers))
 
         if err:
-            print("unifi: failed to retrieve clients: {}".format(err))
-            break
+            fail("unifi: failed to retrieve clients: {}".format(err))
         if type(response_json) != "dict":
-            print("unifi: the API did not return a valid JSON object while fetching clients")
-            break
+            fail("unifi: the API did not return a valid JSON object while fetching clients")
 
         clients_batch = response_json.get("data")
         if type(clients_batch) != "list":
@@ -296,11 +294,9 @@ def get_all_devices(base_url, api_key, site_id, page_limit, config_kwargs):
         response_json, err = get_json(url=devices_url, **get_http_options(config_kwargs, headers=headers))
 
         if err:
-            print("unifi: failed to retrieve devices: {}".format(err))
-            break
+            fail("unifi: failed to retrieve devices: {}".format(err))
         if type(response_json) != "dict":
-            print("unifi: the API did not return a valid JSON object while fetching devices")
-            break
+            fail("unifi: the API did not return a valid JSON object while fetching devices")
 
         devices_batch = response_json.get("data")
         if type(devices_batch) != "list":

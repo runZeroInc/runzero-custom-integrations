@@ -417,6 +417,10 @@ def main(**kwargs):
     cursor = None
     total_inv = 0
     total_skipped = 0
+    # Set when the walk stops on an error. The assets grouped so far are still
+    # built and reported below; the task then ends in error, because a
+    # truncated read is not a smaller estate.
+    walk_err = None
 
     p = pager("investigations")
     while p.next():
@@ -426,7 +430,7 @@ def main(**kwargs):
 
         data, err = post_json(url, json=body, **http_options)
         if err:
-            print("Maze API error on page {}: {}".format(p.page, err))
+            walk_err = "API error on page {}: {}".format(p.page, err)
             break
 
         data = as_dict(data)
@@ -445,4 +449,6 @@ def main(**kwargs):
     print("Reported {} assets from {} investigations".format(total_assets, total_inv))
     if total_skipped:
         print("Skipped {} investigations that named no asset".format(total_skipped))
+    if walk_err != None:
+        fail("maze-security: {}".format(walk_err))
     return None

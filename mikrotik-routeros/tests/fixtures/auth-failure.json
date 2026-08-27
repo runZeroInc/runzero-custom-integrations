@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "mikrotik-routeros",
-  "description": "Wrong credentials. RouterOS answers every REST read with HTTP 401; the 401 branch prints a credential-specific hint (check the username, password, and allowed source address) instead of the generic failure line, and the run ends cleanly with zero assets. request_count pins that 401 is not treated as transient: the first refused menu costs exactly one request.",
+  "description": "Wrong credentials. RouterOS answers every REST read with HTTP 401; the 401 branch prints a credential-specific hint (check the username, password, and allowed source address) instead of the generic failure line, and the run ends cleanly with zero assets. request_count pins that 401 is not treated as transient: the first refused menu costs exactly one request.  The task now ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-wrong-user",
@@ -25,7 +25,10 @@
     "asset_count": 0,
     "request_count": 1,
     "log_contains": [
-      "refused with 401: check the username and password",
+      "refused with 401: check the username and password"
+     ],
+    "script_error": true,
+    "error_contains": [
       "/system/resource returned nothing"
     ]
   },

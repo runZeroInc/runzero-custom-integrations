@@ -1,0 +1,69 @@
+{
+  "name": "page-failure",
+  "integration": "miradore",
+  "description": "Page 1 answers, page 2 dies with a 500 carrying no <Error> envelope, so the attribute ladder cannot repair it and the walk stops short. The two devices already streamed must still be exported -- report_asset writes them before the failure -- but the task must end in ERROR. Reporting 2 of 5 devices as a success is how a truncated import reads as three devices having been decommissioned. 500 is deliberately not in TRANSIENT_STATUSES, so this is one request per page and not a retry storm.",
+  "kwargs": {
+    "url": "$BASE",
+    "api_key": "1_fixturekey",
+    "site_name": "acme",
+    "page_size": "2",
+    "include_software": "false",
+    "include_v2_details": "false"
+  },
+  "routes": [
+    {
+      "name": "page-1",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "page%3D1"
+      },
+      "responses": [
+        {
+          "status": 200,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><Content><Items count=\"5\"><Device><ID>1</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.1</LocalIPAddress><MACAddress>00:11:22:BB:00:01</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-01</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device><Device><ID>2</ID><Platform>iOS</Platform><LocalIPAddress>10.30.0.2</LocalIPAddress><MACAddress>00:11:22:BB:00:02</MACAddress><Status>Active</Status><InvDevice><DeviceName>pager-02</DeviceName></InvDevice><InvOS><Platform>iOS</Platform><Version>17.0</Version></InvOS></Device></Items></Content>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "page-2-broken",
+      "match": {
+        "method": "GET",
+        "path": "/acme/API/Device",
+        "query_contains": "page%3D2"
+      },
+      "responses": [
+        {
+          "status": 500,
+          "headers": {
+            "Content-Type": "application/xml"
+          },
+          "text": "<html><body>502 Bad Gateway</body></html>"
+        }
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "expect": {
+    "asset_count": 2,
+    "ids": [
+      "miradore:acme:1",
+      "miradore:acme:2"
+    ],
+    "log_contains": [
+      "reported 2 of 5 devices matched by the query"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "page 2 failed",
+      "status 500"
+    ]
+  },
+  "invariants": {
+    "skip": []
+  }
+}
