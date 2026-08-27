@@ -79,7 +79,7 @@
               "group": {"id": "g0000000000000000000c3", "name": "Finance"},
               "agent": {"engineVersion": "7.94812", "lastUpdate": "2026-08-14T02:00:00", "productVersion": "7.9.14.1", "signatureOutdated": false, "type": 3, "productOutdated": false},
               "malwareStatus": {"detection": false, "infected": false},
-              "lastLoggedUsers": ["CORP\\\\jdoe"]
+              "lastLoggedUsers": ["CORP\\\\user1"]
             }
           }
         },

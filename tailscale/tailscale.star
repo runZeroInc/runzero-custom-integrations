@@ -190,7 +190,7 @@ def transform_device_to_importasset(device, tailnet):
 
     # Tailscale exposes two names: `name` is the MagicDNS FQDN (a valid DNS
     # hostname, e.g. "my-laptop.tailnet.ts.net"), while `hostname` is the raw
-    # machine name which can contain spaces/apostrophes (e.g. "Andrew's Work
+    # machine name which can contain spaces/apostrophes (e.g. "<owner>'s Work
     # Laptop (2)") and would be rejected as a bogus hostname. Use the MagicDNS
     # name for hostnames and keep the display name as an attribute.
     magic_dns_name = device.get("name", "")

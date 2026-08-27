@@ -42,7 +42,7 @@
                 "platform": "Windows",
                 "version": "23.10.1.1655",
                 "connectionStatus": "Connected",
-                "loggedInUser": "CORP\\alice",
+                "loggedInUser": "CORP\\user1",
                 "platformType": "Desktop",
                 "npvdi": false,
                 "lastConnected": "2026-08-20T16:02:55.442Z",

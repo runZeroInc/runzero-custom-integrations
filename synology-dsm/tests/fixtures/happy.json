@@ -280,7 +280,7 @@
                       "host_ip": "192.168.20.63",
                       "host_name": "WORKSTATION01",
                       "host_port": 0,
-                      "login_user": "jsmith",
+                      "login_user": "user1",
                       "os_name": "Windows 11(64-bit)",
                       "platform_type": 1
                     },

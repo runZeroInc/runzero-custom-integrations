@@ -1,7 +1,7 @@
 {
   "name": "magicdns-hostname",
   "integration": "tailscale",
-  "description": "Tailscale exposes two names and they are not interchangeable. `name` is the MagicDNS FQDN, always a valid DNS label chain. `hostname` is the raw machine name the OS reports, which on a Mac or Windows laptop routinely contains spaces, apostrophes, and parentheses -- \"Andrew's Work Laptop (2)\" is the default macOS naming pattern. Feeding that into hostnames produces a value runZero rejects as bogus, so the device lands with no usable name at all.\n\nThis locks the split: hostnames comes from the MagicDNS name, and the raw machine name is preserved as tailscale_machine_name so nothing is lost. Also covers the DERP latency shape -- each region maps to an object {\"latencyMs\": float, \"preferred\": bool}, not a bare number, so stringifying the whole object put a Starlark dict repr into an attribute instead of a searchable number.\n\nSkips namespaced_ids for the reason recorded in happy: no API-provided tailnet scope exists, and the Tailscale-minted device id is already unique across tailnets.",
+  "description": "Tailscale exposes two names and they are not interchangeable. `name` is the MagicDNS FQDN, always a valid DNS label chain. `hostname` is the raw machine name the OS reports, which on a Mac or Windows laptop routinely contains spaces, apostrophes, and parentheses -- \"Fixture's Work Laptop (2)\" is the default macOS naming pattern. Feeding that into hostnames produces a value runZero rejects as bogus, so the device lands with no usable name at all.\n\nThis locks the split: hostnames comes from the MagicDNS name, and the raw machine name is preserved as tailscale_machine_name so nothing is lost. Also covers the DERP latency shape -- each region maps to an object {\"latencyMs\": float, \"preferred\": bool}, not a bare number, so stringifying the whole object put a Starlark dict repr into an attribute instead of a searchable number.\n\nSkips namespaced_ids for the reason recorded in happy: no API-provided tailnet scope exists, and the Tailscale-minted device id is already unique across tailnets.",
   "kwargs": {
     "url": "$BASE",
     "tailnet": "example.net",
@@ -18,9 +18,9 @@
             "devices": [
               {
                 "id": "90211000000011",
-                "name": "andrews-work-laptop-2.example.ts.net",
-                "hostname": "Andrew's Work Laptop (2)",
-                "user": "andrew@example.invalid",
+                "name": "fixtures-work-laptop-2.example.ts.net",
+                "hostname": "Fixture's Work Laptop (2)",
+                "user": "user2@example.invalid",
                 "os": "macOS",
                 "addresses": ["100.101.30.11"],
                 "clientVersion": "1.78.1",
@@ -55,8 +55,8 @@
       {
         "id": "tailscale-90211000000011",
         "fields": {
-          "hostnames": "andrews-work-laptop-2.example.ts.net",
-          "tailscale_machine_name": "Andrew's Work Laptop (2)",
+          "hostnames": "fixtures-work-laptop-2.example.ts.net",
+          "tailscale_machine_name": "Fixture's Work Laptop (2)",
           "tailscale_latency_ms_lhr": "182.89",
           "tailscale_derp_preferred_region": "lhr"
         }

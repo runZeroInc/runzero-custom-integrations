@@ -46,7 +46,7 @@
               "software": [
                 {"NAME": "Mozilla Firefox", "VERSION": "128.2.0", "PUBLISHER": "Mozilla", "FOLDER": "C:\\Program Files\\Mozilla Firefox", "GUID": "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}", "INSTALLDATE": "2026-07-01"},
                 {"NAME": "Mozilla Firefox", "VERSION": "128.2.0", "PUBLISHER": "Mozilla"},
-                {"NAME": "7-Zip", "VERSION": "24.08", "PUBLISHER": "Igor Pavlov", "BITSWIDTH": "64"},
+                {"NAME": "7-Zip", "VERSION": "24.08", "PUBLISHER": "Fixture Software Ltd", "BITSWIDTH": "64"},
                 {"NAME": "", "VERSION": "1.0"}
               ]
             }

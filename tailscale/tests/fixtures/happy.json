@@ -19,9 +19,9 @@
               {
                 "id": "90210000000001",
                 "nodeId": "nFIXTURE1CNTRL",
-                "name": "laptop-anna.example.ts.net",
-                "hostname": "laptop-anna",
-                "user": "anna@example.invalid",
+                "name": "laptop-user1.example.ts.net",
+                "hostname": "laptop-user1",
+                "user": "user1@example.invalid",
                 "os": "macOS",
                 "clientVersion": "1.62.1",
                 "addresses": ["100.101.10.1", "fd7a:115c:a1e0::1"],
@@ -87,7 +87,7 @@
       {
         "id": "tailscale-90210000000001",
         "fields": {
-          "hostnames": "laptop-anna.example.ts.net",
+          "hostnames": "laptop-user1.example.ts.net",
           "ipAddresses": "100.101.10.1\tfd7a:115c:a1e0::1",
           "os": "macOS",
           "tailscale_client_endpoints": "198.51.100.9:41641, 10.200.0.9:41641",

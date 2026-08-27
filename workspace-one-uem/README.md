@@ -214,7 +214,7 @@ duplicate records after a re-enrollment event.
   asset, and the raw strings preserve the original values either way.
 - **Hostnames are filtered.** `HostName` and `LocalHostName` are device-reported and used directly.
   `DeviceFriendlyName` and `DeviceReportedName` are operator-facing labels that routinely contain spaces and
-  possessives (`user123's Laptop`, `jdoe MacBook Pro macOS 14`), so they are only promoted to hostnames when they are
+  possessives (`user123's Laptop`, `user1 MacBook Pro macOS 14`), so they are only promoted to hostnames when they are
   actually hostname-shaped. Both raw values are always kept as custom attributes. This is a deliberate deviation
   from a naive `DeviceFriendlyName -> hostnames` mapping, which would inject unmergeable junk names into runZero.
 - **Loopback and link-local addresses are dropped.** `DeviceNetworkInfo` entries reporting `127.0.0.0/8`, `::1`,

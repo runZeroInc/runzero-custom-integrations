@@ -1,7 +1,7 @@
 {
   "name": "happy",
   "integration": "jumpcloud",
-  "description": "Two systems, the directory user index that resolves their bindings, and the v2 graph call per system. Proves the v1 inventory and the v2 graph are both routed and correlated, that the per-adapter regrouping turns en0's IPv4 and IPv6 entries into one interface rather than two, that the loopback entry flagged internal and the 169.254 link-local on utun3 never reach an interface, that displayName is only promoted to a hostname when it is still hostname shaped (\"Jane's MacBook Pro\" is not, and importing it would give runZero a name nothing can resolve), and that domainInfo.partOfDomain gates the domain field so a workgroup machine gets none. The two systems also bracket the device-type hint: srv-db01 reports os 'Windows Server 2022' and must come out typed Server, while the Mac reports an OS that says nothing about whether it is a desktop or a laptop and must carry NO deviceType. Neither system publishes a hardware model -- JumpCloud has hwVendor and no hwModel -- so this is the only type signal the inventory holds.",
+  "description": "Two systems, the directory user index that resolves their bindings, and the v2 graph call per system. Proves the v1 inventory and the v2 graph are both routed and correlated, that the per-adapter regrouping turns en0's IPv4 and IPv6 entries into one interface rather than two, that the loopback entry flagged internal and the 169.254 link-local on utun3 never reach an interface, that displayName is only promoted to a hostname when it is still hostname shaped (\"Fixture's MacBook Pro\" is not, and importing it would give runZero a name nothing can resolve), and that domainInfo.partOfDomain gates the domain field so a workgroup machine gets none. The two systems also bracket the device-type hint: srv-db01 reports os 'Windows Server 2022' and must come out typed Server, while the Mac reports an OS that says nothing about whether it is a desktop or a laptop and must carry NO deviceType. Neither system publishes a hardware model -- JumpCloud has hwVendor and no hwModel -- so this is the only type signal the inventory holds.",
   "kwargs": {
     "url": "$BASE",
     "org_id": "fixture-org",
@@ -21,8 +21,8 @@
           "json": {
             "totalCount": 2,
             "results": [
-              {"_id": "6600000000000000000000a1", "username": "jane", "email": "jane@example.com"},
-              {"_id": "6600000000000000000000a2", "username": "bob", "email": "bob@example.com"}
+              {"_id": "6600000000000000000000a1", "username": "user1", "email": "user1@example.com"},
+              {"_id": "6600000000000000000000a2", "username": "user2", "email": "user2@example.com"}
             ]
           }
         }
@@ -41,7 +41,7 @@
               {
                 "_id": "6600000000000000000000b1",
                 "hostname": "wks-042",
-                "displayName": "Jane's MacBook Pro",
+                "displayName": "Fixture's MacBook Pro",
                 "os": "Mac OS X",
                 "version": "14.5",
                 "serialNumber": "C02X1234ABCD",
@@ -64,7 +64,7 @@
                   {"name": "utun3", "address": "169.254.5.5", "family": "ipv4", "internal": false}
                 ],
                 "userMetrics": [
-                  {"userName": "jane", "admin": true, "managed": true},
+                  {"userName": "user1", "admin": true, "managed": true},
                   {"userName": "root", "admin": true, "managed": false}
                 ],
                 "primarySystemUser": {"id": "6600000000000000000000a1"}

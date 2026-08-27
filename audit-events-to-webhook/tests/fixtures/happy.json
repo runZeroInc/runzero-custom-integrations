@@ -27,10 +27,10 @@
               "site_id": "00000000-0000-0000-0000-000000000000",
               "action": "login",
               "source_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
-              "source_name": "jdoe@example.com",
+              "source_name": "user1@example.com",
               "source_type": "user",
               "target_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
-              "target_name": "jdoe@example.com",
+              "target_name": "user1@example.com",
               "target_type": "user",
               "success": true,
               "details": {
@@ -39,7 +39,7 @@
                 "path": "/login",
                 "method": "POST",
                 "user_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
-                "user_email": "jdoe@example.com"
+                "user_email": "user1@example.com"
               },
               "state": "",
               "processor_id": "00000000-0000-0000-0000-000000000000",
@@ -53,7 +53,7 @@
               "site_id": "99999999-8888-7777-6666-555555555555",
               "action": "credential-created",
               "source_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
-              "source_name": "jdoe@example.com",
+              "source_name": "user1@example.com",
               "source_type": "user",
               "target_id": "d2e3f4a5-b6c7-4899-aabb-ccddeeff0011",
               "target_name": "greenbone-appliance",
@@ -65,7 +65,7 @@
                 "path": "/credentials/new",
                 "method": "POST",
                 "user_id": "c1d2e3f4-a5b6-4788-99aa-bbccddeeff00",
-                "user_email": "jdoe@example.com"
+                "user_email": "user1@example.com"
               },
               "state": "",
               "processor_id": "00000000-0000-0000-0000-000000000000",
@@ -125,7 +125,7 @@
       },
       {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"action\":\"login\""},
       {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"action\":\"asset-removed-multiple\""},
-      {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"user_email\":\"jdoe@example.com\""},
+      {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "\"user_email\":\"user1@example.com\""},
       {"method": "POST", "path": "/hooks/runzero-audit", "body_contains": "}\n{"}
     ],
     "requests_absent": [

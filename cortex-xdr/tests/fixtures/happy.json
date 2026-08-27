@@ -32,7 +32,7 @@
                   "mac_address": ["00:11:22:aa:00:01"],
                   "operating_system": "Windows 10 Pro",
                   "os_version": "10.0.19045",
-                  "users": ["CORP\\jdoe"],
+                  "users": ["CORP\\user1"],
                   "group_name": ["Workstations", "PCI"],
                   "assigned_prevention_policy": "Standard Workstation",
                   "assigned_extensions_policy": "Standard Extensions",

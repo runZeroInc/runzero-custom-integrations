@@ -68,7 +68,7 @@
                 "numberOfProcessors": 1,
                 "virtualMachine": false
               },
-              "lastLoggedInUser": "CORP\\jdoe"
+              "lastLoggedInUser": "CORP\\user1"
             },
             {
               "id": 2001,

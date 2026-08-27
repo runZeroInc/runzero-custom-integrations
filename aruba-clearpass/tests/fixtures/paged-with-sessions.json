@@ -35,7 +35,7 @@
                   "callingstationid": "aa:bb:cc:dd:ee:11",
                   "acctsessionid": "0000B001",
                   "acctstarttime": "2026-08-15 06:00:00",
-                  "username": "alice",
+                  "username": "user1",
                   "framedipaddress": "10.32.9.11",
                   "nasipaddress": "10.32.0.1",
                   "nas_name": "cs-idf-2",
@@ -52,7 +52,7 @@
                   "mac_address": "aa:bb:cc:dd:ee:11",
                   "acctsessionid": "0000B000",
                   "acctstarttime": "2026-08-14 06:00:00",
-                  "username": "alice",
+                  "username": "user1",
                   "framedipaddress": "169.254.7.7",
                   "ssid": "CORP-WIFI"
                 },
@@ -94,7 +94,7 @@
                   "randomized_mac": true,
                   "added_at": "2026-05-01 10:00:00",
                   "updated_at": "2026-08-15 06:01:00",
-                  "profile": {"ipv4_address": "10.32.4.11", "host_name": "wks-alice", "device_category": "Computer", "last_profiled_at": "2026-08-15 05:00:00"}
+                  "profile": {"ipv4_address": "10.32.4.11", "host_name": "wks-user1", "device_category": "Computer", "last_profiled_at": "2026-08-15 05:00:00"}
                 },
                 {
                   "id": 5002,
@@ -102,7 +102,7 @@
                   "status": "Known",
                   "added_at": "2026-05-02 10:00:00",
                   "updated_at": "2026-08-15 06:02:00",
-                  "profile": {"ipv4_address": "10.32.4.22", "host_name": "wks-bob", "last_profiled_at": "2026-08-15 05:01:00"}
+                  "profile": {"ipv4_address": "10.32.4.22", "host_name": "wks-user2", "last_profiled_at": "2026-08-15 05:01:00"}
                 }
               ]
             },

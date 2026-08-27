@@ -36,7 +36,7 @@
           "status": 200,
           "json": {
             "Assets": [
-              {"Id": "9001", "Name": "HQ-LAP-1001", "mapped_id": 1001, "asset_type_name": "Device", "asset_status_name": "In Use", "owner_name": "Jane Doe", "location_name": "HQ Floor 3", "asset_type_id": 5, "archive": "0"},
+              {"Id": "9001", "Name": "HQ-LAP-1001", "mapped_id": 1001, "asset_type_name": "Device", "asset_status_name": "In Use", "owner_name": "Fixture User1", "location_name": "HQ Floor 3", "asset_type_id": 5, "archive": "0"},
               {"Id": "9002", "Name": "Office Suite Licence", "mapped_id": 1002, "asset_type_name": "License", "asset_status_name": "Active"},
               {"Id": "9003", "Name": "Unmapped record", "asset_type_name": "Device"}
             ]
@@ -68,13 +68,13 @@
                 "Os_number": "10.0.22631",
                 "Os_family": "Windows",
                 "Virtual": "0",
-                "User_name": "jdoe",
+                "User_name": "user1",
                 "Created": "2025-03-01 09:00:00",
                 "Last_sync": "2026-08-14 07:15:00",
                 "Last_inventory": "2026-08-13 03:00:00",
                 "Software": [
                   {"Id": "501", "Display_Name": "Google Chrome", "Display_Version": "127.0.6533.99", "Publisher": "Google LLC", "Install_Date": "2026-01-15 10:00:00", "Is_Patch": "0"},
-                  {"Id": "502", "Display_Name": "7-Zip", "Display_Version": "23.01", "Publisher": "Igor Pavlov", "Install_Date": "2099-01-01 00:00:00"},
+                  {"Id": "502", "Display_Name": "7-Zip", "Display_Version": "23.01", "Publisher": "Fixture Software Ltd", "Install_Date": "2099-01-01 00:00:00"},
                   {"Id": "503", "Display_Name": "", "Display_Version": "1.0"},
                   {"Id": "501", "Display_Name": "Google Chrome", "Display_Version": "127.0.6533.99", "Publisher": "Google LLC"}
                 ]
