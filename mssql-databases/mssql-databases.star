@@ -1,3 +1,6 @@
+# This is a runZero Custom Integration, please see https://github.com/runZeroInc/runzero-custom-integrations for details.
+# This script was generated with AI.
+
 CONFIG = {
     "id": "runzero-mssql-databases",
     "name": "Microsoft SQL Server databases",
