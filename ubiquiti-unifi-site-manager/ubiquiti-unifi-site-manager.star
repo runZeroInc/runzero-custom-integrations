@@ -215,9 +215,11 @@ def fetch_page(ctx, path, cursor, label):
     payload, err = get_json(url, **ctx["http_options"])
     if err:
         print("{}: {} request failed: {}".format(VENDOR, label, err))
+        ctx["api_err"] = "{} request failed: {}".format(label, err)
         return None, ""
     if type(payload) != "dict":
         print("{}: {} response was not a JSON object".format(VENDOR, label))
+        ctx["api_err"] = "{} response was not a JSON object".format(label)
         return None, ""
 
     data = payload.get("data")
@@ -226,8 +228,10 @@ def fetch_page(ctx, path, cursor, label):
         message = _clean(payload.get("message"))
         if code or message:
             print("{}: {} returned {}: {}".format(VENDOR, label, code, message))
+            ctx["api_err"] = "{} returned {}: {}".format(label, code, message)
         else:
             print("{}: {} response carried no data array".format(VENDOR, label))
+            ctx["api_err"] = "{} response carried no data array".format(label)
         return None, ""
 
     return data, _clean(payload.get("nextToken"))
@@ -570,6 +574,9 @@ def main(*args, **kwargs):
         "hosts": {},
         "sites": {},
         "seen": {},
+        # Set by fetch_page when a call fails, so an unreadable collection ends
+        # the task instead of looking like an empty account.
+        "api_err": None,
     }
 
     extract_devices = get_bool(kwargs, "extract_devices", default=True)
@@ -604,6 +611,8 @@ def main(*args, **kwargs):
 
     print("{}: reported {} assets from {} console(s)".format(
         VENDOR, reported, len(ctx["hosts"])))
+    if ctx["api_err"] != None:
+        fail("{}: {} after reporting {}".format(VENDOR, ctx["api_err"], reported))
     # Devices are streamed with report_assets a page at a time; only the console
     # index and the leftover consoles are held, and both are one entry per
     # console rather than one per device.

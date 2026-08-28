@@ -1,7 +1,7 @@
 {
   "name": "rpc-error",
   "integration": "bitdefender-gravityzone",
-  "description": "GravityZone reports failures as HTTP 200 with an `error` object in the JSON-RPC body, so post_json reports success and the failure has to be read out of the payload. Proves both halves: an error on the getCompanyDetails bootstrap is non-fatal and the walk continues WITHOUT a parentId, and an error on inventory page 2 stops the walk while keeping the assets already reported from page 1.",
+  "description": "GravityZone reports failures as HTTP 200 with an `error` object in the JSON-RPC body, so post_json reports success and the failure has to be read out of the payload. Proves both halves: an error on the getCompanyDetails bootstrap is non-fatal and the walk continues WITHOUT a parentId, and an error on inventory page 2 stops the walk while keeping the assets already reported from page 1. The task now ENDS IN ERROR rather than reporting a successful run: the pages after the failed one were never read, and filing a truncated estate as a complete one makes every endpoint on them look decommissioned. The endpoints already reported are kept, because fail() after streaming does not discard what was handed to report_asset.",
   "kwargs": {
     "url": "$BASE",
     "api_key": "fixture-key",
@@ -10,7 +10,11 @@
   "routes": [
     {
       "name": "company-details-denied",
-      "match": {"method": "POST", "path": "/api/v1.0/jsonrpc/companies", "body_contains": "getCompanyDetails"},
+      "match": {
+        "method": "POST",
+        "path": "/api/v1.0/jsonrpc/companies",
+        "body_contains": "getCompanyDetails"
+      },
       "responses": [
         {
           "status": 200,
@@ -20,7 +24,9 @@
             "error": {
               "code": -32001,
               "message": "Operation not allowed",
-              "data": {"details": "the API key is not licensed for the Companies API"}
+              "data": {
+                "details": "the API key is not licensed for the Companies API"
+              }
             }
           }
         }
@@ -29,7 +35,11 @@
     },
     {
       "name": "network-inventory",
-      "match": {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "getNetworkInventoryItems"},
+      "match": {
+        "method": "POST",
+        "path": "/api/v1.1/jsonrpc/network",
+        "body_contains": "getNetworkInventoryItems"
+      },
       "responses": [
         {
           "status": 200,
@@ -46,14 +56,30 @@
                   "name": "lab-node-01",
                   "type": 5,
                   "companyId": "c0000000000000000000b2",
-                  "details": {"fqdn": "lab-node-01.lab.example.net", "ip": "192.168.30.11", "macs": ["00:1a:2b:00:0a:01"], "managedWithBest": true, "operatingSystemVersion": "Windows 11 Pro"}
+                  "details": {
+                    "fqdn": "lab-node-01.lab.example.net",
+                    "ip": "192.168.30.11",
+                    "macs": [
+                      "00:1a:2b:00:0a:01"
+                    ],
+                    "managedWithBest": true,
+                    "operatingSystemVersion": "Windows 11 Pro"
+                  }
                 },
                 {
                   "id": "e0000000000000000000202",
                   "name": "lab-node-02",
                   "type": 5,
                   "companyId": "c0000000000000000000b2",
-                  "details": {"fqdn": "lab-node-02.lab.example.net", "ip": "192.168.30.12", "macs": ["00:1a:2b:00:0a:02"], "managedWithBest": true, "operatingSystemVersion": "Windows 11 Pro"}
+                  "details": {
+                    "fqdn": "lab-node-02.lab.example.net",
+                    "ip": "192.168.30.12",
+                    "macs": [
+                      "00:1a:2b:00:0a:02"
+                    ],
+                    "managedWithBest": true,
+                    "operatingSystemVersion": "Windows 11 Pro"
+                  }
                 }
               ]
             }
@@ -67,7 +93,9 @@
             "error": {
               "code": -32000,
               "message": "Internal server error",
-              "data": {"parentId": "c0000000000000000000b2"}
+              "data": {
+                "parentId": "c0000000000000000000b2"
+              }
             }
           }
         }
@@ -83,17 +111,33 @@
     ],
     "request_count": 3,
     "requests_include": [
-      {"method": "POST", "path": "/api/v1.0/jsonrpc/companies"},
-      {"method": "POST", "path": "/api/v1.1/jsonrpc/network", "body_contains": "\"page\":2"}
+      {
+        "method": "POST",
+        "path": "/api/v1.0/jsonrpc/companies"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1.1/jsonrpc/network",
+        "body_contains": "\"page\":2"
+      }
     ],
     "requests_absent": [
-      {"body_contains": "parentId"},
-      {"body_contains": "\"page\":3"}
+      {
+        "body_contains": "parentId"
+      },
+      {
+        "body_contains": "\"page\":3"
+      }
     ],
     "log_contains": [
       "could not resolve the parent company (json-rpc error -32001 (authorization error): Operation not allowed)",
       "failed to fetch inventory page 2: json-rpc error -32000 (server error): Internal server error",
       "reported 2 endpoints"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "bitdefender-gravityzone: failed to fetch inventory page 2 after reporting 2",
+      "json-rpc error -32000"
     ]
   },
   "invariants": {

@@ -550,15 +550,13 @@ def fetch_access_token(base_url, client_id, client_secret, config_kwargs):
     }
     data, err = post_json(base_url + OAUTH_PATH, json=payload, **options)
     if err:
-        print("aruba-clearpass: failed to obtain an access token:", err)
         _auth_hint(err)
-        return ""
+        fail("aruba-clearpass: failed to obtain an access token: {}".format(err))
 
     data = data or {}
     token = _clean(data.get("access_token"))
     if not token:
-        print("aruba-clearpass: token response contained no access_token")
-        return ""
+        fail("aruba-clearpass: the token response carried no access_token")
 
     lifetime = data.get("expires_in", 0)
     if type(lifetime) == "int" and lifetime > 0 and lifetime < SHORT_TOKEN_LIFETIME:
@@ -641,9 +639,13 @@ def fetch_session_index(base_url, http_options, page_size, max_pages):
 def fetch_and_report_endpoints(base_url, http_options, page_size, cppm_host, status,
                                session_index, max_profile_age_hours, max_pages):
     """Fetch and stream endpoints one page at a time so the whole endpoint
-    database is never held in memory at once."""
+    database is never held in memory at once.
+
+    Returns (reported, skipped, walk_err). The caller prints its summary before
+    failing on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
     skipped = 0
+    walk_err = None
     url = base_url + ENDPOINT_PATH
     filter_expression = _endpoint_filter(status)
     offset = 0
@@ -655,9 +657,9 @@ def fetch_and_report_endpoints(base_url, http_options, page_size, cppm_host, sta
         items, has_next, err = _get_page(url, http_options,
                                          _page_params(filter_expression, "+id", offset, page_size))
         if err:
-            print("aruba-clearpass: failed to fetch endpoints at offset {}:".format(offset), err)
             _auth_hint(err)
-            return reported, skipped
+            walk_err = "failed to fetch endpoints at offset {} after reporting {}: {}".format(offset, reported, err)
+            break
         pages += 1
         if not items:
             capped = False
@@ -699,7 +701,7 @@ def fetch_and_report_endpoints(base_url, http_options, page_size, cppm_host, sta
         print("aruba-clearpass: page limit of {} hit (integration safety limit, walking endpoints, {}) - raise the max_pages parameter to import the rest".format(
             max_pages, retrieved_of(reported, None)))
 
-    return reported, skipped
+    return reported, skipped, walk_err
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)
@@ -716,8 +718,6 @@ def main(**kwargs):
         page_size = DEFAULT_PAGE_SIZE
 
     token = fetch_access_token(base_url, client_id, client_secret, kwargs)
-    if not token:
-        return None
 
     http_options = get_http_options(kwargs, headers={
         "Authorization": bearer(token),
@@ -731,12 +731,14 @@ def main(**kwargs):
     if include_sessions:
         session_index = fetch_session_index(base_url, http_options, page_size, max_pages)
 
-    reported, skipped = fetch_and_report_endpoints(base_url, http_options, page_size,
-                                                   cppm_host, status, session_index,
-                                                   max_profile_age_days * 24, max_pages)
+    reported, skipped, walk_err = fetch_and_report_endpoints(base_url, http_options, page_size,
+                                                             cppm_host, status, session_index,
+                                                             max_profile_age_days * 24, max_pages)
     print("aruba-clearpass: reported {} endpoints from {}".format(reported, cppm_host))
     if skipped:
         print("aruba-clearpass: skipped {} records with no usable mac_address".format(skipped))
+    if walk_err != None:
+        fail("aruba-clearpass: " + walk_err)
     if not reported:
         print("aruba-clearpass: no assets retrieved")
     return None

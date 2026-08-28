@@ -367,8 +367,12 @@ def fetch_vulnerability_map(base_url, http_options, min_severity):
 
 def fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_map):
     """Fetch and stream hosts one page at a time so the full set is never held
-    in memory at once."""
+    in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
+    walk_err = None
     url = base_url + HOSTS_PATH
     tenant_host = _tenant_host(base_url)
     params = {}
@@ -380,10 +384,10 @@ def fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_ma
     while _pager2.next():
         data, err = _get_page(url, http_options, params)
         if err:
-            print("frontline-vm: failed to fetch hosts:", err)
             if err.startswith("status 401") or err.startswith("status 403"):
                 print("frontline-vm: check the API token")
-            return reported
+            walk_err = "failed to fetch hosts after reporting {}: {}".format(reported, err)
+            break
         data = data or {}
         records = data.get("results", []) or []
         if records:
@@ -396,7 +400,7 @@ def fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_ma
             break
         params = {}
 
-    return reported
+    return reported, walk_err
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)
@@ -416,7 +420,9 @@ def main(**kwargs):
     if include_vulnerabilities:
         vuln_map = fetch_vulnerability_map(base_url, http_options, min_severity)
 
-    reported = fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_map)
+    reported, walk_err = fetch_and_report_assets(base_url, http_options, max_days_since_scan, vuln_map)
+    if walk_err != None:
+        fail("frontline-vm: " + walk_err)
     if not reported:
         print("frontline-vm: no assets retrieved")
     return None

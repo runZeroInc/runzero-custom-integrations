@@ -823,22 +823,19 @@ def _swarm_nodes(ctx, endpoint_id, namespace, daemon_id):
 def main(*args, **kwargs):
     base_url = _clean(kwargs.get("url"))
     if not base_url:
-        _log("url is required")
-        return None
+        fail("portainer: url is required")
     base_url = base_url.rstrip("/")
 
     # url_parse before any fetch: the raw http verbs raise on a transport error
     # rather than returning nil, so a URL with no scheme aborts the run.
     namespace, parsed = _namespace(base_url)
     if not namespace:
-        _log("url must be an absolute URL with a scheme and a host, for example https://portainer.example.com:9443")
-        return None
+        fail("portainer: url must be an absolute URL with a scheme and a host, for example https://portainer.example.com:9443")
 
     mode = get_string(kwargs, "mode", DEFAULT_MODE)
     api_key = _clean(kwargs.get("api_key"))
     if mode == "portainer" and not api_key:
-        _log("api_key is required in portainer mode; create an access token under My account -> Access tokens")
-        return None
+        fail("portainer: api_key is required in portainer mode; create an access token under My account -> Access tokens")
 
     ctx = {
         "mode": mode,
@@ -875,8 +872,9 @@ def main(*args, **kwargs):
     if mode == "portainer":
         endpoints, err = _portainer_endpoints(ctx, max_environments, page_size, wanted_ids)
         if err:
-            _log("could not list Portainer environments: " + err)
-            return None
+            # The environment list IS the estate: without it there is nothing
+            # to walk, and no later call can supply it.
+            fail("portainer: could not list Portainer environments: " + err)
         if not endpoints:
             _log("no Docker environments matched; nothing to import")
             return None

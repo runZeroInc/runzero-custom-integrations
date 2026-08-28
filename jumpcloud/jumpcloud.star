@@ -793,6 +793,7 @@ def fetch_and_report_systems(base_url, scope, http_options, page_size, user_inde
     reported = 0
     url = base_url + SYSTEMS_PATH
     skip = 0
+    walk_err = None
 
     _pager4 = pager("jumpcloud-4")
 
@@ -800,12 +801,12 @@ def fetch_and_report_systems(base_url, scope, http_options, page_size, user_inde
         data, err = get_json(url, params={"limit": page_size, "skip": skip, "sort": SORT_FIELD},
                              **http_options)
         if err:
-            print("jumpcloud: failed to fetch systems at offset {}: {}".format(skip, err))
+            walk_err = "failed to fetch systems at offset {} after reporting {}: {}".format(skip, reported, err)
             if err.startswith("status 401"):
                 print("jumpcloud: check the API key, and set the organization ID if this administrator manages more than one organization")
             if err.startswith("status 403") or err.startswith("status 404"):
                 print("jumpcloud: check that the organization ID is correct for this API key")
-            return reported
+            break
         data = data or {}
         systems = as_list(data.get("results"))
         if not systems:
@@ -823,7 +824,7 @@ def fetch_and_report_systems(base_url, scope, http_options, page_size, user_inde
             break
         skip += page_size
 
-    return reported
+    return reported, walk_err
 
 
 def main(**kwargs):
@@ -864,10 +865,10 @@ def main(**kwargs):
 
     detail_state = {"fetched": 0, "skipped": 0, "limit": detail_system_limit}
     insights_state = {"failures": 0, "not_enabled": 0}
-    reported = fetch_and_report_systems(base_url, scope, http_options, page_size,
-                                        user_index, include_bound_users,
-                                        include_software, include_mac_addresses,
-                                        detail_state, insights_state)
+    reported, walk_err = fetch_and_report_systems(base_url, scope, http_options, page_size,
+                                                  user_index, include_bound_users,
+                                                  include_software, include_mac_addresses,
+                                                  detail_state, insights_state)
 
     if include_bound_users or include_software or include_mac_addresses:
         print("jumpcloud: fetched per-system detail for {} systems".format(detail_state["fetched"]))
@@ -876,6 +877,8 @@ def main(**kwargs):
                 detail_state["skipped"], detail_system_limit))
     if insights_state["not_enabled"]:
         print("jumpcloud: System Insights is not enabled on {} systems".format(insights_state["not_enabled"]))
+    if walk_err != None:
+        fail("jumpcloud: " + walk_err)
     if not reported:
         print("jumpcloud: no assets retrieved")
     return None

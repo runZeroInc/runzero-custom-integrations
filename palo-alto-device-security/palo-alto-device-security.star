@@ -361,8 +361,7 @@ def fetch_access_token(auth_url, tsg_id, client_id, client_secret, config_kwargs
     body = url_encode({"grant_type": "client_credentials", "scope": "tsg_id:" + tsg_id})
     data, err = post_json(auth_url + TOKEN_PATH, body=bytes(body), **options)
     if err:
-        print("palo-alto-device-security: failed to obtain an access token:", err)
-        return ""
+        fail("palo-alto-device-security: failed to obtain an access token: {}".format(err))
 
     data = data or {}
     token = data.get("access_token", "")
@@ -457,9 +456,13 @@ def fetch_vulnerability_index(ctx, stime):
 
 def fetch_and_report_devices(ctx, stime, vuln_index):
     """Fetch and stream devices one page at a time so the full inventory is
-    never held in memory at once."""
+    never held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
     offset = 0
+    walk_err = None
 
     p = pager("devices")
     while p.next():
@@ -469,8 +472,8 @@ def fetch_and_report_devices(ctx, stime, vuln_index):
 
         data, err = fetch_json(ctx, ctx["base_url"] + DEVICE_PATH, params)
         if err:
-            print("palo-alto-device-security: failed to fetch devices:", err)
-            return reported
+            walk_err = "failed to fetch devices after reporting {}: {}".format(reported, err)
+            break
 
         data = data or {}
         devices = data.get("devices", []) or []
@@ -482,7 +485,7 @@ def fetch_and_report_devices(ctx, stime, vuln_index):
             break
         offset += DEVICE_PAGE_SIZE
 
-    return reported
+    return reported, walk_err
 
 def report_unmatched_vulnerabilities(vuln_index, tsg_id):
     """Report assets for devices that carry findings but never appeared in the
@@ -525,9 +528,11 @@ def main(**kwargs):
         print("palo-alto-device-security: lookback disabled, importing the full inventory")
 
     vuln_index = fetch_vulnerability_index(ctx, stime)
-    reported = fetch_and_report_devices(ctx, stime, vuln_index)
+    reported, walk_err = fetch_and_report_devices(ctx, stime, vuln_index)
     reported += report_unmatched_vulnerabilities(vuln_index, tsg_id)
 
+    if walk_err != None:
+        fail("palo-alto-device-security: " + walk_err)
     if not reported:
         print("palo-alto-device-security: no assets retrieved")
     return None

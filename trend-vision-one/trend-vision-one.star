@@ -394,10 +394,14 @@ def build_assets(base_url, detail_options, scope, rows, import_software,
 def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, page_size,
                                import_software, fetch_interfaces, interface_limit):
     """Fetch and stream endpoints one page at a time so the full inventory is
-    never held in memory at once."""
+    never held in memory at once.
+
+    The trailing walk_err is the caller's: it prints its summary before failing
+    on it, so a truncated walk is not filed as a complete estate."""
     reported = 0
     detailed = 0
     adapterless = 0
+    walk_err = None
     url = base_url + ENDPOINTS_PATH
     first = True
     _pager = pager("trend-vision-one")
@@ -423,13 +427,13 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
             # first page, so it is followed with no params at all.
             data, err = get_json(url, retry_backoff=HTTP_RETRY_BACKOFF, **list_options)
         if err:
-            print("trend-vision-one: failed to fetch endpoints:", err)
-            return reported, detailed, adapterless
+            walk_err = "failed to fetch endpoints after reporting {}: {}".format(reported, err)
+            break
         data = data or {}
         items = data.get("items", [])
         if type(items) != "list":
-            print("trend-vision-one: stopping: unexpected items shape from", url)
-            return reported, detailed, adapterless
+            walk_err = "unexpected items shape from the endpoint list after reporting {}".format(reported)
+            break
         rows = [row for row in items if type(row) == "dict"]
 
         if first and type(data.get("totalCount")) == "int":
@@ -459,7 +463,7 @@ def fetch_and_report_endpoints(base_url, list_options, detail_options, scope, pa
             break
         first = False
         url = next_link
-    return reported, detailed, adapterless
+    return reported, detailed, adapterless, walk_err
 
 def main(**kwargs):
     require(kwargs, "api_host", "api_token")
@@ -490,7 +494,7 @@ def main(**kwargs):
     list_options = get_http_options(kwargs, headers=list_headers)
 
     scope = _scope(base_url)
-    reported, detailed, adapterless = fetch_and_report_endpoints(
+    reported, detailed, adapterless, walk_err = fetch_and_report_endpoints(
         base_url, list_options, detail_options, scope, page_size,
         import_software, fetch_interfaces, interface_limit)
     print("trend-vision-one: reported {} endpoints".format(reported))
@@ -500,6 +504,8 @@ def main(**kwargs):
             print("trend-vision-one: none of the fetched endpoint details carried an " +
                   "interfaces[] list; the detail response shape may differ from the " +
                   "expected schema, so no MAC addresses were imported")
+    if walk_err != None:
+        fail("trend-vision-one: " + walk_err)
     if not reported:
         print("trend-vision-one: no assets retrieved")
     return None

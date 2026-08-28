@@ -102,8 +102,7 @@ def main(*args, **kwargs):
             username = username or secret.get('username', '')
             password = secret.get('password', password)
     if not base_url or not username or not password:
-        print("scale-computing: base_url, username, and password are all required")
-        return []
+        fail("scale-computing: base_url, username, and password are all required")
 
     # Session & Auth header
     auth_str = "{}:{}".format(username, password)
@@ -146,7 +145,9 @@ def main(*args, **kwargs):
     # 2) Fetch VMs
     vm_list, ok = get_rows(ctx, "/rest/v1/VirDomain", "list VMs")
     if not ok:
-        return []
+        # The VM list is the inventory. The cluster record and the network
+        # devices above only decorate it, so those degrade; this cannot.
+        fail("scale-computing: could not list VMs")
     print("scale-computing: read {} VMs".format(len(vm_list)))
 
     # 3) Fetch VM network-devices (for MACs & IPs)

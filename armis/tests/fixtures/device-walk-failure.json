@@ -1,0 +1,54 @@
+{
+  "name": "device-walk-failure",
+  "integration": "armis",
+  "description": "The token is good and the first device page imports, then the second page answers 500 until the retries are spent. The assets already handed to report_asset are kept, so the run is PARTIAL, and a partial estate must not be filed as a complete one: every device on the pages never read would otherwise look decommissioned. The task ends in error naming the count already reported, and the summary line still prints before it.",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "fixture-secret-key"
+  },
+  "routes": [
+    {
+      "name": "token",
+      "match": {"method": "POST", "path": "/api/v1/access_token/"},
+      "responses": [
+        {"status": 200, "json": {"data": {"access_token": "fixture-access-token"}}}
+      ],
+      "when_exhausted": "repeat_last"
+    },
+    {
+      "name": "devices",
+      "match": {"method": "GET", "path": "/api/v1/search/"},
+      "responses": [
+        {
+          "status": 200,
+          "json": {
+            "data": {
+              "next": 1,
+              "results": [
+                {
+                  "id": 469,
+                  "name": "geneva-file-01",
+                  "ipAddress": "175.16.199.1",
+                  "macAddress": "00:0c:29:11:22:33",
+                  "type": "Servers"
+                }
+              ]
+            }
+          }
+        },
+        {"status": 500, "json": {"message": "internal error"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 1,
+    "script_error": true,
+    "error_contains": [
+      "armis: failed to fetch devices after reporting 1",
+      "status 500"
+    ]
+  },
+  "invariants": {"skip": []}
+}

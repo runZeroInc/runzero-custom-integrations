@@ -482,8 +482,12 @@ def fetch_parent_id(base_url, http_options):
 
 def fetch_and_report_endpoints(base_url, http_options, console, parent_id, ctx):
     """Fetch and stream the network inventory one page at a time so the full set
-    is never held in memory at once."""
+    is never held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
+    walk_err = None
     filters = {
         "type": {
             "computers": True,
@@ -521,14 +525,16 @@ def fetch_and_report_endpoints(base_url, http_options, console, parent_id, ctx):
         result, err = rpc(base_url, NETWORK_SERVICE, http_options,
                           METHOD_INVENTORY, params)
         if err:
-            print("bitdefender-gravityzone: failed to fetch inventory page {}: {}".format(
-                page, err))
-            return reported
+            print("bitdefender-gravityzone: failed to fetch inventory page {}: {}".format(page, err))
+            walk_err = "failed to fetch inventory page {} after reporting {}: {}".format(
+                page, reported, err)
+            break
         result = as_dict(result)
         items = result.get("items")
         if type(items) != "list":
-            print("bitdefender-gravityzone: stopping: unexpected items shape on page", page)
-            return reported
+            walk_err = "unexpected items shape on inventory page {} after reporting {}".format(
+                page, reported)
+            break
         # Version 1.1 of this method returns pagesCount and total on the FIRST
         # page only, so they are captured there and not re-read afterwards.
         if page == 1:
@@ -556,7 +562,7 @@ def fetch_and_report_endpoints(base_url, http_options, console, parent_id, ctx):
                 break
         elif len(items) < ctx["page_size"]:
             break
-    return reported
+    return reported, walk_err
 
 def main(**kwargs):
     require(kwargs, "url", "api_key")
@@ -597,8 +603,8 @@ def main(**kwargs):
                   " continuing with the API key's default company")
 
     console = _console(base_url)
-    reported = fetch_and_report_endpoints(base_url, http_options, console,
-                                          parent_id, ctx)
+    reported, walk_err = fetch_and_report_endpoints(base_url, http_options, console,
+                                                    parent_id, ctx)
     print("bitdefender-gravityzone: reported {} endpoints".format(reported))
     if ctx["not_endpoints"]:
         print("bitdefender-gravityzone: skipped {} inventory items that are not endpoints".format(
@@ -606,6 +612,8 @@ def main(**kwargs):
     if ctx["detail_skipped"]:
         print("bitdefender-gravityzone: detail limit of {} reached; agent, module, and check-in data were not imported for {} of {} endpoints".format(
             ctx["detail_limit"], ctx["detail_skipped"], reported))
+    if walk_err != None:
+        fail("bitdefender-gravityzone: " + walk_err)
     if not reported:
         print("bitdefender-gravityzone: no assets retrieved")
     return None

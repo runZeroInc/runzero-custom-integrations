@@ -304,6 +304,7 @@ def api_get(ctx, path, label):
                 if mint_token(ctx):
                     continue
             print("{}: {} request failed: {}".format(VENDOR, label, err))
+            ctx["api_err"] = "{} request failed: {}".format(label, err)
             return None, None
 
         result, code, msg = _envelope(payload)
@@ -315,6 +316,7 @@ def api_get(ctx, path, label):
             if mint_token(ctx):
                 continue
         print("{}: {} returned errorCode {}: {}".format(VENDOR, label, code, msg))
+        ctx["api_err"] = "{} returned errorCode {}: {}".format(label, code, msg)
         return None, code
     return None, None
 
@@ -587,15 +589,20 @@ def main(*args, **kwargs):
         "seen": {},
         "site_id": "",
         "site_name": "",
+        # Set by api_get when a call fails, so an unreadable collection ends the
+        # task instead of looking like an empty controller.
+        "api_err": None,
     }
 
     if not mint_token(ctx):
-        return None
+        fail("{}: could not obtain an access token; check the Open API client id and secret".format(VENDOR))
 
     extract_devices = get_bool(kwargs, "extract_devices", default=True)
     extract_clients = get_bool(kwargs, "extract_clients", default=True)
 
     sites = list_sites(ctx)
+    if ctx["api_err"] != None:
+        fail("{}: {}".format(VENDOR, ctx["api_err"]))
     if not sites:
         print("{}: no sites available to this Open API application".format(VENDOR))
         return None
@@ -621,5 +628,7 @@ def main(*args, **kwargs):
             )
 
     print("{}: reported {} assets across {} site(s)".format(VENDOR, total, len(sites)))
+    if ctx["api_err"] != None:
+        fail("{}: {} after reporting {}".format(VENDOR, ctx["api_err"], total))
     # Assets are streamed with report_assets, so nothing is buffered here.
     return None

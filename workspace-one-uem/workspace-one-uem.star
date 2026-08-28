@@ -573,8 +573,12 @@ def fetch_and_report_devices(base_url, tenant_host, devices_options, apps_option
                              page_size, organization_group_id, include_os_updates,
                              include_software, detail_state):
     """Fetch and stream devices one page at a time so the full inventory is never
-    held in memory at once."""
+    held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
+    walk_err = None
     url = base_url + DEVICES_PATH
 
     _pager2 = pager("workspace-one-uem-2")
@@ -604,7 +608,8 @@ def fetch_and_report_devices(base_url, tenant_host, devices_options, apps_option
                 print("workspace-one-uem: check the API username and password")
             if err.startswith("status 403"):
                 print("workspace-one-uem: check the API key and that the account holds a read-only API role")
-            return reported
+            walk_err = "failed to fetch devices after reporting {}: {}".format(reported, err)
+            break
         # A search with no matches answers 204 with an empty body.
         data = data or {}
         devices = data.get("Devices", []) or []
@@ -622,7 +627,7 @@ def fetch_and_report_devices(base_url, tenant_host, devices_options, apps_option
         if (page + 1) * page_size >= total:
             break
 
-    return reported
+    return reported, walk_err
 
 
 def main(**kwargs):
@@ -658,15 +663,17 @@ def main(**kwargs):
         options["retry_max_backoff"] = HTTP_RETRY_MAX_BACKOFF
 
     detail_state = {"fetched": 0, "skipped": 0, "limit": detail_device_limit}
-    reported = fetch_and_report_devices(base_url, tenant_host, devices_options,
-                                        apps_options, page_size, organization_group_id,
-                                        include_os_updates, include_software, detail_state)
+    reported, walk_err = fetch_and_report_devices(base_url, tenant_host, devices_options,
+                                                  apps_options, page_size, organization_group_id,
+                                                  include_os_updates, include_software, detail_state)
 
     if include_os_updates or include_software:
         print("workspace-one-uem: fetched per-device detail for {} devices".format(detail_state["fetched"]))
         if detail_state["skipped"]:
             print("workspace-one-uem: skipped per-device detail for {} devices; raise the per-device detail limit ({}) to cover more".format(
                 detail_state["skipped"], detail_device_limit))
+    if walk_err != None:
+        fail("workspace-one-uem: " + walk_err)
     if not reported:
         print("workspace-one-uem: no assets retrieved")
     return None

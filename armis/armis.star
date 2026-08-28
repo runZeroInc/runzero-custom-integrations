@@ -381,7 +381,7 @@ def build_asset(device, vulns, scope, stats):
         asset.lastSeenTS = last_seen
     return asset
 
-def fetch_access_token(base_url, secret_key, config_kwargs):
+def fetch_access_token(base_url, secret_key, config_kwargs, fatal=True):
     """Exchange the tenant secret key for a short-lived v1 access token.
 
     The secret goes in a form-encoded body rather than the query string so it
@@ -396,13 +396,24 @@ def fetch_access_token(base_url, secret_key, config_kwargs):
 
     body = url_encode({"secret_key": secret_key})
     data, err = post_json(base_url + TOKEN_PATH, body=bytes(body), **options)
+    problem = ""
+    token = ""
     if err:
-        print("armis: failed to obtain an access token:", err)
+        if err.startswith("status 401") or err.startswith("status 403"):
+            print("armis: check the secret key under Settings > API Management, and that it is not in use by another task")
+        problem = "failed to obtain an access token: {}".format(err)
+    else:
+        token = as_text(as_dict(as_dict(data).get("data")).get("access_token"))
+        if not token:
+            problem = "the token response carried no access_token"
+    if problem:
+        # The FIRST exchange is the run: no endpoint answers without a token,
+        # so it ends the task. A mid-run refresh is not - the devices already
+        # imported stay, and fetch_json degrades rather than discarding them.
+        if fatal:
+            fail("armis: " + problem)
+        print("armis: " + problem)
         return ""
-
-    token = as_text(as_dict(as_dict(data).get("data")).get("access_token"))
-    if not token:
-        print("armis: token response contained no access_token")
     return token
 
 def _api_options(config_kwargs, token):
@@ -430,7 +441,7 @@ def fetch_json(ctx, url, params):
             return data, None
         if err.startswith("status 401") and attempt == 0:
             print("armis: access token rejected mid-run, requesting a new one")
-            token = fetch_access_token(ctx["base_url"], ctx["secret_key"], ctx["kwargs"])
+            token = fetch_access_token(ctx["base_url"], ctx["secret_key"], ctx["kwargs"], fatal=False)
             if token:
                 ctx["http_options"] = _api_options(ctx["kwargs"], token)
                 continue
@@ -586,9 +597,13 @@ def fetch_vulnerability_index(ctx, cve_index):
 
 def fetch_and_report_devices(ctx, vuln_index, stats):
     """Walk the device inventory, streaming each page so the whole tenant is
-    never held in memory at once."""
+    never held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
     offset = 0
+    walk_err = None
 
     p = pager("devices")
     while p.next():
@@ -598,8 +613,8 @@ def fetch_and_report_devices(ctx, vuln_index, stats):
         # duplicate on the next poll.
         rows, next_offset, err = _search_page(ctx, ctx["device_query"], "lastSeen", offset)
         if err:
-            print("armis: failed to fetch devices:", err)
-            return reported
+            walk_err = "failed to fetch devices after reporting {}: {}".format(reported, err)
+            break
 
         for row in rows:
             device_id = as_text(row.get("id"))
@@ -610,7 +625,7 @@ def fetch_and_report_devices(ctx, vuln_index, stats):
         if offset == None:
             break
 
-    return reported
+    return reported, walk_err
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)
@@ -620,8 +635,6 @@ def main(**kwargs):
     include_vulnerabilities = get_bool(kwargs, "include_vulnerabilities", default=False)
 
     token = fetch_access_token(base_url, secret_key, kwargs)
-    if not token:
-        return None
 
     device_query = DEVICE_QUERY
     vulnerability_query = VULNERABILITY_QUERY
@@ -651,7 +664,7 @@ def main(**kwargs):
         vuln_index = fetch_vulnerability_index(ctx, fetch_cve_index(ctx))
 
     stats = {"no_id": 0, "no_correlator": 0}
-    reported = fetch_and_report_devices(ctx, vuln_index, stats)
+    reported, walk_err = fetch_and_report_devices(ctx, vuln_index, stats)
 
     if stats["no_correlator"]:
         print("armis: skipped {} devices with no MAC, IP, or hostname to correlate on".format(stats["no_correlator"]))
@@ -660,6 +673,8 @@ def main(**kwargs):
         # device the inventory query did not return cannot be turned into an
         # asset -- there is nothing to correlate it with.
         print("armis: dropped findings for {} devices absent from the inventory query".format(len(vuln_index)))
+    if walk_err != None:
+        fail("armis: " + walk_err)
     if not reported:
         print("armis: no assets retrieved")
     return None

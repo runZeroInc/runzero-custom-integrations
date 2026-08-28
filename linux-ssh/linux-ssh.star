@@ -198,16 +198,14 @@ def main(*args, **kwargs):
     timeout = get_int(kwargs, "timeout", default=30)
 
     if not password and not private_key:
-        print("either password or private_key is required")
-        return []
+        fail("linux-ssh: either password or private_key is required")
 
     # The runtime requires a pinned host key or an explicit opt-out -- there is
     # no trust-on-first-use -- and dial() raises on the missing-key default,
     # which would end the task as an error. Check it here and say what to do.
     if not host_key and not insecure_ignore_host_key:
-        print("host_key is required unless insecure_ignore_host_key is enabled. " +
-              "Capture it on the target with: cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub")
-        return []
+        fail("linux-ssh: host_key is required unless insecure_ignore_host_key is enabled. " +
+             "Capture it on the target with: cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub")
     if host_key and insecure_ignore_host_key:
         # dial() rejects the combination outright; the pin is the stronger
         # statement, so it wins.

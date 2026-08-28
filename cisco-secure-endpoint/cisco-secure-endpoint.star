@@ -508,24 +508,29 @@ def report_page_vulnerabilities(base_url, http_options, scope, computers, budget
 def fetch_and_report_computers(base_url, http_options, scope, page_size, active_only,
                                include_demo, import_vulnerabilities, vulnerability_limit):
     """Fetch and stream computers one page at a time so the full set is never
-    held in memory at once, optionally enriching each page with findings."""
+    held in memory at once, optionally enriching each page with findings.
+
+    Returns (reported, enriched, walk_err). The caller prints its summary before
+    failing on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
     enriched = 0
     offset = 0
     total = -1
+    walk_err = None
     _pager = pager("cisco-secure-endpoint")
     while _pager.next():
         data, err = get_json(base_url + COMPUTERS_PATH,
                              params={"limit": page_size, "offset": offset},
                              retry_backoff=HTTP_RETRY_BACKOFF, **http_options)
         if err:
-            print("cisco-secure-endpoint: failed to fetch computers:", err)
-            return reported, enriched
+            walk_err = "failed to fetch computers at offset {} after reporting {}: {}".format(
+                offset, reported, err)
+            break
         data = data or {}
         rows = data.get("data", [])
         if type(rows) != "list":
-            print("cisco-secure-endpoint: stopping: unexpected data shape at offset", offset)
-            return reported, enriched
+            walk_err = "unexpected data shape at offset {} after reporting {}".format(offset, reported)
+            break
         if not rows:
             break
 
@@ -552,7 +557,7 @@ def fetch_and_report_computers(base_url, http_options, scope, page_size, active_
         if len(rows) < page_size:
             break
         offset += page_size
-    return reported, enriched
+    return reported, enriched, walk_err
 
 def main(**kwargs):
     require(kwargs, "api_host", "client_id", "api_key")
@@ -577,12 +582,14 @@ def main(**kwargs):
     })
     scope = _scope(base_url)
 
-    reported, enriched = fetch_and_report_computers(
+    reported, enriched, walk_err = fetch_and_report_computers(
         base_url, http_options, scope, page_size, active_only, include_demo,
         import_vulnerabilities, vulnerability_limit)
     print("cisco-secure-endpoint: reported {} computers".format(reported))
     if import_vulnerabilities:
         print("cisco-secure-endpoint: checked {} computers for vulnerabilities".format(enriched))
+    if walk_err != None:
+        fail("cisco-secure-endpoint: " + walk_err)
     if not reported:
         print("cisco-secure-endpoint: no assets retrieved")
     return None

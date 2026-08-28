@@ -503,22 +503,27 @@ def sweep(ctx, stats):
     than a recursive descent: pop a window, query it, and on truncation push
     the two narrower windows that replace it. Popping from the end makes the
     walk depth-first, which keeps the stack shallow -- a breadth-first queue
-    would hold every window of a whole level at once."""
+    would hold every window of a whole level at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated sweep is not filed as a complete estate."""
+    walk_err = None
     # Sending either risk bound makes the API drop assets scored exactly 0, so
     # this bound-free call, ordered by risk_score ASCENDING, is the only one
     # that can see them. See sweep_zero_score.
     unbanded = _window(ctx["from_ms"], ctx["to_ms"], 0, RISK_MAX_TENTHS, 0, banded=False)
     entities, total_hits, err = _search(ctx, unbanded)
     if err:
-        print("forescout-rem: asset search failed:", err)
-        return 0
+        # The first search IS the run: nothing has been reported and no later
+        # window can succeed where this one was refused, so it ends the task.
+        fail("forescout-rem: asset search failed: {}".format(err))
 
     stats["windows"] += 1
     reported = report_window(ctx, entities, stats)
     unbanded_missing = _truncated(entities, total_hits)
     if not unbanded_missing:
         print("forescout-rem: the whole window fit in one response, so no risk banding was needed")
-        return reported
+        return reported, walk_err
     print("forescout-rem: the search window is larger than one response; banding the risk scale to cover it")
 
     # A capped probe is split on time and re-queued rather than accepted; the
@@ -542,8 +547,9 @@ def sweep(ctx, stats):
         window = queue.pop()
         entities, total_hits, err = _search(ctx, window)
         if err:
-            print("forescout-rem: asset search failed for {}: {}".format(_label(window), err))
             stats["abandoned"] += len(queue) + 1
+            walk_err = "asset search failed for {} after reporting {}: {}".format(
+                _label(window), reported, err)
             break
 
         stats["windows"] += 1
@@ -559,7 +565,7 @@ def sweep(ctx, stats):
             stats["capped_windows"] += 1
             stats["capped_assets"] += missing
 
-    return reported
+    return reported, walk_err
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)
@@ -596,7 +602,7 @@ def main(**kwargs):
 
     stats = {"windows": 0, "duplicates": 0, "no_id": 0, "no_correlator": 0,
              "capped_windows": 0, "capped_assets": 0, "abandoned": 0}
-    reported = sweep(ctx, stats)
+    reported, walk_err = sweep(ctx, stats)
 
     print("forescout-rem: reported {} assets from {} search windows".format(reported, stats["windows"]))
     if stats["duplicates"]:
@@ -612,6 +618,8 @@ def main(**kwargs):
             stats["capped_windows"], stats["capped_assets"]))
     if stats["abandoned"]:
         print("forescout-rem: gave up with {} windows never searched; the assets in them were not imported".format(stats["abandoned"]))
+    if walk_err != None:
+        fail("forescout-rem: " + walk_err)
     if not reported:
         print("forescout-rem: no assets retrieved")
     return None

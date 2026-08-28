@@ -383,8 +383,7 @@ def fetch_access_token(auth_url, client_id, client_secret, config_kwargs):
     })
     data, err = post_json(auth_url + TOKEN_PATH, body=bytes(body), **options)
     if err:
-        print("sophos-central: failed to obtain an access token:", err)
-        return ""
+        fail("sophos-central: failed to obtain an access token: {}".format(err))
 
     data = data or {}
     token = _clean(data.get("access_token"))
@@ -450,8 +449,7 @@ def fetch_whoami(ctx, base_url):
     """
     data, err = authed_get(ctx, base_url + WHOAMI_PATH, None, {})
     if err:
-        print("sophos-central: failed to identify the credential:", err)
-        return "", "", "", ""
+        fail("sophos-central: failed to identify the credential: {}".format(err))
 
     data = data or {}
     hosts = as_dict(data.get("apiHosts"))
@@ -480,8 +478,7 @@ def fetch_tenants(ctx, global_url, id_type, entity_id, wanted):
                                 "pageTotal": "true"},
                                extra)
         if err:
-            print("sophos-central: failed to list {} tenants:".format(id_type), err)
-            return tenants
+            fail("sophos-central: failed to list {} tenants: {}".format(id_type, err))
 
         data = data or {}
         items = as_list(data.get("items"))
@@ -520,8 +517,12 @@ def fetch_tenants(ctx, global_url, id_type, entity_id, wanted):
 
 def fetch_and_report_endpoints(ctx, tenant, page_size):
     """Fetch and stream one tenant's endpoints a page at a time so the full
-    inventory is never held in memory at once."""
+    inventory is never held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
+    walk_err = None
     from_key = ""
 
     extra = {"X-Tenant-ID": tenant["id"]}
@@ -537,8 +538,10 @@ def fetch_and_report_endpoints(ctx, tenant, page_size):
 
         data, err = authed_get(ctx, tenant["api_host"] + ENDPOINTS_PATH, params, extra)
         if err:
-            print("sophos-central: failed to fetch endpoints for tenant {}:".format(tenant["id"]), err)
-            return reported
+            print("sophos-central: failed to fetch endpoints for tenant {}: {}".format(tenant["id"], err))
+            walk_err = "failed to fetch endpoints for tenant {} after reporting {}: {}".format(
+                tenant["id"], reported, err)
+            break
 
         data = data or {}
         items = as_list(data.get("items"))
@@ -566,7 +569,7 @@ def fetch_and_report_endpoints(ctx, tenant, page_size):
             break
         from_key = next_key
 
-    return reported
+    return reported, walk_err
 
 
 def main(**kwargs):
@@ -623,18 +626,31 @@ def main(**kwargs):
             if tenant_id not in found:
                 print("sophos-central: requested tenant is not managed by this credential: id=" + tenant_id)
     else:
-        print("sophos-central: unsupported credential type: " + id_type)
-        return None
+        fail("sophos-central: unsupported credential type: " + id_type)
 
     if not tenants:
         print("sophos-central: no tenants to import")
         return None
 
     reported = 0
+    failed = 0
+    last_err = None
     for tenant in tenants:
-        reported += fetch_and_report_endpoints(ctx, tenant, page_size)
+        tenant_reported, tenant_err = fetch_and_report_endpoints(ctx, tenant, page_size)
+        reported += tenant_reported
+        if tenant_err != None:
+            failed += 1
+            last_err = tenant_err
 
     print("sophos-central: reported {} endpoints across {} tenants".format(reported, len(tenants)))
+    if failed:
+        # One unreachable tenant among many is contained: the others still
+        # import, and killing the run would discard them. But a run where every
+        # tenant failed read nothing at all, and reporting that as a success
+        # makes a dead credential look like an estate that emptied itself.
+        print("sophos-central: {} of {} tenants could not be read".format(failed, len(tenants)))
+        if not reported:
+            fail("sophos-central: no tenant could be read, last error: {}".format(last_err))
     if not reported:
         print("sophos-central: no assets retrieved")
     return None

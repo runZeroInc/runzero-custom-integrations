@@ -1,0 +1,33 @@
+{
+  "name": "auth-failure",
+  "integration": "armis",
+  "description": "A rejected secret key. The token exchange answers 401, so no access token is ever minted and no search can be attempted. The task ENDS IN ERROR rather than reporting a successful run with zero assets: a refused credential and an empty tenant are otherwise the same result, and only the exit status separates them. The pinned request count is the assertion that no search was attempted with a dead credential, and that the 401 is not retried (it is not in post_json's transient status list).",
+  "kwargs": {
+    "url": "$BASE",
+    "secret_key": "revoked-secret-key"
+  },
+  "routes": [
+    {
+      "name": "token-denied",
+      "match": {
+        "method": "POST",
+        "path": "/api/v1/access_token/"
+      },
+      "responses": [
+        {"status": 401, "json": {"message": "Invalid access token"}}
+      ],
+      "when_exhausted": "repeat_last"
+    }
+  ],
+  "default_response": {"status": 404, "text": "no fixture route"},
+  "expect": {
+    "asset_count": 0,
+    "request_count": 1,
+    "script_error": true,
+    "error_contains": [
+      "armis: failed to obtain an access token",
+      "status 401"
+    ]
+  },
+  "invariants": {"skip": []}
+}

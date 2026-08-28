@@ -475,11 +475,9 @@ def main(*args, **kwargs):
     timeout_seconds = get_int(kwargs, "request_timeout", DEFAULT_REQUEST_TIMEOUT)
 
     if not base_url:
-        _log("url (Kubernetes API server URL) is required")
-        return []
+        fail("kubernetes: url (Kubernetes API server URL) is required")
     if not token:
-        _log("bearer_token (ServiceAccount bearer token) is required")
-        return []
+        fail("kubernetes: bearer_token (ServiceAccount bearer token) is required")
 
     # Each collection is walked in limit/continue chunks and every asset is
     # reported as it is built, so neither a decoded LIST response nor the
@@ -490,8 +488,9 @@ def main(*args, **kwargs):
                              kwargs, _node_to_asset, "nodes", "k8s-nodes")
     total += imported
     if err:
-        _log("failed to list nodes: " + err)
-        return None
+        # Nodes are the cluster: a token that cannot list them cannot list the
+        # rest either, and there is nothing to degrade to.
+        fail("kubernetes: failed to list nodes: " + err)
 
     if include_loadbalancer_services:
         imported, err = _collect(base_url, "/api/v1/services", token,

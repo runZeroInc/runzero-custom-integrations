@@ -61,8 +61,7 @@ def main(*args, **kwargs):
     mount_shares = get_bool(kwargs, "mount_shares", default=True)
 
     if not password and not nt_hash:
-        print("either password or nt_hash is required")
-        return []
+        fail("windows-smb-shares: either password or nt_hash is required")
 
     session = smb_dial(
         host=host,

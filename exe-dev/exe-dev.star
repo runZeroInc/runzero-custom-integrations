@@ -357,8 +357,7 @@ def main(**kwargs):
 
     token = get_string(kwargs, "api_token")
     if token == "":
-        _log("api_token is required")
-        return None
+        fail("exe-dev: api_token is required")
 
     http_options = get_http_options(kwargs, headers={
         "Authorization": bearer(token),
@@ -368,11 +367,9 @@ def main(**kwargs):
     # Use -l for detailed listing: tags, comment, and shelley status
     vms_data = run_exe_command(base_url, http_options, "ls -l")
     if vms_data == None:
-        _log("no VM data retrieved")
-        return None
+        fail("exe-dev: could not read the VM list")
     if type(vms_data) != "dict":
-        _log("unexpected response shape for 'ls -l', wanted an object")
-        return None
+        fail("exe-dev: the VM list returned an unexpected response shape, wanted an object")
 
     # "vms": null defeats a .get default and len(None) aborts the run; a
     # non-object element in the list has no fields to read at all.

@@ -731,17 +731,21 @@ def collect_extras(query_url, http_options, asset_ids, options):
 
 def fetch_and_report_assets(query_url, config_kwargs, api_key, api_secret, customer_id, options):
     """Fetch and stream upt_assets one page at a time so the full inventory is
-    never held in memory at once."""
+    never held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
     offset = 0
+    walk_err = None
     p = pager("uptycs-assets")
     while p.next():
         http_options = get_http_options(config_kwargs, headers=_auth_headers(api_key, api_secret))
         sql = "SELECT * FROM upt_assets ORDER BY id LIMIT {} OFFSET {}".format(ASSET_PAGE_SIZE, offset)
         items, err = _run_query(query_url, http_options, sql)
         if err:
-            print("uptycs: failed to fetch assets:", err)
-            return reported
+            walk_err = "failed to fetch assets after reporting {}: {}".format(reported, err)
+            break
         if not items:
             break
 
@@ -758,7 +762,7 @@ def fetch_and_report_assets(query_url, config_kwargs, api_key, api_secret, custo
         if len(items) < ASSET_PAGE_SIZE:
             break
         offset += ASSET_PAGE_SIZE
-    return reported
+    return reported, walk_err
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)
@@ -776,7 +780,9 @@ def main(**kwargs):
     }
 
     query_url = base_url + QUERY_PATH.format(customer_id)
-    reported = fetch_and_report_assets(query_url, kwargs, api_key, api_secret, customer_id, options)
+    reported, walk_err = fetch_and_report_assets(query_url, kwargs, api_key, api_secret, customer_id, options)
     if not reported:
         print("uptycs: no assets retrieved")
+    if walk_err != None:
+        fail("uptycs: " + walk_err)
     return None

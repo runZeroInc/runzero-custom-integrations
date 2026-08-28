@@ -194,10 +194,59 @@ def check_config(slug, src):
     return out
 
 
+# A diagnostic that names a failure, as opposed to a progress or summary line.
+FAILURE_PRINT_RE = re.compile(
+    r'\b(failed|failure|could not|cannot|unable to|rejected|refused|denied'
+    r'|is required|are required|unexpected|invalid|unsupported|no .{0,24}retrieved)\b',
+    re.I)
+
+
+def check_failure(slug, src):
+    """A run that could not read the inventory must fail(), not return empty.
+
+    A script that prints a diagnostic and returns reports ZERO ASSETS AND A
+    SUCCESSFUL RUN, which is indistinguishable from a tenant that genuinely has
+    no devices: a rejected API key then reads as an estate that emptied itself.
+    See AGENTS.md, "Failing the task".
+
+    The signature is a print that NAMES a failure followed by a return, in a
+    script that calls fail() nowhere. Both halves are needed. Absence of fail()
+    alone is not a defect: the ssh, smb, and sql helpers raise on a refused
+    login, so a script built on those ends the task correctly without ever
+    calling it. And a print-then-return inside a script that does use fail()
+    is usually a deliberate degrade, which only the vendor's API can settle.
+
+    A hit is a candidate, not a verdict: which branch is wrong is left to the
+    reader, since telling an optional enrichment call apart from the estate
+    walk is not something a regex can do.
+    """
+    if re.search(r'(?<![\w.])fail\s*\(', src):
+        return []
+    lines = src.splitlines()
+    for ln, line in enumerate(lines, 1):
+        if 'print(' not in line or not FAILURE_PRINT_RE.search(line):
+            continue
+        # The return has to be in the SAME branch as the print: a line that
+        # dedents first has closed the branch, so a later return is the
+        # function's ordinary exit rather than a swallowed failure.
+        indent = len(line) - len(line.lstrip())
+        for follow in lines[ln:ln + 3]:
+            if not follow.strip():
+                continue
+            if len(follow) - len(follow.lstrip()) < indent:
+                break
+            if re.match(r'\s*return\b', follow):
+                return [(ln, "prints a failure and returns; with no fail() "
+                             "anywhere the task reports zero assets as a "
+                             "successful run", line.strip())]
+    return []
+
+
 CHECKS = [
     ("secrets", check_secrets),
     ("hangs", check_hangs),
     ("logging", check_logging),
+    ("failure", check_failure),
     ("coverage", check_coverage),
     ("config", check_config),
 ]

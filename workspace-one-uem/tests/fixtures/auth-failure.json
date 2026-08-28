@@ -1,7 +1,7 @@
 {
   "name": "auth-failure",
   "integration": "workspace-one-uem",
-  "description": "Workspace ONE UEM requires the aw-tenant-code header AND Basic auth together; supplying only one answers 403 and yields nothing. Here page 0 succeeds and page 1 answers 403, which is what a mid-run credential or role change looks like. The run must keep the devices it already reported, emit the API-key-specific diagnostic rather than the password one, and stop cleanly instead of retrying forever or aborting. check_determinism is off because the id is scoped by the tenant host, which under the fixture server carries an ephemeral port.",
+  "description": "Workspace ONE UEM requires the aw-tenant-code header AND Basic auth together; supplying only one answers 403 and yields nothing. Here page 0 succeeds and page 1 answers 403, which is what a mid-run credential or role change looks like. The run must keep the devices it already reported and emit the API-key-specific diagnostic rather than the password one, and it must not retry forever. It then ENDS IN ERROR: the pages after the 403 were never read, and filing a truncated estate as a complete one makes every device on them look decommissioned. The already-reported device is still written, because fail() after streaming does not discard what was handed to report_asset. check_determinism is off because the id is scoped by the tenant host, which under the fixture server carries an ephemeral port.",
   "kwargs": {
     "url": "$BASE",
     "username": "fixture-admin",
@@ -12,7 +12,10 @@
   "routes": [
     {
       "name": "device-search",
-      "match": {"method": "GET", "path": "/api/mdm/devices/search"},
+      "match": {
+        "method": "GET",
+        "path": "/api/mdm/devices/search"
+      },
       "responses": [
         {
           "status": 200,
@@ -20,7 +23,9 @@
             "Total": 3,
             "Devices": [
               {
-                "Id": {"Value": 7001},
+                "Id": {
+                  "Value": 7001
+                },
                 "Uuid": "4d3e0000-0000-4000-8000-000000000001",
                 "SerialNumber": "AUTHFIXTURE01",
                 "MacAddress": "00:18:51:00:03:01",
@@ -32,13 +37,22 @@
                 "EnrollmentStatus": "Enrolled",
                 "LastSeen": "2026-08-09T00:00:00Z",
                 "DeviceNetworkInfo": [
-                  {"MACAddress": "00:18:51:00:03:01", "IPAddress": "10.140.3.1"}
+                  {
+                    "MACAddress": "00:18:51:00:03:01",
+                    "IPAddress": "10.140.3.1"
+                  }
                 ]
               }
             ]
           }
         },
-        {"status": 403, "json": {"errorCode": 401, "message": "aw-tenant-code header missing or the account holds no API role"}}
+        {
+          "status": 403,
+          "json": {
+            "errorCode": 401,
+            "message": "aw-tenant-code header missing or the account holds no API role"
+          }
+        }
       ],
       "when_exhausted": "repeat_last"
     }
@@ -47,16 +61,34 @@
     "asset_count": 1,
     "min_requests": 2,
     "requests_include": [
-      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=0"},
-      {"method": "GET", "path": "/api/mdm/devices/search", "query_contains": "page=1"},
-      {"header_contains": "Basic"}
+      {
+        "method": "GET",
+        "path": "/api/mdm/devices/search",
+        "query_contains": "page=0"
+      },
+      {
+        "method": "GET",
+        "path": "/api/mdm/devices/search",
+        "query_contains": "page=1"
+      },
+      {
+        "header_contains": "Basic"
+      }
     ],
     "requests_absent": [
-      {"path": "/api/mdm/devices/search", "query_contains": "page=2"}
+      {
+        "path": "/api/mdm/devices/search",
+        "query_contains": "page=2"
+      }
     ],
     "log_contains": [
       "workspace-one-uem: failed to fetch devices on page 1",
       "workspace-one-uem: check the API key and that the account holds a read-only API role"
+    ],
+    "script_error": true,
+    "error_contains": [
+      "workspace-one-uem: failed to fetch devices after reporting 1",
+      "status 403"
     ]
   },
   "invariants": {

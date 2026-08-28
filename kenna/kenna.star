@@ -686,8 +686,12 @@ def fetch_and_report_assets(base_url, http_options, params, page_size,
                             include_vulnerabilities, include_non_network,
                             min_risk):
     """Fetch and stream assets one page at a time so the full set is never
-    held in memory at once."""
+    held in memory at once.
+
+    Returns (reported, walk_err). The caller prints its summary before failing
+    on walk_err, so a truncated walk is not filed as a complete estate."""
     reported = 0
+    walk_err = None
     truncated = False
     tenant_host = _tenant_host(base_url)
     url = base_url + ASSETS_SEARCH_PATH
@@ -705,9 +709,9 @@ def fetch_and_report_assets(base_url, http_options, params, page_size,
 
         data, err = get_json(url, params=page_params, **http_options)
         if err:
-            print("kenna: failed to fetch assets:", err)
             if err.startswith("status 401") or err.startswith("status 403"):
                 print("kenna: check the API token")
+            walk_err = "failed to fetch assets after reporting {}: {}".format(reported, err)
             break
         data = data or {}
         records = data.get("assets", []) or []
@@ -739,7 +743,7 @@ def fetch_and_report_assets(base_url, http_options, params, page_size,
         print("kenna: skipped {} assets below the configured minimum risk meter score".format(skipped["below_risk"]))
     if skipped["malformed"]:
         print("kenna: skipped {} malformed asset records".format(skipped["malformed"]))
-    return reported
+    return reported, walk_err
 
 def main(**kwargs):
     base_url = get_url_base(kwargs)
@@ -764,9 +768,11 @@ def main(**kwargs):
     })
     http_options["retry_backoff"] = HTTP_RETRY_BACKOFF
 
-    reported = fetch_and_report_assets(base_url, http_options, params, page_size,
-                                       include_vulnerabilities, include_non_network,
-                                       min_risk_meter_score)
+    reported, walk_err = fetch_and_report_assets(base_url, http_options, params, page_size,
+                                                 include_vulnerabilities, include_non_network,
+                                                 min_risk_meter_score)
+    if walk_err != None:
+        fail("kenna: " + walk_err)
     if not reported:
         print("kenna: no assets retrieved")
     return None
