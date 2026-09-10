@@ -9,6 +9,9 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # WFH devices often share a home router's public IP, so IP agreement alone
+    # must not merge or break a match; id/MAC/name matching is unaffected.
+    "matchBehavior": "no-ip-match no-ip-break",
     "params": [
         {
             "key": "api_url",

@@ -189,12 +189,14 @@ for ad-hoc runs.
 - Presence: present on every device row observed. The guard exists for defensive reasons rather than because the field is known to be optional.
 - Final runZero ID: the decimal device id as a string, unprefixed.
 - Missing-ID behavior: skip the record, logging its `systemName`.
-- Match behavior: **left at the platform default** — all eight flags on.
+- Match behavior: `no-ip-match no-ip-break` — id, MAC, and name matching stay at the platform default; only the IP dimension is suppressed.
 - Verdict: authoritative within one tenant; the tenant boundary is enforced by the credential rather than by the id, which is the weakness recorded above.
 
-### Why the default is kept
+### Why IP matching is suppressed
 
-The device id is a persistent, vendor-assigned identifier, so the governing rule points at foreign-ID matching and the code follows it. The usual companion preset `no-mac-break no-ip-break no-name-break` is not applied, and that is the right call for this source rather than an oversight: the record carries an `ipAddresses` list, a `macAddresses` list, and **four separate name fields** — `displayName`, `systemName`, `dnsName`, and `netbiosName` — all of which the mapping passes through as hostnames. This is contemporaneous agent-reported data about a live machine, not drifting inventory metadata, and it is exactly the material that should be allowed to merge a NinjaOne record onto an asset runZero already discovered. Suppressing the break flags would discard the richest correlation signal of any source in this library while protecting against churn that cannot happen — once the device id matches, no MAC, address, or name disagreement can fragment the asset, because those checks live only on the MAC, IP, and name match paths.
+The device id is a persistent, vendor-assigned identifier, so the governing rule points at foreign-ID matching and the code follows it. The usual companion preset `no-mac-break no-ip-break no-name-break` is not applied wholesale, and that is the right call for this source rather than an oversight: the record carries a `macAddresses` list and **four separate name fields** — `displayName`, `systemName`, `dnsName`, and `netbiosName` — all of which the mapping passes through as hostnames. This is contemporaneous agent-reported data about a live machine, not drifting inventory metadata, and it is exactly the material that should be allowed to merge a NinjaOne record onto an asset runZero already discovered. Suppressing the MAC and name break flags would discard the richest correlation signal of any source in this library while protecting against churn that cannot happen — once the device id matches, no MAC or name disagreement can fragment the asset, because those checks live only on the MAC and name match paths.
+
+The IP dimension is the exception. NinjaOne's `ipAddresses` list is agent-reported, but for remote/WFH devices it is frequently the home router's public IP rather than an address unique to the device — several employees on the same residential ISP, or behind the same NAT, report identical or overlapping addresses. Left at the default, that shared address is both a false match signal (pulling unrelated devices together) and a false break signal (fragmenting one device across runs as its address rotates). `no-ip-match no-ip-break` removes IP from correlation entirely for this source; id, MAC, and hostname carry the matching on their own.
 
 Two details of that mapping are worth knowing because they affect what gets matched:
 
