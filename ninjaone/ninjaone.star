@@ -9,6 +9,21 @@ CONFIG = {
     "version": "1",
     "maturity": "beta",
     "minVersion": "5.1.260818.0",
+    # The device id is stable and unique per tenant, so id/MAC/name matching
+    # stays at the platform default; only the IP dimension is suppressed.
+    #
+    # WHY: `ipAddresses` is the agent's own interface list, the device's LAN
+    # addresses. (`publicIP` is a separate field, imported as an attribute and
+    # never placed on an interface.) A device off the corporate network -- home,
+    # hotel, VPN split-tunnel -- reports a private address from whatever LAN it
+    # is sitting on, and consumer routers hand out from the same few ranges:
+    # 192.168.0.0/24, 192.168.1.0/24, 10.0.0.0/24. Those collide with each other
+    # across employees and with real corporate addressing, and nothing in the
+    # address distinguishes the two. Left at the default, one of these is both a
+    # false match signal (pulling an off-network endpoint onto whatever
+    # corporate device holds the same address) and a false break signal
+    # (fragmenting one endpoint as it moves between networks).
+    "matchBehavior": "no-ip-match no-ip-break",
     "params": [
         {
             "key": "api_url",

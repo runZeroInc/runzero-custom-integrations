@@ -174,7 +174,7 @@ for ad-hoc runs.
 
 - You will see the task kick off on the [tasks](https://console.runzero.com/tasks) page like any other integration.
 - The task will update the existing assets with the data pulled from the Custom Integration source.
-- The task will create new assets for when there are no existing assets that meet merge criteria (hostname, MAC, etc).
+- The task will create new assets for when there are no existing assets that meet merge criteria (device id, hostname, MAC). IP addresses are deliberately excluded; see [Why IP matching is suppressed](#why-ip-matching-is-suppressed).
 - You can search for assets enriched by this custom integration with the runZero search `custom_integration:ninjaone`.
 
 ## Asset identity
@@ -189,17 +189,37 @@ for ad-hoc runs.
 - Presence: present on every device row observed. The guard exists for defensive reasons rather than because the field is known to be optional.
 - Final runZero ID: the decimal device id as a string, unprefixed.
 - Missing-ID behavior: skip the record, logging its `systemName`.
-- Match behavior: **left at the platform default** — all eight flags on.
+- Match behavior: `no-ip-match no-ip-break`. The id, MAC, and name dimensions stay at the platform default; only IP is suppressed.
 - Verdict: authoritative within one tenant; the tenant boundary is enforced by the credential rather than by the id, which is the weakness recorded above.
 
-### Why the default is kept
+### Why IP matching is suppressed
 
-The device id is a persistent, vendor-assigned identifier, so the governing rule points at foreign-ID matching and the code follows it. The usual companion preset `no-mac-break no-ip-break no-name-break` is not applied, and that is the right call for this source rather than an oversight: the record carries an `ipAddresses` list, a `macAddresses` list, and **four separate name fields** — `displayName`, `systemName`, `dnsName`, and `netbiosName` — all of which the mapping passes through as hostnames. This is contemporaneous agent-reported data about a live machine, not drifting inventory metadata, and it is exactly the material that should be allowed to merge a NinjaOne record onto an asset runZero already discovered. Suppressing the break flags would discard the richest correlation signal of any source in this library while protecting against churn that cannot happen — once the device id matches, no MAC, address, or name disagreement can fragment the asset, because those checks live only on the MAC, IP, and name match paths.
+The device id is a persistent, vendor-assigned identifier, so the governing rule points at foreign-ID matching and the code follows it. The MAC and name dimensions are left at the platform default, and that is deliberate rather than an oversight: the record carries a `macAddresses` list and **four separate name fields** — `displayName`, `systemName`, `dnsName`, and `netbiosName` — which the mapping passes through as hostnames. This is contemporaneous agent-reported data about a live machine, not drifting inventory metadata, and it is exactly the material that should be allowed to merge a NinjaOne record onto an asset runZero already discovered. Suppressing MAC and name matching wholesale would discard the richest correlation signal this source has.
 
-Two details of that mapping are worth knowing because they affect what gets matched:
+The IP dimension is the exception, and `no-ip-match no-ip-break` removes it from correlation entirely.
 
-- **`displayName` is an operator-editable label**, not a machine name. It is the friendly name shown in the NinjaOne console and is routinely set to a person or a location. It is passed as a hostname alongside the three real ones, so a device can contribute a hostname that no name service would ever resolve.
-- **Devices with no address get no synthetic one.** An earlier shape assigned a placeholder address to address-less devices; because a placeholder is identical on every host, IP matching would have pulled every one of them onto the same asset. Those devices now correlate on MAC and hostname only, which is correct and is why some records legitimately arrive with no network interface.
+`ipAddresses` is the agent's own interface list: the addresses of the NICs on the machine. It is not `publicIP`, which is a separate field imported as an attribute and never placed on an interface. For any device that is off the corporate network — home, hotel, VPN split-tunnel — that list holds a private RFC1918 address from whatever LAN the device happens to be sitting on, and consumer and small-office routers hand out from the same handful of ranges: `192.168.0.0/24`, `192.168.1.0/24`, `10.0.0.0/24`. Nothing in the address distinguishes an employee's living room from a plant floor.
+
+Left at the default, one of those addresses is both:
+
+- a **false match signal**, pulling an off-network endpoint onto whatever corporate device happens to hold the same address, and
+- a **false break signal**, fragmenting one endpoint across runs as it moves between networks.
+
+Both have been observed in the field. `no-ip-match` stops the address being used to find a merge candidate; `no-ip-break` stops an address disagreement vetoing a merge the device id or a hostname already established.
+
+Two further details of the mapping are worth knowing because they affect what gets matched:
+
+- **`displayName` is an operator-editable label**, not a machine name. It is the friendly name shown in the NinjaOne console and is routinely set to a person or a location. It is passed as a hostname alongside the three real ones, so a device can contribute a hostname that no name service would ever resolve. Note the interaction with `no-ip-break`: a conflicting address no longer vetoes a merge that name matching produced, so two devices a technician labelled the same way have one fewer thing standing between them. Dropping `displayName` from the hostname list would close that, at the cost of leaving devices whose only populated name is `displayName` with no hostname at all. That trade has not been made here.
+- **Devices with no address get no synthetic one.** An earlier shape assigned a placeholder address to address-less devices; because a placeholder is identical on every host, IP matching would have pulled every one of them onto the same asset. `no-ip-match` now covers that case as well, but the guard is kept: it is correct on its own terms and does not depend on the flag staying set. It is why some records legitimately arrive with no network interface.
+
+### Scope of the IP suppression
+
+`matchBehavior` governs how **this integration's** records find and reject merge candidates. It does not change how a network scan or another integration matches. An address this source contributes to an asset it matched by id or hostname is still on that asset, and whether it remains available for another source to match on is a property of the platform, not of this flag.
+
+This script is also shipped as a platform-native source under
+`content/integrations/ninjaone/` in the runZero platform repository. `matchBehavior`
+is shared between the two copies and must be kept identical in both; anything that
+changes merge semantics here needs the same change there, and vice versa.
 
 ### A defect worth noting
 
